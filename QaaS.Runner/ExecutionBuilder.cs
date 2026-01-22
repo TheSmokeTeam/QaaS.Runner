@@ -1,0 +1,427 @@
+using System.Collections.Immutable;
+using System.ComponentModel;
+using System.ComponentModel.DataAnnotations;
+using System.Runtime.CompilerServices;
+using Autofac;
+using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Logging;
+using QaaS.Framework.Configurations;
+using QaaS.Framework.Configurations.CustomAttributes;
+using QaaS.Framework.Configurations.CustomExceptions;
+using QaaS.Framework.Configurations.CustomValidationAttributes;
+using QaaS.Framework.Executions;
+using QaaS.Framework.Providers;
+using QaaS.Framework.Providers.Modules;
+using QaaS.Framework.Providers.ObjectCreation;
+using QaaS.Framework.SDK;
+using QaaS.Framework.SDK.ContextObjects;
+using QaaS.Framework.SDK.DataSourceObjects;
+using QaaS.Framework.SDK.ExecutionObjects;
+using QaaS.Framework.SDK.Extensions;
+using QaaS.Framework.SDK.Hooks.Assertion;
+using QaaS.Framework.SDK.Hooks.Generator;
+using QaaS.Framework.SDK.Hooks.Probe;
+using QaaS.Framework.SDK.Session.SessionDataObjects;
+using QaaS.Framework.SDK.Session.SessionDataObjects.RunningSessionsObjects;
+using QaaS.Runner.Assertions;
+using QaaS.Runner.Assertions.AssertionObjects;
+using QaaS.Runner.Assertions.ConfigurationObjects;
+using QaaS.Runner.Extensions;
+using QaaS.Runner.Logics;
+using QaaS.Runner.Sessions.Session;
+using QaaS.Runner.Sessions.Session.Builders;
+using QaaS.Runner.Storage;
+using QaaS.Runner.Storage.ConfigurationObjects;
+using ILogger = Microsoft.Extensions.Logging.ILogger;
+
+[assembly: InternalsVisibleTo("QaaS.Runner.Tests")]
+
+namespace QaaS.Runner;
+
+/// <summary>
+/// Builds <see cref="Execution" /> instance
+/// </summary>
+[JsonSchema]
+public class ExecutionBuilder : BaseExecutionBuilder<InternalContext, ExecutionData>
+{
+    /// <summary>
+    /// List of all sessions to run.
+    /// Sessions contain the actions performed against the tested system and its underlying infrastructure
+    /// in order to receive response data from the tested system to assert on.
+    /// </summary>
+    [UniquePropertyInEnumerable(nameof(SessionBuilder.Name))]
+    [UniquePropertyInEnumerableProperties("Name",
+        "Can't have the same name across multiple publishers/transactions since they all produce `SessionData.Input`.",
+        "Publishers", "Transactions")]
+    [UniquePropertyInEnumerableProperties("Name",
+        "Can't have the same name across multiple consumers/transactions/collectors since they all produce `SessionData.Output`.",
+        "Consumers", "Transactions", "Collectors")]
+    [Description("List of all sessions to run. Sessions contain the actions" +
+                 " performed against the tested system and its underlying infrastructure in order to receive" +
+                 " response data from the tested system to assert on.")]
+    public SessionBuilder[]? Sessions { get; internal set; } = [];
+
+    /// <summary>
+    /// External storages qaas inner objects can be stored in or retrieved from when
+    /// using the `qaas act` (to create and store) or `qaas assert` (to retrieve and use) commands
+    /// </summary>
+    [Description(
+        "External storages qaas inner objects can be stored in or retrieved from when using " +
+        "the `qaas act` (to create and store) or `qaas assert` (to retrieve and use) commands")]
+
+    public StorageBuilder[]? Storages { get; internal set; } = [];
+
+    /// <summary>
+    /// The list of assertions performed on the sessions' results in order to decide the test's status,
+    /// each assertion produces a different test result.
+    /// </summary>
+    [UniquePropertyInEnumerable(nameof(AssertionBuilder.Name))]
+    [Description(
+        "The list of assertions performed on the sessions' results in order to decide the test's status," +
+        " each assertion produces a different test result.")]
+    public AssertionBuilder[]? Assertions { get; internal set; } = [];
+
+    /// <summary>
+    /// The links generated on test results, used to view observability data outputted by the tested application.
+    /// These links are generated per test result to be relevant specifically to that test and the time it ran at
+    /// </summary>
+    [Description(
+        "The links generated on test results, used to view observability data outputted by the tested application. " +
+        "These links are generated per test result to be relevant specifically to that test and the time it ran at")]
+    public LinkBuilder[]? Links { get; internal set; } = [];
+
+    /// <summary>
+    /// The metadata for the tests' run
+    /// </summary>
+    [Description("The metadata for the tests' run")]
+    public MetaDataConfig MetaData { get; internal set; } = new();
+
+    private ExecutionType Type { get; set; }
+
+    private bool LoadedContext { get; }
+
+    private ILifetimeScope _scope;
+
+    private readonly List<ValidationResult> _validationResults;
+
+    private readonly IList<string>? _sessionNamesToRun;
+
+    private readonly IList<string>? _assertionNamesToRun;
+
+    private readonly IList<string>? _sessionCategoriesToRun;
+
+    private readonly IList<string>? _assertionCategoriesToRun;
+
+    private ILogger _configuredLogger;
+    private string? _configuredCaseName;
+    private string? _configuredExecutionId;
+    private Dictionary<string, object?> _globalDict;
+
+    public ExecutionBuilder()
+    {
+        _validationResults = [];
+        _scope = new ContainerBuilder().Build().BeginLifetimeScope();
+    }
+
+    internal ExecutionBuilder(InternalContext context, ExecutionType executionType, IList<string>? sessionNamesToRun,
+        IList<string>? sessionCategoriesToRun, IList<string>? assertionNamesToRun,
+        IList<string>? assertionCategoriesToRun) : this()
+    {
+        LoadedContext = true;
+        Type = executionType;
+
+        Context = context;
+        var blankRunBuilderFromContext = Bind.BindFromContext<ExecutionBuilder>(Context, _validationResults,
+            new BinderOptions() { BindNonPublicProperties = true });
+
+        DataSources = blankRunBuilderFromContext.DataSources;
+        Storages = blankRunBuilderFromContext.Storages;
+        Assertions = blankRunBuilderFromContext.Assertions;
+        Sessions = blankRunBuilderFromContext.Sessions;
+        Links = blankRunBuilderFromContext.Links;
+        MetaData = blankRunBuilderFromContext.MetaData;
+
+        _sessionNamesToRun = sessionNamesToRun != null && !sessionNamesToRun.Any() ? null : sessionNamesToRun;
+        _sessionCategoriesToRun = sessionCategoriesToRun != null && !sessionCategoriesToRun.Any()
+            ? null
+            : sessionCategoriesToRun;
+        _assertionNamesToRun = assertionNamesToRun != null && !assertionNamesToRun.Any() ? null : assertionNamesToRun;
+        _assertionCategoriesToRun = assertionCategoriesToRun != null && !assertionCategoriesToRun.Any()
+            ? null
+            : assertionCategoriesToRun;
+    }
+
+    /// <inheritdoc />
+    protected override IEnumerable<DataSource> BuildDataSources()
+    {
+        var configuredDataSources = DataSources ?? [];
+        var dataSources = configuredDataSources.Select(dataSourceBuilder => dataSourceBuilder.Register()).ToImmutableList();
+        var resolvedDataSources = configuredDataSources.Select(dataSourceBuilder =>
+            dataSourceBuilder.Build(Context,dataSources, _scope.Resolve<IList<KeyValuePair<string, IGenerator>>>()));
+        return resolvedDataSources;
+    }
+
+    private IEnumerable<ISession> BuildSessions()
+    {
+        // Assigning session stage default as the index in Sessions list
+        Sessions = Sessions is null ? [] : Sessions.Select((session, index) =>
+        {
+            session.Stage ??= index;
+            return session;
+        }).ToArray();
+
+        // Build sessions
+        var sessions = Sessions.Select(session =>
+        {
+            // Resolve hooks
+            var hooks = session.Probes != null
+                ? _scope.Resolve<IList<KeyValuePair<string, IProbe>>>()
+                : new List<KeyValuePair<string, IProbe>>();
+
+            return session.Build(Context, hooks);
+        }).ToList();
+
+        return sessions;
+    }
+
+    private IEnumerable<Assertion> BuildAssertions()
+    {
+        if (Assertions is null) return [];
+        var assertions = Assertions.Select(assertion =>
+            assertion.Build(_scope.Resolve<IList<KeyValuePair<string, IAssertion>>>(), Links));
+        return assertions;
+    }
+
+    private IEnumerable<IReporter> BuildReports()
+    {
+        if (Assertions is null) return [];
+        var resolvedReports = Assertions.Select(assertionReport =>
+            assertionReport.Build(Context, DateTime.UtcNow));
+        return resolvedReports;
+    }
+
+    private IEnumerable<IStorage> BuildStorages()
+    {
+        if (Storages is null) return [];
+        var resolvedStorages = Storages.Select(storage =>
+            storage.Build(Context));
+        return resolvedStorages;
+    }
+
+    public ExecutionBuilder WithGlobalDict(Dictionary<string, object?> globalDict)
+    {
+        _globalDict = globalDict;
+        return this;
+    }
+
+    public ExecutionBuilder AddSession(SessionBuilder sessionBuilder)
+    {
+        Sessions = Sessions is null ? [sessionBuilder] : Sessions.Append(sessionBuilder).ToArray();
+        return this;
+    }
+
+    public ExecutionBuilder AddAssertion(AssertionBuilder assertionBuilder)
+    {
+        Assertions = Assertions is null ? [assertionBuilder] : Assertions.Append(assertionBuilder).ToArray();
+        return this;
+    }
+
+    public ExecutionBuilder AddStorage(StorageBuilder storageBuilder)
+    {
+        Storages = Storages is null ? [storageBuilder] : Storages.Append(storageBuilder).ToArray();
+        return this;
+    }
+
+    public ExecutionBuilder AddDataSource(DataSourceBuilder dataSourceBuilder)
+    {
+        DataSources = DataSources is null ? [dataSourceBuilder] : DataSources.Append(dataSourceBuilder).ToArray();
+        return this;
+    }
+
+    public ExecutionBuilder AddLink(LinkBuilder linkBuilder)
+    {
+        Links = Links is null ? [linkBuilder] : Links.Append(linkBuilder).ToArray();
+        return this;
+    }
+
+    public ExecutionBuilder ExecutionType(ExecutionType executionType)
+    {
+        Type = executionType;
+        return this;
+    }
+
+    internal ExecutionBuilder WithLogger(ILogger logger)
+    {
+        _configuredLogger = logger;
+        return this;
+    }
+
+    public ExecutionBuilder SetCase(string caseName)
+    {
+        _configuredCaseName = caseName;
+        return this;
+    }
+
+    public ExecutionBuilder SetExecutionId(string executionId)
+    {
+        _configuredExecutionId = executionId;
+        return this;
+    }
+
+    public ExecutionBuilder WithMetadata(MetaDataConfig metaDataConfig)
+    {
+        MetaData = metaDataConfig;
+        return this;
+    }
+
+    /// <summary>
+    ///     Loads the <see cref="ExecutionBuilder" /> scope with all context's dependencies
+    /// </summary>
+    private void LoadContextScopeDependencies()
+    {
+        var contextScope = _scope.BeginLifetimeScope(containerBuilder =>
+        {
+            // Loads context into scope
+            containerBuilder.RegisterInstance(Context).As<InternalContext>().SingleInstance();
+            containerBuilder.RegisterInstance(Context).As<Context>().SingleInstance();
+            containerBuilder.RegisterInstance(new ByNameObjectCreator(Context.Logger)).As<IByNameObjectCreator>();
+
+            containerBuilder.Register<IComponentContext, IEnumerable<HookData<IAssertion>>>(_ =>
+                Assertions.Select(assertion => new HookData<IAssertion>
+                {
+                    Type = assertion.Assertion!,
+                    Configuration = assertion.AssertionConfiguration,
+                    Name = assertion.Name!
+                })
+            ).InstancePerLifetimeScope(); // Loads all IAssertion hooks
+            containerBuilder.Register<IComponentContext, IEnumerable<HookData<IGenerator>>>(_ =>
+                DataSources.Select(dataSourceConfig => new HookData<IGenerator>
+                {
+                    Type = dataSourceConfig.Generator!,
+                    Configuration = dataSourceConfig.GeneratorConfiguration,
+                    Name = dataSourceConfig.Name!
+                })
+            ).InstancePerLifetimeScope(); // Loads all IGenerator hooks
+            containerBuilder
+                .Register<IComponentContext, IEnumerable<HookData<IProbe>>>(_ =>
+                    Sessions.Select(sessionBuilder => sessionBuilder.Probes?.Select(probeBuilder =>
+                        new HookData<IProbe>
+                        {
+                            Type = probeBuilder.Probe!,
+                            Configuration = probeBuilder.ProbeConfiguration,
+                            Name = probeBuilder.Name!
+                        })).SelectMany(probe => probe))
+                .InstancePerLifetimeScope(); // Loads all IProbe hooks
+            containerBuilder.RegisterModule(
+                new HooksLoaderModule<IAssertion>(_validationResults)); // Loads all IAssertion hooks
+            containerBuilder.RegisterModule(
+                new HooksLoaderModule<IGenerator>(_validationResults)); // Loads all IGenerator hooks
+            containerBuilder.RegisterModule(
+                new HooksLoaderModule<IProbe>(_validationResults)); // Loads all IProbe hooks
+
+            // loads logics
+            containerBuilder.RegisterType<DataSourceLogic>().As<DataSourceLogic>();
+            containerBuilder.RegisterType<SessionLogic>().As<SessionLogic>();
+            containerBuilder.RegisterType<StorageLogic>().As<StorageLogic>();
+            containerBuilder.RegisterType<AssertionLogic>().As<AssertionLogic>();
+            containerBuilder.RegisterType<ReportLogic>().As<ReportLogic>();
+            containerBuilder.RegisterType<TemplateLogic>().As<TemplateLogic>();
+        });
+
+        _scope = contextScope;
+    }
+
+    /// <summary>
+    ///     Builds context based the configured values and the context loaded from YAML
+    /// </summary>
+    private void InitializeContext()
+    {
+        var existingContext = LoadedContext ? Context : null;
+
+        var logger = _configuredLogger;
+        var caseName = _configuredCaseName ?? existingContext?.CaseName;
+        var executionId = _configuredExecutionId ?? existingContext?.ExecutionId;
+        var rootConfiguration = existingContext?.RootConfiguration ?? new ConfigurationBuilder().Build();
+        var internalRunningSessions = existingContext?.InternalRunningSessions ??
+                                      new RunningSessions(new Dictionary<string, RunningSessionData<object, object>>());
+
+        Context = new InternalContext()
+        {
+            Logger = logger,
+            CaseName = caseName,
+            ExecutionId = executionId,
+            RootConfiguration = rootConfiguration,
+            InternalRunningSessions = internalRunningSessions,
+            InternalGlobalDict = _globalDict
+        };
+
+        // saved context's metadata in globalDict
+        Context.InsertValueIntoGlobalDictionary(Context.GetMetaDataPath(), MetaData);
+    }
+
+    /// <summary>
+    /// Filters Sessions and Assertions lists based on provided flags
+    /// </summary>
+    private void FilterConfigurationsBasedOnFlags()
+    {
+        Assertions =
+            Assertions.FilterConfigurationByAssertion(_assertionNamesToRun, _assertionCategoriesToRun, Context);
+        Sessions = Sessions.FilterConfigurationBySessionsAndAssertions(Assertions, _sessionNamesToRun,
+            _assertionNamesToRun, _sessionCategoriesToRun, _assertionCategoriesToRun, Context);
+    }
+
+    /// <inheritdoc />
+    public override Execution Build()
+    {
+        InitializeContext();
+        Context.Logger.LogInformation(
+            "Started building {Type} execution with executionId {ExecutionId} and case name {CaseName}", Type,
+            Context.ExecutionId,
+            Context.CaseName);
+
+
+        // loads all hooks & logics validate them
+        LoadContextScopeDependencies();
+
+        // filter session assertion list based on names & categories
+        FilterConfigurationsBasedOnFlags();
+
+        // validate configuration
+        _ = ValidationUtils.TryValidateObjectRecursive(this, _validationResults);
+
+        if (_validationResults.Any())
+        {
+            Context.Logger.LogCritical("Configurations are not valid. The validation results are: \n- " +
+                                       string.Join("\n- ", _validationResults.Select(result => result.ErrorMessage)));
+            throw new InvalidConfigurationsException("Configurations are not valid");
+        }
+
+
+        // builds every list of domain objects 
+        var dataSourceLogic =
+            _scope.Resolve<DataSourceLogic>(new TypedParameter(typeof(IList<DataSource>), BuildDataSources().ToList()));
+        var sessionLogic =
+            _scope.Resolve<SessionLogic>(
+                new TypedParameter(typeof(List<ISession>), BuildSessions().ToList()));
+        var storageLogic =
+            _scope.Resolve<StorageLogic>(new TypedParameter(typeof(IList<IStorage>), BuildStorages().ToList()),
+                new TypedParameter(typeof(ExecutionType), Type));
+        var assertionLogic =
+            _scope.Resolve<AssertionLogic>(new TypedParameter(typeof(IList<Assertion>), BuildAssertions().ToList()));
+        var reportLogic =
+            _scope.Resolve<ReportLogic>(new TypedParameter(typeof(IList<IReporter>), BuildReports().ToList()));
+        var templateLogic = _scope.Resolve<TemplateLogic>(new TypedParameter(typeof(Context), Context));
+
+
+        Context.Logger.LogInformation(
+            "Finished building {Type} execution with executionId {ExecutionId} and case name {CaseName}", Type,
+            Context.ExecutionId, Context.CaseName);
+
+        // bind back context onto the executionBuilder object
+        return new Execution(Type, Context)
+        {
+            AssertionLogic = assertionLogic, ReportLogic = reportLogic, SessionLogic = sessionLogic,
+            TemplateLogic = templateLogic, DataSourceLogic = dataSourceLogic, StorageLogic = storageLogic
+        };
+    }
+}

@@ -1,0 +1,21 @@
+DataSources:
+  4:
+    Name: TestDataSource4
+    Generator: TestGenerator
+    GeneratorConfiguration:
+      Count: 30
+      ComplexConfigList:
+        - SomeItem: "ItemA"
+    Lazy: true
+
+Sessions:
+  4:
+    Name: Session3
+    SaveData: true
+
+Assertions:
+  4:
+    SessionNamePatterns: [ "Session0" ]
+    Assertion: PassedAssertion
+    Name: Assertion4
+    Category: test

@@ -1,0 +1,211 @@
+using QaaS.Framework.Policies;
+using QaaS.Framework.Protocols.ConfigurationObjects;
+using QaaS.Framework.Protocols.ConfigurationObjects.Elastic;
+using QaaS.Framework.Protocols.ConfigurationObjects.Kafka;
+using QaaS.Framework.Protocols.ConfigurationObjects.MongoDb;
+using QaaS.Framework.Protocols.ConfigurationObjects.RabbitMq;
+using QaaS.Framework.Protocols.ConfigurationObjects.Redis;
+using QaaS.Framework.Protocols.ConfigurationObjects.S3;
+using QaaS.Framework.Protocols.ConfigurationObjects.Sftp;
+using QaaS.Framework.Protocols.ConfigurationObjects.Socket;
+using QaaS.Framework.Protocols.ConfigurationObjects.Sql;
+using QaaS.Framework.Protocols.Protocols.Factories;
+using QaaS.Framework.SDK.ContextObjects;
+using QaaS.Framework.SDK.Extensions;
+using QaaS.Framework.SDK.Session;
+using QaaS.Framework.SDK.Session.SessionDataObjects;
+using QaaS.Framework.Serialization;
+using QaaS.Runner.Sessions.ConfigurationObjects;
+using QaaS.Runner.Sessions.Extensions;
+using Parallel = QaaS.Runner.Sessions.ConfigurationObjects.Parallel;
+
+namespace QaaS.Runner.Sessions.Actions.Publishers.Builders;
+
+public partial class PublisherBuilder
+{
+    public PublisherBuilder Named(string name)
+    {
+        Name = name;
+        return this;
+    }
+
+    public PublisherBuilder AtStage(int stage)
+    {
+        Stage = stage;
+        return this;
+    }
+
+    public PublisherBuilder FilterData(DataFilter dataFilter)
+    {
+        DataFilter = dataFilter;
+        return this;
+    }
+
+    public PublisherBuilder WithSerializer(SerializeConfig serializeConfig)
+    {
+        Serialize = serializeConfig;
+        return this;
+    }
+
+    public PublisherBuilder WithIterations(int iterations)
+    {
+        Iterations = iterations;
+        return this;
+    }
+
+    public PublisherBuilder AddDataSource(string dataSourceName)
+    {
+        var dataSourceNamesList = DataSourceNames?.ToList() ?? [];
+        dataSourceNamesList.Add(dataSourceName);
+        DataSourceNames = dataSourceNamesList.ToArray();
+        return this;
+    }
+
+    public PublisherBuilder AddDataSourcePattern(string dataSourcePattern)
+    {
+        var dataSourcePatternsList = DataSourcePatterns?.ToList() ?? [];
+        dataSourcePatternsList.Add(dataSourcePattern);
+        DataSourcePatterns = dataSourcePatternsList.ToArray();
+        return this;
+    }
+
+    public PublisherBuilder InLoops()
+    {
+        Loop = true;
+        return this;
+    }
+
+    public PublisherBuilder WithSleep(ulong sleepTimeMs)
+    {
+        SleepTimeMs = sleepTimeMs;
+        return this;
+    }
+
+    public PublisherBuilder WithChunks(Chunks chunks)
+    {
+        Chunk = chunks;
+        return this;
+    }
+
+    public PublisherBuilder AddPolicy(PolicyBuilder policy)
+    {
+        var policiesList = Policies.ToList();
+        policiesList.Add(policy);
+        Policies = policiesList.ToArray();
+        return this;
+    }
+
+    public PublisherBuilder WithParallelism(int parallelism)
+    {
+        Parallel = new Parallel { Parallelism = parallelism };
+        return this;
+    }
+
+    private PublisherBuilder Reset()
+    {
+        RabbitMq = null;
+        Socket = null;
+        Sftp = null;
+        S3Bucket = null;
+        KafkaTopic = null;
+        OracleSqlTable = null;
+        PostgreSqlTable = null;
+        MsSqlTable = null;
+        ElasticIndex = null;
+        MongoDbCollection = null;
+        Redis = null;
+        return this;
+    }
+
+    public PublisherBuilder Configure(ISenderConfig config)
+    {
+        Reset();
+        switch (config)
+        {
+            case RabbitMqSenderConfig rabbitMqSenderConfig:
+                RabbitMq = rabbitMqSenderConfig;
+                break;
+            case SocketSenderConfig socketSenderConfig:
+                Socket = socketSenderConfig;
+                break;
+            case SftpSenderConfig sftpSenderConfig:
+                Sftp = sftpSenderConfig;
+                break;
+            case S3BucketSenderConfig s3SenderConfig:
+                S3Bucket = s3SenderConfig;
+                break;
+            case KafkaTopicSenderConfig kafkaSenderConfig:
+                KafkaTopic = kafkaSenderConfig;
+                break;
+            case OracleSenderConfig oracleSenderConfig:
+                OracleSqlTable = oracleSenderConfig;
+                break;
+            case PostgreSqlSenderConfig postgreSqlSenderConfig:
+                PostgreSqlTable = postgreSqlSenderConfig;
+                break;
+            case MsSqlSenderConfig mssqlSenderConfig:
+                MsSqlTable = mssqlSenderConfig;
+                break;
+            case ElasticSenderConfig elasticSenderConfig:
+                ElasticIndex = elasticSenderConfig;
+                break;
+            case MongoDbCollectionSenderConfig mongoDbCollectionSenderConfig:
+                MongoDbCollection = mongoDbCollectionSenderConfig;
+                break;
+            case RedisSenderConfig redisSenderConfig:
+                Redis = redisSenderConfig;
+                break;
+        }
+
+        return this;
+    }
+
+    internal BasePublisher? Build(InternalContext context, IList<ActionFailure> actionFailures, string sessionName)
+    {
+        ISenderConfig? type = null;
+        try
+        {
+            var allTypes = new List<ISenderConfig?>
+            {
+                RabbitMq, KafkaTopic, Socket, Sftp, PostgreSqlTable, OracleSqlTable, MsSqlTable, ElasticIndex, Redis,
+                S3Bucket, MongoDbCollection
+            };
+            if (allTypes.Count(config => config != null) > 1)
+            {
+                var conflictingConfigs = allTypes
+                    .Where(config => config != null)
+                    .Select(config => config!.GetType().Name)
+                    .ToArray();
+                throw new InvalidOperationException(
+                    $"Multiple configurations provided for Publisher '{Name}': {string.Join(", ", conflictingConfigs)}. " +
+                    "Only one type is allowed at a time.");
+            }
+
+            type = allTypes.FirstOrDefault(configuredType => configuredType != null) ??
+                   throw new InvalidOperationException($"Missing supported type in publisher {Name}");
+            
+            var (sender, chunkSender) = SenderFactory.CreateSender(Chunk != null, type, context.Logger, DataFilter);
+            
+            context.Logger.LogDebugWithMetaData("Started building Publisher of type {type}", context.GetMetaDataFromContext(), sender != null 
+                ? sender.GetType().ToString().Split('.').Last()
+                : chunkSender?.GetType().ToString().Split('.').Last());
+
+            return sender != null
+                ? new Publisher(Name!, sender, Stage, DataFilter, PolicyBuilder.BuildPolicies(Policies), Loop,
+                    Parallel?.Parallelism, Iterations, SleepTimeMs, Serialize?.Serializer, DataSourcePatterns,
+                    DataSourceNames, context.Logger)
+                : chunkSender != null
+                    ? new ChunkPublisher(Name!, chunkSender, Stage, DataFilter, PolicyBuilder.BuildPolicies(Policies),
+                        Parallel?.Parallelism, Chunk!.ChunkSize!.Value, Loop, Iterations, SleepTimeMs,
+                        Serialize?.Serializer, DataSourcePatterns, DataSourceNames, context.Logger)
+                    : null;
+        }
+        catch (Exception e)
+        {
+            actionFailures.AppendActionFailure(e, sessionName, context.Logger, nameof(Publisher), Name!,
+                type?.GetType().ToString()!);
+        }
+
+        return null;
+    }
+}

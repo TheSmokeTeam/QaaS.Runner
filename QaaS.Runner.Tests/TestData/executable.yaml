@@ -1,0 +1,6 @@
+﻿Commands:
+  - Command: run TestData/test.qaas.yaml
+    Id: Command1
+  - Command: run TestData/test.qaas.yaml -w TestData/override.yaml
+    Id: Command2
+

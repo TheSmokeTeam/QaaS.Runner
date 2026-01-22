@@ -1,0 +1,8 @@
+﻿variables:
+  rabbitmq:
+    Host: REDA
+    Username: admin
+    Password: admin
+    RoutingKey: /
+    Port: REDA
+

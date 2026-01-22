@@ -1,0 +1,11 @@
+﻿Sessions:
+  0:
+    Publishers:
+      0:
+        Policies:
+          - Type: LoadBalance
+            LoadBalance:
+              Rate: 10
+          - Type: Count
+            Count:
+              Amount: 20

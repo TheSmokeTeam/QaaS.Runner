@@ -1,0 +1,4 @@
+Serilog:
+  MinimumLevel: Debug
+  WriteTo:
+    - Name: Console

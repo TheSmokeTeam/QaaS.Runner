@@ -1,0 +1,277 @@
+using System.Collections.Generic;
+using System.Net.Sockets;
+using Moq;
+using NUnit.Framework;
+using QaaS.Framework.Policies;
+using QaaS.Framework.Policies.ConfigurationObjects;
+using QaaS.Framework.Protocols.ConfigurationObjects.Http;
+using QaaS.Framework.Protocols.ConfigurationObjects.Prometheus;
+using QaaS.Framework.Protocols.ConfigurationObjects.RabbitMq;
+using QaaS.Framework.Protocols.ConfigurationObjects.Socket;
+using QaaS.Framework.SDK.ContextObjects;
+using QaaS.Framework.SDK.Hooks.Probe;
+using QaaS.Runner.Sessions.Actions.Collectors;
+using QaaS.Runner.Sessions.Actions.MockerCommands;
+using QaaS.Runner.Sessions.Actions.Probes;
+using QaaS.Runner.Sessions.Actions.Transactions.Builders;
+using QaaS.Runner.Sessions.ConfigurationObjects;
+using QaaS.Runner.Sessions.Session.Builders;
+using QaaS.Runner.Sessions.Tests.Actions.Utils;
+using ConsumerBuilder = QaaS.Runner.Sessions.Actions.Consumers.Builders.ConsumerBuilder;
+using PublisherBuilder = QaaS.Runner.Sessions.Actions.Publishers.Builders.PublisherBuilder;
+using StageConfig = QaaS.Runner.Sessions.Session.Builders.StageConfig;
+
+namespace QaaS.Runner.Sessions.Tests.Session.Builders;
+
+[TestFixture]
+public class SessionBuilderTests
+{
+    private InternalContext _context;
+    private Mock<IProbe> _mockProbe;
+    private Mock<ConsumerBuilder> _mockConsumerBuilder;
+    private Mock<PublisherBuilder> _mockPublisherBuilder;
+    private Mock<TransactionBuilder> _mockTransactionBuilder;
+    private Mock<ProbeBuilder> _mockProbeBuilder;
+    private Mock<CollectorBuilder> _mockCollectorBuilder;
+    private Mock<MockerCommandBuilder> _mockMockerCommandBuilder;
+    private const string SessionName = "test session";
+
+    [SetUp]
+    public void SetUp()
+    {
+        _context = CreationalFunctions.CreateContext(SessionName, []);
+        _mockProbe = new Mock<IProbe>();
+        _mockConsumerBuilder = new Mock<ConsumerBuilder>();
+        _mockPublisherBuilder = new Mock<PublisherBuilder>();
+        _mockTransactionBuilder = new Mock<TransactionBuilder>();
+        _mockProbeBuilder = new Mock<ProbeBuilder>();
+        _mockCollectorBuilder = new Mock<CollectorBuilder>();
+        _mockMockerCommandBuilder = new Mock<MockerCommandBuilder>();
+    }
+
+    [Test]
+    public void Named_Should_Set_Name()
+    {
+        var builder = new SessionBuilder();
+        builder.Named("TestSession");
+
+        Assert.That(builder.Name, Is.EqualTo("TestSession"));
+    }
+
+    [Test]
+    public void WithTimeoutBefore_Should_Set_TimeoutBeforeSessionMs()
+    {
+        var builder = new SessionBuilder();
+        builder.WithTimeoutBefore(5000);
+
+        Assert.That(builder.TimeoutBeforeSessionMs, Is.EqualTo(5000));
+    }
+
+    [Test]
+    public void WithTimeoutAfter_Should_Set_TimeoutAfterSessionMs()
+    {
+        var builder = new SessionBuilder();
+        builder.WithTimeoutAfter(3000);
+
+        Assert.That(builder.TimeoutAfterSessionMs, Is.EqualTo(3000));
+    }
+
+    [Test]
+    public void AtStage_Should_Set_Stage_And_RunUntilStage()
+    {
+        var builder = new SessionBuilder();
+        builder.AtStage(5);
+
+        Assert.That(builder.Stage, Is.EqualTo(5));
+        Assert.That(builder.RunUntilStage, Is.EqualTo(6));
+    }
+
+    [Test]
+    public void RunSessionUntilStage_Should_Set_RunUntilStage()
+    {
+        var builder = new SessionBuilder();
+        builder.RunSessionUntilStage(10);
+
+        Assert.That(builder.RunUntilStage, Is.EqualTo(10));
+    }
+
+    [Test]
+    public void DiscardData_Should_Set_SaveData()
+    {
+        var builder = new SessionBuilder();
+        builder.DiscardData();
+
+        Assert.That(builder.SaveData, Is.True);
+    }
+
+    [Test]
+    public void WithinCategory_Should_Set_Category()
+    {
+        var builder = new SessionBuilder();
+        builder.WithinCategory("TestCategory");
+
+        Assert.That(builder.Category, Is.EqualTo("TestCategory"));
+    }
+
+    [Test]
+    public void AddConsumer_Should_Add_ConsumerBuilder()
+    {
+        var builder = new SessionBuilder();
+        builder.AddConsumer(_mockConsumerBuilder.Object);
+
+        Assert.That(builder.Consumers, Contains.Item(_mockConsumerBuilder.Object));
+    }
+
+    [Test]
+    public void AddPublisher_Should_Add_PublisherBuilder()
+    {
+        var builder = new SessionBuilder();
+        builder.AddPublisher(_mockPublisherBuilder.Object);
+
+        Assert.That(builder.Publishers, Contains.Item(_mockPublisherBuilder.Object));
+    }
+
+    [Test]
+    public void AddTransaction_Should_Add_TransactionBuilder()
+    {
+        var builder = new SessionBuilder();
+        builder.AddTransaction(_mockTransactionBuilder.Object);
+
+        Assert.That(builder.Transactions, Contains.Item(_mockTransactionBuilder.Object));
+    }
+
+    [Test]
+    public void AddProbe_Should_Add_ProbeBuilder()
+    {
+        var builder = new SessionBuilder();
+        builder.AddProbe(_mockProbeBuilder.Object);
+
+        Assert.That(builder.Probes, Contains.Item(_mockProbeBuilder.Object));
+    }
+
+    [Test]
+    public void AddCollector_Should_Add_CollectorBuilder()
+    {
+        var builder = new SessionBuilder();
+        builder.AddCollector(_mockCollectorBuilder.Object);
+
+        Assert.That(builder.Collectors, Contains.Item(_mockCollectorBuilder.Object));
+    }
+
+    [Test]
+    public void AddMockerCommand_Should_Add_MockerCommandBuilder()
+    {
+        var builder = new SessionBuilder();
+        builder.AddMockerCommand(_mockMockerCommandBuilder.Object);
+
+        Assert.That(builder.MockerCommands, Contains.Item(_mockMockerCommandBuilder.Object));
+    }
+
+    [Test]
+    public void AddStage_Should_Add_StageConfig()
+    {
+        var builder = new SessionBuilder();
+        var stageConfig = new StageConfig(1, 0, 0);
+        builder.AddStage(stageConfig);
+
+        Assert.That(builder.Stages, Contains.Item(stageConfig));
+    }
+
+    [Test]
+    public void Build_Should_Create_Session_With_All_Builders()
+    {
+        // Arrange
+        var builder = new SessionBuilder()
+            .Named("TestSession")
+            .AtStage(1)
+            .WithTimeoutBefore(1000)
+            .WithTimeoutAfter(2000)
+            .DiscardData()
+            .WithinCategory("TestCategory");
+
+        builder.AddConsumer(
+            new ConsumerBuilder()
+                .Named("TestConsumer")
+                .AddPolicy(new PolicyBuilder().Configure(new CountPolicyConfig()))
+                .Configure(new SocketReaderConfig
+                {
+                    Host = "https:test",
+                    Port = 8080,
+                    ProtocolType = ProtocolType.IP
+                }));
+        
+        builder.AddPublisher(
+            new PublisherBuilder()
+                .Named("TestPublisher")
+                .AddPolicy(new PolicyBuilder().Configure(new CountPolicyConfig()))
+                .Configure(new RabbitMqSenderConfig { Host = "https://test.com" }));
+        
+        builder.AddTransaction(new TransactionBuilder()
+            .Named("TestTransaction")
+            .Configure(new HttpTransactorConfig
+            {
+                Method = HttpMethods.Delete,
+                BaseAddress = "https://test.com"
+            }));
+        
+        var probes = new List<KeyValuePair<string, IProbe>>
+        {
+            new ("TestProbe", _mockProbe.Object)
+        };
+        
+        builder.AddProbe(new ProbeBuilder()
+            .Named("TestProbe")
+            .HookNamed("TestHook"));
+        
+        builder.AddCollector(new CollectorBuilder()
+            .Named("TestCollector")
+            .Configure(new PrometheusFetcherConfig { Url = "https://promql:8080", Expression = "sum ()" }));
+        
+        builder.AddMockerCommand(new MockerCommandBuilder()
+            .Named("TestMockerCommand")
+            .WithCommand(new CommandConfig()));
+
+        // Act
+        var session = builder.Build(_context, probes);
+
+        // Assert
+        Assert.That(session, Is.Not.Null);
+        Assert.That(session.Name, Is.EqualTo("TestSession"));
+        Assert.That(session.SessionStage, Is.EqualTo(1));
+    }
+
+    [Test]
+    public void Build_Should_Handle_Null_Collections()
+    {
+        // Arrange
+        var builder = new SessionBuilder()
+            .Named("TestSession")
+            .AtStage(1);
+
+        var probeHooks = new List<KeyValuePair<string, IProbe>>();
+
+        // Act
+        var session = builder.Build(_context, probeHooks);
+
+        // Assert
+        Assert.That(session, Is.Not.Null);
+        Assert.That(session.Name, Is.EqualTo("TestSession"));
+    }
+
+    [Test]
+    public void Build_Should_Handle_Empty_Collections()
+    {
+        // Arrange
+        var builder = new SessionBuilder()
+            .Named("TestSession")
+            .AtStage(1);
+
+        var probeHooks = new List<KeyValuePair<string, IProbe>>();
+
+        // Act
+        var session = builder.Build(_context, probeHooks);
+
+        // Assert
+        Assert.That(session, Is.Not.Null);
+    }
+}

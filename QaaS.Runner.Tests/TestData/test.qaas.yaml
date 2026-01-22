@@ -1,0 +1,50 @@
+anchors:
+  rabbitmq: &rabbitmq ${variables:rabbitmq}
+
+
+DataSources:
+  - Name: TestDataSource3
+    Generator: TestGenerator
+    GeneratorConfiguration:
+      Count: 30
+      ComplexConfigList:
+        - SomeItem: "ItemA"
+    Lazy: true
+  - Name: TestDataSource2
+    Generator: TestGenerator
+    GeneratorConfiguration:
+      Count: 30
+      ComplexConfigList:
+        - SomeItem: "ItemA"
+    Lazy: true
+  - Name: TestDataSource1
+    Generator: TestGenerator
+    GeneratorConfiguration:
+      Count: 30
+      ComplexConfigList:
+        - SomeItem: "ItemA"
+    Lazy: true
+
+
+Sessions:
+  - Name: Session0
+    SaveData: true
+  - Name: Session1
+    SaveData: true
+  - Name: Session2
+    SaveData: true
+
+
+Assertions:
+  - SessionNamePatterns: [ "Session0" ]
+    Assertion: PassedAssertion
+    Name: Assertion1
+    Category: test
+  - SessionNamePatterns: [ "Session0" ]
+    Assertion: PassedAssertion
+    Name: Assertion2
+    Category: test
+  - SessionNamePatterns: [ "Session0" ]
+    Assertion: PassedAssertion
+    Name: Assertion3
+    Category: test
