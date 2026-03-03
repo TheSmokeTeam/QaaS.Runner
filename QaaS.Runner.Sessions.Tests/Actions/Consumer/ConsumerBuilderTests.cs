@@ -603,7 +603,7 @@ public class ConsumerBuilderTests
         var config = new S3BucketReaderConfig
         {
             StorageBucket = "test",
-            ServiceURL = "REDA",
+            ServiceURL = "url",
             AccessKey = "test",
             SecretKey = "test"
         };

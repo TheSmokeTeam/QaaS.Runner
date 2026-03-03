@@ -1,7 +1,6 @@
 ﻿using System.Net;
 using System.Text;
 using System.Text.Json;
-using ClosedLibsWrappers.interfaces;
 using Moq;
 using NUnit.Framework;
 using QaaS.Runner.Artifactory;
@@ -52,7 +51,7 @@ public class JfrogArtifactoryHelperTests
     public void TestGetUrlsToAllFilesInArtifactoryFolder_WithNestedStructure_ReturnsAllFilePaths()
     {
         // Arrange
-        var mockHttpClient = new Mock<IHttpClient>();
+        var mockHttpClient = new Mock<HttpClient>();
         var baseUrl = "https://test-artifactory.com/artifactory/folder1/folder2";
         var storageApiUrl = "https://test-artifactory.com/artifactory/api/storage/folder1/folder2";
 
@@ -126,7 +125,7 @@ public class JfrogArtifactoryHelperTests
         string folderUrl, int expectedCount)
     {
         // Arrange
-        var mockHttpClient = new Mock<IHttpClient>();
+        var mockHttpClient = new Mock<HttpClient>();
         var storageApiUrl = "https://test-artifactory.com/artifactory/api/storage/" +
             folderUrl.Split('/').LastOrDefault() ?? "";
 
@@ -163,7 +162,7 @@ public class JfrogArtifactoryHelperTests
         HttpStatusCode statusCode, Type expectedExceptionType)
     {
         // Arrange
-        var mockHttpClient = new Mock<IHttpClient>();
+        var mockHttpClient = new Mock<HttpClient>();
         var folderUrl = "https://test-artifactory.com/artifactory/folder";
         var storageApiUrl = "https://test-artifactory.com/artifactory/api/storage/folder";
 
@@ -184,7 +183,7 @@ public class JfrogArtifactoryHelperTests
     public void TestGetUrlsToAllFilesInArtifactoryFolder_WhenChildHasNoUri_ThrowsArgumentException()
     {
         // Arrange
-        var mockHttpClient = new Mock<IHttpClient>();
+        var mockHttpClient = new Mock<HttpClient>();
         var folderUrl = "https://test-artifactory.com/artifactory/folder";
         var storageApiUrl = "https://test-artifactory.com/artifactory/api/storage/folder";
 

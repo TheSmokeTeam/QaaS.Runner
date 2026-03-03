@@ -10,8 +10,8 @@
     </PropertyGroup>
 
     <ItemGroup>
-        <PackageReference Include="AWSSDK.S3" Version="4.0.0.1"/>
-        <PackageReference Include="System.IO.Abstractions" Version="16.1.26"/>
+        <PackageReference Include="AWSSDK.S3" Version="4.0.18.7" />
+        <PackageReference Include="System.IO.Abstractions" Version="22.1.0" />
     </ItemGroup>
 
     <ItemGroup>

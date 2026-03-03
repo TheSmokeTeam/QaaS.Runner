@@ -3,6 +3,7 @@ using System.Diagnostics;
 using System.Linq;
 using Moq;
 using NUnit.Framework;
+using NUnit.Framework.Legacy;
 using QaaS.Framework.Protocols.Protocols;
 using QaaS.Framework.SDK.Session;
 using QaaS.Framework.SDK.Session.DataObjects;

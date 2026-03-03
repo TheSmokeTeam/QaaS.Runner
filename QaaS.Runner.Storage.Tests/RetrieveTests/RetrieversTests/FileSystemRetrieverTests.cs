@@ -2,6 +2,7 @@
 using System.Reflection;
 using Microsoft.Extensions.Logging;
 using NUnit.Framework;
+using NUnit.Framework.Legacy;
 using QaaS.Framework.Configurations.CommonConfigurationObjects;
 using QaaS.Runner.Storage.ConfigurationObjects;
 

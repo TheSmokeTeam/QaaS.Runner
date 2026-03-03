@@ -27,7 +27,7 @@ public static class Globals
     {
         Context.InsertValueIntoGlobalDictionary([nameof(MetaDataConfig)],new MetaDataConfig
         {
-            Team = "REDA",
+            Team = "Smoke",
             System = "QaaS"
         });
         return Context;

@@ -2,10 +2,10 @@ anchors:
   rabbitmq: &rabbitmq ${variables:rabbitmq}
 
 MetaData:
-  Team: REDA
+  Team: Smoke
   System: QaaS
   ExtraLabels:
-    Component: REDA
+    Component: Parser
 
 Storages:
   - FileSystem:

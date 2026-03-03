@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using Microsoft.Extensions.Logging;
 using NUnit.Framework;
+using NUnit.Framework.Legacy;
 using QaaS.Runner.Assertions.ConfigurationObjects.LinkConfigs;
 using QaaS.Runner.Assertions.LinkBuilders;
 
@@ -12,13 +13,13 @@ public class GrafanaLinkBuilderTests
     [Test]
     public void TestBuildWithAllAdditions_BuildUrlWithAllPossibleOptions_UrlShouldContainStringsFromAllOptions()
     {
-        const string url = "REDA",
+        const string url = "url",
             dashboardId = "jEhCoNoSk",
             linkName = "moby",
             variableAKey = "var-namespace",
             variableAValue = "qaas-runner-env-poc",
             variableBKey = "var-site",
-            variableBValue = "REDA",
+            variableBValue = "B",
             expectedStartTimeMs = "1722927661000",
             expectedEndTimeMs = "1722927844000";
 

@@ -84,7 +84,7 @@ public class ExecutionBuilderTests
 
         // Add valid link builder
         var linkBuilder = new LinkBuilder()
-            { Grafana = new GrafanaLinkConfig { DashboardId = "REDA", Url = "https://grafa.com", Variables = [] } };
+            { Grafana = new GrafanaLinkConfig { DashboardId = "dash-id", Url = "https://grafa.com", Variables = [] } };
         builder.AddLink(linkBuilder);
 
         // Add valid data source builder
@@ -92,7 +92,7 @@ public class ExecutionBuilderTests
         builder.AddDataSource(dataSourceBuilder);
 
         return builder.SetExecutionId("test").SetCase("valid").WithLogger(Globals.Logger)
-            .WithMetadata(new MetaDataConfig { Team = "REDA", System = "QaaS" })
+            .WithMetadata(new MetaDataConfig { Team = "Smoke", System = "QaaS" })
             .WithGlobalDict(new Dictionary<string, object?>());
     }
 
@@ -128,6 +128,6 @@ public class ExecutionBuilderTests
 
         return builder.ExecutionType(ExecutionType.Run).SetExecutionId("test").SetCase("invalid")
             .WithLogger(Globals.Logger).WithGlobalDict(new Dictionary<string, object?>())
-            .WithMetadata(new MetaDataConfig { System = "QaaS", Team = "REDA" });
+            .WithMetadata(new MetaDataConfig { System = "QaaS", Team = "Smoke" });
     }
 }

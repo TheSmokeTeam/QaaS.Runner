@@ -25,7 +25,7 @@ public class AllureWrapperTests
     [Test,
      TestCase("unknown-path", TestName = "allure path wrong"),
      TestCase("allure", TestName = "allure path right"),
-     TestCase(null, TestName = "default allure path right")]
+     TestCase("",TestName = "default allure path right")]
     public void TestServeTestResults_WithVariousPaths_ShouldExecuteWithoutException(string path)
     {
         // Act & Assert
