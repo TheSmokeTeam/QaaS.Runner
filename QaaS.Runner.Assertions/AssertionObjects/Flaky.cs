@@ -1,4 +1,4 @@
-﻿using QaaS.Framework.SDK.Session.SessionDataObjects;
+﻿﻿using QaaS.Framework.SDK.Session.SessionDataObjects;
 
 namespace QaaS.Runner.Assertions.AssertionObjects;
 
@@ -16,5 +16,5 @@ public record Flaky
     ///     The reasons the assertion is flaky, each key is the Name of the session who caused the flakiness
     ///     and the value is the failures in that session
     /// </summary>
-    public IList<KeyValuePair<string, List<ActionFailure>>> FlakinessReasons { get; init; } = null!;
+    public required IList<KeyValuePair<string, List<ActionFailure>>> FlakinessReasons { get; init; }
 }

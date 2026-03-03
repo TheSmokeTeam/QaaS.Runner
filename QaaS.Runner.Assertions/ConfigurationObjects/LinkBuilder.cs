@@ -1,4 +1,4 @@
-﻿using System.ComponentModel;
+﻿﻿using System.ComponentModel;
 using System.Runtime.CompilerServices;
 using QaaS.Runner.Assertions.ConfigurationObjects.LinkConfigs;
 using QaaS.Runner.Assertions.LinkBuilders;
@@ -7,8 +7,14 @@ using QaaS.Runner.Assertions.LinkBuilders;
 
 namespace QaaS.Runner.Assertions.ConfigurationObjects;
 
+/// <summary>
+/// Builder for configuring links to attach to test results
+/// </summary>
 public class LinkBuilder
 {
+    /// <summary>
+    /// The display name of the link in the test results
+    /// </summary>
     [Description("The display name of the link in the test results, if none is given uses the `Type` as the name")]
     public string? Name { get; internal set; }
 
@@ -21,6 +27,11 @@ public class LinkBuilder
     [Description("Links the grafana dashboard filtered for the test's session times to each test result.")]
     internal GrafanaLinkConfig? Grafana { get; set; }
 
+    /// <summary>
+    /// Sets the display name for the link
+    /// </summary>
+    /// <param name="name">Display name</param>
+    /// <returns>This builder instance for chaining</returns>
     public LinkBuilder Named(string name)
     {
         Name = name;
@@ -35,6 +46,11 @@ public class LinkBuilder
         return this;
     }
 
+    /// <summary>
+    /// Configures the link with a link configuration
+    /// </summary>
+    /// <param name="config">Link configuration to use</param>
+    /// <returns>This builder instance for chaining</returns>
     public LinkBuilder Configure(ILinkConfig config)
     {
         Reset();

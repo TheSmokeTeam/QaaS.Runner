@@ -74,7 +74,9 @@ public class ExecutionBuilderTests
         var assertionBuilder = new AssertionBuilder
         {
             Name = "test-assertion",
-            Assertion = "Equals"
+            Assertion = "Equals",
+            AssertionInstance = null,
+            Reporter = null
         }.HookNamed(nameof(TestAssertion));
         builder.AddAssertion(assertionBuilder);
 
@@ -122,7 +124,9 @@ public class ExecutionBuilderTests
         var assertionBuilder = new AssertionBuilder
         {
             Name = "test-assertion",
-            Assertion = "Equals"
+            Assertion = "Equals",
+            AssertionInstance = null,
+            Reporter = null
         }.HookNamed(nameof(TestAssertion));
         builder.AddAssertion(assertionBuilder);
 

@@ -26,9 +26,13 @@ public class AllureReporterTests
         // Setup reporter with mocked dependencies
         Reporter = new AllureReporter
         {
-            Context = new Context { Logger = Globals.Logger },
+            Context = new Context
+            {
+                Logger = Globals.Logger
+            },
             SaveAttachments = true,
-            FileSystem = new FileSystem()
+            FileSystem = new FileSystem(),
+            Name = null
         };
     }
 
@@ -54,7 +58,10 @@ public class AllureReporterTests
                 {
                     Name = "Test",
                     AssertionName = "AssertionOne",
-                    SessionDataList = []
+                    SessionDataList =
+                        [],
+                    AssertionHook = null,
+                    StatussesToReport = null
                 },
                 AssertionStatus = AssertionStatus.Passed,
                 TestDurationMs = 10,
@@ -79,7 +86,9 @@ public class AllureReporterTests
                             Name = "test",
                             SessionFailures = new List<ActionFailure>()
                         }
-                    }.ToImmutableList()
+                    }.ToImmutableList(),
+                    AssertionHook = null,
+                    StatussesToReport = null
                 },
 
                 AssertionStatus = AssertionStatus.Passed,
@@ -110,7 +119,9 @@ public class AllureReporterTests
                             Name = "test",
                             SessionFailures = new List<ActionFailure>()
                         }
-                    }.ToImmutableList()
+                    }.ToImmutableList(),
+                    AssertionHook = null,
+                    StatussesToReport = null
                 },
                 AssertionStatus = AssertionStatus.Passed,
                 TestDurationMs = 10,
@@ -140,7 +151,9 @@ public class AllureReporterTests
                             Name = "test",
                             SessionFailures = new List<ActionFailure>()
                         }
-                    }.ToImmutableList()
+                    }.ToImmutableList(),
+                    AssertionHook = null,
+                    StatussesToReport = null
                 },
                 AssertionStatus = AssertionStatus.Passed,
                 TestDurationMs = 10,
@@ -175,7 +188,9 @@ public class AllureReporterTests
                             Name = "test3",
                             SessionFailures = new List<ActionFailure>()
                         }
-                    }.ToImmutableList()
+                    }.ToImmutableList(),
+                    AssertionHook = null,
+                    StatussesToReport = null
                 },
                 AssertionStatus = AssertionStatus.Passed,
                 TestDurationMs = 10,
@@ -226,7 +241,9 @@ public class AllureReporterTests
                             Name = "test3",
                             SessionFailures = new List<ActionFailure>()
                         }
-                    }.ToImmutableList()
+                    }.ToImmutableList(),
+                    AssertionHook = null,
+                    StatussesToReport = null
                 },
                 AssertionStatus = AssertionStatus.Passed,
                 TestDurationMs = 10,
@@ -255,7 +272,8 @@ public class AllureReporterTests
                 SaveAttachments = false,
                 SaveTemplate = saveTemplate,
                 SaveSessionData = saveSessionData,
-                FileSystem = new FileSystem()
+                FileSystem = new FileSystem(),
+                Name = null
             });
 
         // Act
@@ -330,8 +348,14 @@ public class AllureReporterTests
                 AssertionHook = new AssertionHookMock
                 {
                     AssertionAttachments = attachments
-                }
-            }
+                },
+                Name = null,
+                AssertionName = null,
+                StatussesToReport = null
+            },
+            AssertionStatus = AssertionStatus.Passed,
+            TestDurationMs = 0,
+            Flaky = null
         };
 
         var saveAssertionAttachmentsToAllureMethod = Reporter?.GetType()

@@ -31,7 +31,7 @@ public class AllureWrapper
     }
 
     /// <summary>
-    ///     Automatically serves the test results in a human readable manner
+    ///     Automatically serves the test results in a human-readable manner
     /// </summary>
     public void ServeTestResults(string allureRunnablePath = DefaultAllureRunnablePath)
     {

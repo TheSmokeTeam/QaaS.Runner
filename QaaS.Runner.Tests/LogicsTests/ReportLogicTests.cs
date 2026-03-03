@@ -45,12 +45,22 @@ public class ReportLogicTests
                 Name = $"Assertion{i + 1}",
                 StatussesToReport =
                 [
-                    AssertionStatus.Broken, AssertionStatus.Failed, AssertionStatus.Passed, AssertionStatus.Skipped,
+                    AssertionStatus.Broken,
+                    AssertionStatus.Failed,
+                    AssertionStatus.Passed,
+                    AssertionStatus.Skipped,
                     AssertionStatus.Unknown
-                ]
+                ],
+                AssertionName = null,
+                AssertionHook = null
             };
             var assertionResult = new AssertionResult
-                { Assertion = assertion, AssertionStatus = AssertionStatus.Passed, };
+            {
+                Assertion = assertion,
+                AssertionStatus = AssertionStatus.Passed,
+                TestDurationMs = 0,
+                Flaky = null,
+            };
             assertionResults.Add(assertionResult);
         }
 
@@ -85,7 +95,19 @@ public class ReportLogicTests
         var mockReporter = new Mock<IReporter>();
         mockReporter.Setup(r => r.Name).Returns("NonExistentReporter");
 
-        var assertionResult = new AssertionResult { Assertion = new Assertion { Name = "DifferentReporter" } };
+        var assertionResult = new AssertionResult
+        {
+            Assertion = new Assertion
+            {
+                Name = "DifferentReporter",
+                AssertionName = null,
+                AssertionHook = null,
+                StatussesToReport = null
+            },
+            AssertionStatus = AssertionStatus.Passed,
+            TestDurationMs = 0,
+            Flaky = null
+        };
 
         var mockReporters = new List<IReporter> { mockReporter.Object };
         var reportLogic = new ReportLogic(mockReporters, Globals.GetContextWithMetadata());

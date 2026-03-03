@@ -10,19 +10,39 @@ using QaaS.Runner.Assertions.LinkBuilders;
 
 namespace QaaS.Runner.Assertions.AssertionObjects;
 
+/// <summary>
+/// Represents an assertion to be executed
+/// </summary>
 public class Assertion
 {
-    public string Name { get; set; }
+    /// <summary>
+    /// The display name of the assertion in test results
+    /// </summary>
+    public required string Name { get; set; }
 
-    public string AssertionName { get; set; }
+    /// <summary>
+    /// The name of the assertion hook implementation
+    /// </summary>
+    public required string AssertionName { get; set; }
 
-
-    public IAssertion AssertionHook { get; set; }
+    /// <summary>
+    /// The assertion hook implementation
+    /// </summary>
+    public required IAssertion AssertionHook { get; set; }
     
-    public IList<AssertionStatus> StatussesToReport { get; set; }
+    /// <summary>
+    /// List of assertion statuses to report
+    /// </summary>
+    public required IList<AssertionStatus> StatussesToReport { get; set; }
 
+    /// <summary>
+    /// Configuration for the assertion
+    /// </summary>
     public IConfiguration AssertionConfiguration { get; set; } = new ConfigurationBuilder().Build();
 
+    /// <summary>
+    /// Links to attach to assertion results
+    /// </summary>
     public List<BaseLink>? Links { get; set; }
 
     /// <summary>
@@ -35,9 +55,24 @@ public class Assertion
     /// </summary>
     public IImmutableList<DataSource>? DataSourceList { get; set; }
 
+    /// <summary>
+    /// Data source names filter
+    /// </summary>
     public string[]? _dataSourceNames { get; set; }
+    
+    /// <summary>
+    /// Data source patterns filter
+    /// </summary>
     public string[]? _dataSourcePatterns { get; set; }
+    
+    /// <summary>
+    /// Session names filter
+    /// </summary>
     public string[]? _sessionNames { get; set; }
+    
+    /// <summary>
+    /// Session patterns filter
+    /// </summary>
     public string[]? _sessionPatterns { get; set; }
 
     public virtual AssertionResult Execute(IImmutableList<SessionData?> sessionDataList,

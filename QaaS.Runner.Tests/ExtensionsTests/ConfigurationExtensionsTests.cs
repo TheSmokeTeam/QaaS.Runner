@@ -22,7 +22,9 @@ public class ConfigurationExtensionsTests
                 {
                     Assertion = "test",
                     Name = "3",
-                    Category = "c1"
+                    Category = "c1",
+                    AssertionInstance = null,
+                    Reporter = null
                 });
                 continue;
             }
@@ -33,7 +35,9 @@ public class ConfigurationExtensionsTests
                 {
                     Assertion = "test",
                     Name = "5",
-                    Category = null
+                    Category = null,
+                    AssertionInstance = null,
+                    Reporter = null
                 });
                 continue;
             }
@@ -42,7 +46,9 @@ public class ConfigurationExtensionsTests
             {
                 Assertion = "test",
                 Name = i.ToString(),
-                Category = "c" + i
+                Category = "c" + i,
+                AssertionInstance = null,
+                Reporter = null
             });
         }
 

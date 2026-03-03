@@ -8,17 +8,20 @@ namespace QaaS.Runner.Assertions.AssertionObjects;
 /// </summary>
 public record AssertionResult : IAssertionResult
 {
-    public Assertion Assertion { get; set; }
+    /// <summary>
+    ///     The assertion object that was executed
+    /// </summary>
+    public required Assertion Assertion { get; set; }
 
     /// <summary>
     ///     The assertion's execution status
     /// </summary>
-    public AssertionStatus AssertionStatus { get; init; }
+    public required AssertionStatus AssertionStatus { get; init; }
 
     /// <summary>
     ///     How long in milliseconds did the full assertion's test take (includes all relevant test sessions + its assertion)
     /// </summary>
-    public long TestDurationMs { get; init; }
+    public required long TestDurationMs { get; init; }
 
     /// <summary>
     ///     If the assertion threw an exception its saved here
@@ -33,5 +36,5 @@ public record AssertionResult : IAssertionResult
     /// <summary>
     ///     Contain data about the flakiness of the assertion
     /// </summary>
-    public Flaky Flaky { get; init; }
+    public required Flaky Flaky { get; init; }
 }
