@@ -1,0 +1,71 @@
+name: CI
+
+on:
+  push:
+    branches:
+      - "**"
+    tags:
+      - "*"
+  pull_request:
+
+permissions:
+  contents: read
+
+env:
+  DOTNET_NOLOGO: true
+  DOTNET_CLI_TELEMETRY_OPTOUT: true
+  CONFIGURATION: Release
+  PROJECT_PATH: QaaS.Runner.sln
+  PACKAGE_OUTPUT_DIRECTORY: ${{ github.workspace }}\\BuildOutput
+  NUGET_SOURCE_URL: "https://api.nuget.org/v3/index.json"
+  ARTIFACTORY_NUGET_SOURCE_URL: ${{ secrets.ARTIFACTORY_NUGET_SOURCE_URL }}
+
+jobs:
+  build-test-deploy:
+    name: Build, Test & Deploy
+    runs-on: windows-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install dotnet
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.x
+
+      - name: Restore packages
+        run: dotnet restore ${{ env.PROJECT_PATH }}
+
+      - name: Build project
+        run: dotnet build ${{ env.PROJECT_PATH }} --no-restore --configuration ${{ env.CONFIGURATION }}
+
+      - name: Test solution
+        run: dotnet test ${{ env.PROJECT_PATH }} --configuration ${{ env.CONFIGURATION }} --no-restore --no-build --maxcpucount
+
+      - name: Get Version
+        if: startsWith(github.ref, 'refs/tags/')
+        id: version
+        uses: battila7/get-version-action@v2
+
+      - name: Validate SemVer tag
+        if: startsWith(github.ref, 'refs/tags/')
+        shell: bash
+        run: |
+          VERSION="${{ steps.version.outputs.version-without-v }}"
+          if [[ ! "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+(-(alpha|beta)\.[0-9]+)?$ ]]; then
+            echo "Error: '$VERSION' is not a valid version."
+            echo "Allowed formats: X.X.X, X.X.X-alpha.N, or X.X.X-beta.N"
+            exit 1
+          fi
+
+      - name: Pack project
+        if: startsWith(github.ref, 'refs/tags/')
+        run: dotnet pack ${{ env.PROJECT_PATH }} --no-restore --no-build --configuration ${{ env.CONFIGURATION }} --include-symbols -p:PackageVersion=${{ steps.version.outputs.version-without-v }} --output ${{ env.PACKAGE_OUTPUT_DIRECTORY }}
+
+      - name: Push package to NuGet
+        if: startsWith(github.ref, 'refs/tags/')
+        run: dotnet nuget push ${{ env.PACKAGE_OUTPUT_DIRECTORY }}\*.nupkg -k ${{ secrets.NUGET_AUTH_TOKEN }} -s ${{ env.NUGET_SOURCE_URL }}
+
+      - name: Push QaaS.Runner package to Artifactory
+        if: startsWith(github.ref, 'refs/tags/')
+        run: dotnet nuget push ${{ env.PACKAGE_OUTPUT_DIRECTORY }}\QaaS.Runner.*.nupkg -k ${{ secrets.ARTIFACTORY_NUGET_AUTH_TOKEN }} -s ${{ env.ARTIFACTORY_NUGET_SOURCE_URL }}
