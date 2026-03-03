@@ -18,8 +18,8 @@ namespace QaaS.Runner.Sessions.Tests.Actions.Transactions;
 [TestFixture]
 public class TransactionTests
 {
-    private static Mock<ITransactor>? _transactor;
-    private static List<Data<object>> _infoSent = [];
+    private static Mock<ITransactor> _transactor = null!;
+    private static List<Data<object>> _infoSent = null!;
 
     [Test,
      TestCaseSource(typeof(TestResourceDataSources),

@@ -32,8 +32,8 @@ namespace QaaS.Runner.Sessions.Tests.Actions.Publisher;
 [TestFixture]
 public class PublisherBuilderTests
 {
-    private IList<ActionFailure> _actionFailures;
-    private string _sessionName;
+    private IList<ActionFailure> _actionFailures = null!;
+    private string _sessionName = null!;
 
     [SetUp]
     public void SetUp()

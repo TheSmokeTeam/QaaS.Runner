@@ -13,8 +13,8 @@ namespace QaaS.Runner.Sessions.Tests.Actions.Probes;
 [TestFixture]
 public class ProbeBuilderTests
 {
-    private Mock<IProbe> _mockProbe;
-    private InternalContext _context;
+    private Mock<IProbe> _mockProbe = null!;
+    private InternalContext _context = null!;
     private const string SessionName = "test session";
 
     [SetUp]

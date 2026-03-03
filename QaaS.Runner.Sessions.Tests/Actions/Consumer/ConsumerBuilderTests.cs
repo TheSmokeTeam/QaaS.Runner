@@ -21,8 +21,8 @@ namespace QaaS.Runner.Sessions.Tests.Actions.Consumer;
 [TestFixture]
 public class ConsumerBuilderTests
 {
-    private IList<ActionFailure> _actionFailures;
-    private string _sessionName;
+    private IList<ActionFailure> _actionFailures = null!;
+    private string _sessionName = null!;
 
     [SetUp]
     public void SetUp()
@@ -404,7 +404,7 @@ public class ConsumerBuilderTests
             .Configure(config);
 
         // Act
-        var result = builder.Build(Globals.GetContextWithMetadata(), _actionFailures, _sessionName);
+        var result = builder.Build(Globals.GetContextWithMetadata(), _actionFailures!, _sessionName!);
 
         // Assert
         Assert.That(result, Is.Not.Null);
@@ -562,7 +562,7 @@ public class ConsumerBuilderTests
 
         // Assert
         Assert.That(result, Is.Not.Null);
-        Assert.That(result.Name, Is.EqualTo("TestConsumer"));
+        Assert.That(result!.Name, Is.EqualTo("TestConsumer"));
     }
 
     [Test]
@@ -593,7 +593,7 @@ public class ConsumerBuilderTests
 
         // Assert
         Assert.That(result, Is.Not.Null);
-        Assert.That(result.Name, Is.EqualTo("TestConsumer"));
+        Assert.That(result!.Name, Is.EqualTo("TestConsumer"));
     }
 
     [Test]

@@ -26,14 +26,14 @@ namespace QaaS.Runner.Sessions.Tests.Session.Builders;
 [TestFixture]
 public class SessionBuilderTests
 {
-    private InternalContext _context;
-    private Mock<IProbe> _mockProbe;
-    private Mock<ConsumerBuilder> _mockConsumerBuilder;
-    private Mock<PublisherBuilder> _mockPublisherBuilder;
-    private Mock<TransactionBuilder> _mockTransactionBuilder;
-    private Mock<ProbeBuilder> _mockProbeBuilder;
-    private Mock<CollectorBuilder> _mockCollectorBuilder;
-    private Mock<MockerCommandBuilder> _mockMockerCommandBuilder;
+    private InternalContext _context = null!;
+    private Mock<IProbe> _mockProbe = null!;
+    private Mock<ConsumerBuilder> _mockConsumerBuilder = null!;
+    private Mock<PublisherBuilder> _mockPublisherBuilder = null!;
+    private Mock<TransactionBuilder> _mockTransactionBuilder = null!;
+    private Mock<ProbeBuilder> _mockProbeBuilder = null!;
+    private Mock<CollectorBuilder> _mockCollectorBuilder = null!;
+    private Mock<MockerCommandBuilder> _mockMockerCommandBuilder = null!;
     private const string SessionName = "test session";
 
     [SetUp]

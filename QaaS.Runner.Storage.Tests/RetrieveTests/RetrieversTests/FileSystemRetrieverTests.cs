@@ -1,4 +1,4 @@
-﻿using System.IO.Abstractions;
+﻿﻿using System.IO.Abstractions;
 using System.Reflection;
 using Microsoft.Extensions.Logging;
 using NUnit.Framework;
@@ -106,9 +106,11 @@ public class FileSystemRetrieverTests
             .GetMethod("RetrieveSerialized", BindingFlags.NonPublic | BindingFlags.Instance)!;
 
         // Act
-        var output = ((IEnumerable<byte[]>)retrieveSerializedMethod.Invoke(fileSystemSource, [null])).ToList();
+        var invokedOutput = retrieveSerializedMethod.Invoke(fileSystemSource, [null]);
+        Assert.That(invokedOutput, Is.Not.Null);
+        var output = ((IEnumerable<byte[]>)invokedOutput!).ToList();
 
         // Assert
-        CollectionAssert.AreEqual(expectedOutput, output);
+        Assert.That(output, Is.EqualTo(expectedOutput));
     }
 }

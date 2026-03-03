@@ -39,7 +39,7 @@ public class AllureReporterTests
             FileSystem.Directory.Delete(AllureResultsFolder, true);
     }
 
-    public AllureReporter Reporter;
+    public AllureReporter? Reporter;
 
     private static readonly IFileSystem FileSystem = new FileSystem();
     private const string AllureResultsFolder = AllureConstants.DEFAULT_RESULTS_FOLDER;
@@ -284,9 +284,9 @@ public class AllureReporterTests
             ExecutionId = executionId,
             CaseName = caseName
         };
-        Reporter.Context = context;
+        Reporter?.Context = context;
         // Arrange
-        var getAttachmentDirectoryMethod = Reporter.GetType()
+        var getAttachmentDirectoryMethod = Reporter?.GetType()
             .GetMethod("GetAttachmentDirectory", BindingFlags.NonPublic | BindingFlags.Instance)!;
         var epochTestSuiteStartTimeField = typeof(AllureReporter)
             .GetProperty("EpochTestSuiteStartTime", BindingFlags.Public | BindingFlags.Instance)!;
@@ -334,7 +334,7 @@ public class AllureReporterTests
             }
         };
 
-        var saveAssertionAttachmentsToAllureMethod = Reporter.GetType()
+        var saveAssertionAttachmentsToAllureMethod = Reporter?.GetType()
             .GetMethod("SaveAssertionAttachmentsToAllure", BindingFlags.NonPublic | BindingFlags.Instance)!;
 
         // Act
