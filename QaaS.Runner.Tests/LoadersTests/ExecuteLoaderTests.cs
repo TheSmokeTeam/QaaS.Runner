@@ -1,7 +1,6 @@
 using System.Reflection;
 using Microsoft.Extensions.Logging;
 using NUnit.Framework;
-using NUnit.Framework.Legacy;
 using QaaS.Runner.ConfigurationObjects;
 using QaaS.Runner.Loaders;
 using QaaS.Runner.Options;
@@ -34,18 +33,20 @@ public class ExecuteLoaderTests
                 Command = "3"
             }
         };
-        yield return new TestCaseData(new ExecuteOptions { ConfigurationFile = "executable.yaml" }, allCommandList,
+        yield return new TestCaseData(new ExecuteOptions { ConfigurationFile = "executable.yaml", SendLogs = false }, allCommandList,
             allCommandList).SetName("TestGetCommandsToRunAllCommands");
         yield return new TestCaseData(new ExecuteOptions
             {
                 ConfigurationFile = "executable.yaml",
-                CommandIdsToRun = new List<string> { "1" }
+                CommandIdsToRun = new List<string> { "1" },
+                SendLogs = false
             }, allCommandList, new List<CommandConfig> { new() { Command = "1", Id = "1" } })
             .SetName("TestGetCommandsToRunSpecificCommands");
         yield return new TestCaseData(new ExecuteOptions
             {
                 ConfigurationFile = "executable.yaml",
-                CommandIdsToRun = new List<string> { "7" }
+                CommandIdsToRun = new List<string> { "7" },
+                SendLogs = false
             }, allCommandList, null)
             .SetName("TestGetCommandsToNotFindAnyCommand");
     }
@@ -72,6 +73,6 @@ public class ExecuteLoaderTests
         }
 
         // Assert
-        CollectionAssert.AreEqual(expectedOutput, commandsRan);
+        Assert.That(commandsRan, Is.EqualTo(expectedOutput));
     }
 }

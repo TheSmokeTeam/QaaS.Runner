@@ -10,10 +10,10 @@ public class TestGeneratorConfig
     public int? Count { get; set; }
 
     [Description("Some complex config for testing purposes")]
-    public List<ComplexConfig> ComplexConfigList { get; set; }
+    public List<ComplexConfig> ComplexConfigList { get; set; } = [];
 }
 
 public class ComplexConfig
 {
-    public string SomeItem { get; set; }
+    public string SomeItem { get; set; } = string.Empty;
 }

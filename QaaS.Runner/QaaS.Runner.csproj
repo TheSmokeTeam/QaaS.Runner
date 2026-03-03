@@ -4,15 +4,22 @@
         <TargetFramework>net10.0</TargetFramework>
         <ImplicitUsings>enable</ImplicitUsings>
         <Nullable>enable</Nullable>
+        <PackageId>QaaS.Runner</PackageId>
+        <Authors>SmokeTeam</Authors>
+        <Description>Execution orchestration for QaaS test workflows.</Description>
+        <RepositoryType>git</RepositoryType>
+        <IncludeSymbols>true</IncludeSymbols>
+        <SymbolPackageFormat>snupkg</SymbolPackageFormat>
         <VersionPrefix>0.0.0</VersionPrefix>
         <IsPackable>true</IsPackable>
         <GenerateDocumentationFile>true</GenerateDocumentationFile>
+        <PackageReadmeFile>README.md</PackageReadmeFile>
     </PropertyGroup>
 
     <ItemGroup>
-        <ProjectReference Include="..\QaaS.Runner.Assertions\QaaS.Runner.Assertions.csproj"/>
-        <ProjectReference Include="..\QaaS.Runner.Sessions\QaaS.Runner.Sessions.csproj"/>
-        <ProjectReference Include="..\QaaS.Runner.Storage\QaaS.Runner.Storage.csproj"/>
+        <ProjectReference Include="..\QaaS.Runner.Assertions\QaaS.Runner.Assertions.csproj" PrivateAssets="all" />
+        <ProjectReference Include="..\QaaS.Runner.Sessions\QaaS.Runner.Sessions.csproj" PrivateAssets="all" />
+        <ProjectReference Include="..\QaaS.Runner.Storage\QaaS.Runner.Storage.csproj" PrivateAssets="all" />
     </ItemGroup>
 
     <ItemGroup>
@@ -23,5 +30,19 @@
         <PackageReference Include="Serilog.Settings.Configuration" Version="10.0.0" />
         <PackageReference Include="Serilog.Sinks.Console" Version="6.1.1" />
     </ItemGroup>
+
+    <ItemGroup>
+        <None Include="..\README.md" Pack="true" PackagePath="\" Link="README.md" />
+    </ItemGroup>
+
+    <PropertyGroup>
+        <TargetsForTfmSpecificBuildOutput>$(TargetsForTfmSpecificBuildOutput);IncludeProjectReferencesInPackage</TargetsForTfmSpecificBuildOutput>
+    </PropertyGroup>
+
+    <Target Name="IncludeProjectReferencesInPackage" DependsOnTargets="ResolveReferences">
+        <ItemGroup>
+            <BuildOutputInPackage Include="@(ReferenceCopyLocalPaths->WithMetadataValue('ReferenceSourceTarget', 'ProjectReference'))" />
+        </ItemGroup>
+    </Target>
 
 </Project>

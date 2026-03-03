@@ -18,13 +18,16 @@
           <PrivateAssets>all</PrivateAssets>
           <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
         </PackageReference>
-        <PackageReference Include="Serilog.Sinks.NUnit" Version="1.0.3"/>
         <PackageReference Include="System.IO.Abstractions" Version="22.1.0" />
     </ItemGroup>
 
 
     <ItemGroup>
         <ProjectReference Include="..\QaaS.Runner\QaaS.Runner.csproj"/>
+        <ProjectReference Include="..\QaaS.Runner.Assertions\QaaS.Runner.Assertions.csproj" />
+        <ProjectReference Include="..\QaaS.Runner.Sessions\QaaS.Runner.Sessions.csproj" />
+        <ProjectReference Include="..\QaaS.Runner.Storage\QaaS.Runner.Storage.csproj" />
+        <ProjectReference Include="..\QaaS.Runner.Infrastructure\QaaS.Runner.Infrastructure.csproj" />
     </ItemGroup>
 
 

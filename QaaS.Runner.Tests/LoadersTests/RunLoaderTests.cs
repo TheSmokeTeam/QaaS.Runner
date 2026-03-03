@@ -24,7 +24,8 @@ namespace QaaS.Runner.Tests.LoadersTests
                 ConfigurationFile = "test.yaml",
                 OverwriteFiles = new List<string>(),
                 OverwriteArguments = new List<string>(),
-                PushReferences = new List<string>()
+                PushReferences = new List<string>(),
+                SendLogs = false
             };
 
             yield return new TestCaseData(basicOptions, null, null)
@@ -48,7 +49,8 @@ namespace QaaS.Runner.Tests.LoadersTests
                 ConfigurationFile = "test.yaml",
                 OverwriteFiles = new List<string> { "file1.yaml", "file2.yaml" },
                 OverwriteArguments = new List<string>(),
-                PushReferences = new List<string>()
+                PushReferences = new List<string>(),
+                SendLogs = false
             };
             yield return new TestCaseData(optionsWithOverwriteFiles, null, null)
                 .SetName("WithOverwriteFiles");
@@ -59,7 +61,8 @@ namespace QaaS.Runner.Tests.LoadersTests
                 ConfigurationFile = "test.yaml",
                 OverwriteFiles = new List<string>(),
                 OverwriteArguments = new List<string> { "arg1=value1", "arg2=value2" },
-                PushReferences = new List<string>()
+                PushReferences = new List<string>(),
+                SendLogs = false
             };
             yield return new TestCaseData(optionsWithOverwriteArgs, null, null)
                 .SetName("WithOverwriteArguments");
@@ -70,7 +73,8 @@ namespace QaaS.Runner.Tests.LoadersTests
                 ConfigurationFile = "test.yaml",
                 OverwriteFiles = new List<string>(),
                 OverwriteArguments = new List<string>(),
-                PushReferences = new List<string> { "Sessions", "ref1.yml", "ref2.yml" }
+                PushReferences = new List<string> { "Sessions", "ref1.yml", "ref2.yml" },
+                SendLogs = false
             };
             yield return new TestCaseData(optionsWithReferences, null, null)
                 .SetName("WithPushReferences");
@@ -83,10 +87,24 @@ namespace QaaS.Runner.Tests.LoadersTests
                 OverwriteArguments = new List<string> { "arg=value" },
                 PushReferences = new List<string> { "Sessions", "ref1.yml", "ref2.yml" },
                 ResolveCasesLast = true,
-                DontResolveWithEnvironmentVariables = false
+                DontResolveWithEnvironmentVariables = false,
+                SendLogs = false
             };
             yield return new TestCaseData(allOptions, "full-execution", "cases/full-case.yaml")
                 .SetName("FullOptionsEnabled");
+
+            // Test Case 9: Build context without environment variable resolution
+            var noEnvResolutionOptions = new RunOptions
+            {
+                ConfigurationFile = "no-env.yaml",
+                OverwriteFiles = new List<string>(),
+                OverwriteArguments = new List<string>(),
+                PushReferences = new List<string>(),
+                DontResolveWithEnvironmentVariables = true,
+                SendLogs = false
+            };
+            yield return new TestCaseData(noEnvResolutionOptions, "no-env-execution", null)
+                .SetName("WithNoEnvironmentVariableResolution");
         }
 
         [Test, TestCaseSource(nameof(TestBuildContextCaseData))]
@@ -164,6 +182,10 @@ namespace QaaS.Runner.Tests.LoadersTests
             if (!options.DontResolveWithEnvironmentVariables)
             {
                 mockContextBuilder.Verify(cb => cb.WithEnvironmentVariableResolution(), Times.Once);
+            }
+            else
+            {
+                mockContextBuilder.Verify(cb => cb.WithEnvironmentVariableResolution(), Times.Never);
             }
 
             // Verify final build call

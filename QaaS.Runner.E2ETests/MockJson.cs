@@ -2,5 +2,5 @@
 
 public record MockJson
 {
-    public string Property { get; set; }
+    public string Property { get; set; } = string.Empty;
 }

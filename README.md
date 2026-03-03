@@ -3,7 +3,7 @@
 The `QaaS.Runner` is a package available as part of the `QaaS` Framework that is
 used for running backend and e2e testing projects.
 
-> Written In C# 12 & .net 8
+> Written In C# 14 & .net 10
 
 ## Projects
 

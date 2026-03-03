@@ -8,6 +8,5 @@ public static class Globals
 {
     public static readonly ILogger Logger = new SerilogLoggerFactory(
         new LoggerConfiguration().MinimumLevel.Debug()
-            .WriteTo.NUnitOutput()
             .CreateLogger()).CreateLogger("TestsLogger");
 }

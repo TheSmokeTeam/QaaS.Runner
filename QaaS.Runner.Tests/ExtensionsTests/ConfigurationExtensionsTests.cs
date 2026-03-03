@@ -1,6 +1,5 @@
 using Microsoft.Extensions.Configuration;
 using NUnit.Framework;
-using NUnit.Framework.Legacy;
 using QaaS.Framework.SDK.ContextObjects;
 using QaaS.Framework.SDK.Session.SessionDataObjects;
 using QaaS.Framework.SDK.Session.SessionDataObjects.RunningSessionsObjects;
@@ -98,7 +97,7 @@ public class ConfigurationExtensionsTests
         var filteredAssertionNames = config.Select(assertion => assertion.Name!).ToList();
         filteredAssertionNames.Sort();
         Array.Sort(expectedFilteredAssertionNames);
-        CollectionAssert.AreEqual(filteredAssertionNames, expectedFilteredAssertionNames);
+        Assert.That(filteredAssertionNames, Is.EqualTo(expectedFilteredAssertionNames));
     }
 
     private static SessionBuilder[] CreateSessionConfiguration(int numberOfSessions)
@@ -250,7 +249,7 @@ public class ConfigurationExtensionsTests
             var filteredSessionNames = sessionConfig.Select(session => session.Name).ToList();
             filteredSessionNames.Sort();
             Array.Sort(expectedFilteredSessionNames);
-            CollectionAssert.AreEqual(expectedFilteredSessionNames, filteredSessionNames);
+            Assert.That(filteredSessionNames, Is.EqualTo(expectedFilteredSessionNames));
         }
     }
 
@@ -272,7 +271,7 @@ public class ConfigurationExtensionsTests
 
         var filteredAssertionNames = assertionConfig.Select(assertion => assertion.Name).ToList();
         filteredAssertionNames.Sort();
-        CollectionAssert.AreEqual(new List<string> { "1", "2", "3", "4", "5" }, filteredAssertionNames);
+        Assert.That(filteredAssertionNames, Is.EqualTo(new List<string> { "1", "2", "3", "4", "5" }));
     }
 
     [Test]
@@ -296,6 +295,6 @@ public class ConfigurationExtensionsTests
 
         var filteredSessionNames = sessionsConfig.Select(session => session.Name).ToList();
         filteredSessionNames.Sort();
-        CollectionAssert.AreEqual(new List<string> { "1", "2", "3", "4", "5" }, filteredSessionNames);
+        Assert.That(filteredSessionNames, Is.EqualTo(new List<string> { "1", "2", "3", "4", "5" }));
     }
 }
