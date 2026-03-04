@@ -267,10 +267,6 @@ public class AllureReporter : BaseReporter
         };
     }
 
-    /// <summary>
-    /// Writes assertion test results to the Allure report
-    /// </summary>
-    /// <param name="assertionResult">The assertion result to write</param>
     public override void WriteTestResults(AssertionResult assertionResult)
     {
         // Build test result
