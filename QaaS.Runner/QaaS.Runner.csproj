@@ -24,11 +24,21 @@
 
     <ItemGroup>
         <PackageReference Include="CommandLineParser" Version="2.9.1"/>
+        <PackageReference Include="Allure.Commons" Version="3.5.0.73" />
+        <PackageReference Include="Autofac" Version="9.0.0" />
+        <PackageReference Include="AWSSDK.S3" Version="4.0.18.7" />
         <PackageReference Include="Microsoft.Extensions.Configuration.EnvironmentVariables" Version="10.0.3" />
+        <PackageReference Include="Microsoft.Extensions.Configuration" Version="10.0.3" />
         <PackageReference Include="Microsoft.Extensions.Configuration.Json" Version="10.0.3" />
+        <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" Version="10.0.3" />
+        <PackageReference Include="morelinq" Version="4.4.0" />
+        <PackageReference Include="QaaS.Framework.Executions" Version="1.0.1-alpha.3" />
         <PackageReference Include="Serilog.Extensions.Logging" Version="10.0.0" />
         <PackageReference Include="Serilog.Settings.Configuration" Version="10.0.0" />
         <PackageReference Include="Serilog.Sinks.Console" Version="6.1.1" />
+        <PackageReference Include="StackExchange.Redis" Version="2.11.8" />
+        <PackageReference Include="System.IO.Abstractions" Version="22.1.0" />
+        <PackageReference Include="YamlDotNet" Version="16.3.0"/>
     </ItemGroup>
 
     <ItemGroup>

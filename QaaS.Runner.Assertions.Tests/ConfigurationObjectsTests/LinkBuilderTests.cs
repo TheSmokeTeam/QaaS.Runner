@@ -1,0 +1,108 @@
+using System;
+using System.Collections.Generic;
+using NUnit.Framework;
+using QaaS.Runner.Assertions.ConfigurationObjects;
+using QaaS.Runner.Assertions.ConfigurationObjects.LinkConfigs;
+using QaaS.Runner.Assertions.LinkBuilders;
+
+namespace QaaS.Runner.Assertions.Tests.ConfigurationObjectsTests;
+
+[TestFixture]
+public class LinkBuilderTests
+{
+    [Test]
+    public void Build_WithoutConfiguredType_ThrowsInvalidOperationException()
+    {
+        var builder = new LinkBuilder();
+
+        Assert.Throws<InvalidOperationException>(() => builder.Build());
+    }
+
+    [Test]
+    public void Build_WithKibanaConfig_ReturnsKibanaLinkWithConfiguredName()
+    {
+        var builder = new LinkBuilder()
+            .Named("kibana-link")
+            .Configure(new KibanaLinkConfig
+            {
+                Url = "https://kibana.local",
+                DataViewId = "data-view"
+            });
+
+        var result = builder.Build();
+        var link = result.GetLink([new KeyValuePair<DateTime, DateTime>(DateTime.UtcNow, DateTime.UtcNow)]);
+
+        Assert.That(result, Is.TypeOf<KibanaLink>());
+        Assert.That(link.Key, Is.EqualTo("kibana-link"));
+    }
+
+    [Test]
+    public void Build_WithPrometheusConfig_ReturnsPrometheusLink()
+    {
+        var builder = new LinkBuilder()
+            .Configure(new PrometheusLinkConfig
+            {
+                Url = "https://prometheus.local",
+                Expressions = ["up"]
+            });
+
+        var result = builder.Build();
+
+        Assert.That(result, Is.TypeOf<PrometheusLink>());
+    }
+
+    [Test]
+    public void Build_WithGrafanaConfig_ReturnsGrafanaLink()
+    {
+        var builder = new LinkBuilder()
+            .Configure(new GrafanaLinkConfig
+            {
+                Url = "https://grafana.local",
+                DashboardId = "dashboard-id"
+            });
+
+        var result = builder.Build();
+
+        Assert.That(result, Is.TypeOf<GrafanaLink>());
+    }
+
+    [Test]
+    public void Build_WithMultipleConfiguredTypes_ThrowsInvalidOperationException()
+    {
+        var builder = new LinkBuilder
+        {
+            Kibana = new KibanaLinkConfig
+            {
+                Url = "https://kibana.local",
+                DataViewId = "data-view"
+            },
+            Prometheus = new PrometheusLinkConfig
+            {
+                Url = "https://prometheus.local",
+                Expressions = ["up"]
+            }
+        };
+
+        Assert.Throws<InvalidOperationException>(() => builder.Build());
+    }
+
+    [Test]
+    public void Configure_WhenCalledMultipleTimes_ResetsPreviousConfiguration()
+    {
+        var builder = new LinkBuilder()
+            .Configure(new KibanaLinkConfig
+            {
+                Url = "https://kibana.local",
+                DataViewId = "data-view"
+            })
+            .Configure(new GrafanaLinkConfig
+            {
+                Url = "https://grafana.local",
+                DashboardId = "dashboard-id"
+            });
+
+        var result = builder.Build();
+
+        Assert.That(result, Is.TypeOf<GrafanaLink>());
+    }
+}

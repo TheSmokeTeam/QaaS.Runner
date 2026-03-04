@@ -255,7 +255,7 @@ public class AssertionBuilder : IYamlConvertible
     /// <returns>This builder instance for chaining</returns>
     public AssertionBuilder AddSessionName(string sessionName)
     {
-        SessionNames = SessionNames != null ? [sessionName] : SessionNames!.Append(sessionName).ToArray();
+        SessionNames = SessionNames == null ? [sessionName] : SessionNames.Append(sessionName).ToArray();
         return this;
     }
 
@@ -266,9 +266,9 @@ public class AssertionBuilder : IYamlConvertible
     /// <returns>This builder instance for chaining</returns>
     public AssertionBuilder AddSessionPattern(string sessionPattern)
     {
-        SessionNamePatterns = SessionNamePatterns != null
+        SessionNamePatterns = SessionNamePatterns == null
             ? [sessionPattern]
-            : SessionNamePatterns!.Append(sessionPattern).ToArray();
+            : SessionNamePatterns.Append(sessionPattern).ToArray();
         return this;
     }
 
