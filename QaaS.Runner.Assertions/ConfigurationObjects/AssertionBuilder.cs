@@ -20,11 +20,20 @@ using AssertionSeverity = QaaS.Runner.Assertions.AssertionObjects.AssertionSever
 
 namespace QaaS.Runner.Assertions.ConfigurationObjects;
 
+/// <summary>
+/// Builder for configuring and creating assertion instances
+/// </summary>
 public class AssertionBuilder : IYamlConvertible
 {
-    private Assertion _assertion;
+    /// <summary>
+    /// Internal assertion instance
+    /// </summary>
+    public required Assertion AssertionInstance;
 
-    private BaseReporter _reporter;
+    /// <summary>
+    /// Internal reporter instance
+    /// </summary>
+    public required BaseReporter Reporter;
 
     [Required]
     [Description("The name of the assertion to use")]
@@ -79,18 +88,28 @@ public class AssertionBuilder : IYamlConvertible
     [Description("The assertion's specific links. Will be added with the general links.")]
     internal List<LinkBuilder> Links { get; set; } = [];
     
+    /// <summary>
+    /// Defines which assertion statuses will appear in the final report.
+    /// Statuses explicitly listed will be included in the report, while all others will be excluded.
+    /// </summary>
     [Description("Defines which assertion statuses will appear in the final report. " +
                  "Statuses explicitly listed will be included in the report, while all others will be exluded." +
                  $"Options: [`{nameof(AssertionStatus.Passed)}` `{nameof(AssertionStatus.Broken)}` `{nameof(AssertionStatus.Failed)}` `{nameof(AssertionStatus.Skipped)}` `{nameof(AssertionStatus.Unknown)}` ]"),
      DefaultValue("List containing all assertion statuses")]
     public IList<AssertionStatus> StatusesToReport { get; set; } = Enum.GetValues<AssertionStatus>().ToList();
 
+    /// <summary>
+    /// Reads YAML configuration (not supported for AssertionBuilder)
+    /// </summary>
     public void Read(IParser parser, Type expectedType, ObjectDeserializer nestedObjectDeserializer)
     {
         throw new NotSupportedException($"{nameof(Read)} doesn't support custom" +
                                         $" deserialization from Yaml for {nameof(AssertionBuilder)}");
     }
 
+    /// <summary>
+    /// Writes the assertion builder configuration to YAML emitter
+    /// </summary>
     public void Write(IEmitter emitter, ObjectSerializer nestedObjectSerializer)
     {
         var assertionConfiguration = AssertionConfiguration
@@ -108,92 +127,167 @@ public class AssertionBuilder : IYamlConvertible
         });
     }
 
+    /// <summary>
+    /// Sets which assertion statuses should be reported
+    /// </summary>
+    /// <param name="statusesToReport">List of assertion statuses to include in the report</param>
+    /// <returns>This builder instance for chaining</returns>
     public AssertionBuilder ReportOnlyStatuses(IList<AssertionStatus> statusesToReport)
     {
         StatusesToReport = statusesToReport;
         return this;
     }
 
+    /// <summary>
+    /// Sets the category for the assertion
+    /// </summary>
+    /// <param name="category">Category name</param>
+    /// <returns>This builder instance for chaining</returns>
     public AssertionBuilder WithCategory(string category)
     {
         Category = category;
         return this;
     }
 
+    /// <summary>
+    /// Sets whether to save session data
+    /// </summary>
+    /// <param name="weatherToSaveSessionData">Whether to save session data</param>
+    /// <returns>This builder instance for chaining</returns>
     public AssertionBuilder WeatherToSaveSessionData(bool weatherToSaveSessionData)
     {
         SaveSessionData = weatherToSaveSessionData;
         return this;
     }
     
+    /// <summary>
+    /// Sets whether to save configuration template
+    /// </summary>
+    /// <param name="weatherToSaveConfigurationTemplate">Whether to save configuration template</param>
+    /// <returns>This builder instance for chaining</returns>
     public AssertionBuilder WeatherToSaveConfigurationTemplate(bool weatherToSaveConfigurationTemplate)
     {
         SaveTemplate = weatherToSaveConfigurationTemplate;
         return this;
     }
 
+    /// <summary>
+    /// Sets the severity level for the assertion
+    /// </summary>
+    /// <param name="severity">Severity level</param>
+    /// <returns>This builder instance for chaining</returns>
     public AssertionBuilder WithSeverity(AssertionSeverity severity)
     {
         Severity = severity;
         return this;
     }
     
+    /// <summary>
+    /// Sets whether to save attachments
+    /// </summary>
+    /// <param name="weatherToSaveAttachments">Whether to save attachments</param>
+    /// <returns>This builder instance for chaining</returns>
     public AssertionBuilder WeatherToSaveAttachments(bool weatherToSaveAttachments)
     {
         SaveAttachments = weatherToSaveAttachments;
         return this;
     }
     
+    /// <summary>
+    /// Sets whether to display assertion trace
+    /// </summary>
+    /// <param name="weatherToDisplayTrace">Whether to display trace</param>
+    /// <returns>This builder instance for chaining</returns>
     public AssertionBuilder WeatherToDisplayTrace(bool weatherToDisplayTrace)
     {
         DisplayTrace = weatherToDisplayTrace;
         return this;
     }
     
+    /// <summary>
+    /// Sets the display name for the assertion
+    /// </summary>
+    /// <param name="name">Display name</param>
+    /// <returns>This builder instance for chaining</returns>
     public AssertionBuilder Named(string name)
     {
         Name = name;
         return this;
     }
 
+    /// <summary>
+    /// Sets the assertion hook implementation name
+    /// </summary>
+    /// <param name="hookName">Hook implementation name</param>
+    /// <returns>This builder instance for chaining</returns>
     public AssertionBuilder HookNamed(string hookName)
     {
         Assertion = hookName;
         return this;
     }
 
+    /// <summary>
+    /// Adds a data source name filter
+    /// </summary>
+    /// <param name="dataSourceName">Data source name to add</param>
+    /// <returns>This builder instance for chaining</returns>
     public AssertionBuilder AddDataSourceName(string dataSourceName)
     {
         DataSourceNames = DataSourceNames.Append(dataSourceName).ToArray();
         return this;
     }
 
+    /// <summary>
+    /// Adds a data source pattern filter
+    /// </summary>
+    /// <param name="dataSourcePattern">Regex pattern for data source names</param>
+    /// <returns>This builder instance for chaining</returns>
     public AssertionBuilder AddDataSourcePattern(string dataSourcePattern)
     {
         DataSourcePatterns = DataSourcePatterns.Append(dataSourcePattern).ToArray();
         return this;
     }
 
+    /// <summary>
+    /// Adds a session name filter
+    /// </summary>
+    /// <param name="sessionName">Session name to add</param>
+    /// <returns>This builder instance for chaining</returns>
     public AssertionBuilder AddSessionName(string sessionName)
     {
-        SessionNames = SessionNames != null ? [sessionName] : SessionNames!.Append(sessionName).ToArray();
+        SessionNames = SessionNames == null ? [sessionName] : SessionNames.Append(sessionName).ToArray();
         return this;
     }
 
+    /// <summary>
+    /// Adds a session name pattern filter
+    /// </summary>
+    /// <param name="sessionPattern">Regex pattern for session names</param>
+    /// <returns>This builder instance for chaining</returns>
     public AssertionBuilder AddSessionPattern(string sessionPattern)
     {
-        SessionNamePatterns = SessionNamePatterns != null
+        SessionNamePatterns = SessionNamePatterns == null
             ? [sessionPattern]
-            : SessionNamePatterns!.Append(sessionPattern).ToArray();
+            : SessionNamePatterns.Append(sessionPattern).ToArray();
         return this;
     }
 
+    /// <summary>
+    /// Adds a link builder to the assertion
+    /// </summary>
+    /// <param name="linkBuilder">Link builder to add</param>
+    /// <returns>This builder instance for chaining</returns>
     public AssertionBuilder AddLink(LinkBuilder linkBuilder)
     {
         Links = Links.Append(linkBuilder).ToList();
         return this;
     }
 
+    /// <summary>
+    /// Configures the assertion with a configuration object
+    /// </summary>
+    /// <param name="configuration">Configuration object to use</param>
+    /// <returns>This builder instance for chaining</returns>
     public AssertionBuilder Configure(object configuration)
     {
         var stream = new MemoryStream(Encoding.UTF8.GetBytes(JsonSerializer.Serialize(configuration)));
@@ -203,7 +297,7 @@ public class AssertionBuilder : IYamlConvertible
 
     internal Assertion Build(IList<KeyValuePair<string, IAssertion>> assertions, IEnumerable<LinkBuilder>? linkBuilders)
     {
-        _assertion = new Assertion
+        AssertionInstance = new Assertion
         {
             AssertionConfiguration = AssertionConfiguration,
             _sessionNames = SessionNames,
@@ -211,19 +305,21 @@ public class AssertionBuilder : IYamlConvertible
             _dataSourcePatterns = DataSourcePatterns,
             _dataSourceNames = DataSourceNames,
             Name = Name!,
-            AssertionHook = assertions.FirstOrDefault(pair => pair.Key == Name!).Value
-                            ?? throw new ArgumentException($"Assertion {Name} of type" +
-                                                           $" {Assertion} was not found" +
-                                                           " in provided assertions."),
-            StatussesToReport = StatusesToReport
+            AssertionHook = assertions.FirstOrDefault(pair => pair.Key == Name!)
+                                .Value ??
+                            throw new ArgumentException($"Assertion {Name} of type" +
+                                                        $" {Assertion} was not found" +
+                                                        " in provided assertions."),
+            StatussesToReport = StatusesToReport,
+            AssertionName = null
         };
 
         var allLinkBuilders = Links.Concat(linkBuilders ?? []).ToList();
         var allLinks = allLinkBuilders.Select(linkBuilder => linkBuilder.Build());
         
-        _assertion.AssertionName = Assertion!;
-        _assertion.Links = allLinks.ToList();
-        return _assertion;
+        AssertionInstance.AssertionName = Assertion!;
+        AssertionInstance.Links = allLinks.ToList();
+        return AssertionInstance;
     }
 
     /// <summary>
@@ -237,18 +333,23 @@ public class AssertionBuilder : IYamlConvertible
     internal IReporter Build(Context context, DateTime testSuiteStartTimeUtc,
         IFileSystem? fileSystem = null)
     {
-        _reporter = new AllureReporter { Name = Name! };
+        Reporter = new AllureReporter
+        {
+            Name = Name!,
+            Context = null,
+            FileSystem = null
+        };
 
-        _reporter.DisplayTrace = DisplayTrace;
-        _reporter.SaveSessionData = SaveSessionData;
-        _reporter.SaveAttachments = SaveAttachments;
-        _reporter.SaveTemplate = SaveTemplate;
-        _reporter.Severity = Severity;
-        _reporter.Context = context;
-        _reporter.EpochTestSuiteStartTime =
+        Reporter.DisplayTrace = DisplayTrace;
+        Reporter.SaveSessionData = SaveSessionData;
+        Reporter.SaveAttachments = SaveAttachments;
+        Reporter.SaveTemplate = SaveTemplate;
+        Reporter.Severity = Severity;
+        Reporter.Context = context;
+        Reporter.EpochTestSuiteStartTime =
             new DateTimeOffset(testSuiteStartTimeUtc, new TimeSpan(0)).ToUnixTimeMilliseconds();
 
-        _reporter.FileSystem = fileSystem ?? new FileSystem();
-        return _reporter;
+        Reporter.FileSystem = fileSystem ?? new FileSystem();
+        return Reporter;
     }
 }

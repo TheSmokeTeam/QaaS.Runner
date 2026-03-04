@@ -14,7 +14,6 @@ public static class Globals
 {
     public static readonly ILogger Logger = new SerilogLoggerFactory(
         new LoggerConfiguration().MinimumLevel.Debug()
-            .WriteTo.NUnitOutput()
             .CreateLogger()).CreateLogger("TestsLogger");
 
     private static readonly InternalContext Context = new()
@@ -27,7 +26,7 @@ public static class Globals
     {
         Context.InsertValueIntoGlobalDictionary([nameof(MetaDataConfig)],new MetaDataConfig
         {
-            Team = "REDA",
+            Team = "Smoke",
             System = "QaaS"
         });
         return Context;

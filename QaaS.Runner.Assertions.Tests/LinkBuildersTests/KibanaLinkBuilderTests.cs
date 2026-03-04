@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using NUnit.Framework;
+using NUnit.Framework.Legacy;
 using QaaS.Runner.Assertions.ConfigurationObjects.LinkConfigs;
 using QaaS.Runner.Assertions.LinkBuilders;
 
@@ -11,7 +12,7 @@ public class KibanaLinkBuilderTests
     [Test]
     public void TestBuildWithAllAdditions_BuildUrlWithAllPossibleOptions_UrlShouldContainStringsFromAllOptions()
     {
-        const string url = "REDA",
+        const string url = "url",
             dataViewId = "b337f9fe-6f76-4240-b47b-a149a5d154f3",
             timeStampField = "@timestamp",
             kqlQuery = "severity.keyword : \"INFO\"",

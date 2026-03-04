@@ -38,9 +38,19 @@ public class AssertionLogicTests
         var mockAssertion1 = new Mock<Assertion>();
         var mockAssertion2 = new Mock<Assertion>();
         var mockResult1 = new AssertionResult
-            { Assertion = mockAssertion1.Object, AssertionStatus = AssertionStatus.Passed };
+        {
+            Assertion = mockAssertion1.Object,
+            AssertionStatus = AssertionStatus.Passed,
+            TestDurationMs = 0,
+            Flaky = null
+        };
         var mockResult2 = new AssertionResult
-            { Assertion = mockAssertion2.Object, AssertionStatus = AssertionStatus.Skipped };
+        {
+            Assertion = mockAssertion2.Object,
+            AssertionStatus = AssertionStatus.Skipped,
+            TestDurationMs = 0,
+            Flaky = null
+        };
 
         mockAssertion1.Setup(a =>
                 a.Execute(It.IsAny<IImmutableList<SessionData?>>(), It.IsAny<IImmutableList<DataSource>?>()))

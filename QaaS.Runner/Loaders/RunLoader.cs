@@ -1,7 +1,5 @@
 using System.IO.Abstractions;
 using Autofac;
-using ClosedLibsWrappers.implementations;
-using ClosedLibsWrappers.interfaces;
 using Microsoft.Extensions.Configuration;
 using QaaS.Framework.Configurations;
 using QaaS.Framework.Executions.Loaders;
@@ -66,7 +64,7 @@ public class RunLoader<TRunner, TOptions> : BaseLoader<TOptions, TRunner>
 
     private List<InternalContext> GetContextsWithJfrogArtifactoryCases(string? executionId, string casesDirectoryPath)
     {
-        using IHttpClient httpClient = new HttpClientWrapper();
+        using var httpClient = new HttpClient();
         httpClient.Timeout = TimeSpan.FromSeconds(HttpClientTimeoutSeconds);
         return _jfrogArtifactoryHelper.GetUrlsToAllFilesInArtifactoryFolder(casesDirectoryPath, httpClient)
             .OrderBy(f => f)

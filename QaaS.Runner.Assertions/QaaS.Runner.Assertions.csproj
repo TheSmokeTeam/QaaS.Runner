@@ -6,7 +6,8 @@
         <Nullable>enable</Nullable>
         <GenerateDocumentationFile>true</GenerateDocumentationFile>
         <VersionPrefix>0.0.0</VersionPrefix>
-        <IsPackable>true</IsPackable>
+        <IsPackable>false</IsPackable>
+        <PackageReadmeFile>README.md</PackageReadmeFile>
     </PropertyGroup>
 
     <ItemGroup>
@@ -15,9 +16,13 @@
 
     <ItemGroup>
         <PackageReference Include="Allure.Commons" Version="3.5.0.73"/>
-        <PackageReference Include="NUnit" Version="3.13.3"/>
-        <PackageReference Include="System.IO.Abstractions" Version="16.1.26"/>
+        <PackageReference Include="NUnit" Version="4.5.0" />
+        <PackageReference Include="System.IO.Abstractions" Version="22.1.0" />
         <PackageReference Include="YamlDotNet" Version="16.3.0"/>
+    </ItemGroup>
+
+    <ItemGroup>
+        <None Include="..\README.md" Pack="true" PackagePath="\" Link="README.md" />
     </ItemGroup>
 
 </Project>

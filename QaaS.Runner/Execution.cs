@@ -18,19 +18,24 @@ namespace QaaS.Runner;
 /// </summary>
 public class Execution : BaseExecution
 {
+    /// <summary>
+    /// Execution information and context
+    /// </summary>
+    /// <param name="type">Execution type</param>
+    /// <param name="context">Context</param>
     public Execution(ExecutionType type, Context context)
     {
         Context = context;
         Type = type;
     }
 
-    internal DataSourceLogic DataSourceLogic { get; init; }
-    internal StorageLogic StorageLogic { get; init; }
-    internal SessionLogic SessionLogic { get; init; }
-    internal AssertionLogic AssertionLogic { get; init; }
-    internal ReportLogic ReportLogic { get; init; }
-    internal TemplateLogic TemplateLogic { get; init; }
-    
+    internal DataSourceLogic DataSourceLogic { get; init; } = null!;
+    internal StorageLogic StorageLogic { get; init; } = null!;
+    internal SessionLogic SessionLogic { get; init; } = null!;
+    internal AssertionLogic AssertionLogic { get; init; } = null!;
+    internal ReportLogic ReportLogic { get; init; } = null!;
+    internal TemplateLogic TemplateLogic { get; init; } = null!;
+
     /// <inheritdoc />
     public override int Start()
     {

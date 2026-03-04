@@ -1,0 +1,79 @@
+name: CI
+
+on:
+  push:
+    branches: ["**"]
+    tags: ["*"]
+  pull_request:
+
+permissions:
+  contents: read
+
+env:
+  DOTNET_NOLOGO: true
+  DOTNET_CLI_TELEMETRY_OPTOUT: true
+  CONFIGURATION: Release
+  SOLUTION_PATH: QaaS.Runner.sln
+  PROJECT_TO_PACK: QaaS.Runner/QaaS.Runner.csproj
+  PACKAGE_OUTPUT_DIRECTORY: ${{ github.workspace }}\BuildOutput
+
+jobs:
+  build-test-deploy:
+    name: Build, Test & Deploy
+    runs-on: windows-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install dotnet
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.x
+
+      - name: Restore packages
+        run: dotnet restore ${{ env.SOLUTION_PATH }}
+
+      - name: Build solution
+        run: dotnet build ${{ env.SOLUTION_PATH }} --no-restore --configuration ${{ env.CONFIGURATION }}
+
+      - name: Test solution
+        run: dotnet test ${{ env.SOLUTION_PATH }} --configuration ${{ env.CONFIGURATION }} --no-restore --maxcpucount
+
+      # --- DEPLOYMENT STEPS (Run only on tags) ---
+
+      - name: Get Version
+        if: startsWith(github.ref, 'refs/tags/')
+        id: version
+        uses: battila7/get-version-action@v2
+
+      - name: Validate SemVer tag
+        if: startsWith(github.ref, 'refs/tags/')
+        shell: bash
+        run: |
+          VERSION="${{ steps.version.outputs.version-without-v }}"
+          if [[ ! "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+(-(alpha|beta)\.[0-9]+)?$ ]]; then
+            echo "Error: '$VERSION' is not a valid version."
+            exit 1
+          fi
+
+      - name: Pack QaaS.Runner
+        if: startsWith(github.ref, 'refs/tags/')
+        run: |
+          dotnet pack ${{ env.PROJECT_TO_PACK }} `
+            --no-restore `
+            --configuration ${{ env.CONFIGURATION }} `
+            --include-symbols `
+            -p:PackageVersion=${{ steps.version.outputs.version-without-v }} `
+            --output ${{ env.PACKAGE_OUTPUT_DIRECTORY }}
+
+      - name: Push QaaS.Runner to NuGet
+        if: startsWith(github.ref, 'refs/tags/')
+        shell: powershell
+        run: |
+          $packages = Get-ChildItem "${{ env.PACKAGE_OUTPUT_DIRECTORY }}\QaaS.Runner.*.nupkg"
+          foreach ($package in $packages) {
+            # Only push the main QaaS.Runner package, not QaaS.Runner.* (e.g., QaaS.Runner.Assertions)
+            if ($package.Name -match "^QaaS\.Runner\.[0-9]") {
+              dotnet nuget push $package.FullName -k ${{ secrets.NUGET_AUTH_TOKEN }} -s https://api.nuget.org/v3/index.json
+            }
+          }

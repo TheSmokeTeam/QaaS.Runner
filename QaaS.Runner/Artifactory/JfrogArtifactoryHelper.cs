@@ -1,5 +1,4 @@
 using System.Text.Json;
-using ClosedLibsWrappers.interfaces;
 
 namespace QaaS.Runner.Artifactory;
 
@@ -35,7 +34,7 @@ public class JfrogArtifactoryHelper : IJfrogArtifactoryHelper
 
     /// <inheritdoc />
     public IEnumerable<string> GetUrlsToAllFilesInArtifactoryFolder(string artifactoryFolderUrl,
-        IHttpClient httpClient)
+        HttpClient httpClient)
     {
         var storageApiUrl = ParseArtifactoryFolderUrlToStorageApiUrl(artifactoryFolderUrl);
         var getResponse = httpClient.GetAsync(storageApiUrl).Result;

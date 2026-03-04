@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using Moq;
 using NUnit.Framework;
+using NUnit.Framework.Legacy;
 using QaaS.Framework.Protocols.Protocols;
 using QaaS.Framework.SDK.ContextObjects;
 using QaaS.Framework.SDK.DataSourceObjects;
@@ -16,15 +17,15 @@ namespace QaaS.Runner.Sessions.Tests.Session;
 [TestFixture]
 public class SessionTests
 {
-    private static Mock<IReader>? _reader;
-    private static Mock<IChunkReader>? _chunkReader;
+    private static Mock<IReader> _reader = null!;
+    private static Mock<IChunkReader> _chunkReader = null!;
 
-    private static Mock<ISender>? _sender;
-    private static Mock<IChunkSender>? _chunkSender;
-    private static List<Data<object>> _sentData;
+    private static Mock<ISender> _sender = null!;
+    private static Mock<IChunkSender> _chunkSender = null!;
+    private static List<Data<object>> _sentData = null!;
 
-    private static Mock<ITransactor>? _transactor;
-    private static List<Data<object>> _transactionSentData;
+    private static Mock<ITransactor> _transactor = null!;
+    private static List<Data<object>> _transactionSentData = null!;
 
     private string _messageToRead = "return message";
     

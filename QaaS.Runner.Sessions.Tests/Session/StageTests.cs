@@ -17,8 +17,8 @@ namespace QaaS.Runner.Sessions.Tests.Session;
 public class StageTests
 {
     private readonly string _sessionName = "TestSession";
-    private Stage? _stage;
-    private InternalContext _context;
+    private Stage _stage = null!;
+    private InternalContext _context = null!;
 
     [SetUp]
     public void SetUp()
@@ -38,20 +38,20 @@ public class StageTests
                 {
                     TopicName = "test", Username = "testUser", Password = "SHHHHHH", HostNames = ["h1-prod", "h2-test"]
                 })
-                .Build(_context, [], _sessionName)!);
+                .Build(_context!, [], _sessionName)!);
         _stage.AddCommunication(
             new ConsumerBuilder().WithTimeout(1000).Configure(new KafkaTopicReaderConfig
                 {
                     TopicName = "test", Username = "testUser", Password = "SHHHHHH", HostNames = ["h1-prod", "h2-test"],
                     GroupId = "1"
                 })
-                .Build(_context, [], _sessionName)!);
+                .Build(_context!, [], _sessionName)!);
         _stage.AddCommunication(
             new TransactionBuilder().WithTimeout(1000)
                 .Configure(new HttpTransactorConfig { BaseAddress = "http://test", Method = HttpMethods.Get })
-                .Build(_context, [], _sessionName)!);
+                .Build(_context!, [], _sessionName)!);
         _stage.AddCommunication(
-            new ProbeBuilder().Named("testProbe").Build(_context,
+            new ProbeBuilder().Named("testProbe").Build(_context!,
                 [new("testProbe", InitializeProbeHook())], [],
                 _sessionName)!);
         _stage.ExportRunningCommunicationData();

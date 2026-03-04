@@ -5,6 +5,8 @@ using Microsoft.Extensions.Logging;
 using QaaS.Framework.Executions.CommandLineBuilders;
 using QaaS.Runner.Loaders;
 using QaaS.Runner.Options;
+using Serilog;
+using Serilog.Extensions.Logging;
 using ExecuteOptions = QaaS.Runner.Options.ExecuteOptions;
 using ILogger = Microsoft.Extensions.Logging.ILogger;
 
@@ -17,6 +19,7 @@ public static class Bootstrap
 {
 
     private static readonly ILifetimeScope DefaultScope = BuildParentContainer();
+    private static readonly Lazy<bool> ShouldForceDisableSendLogs = new(() => !CanUseFrameworkDefaultLoggers());
 
     /// <summary>
     /// Creates a new <see cref="Runner" /> instance using default <see cref="Runner" /> type
@@ -48,7 +51,10 @@ public static class Bootstrap
         where TRunner : Runner
     {
         if (args == null)
-            return CreateRunner<TRunner>(DefaultScope, new List<ExecutionBuilder>(), Framework.Executions.Constants.DefaultLogger, Framework.Executions.Constants.DefaultSerilogLogger);
+        {
+            var (logger, serilogLogger) = GetDefaultLoggers();
+            return CreateRunner<TRunner>(DefaultScope, [], logger, serilogLogger);
+        }
 
         // Build CLI parser and parse supported verbs
         using var cliParser = ParserBuilder.BuildParser();
@@ -59,14 +65,14 @@ public static class Bootstrap
             .WithNotParsed(_ => Console.Out.WriteLine(HelpTextBuilder.BuildHelpText(cliParserResult)))
             .MapResult(
                 (TemplateOptions options) =>
-                    new RunLoader<TRunner, TemplateOptions>(options, executionId).GetLoadedRunner(),
+                    new RunLoader<TRunner, TemplateOptions>(GetSafeLoggerOptions(options), executionId).GetLoadedRunner(),
                 (RunOptions options) =>
-                    new RunLoader<TRunner, RunOptions>(options, executionId).GetLoadedRunner(),
+                    new RunLoader<TRunner, RunOptions>(GetSafeLoggerOptions(options), executionId).GetLoadedRunner(),
                 (ActOptions options) =>
-                    new RunLoader<TRunner, ActOptions>(options, executionId).GetLoadedRunner(),
+                    new RunLoader<TRunner, ActOptions>(GetSafeLoggerOptions(options), executionId).GetLoadedRunner(),
                 (AssertOptions options) =>
-                    new RunLoader<TRunner, AssertOptions>(options, executionId).GetLoadedRunner(),
-                (ExecuteOptions options) => new ExecuteLoader<TRunner>(options).GetLoadedRunner(),
+                    new RunLoader<TRunner, AssertOptions>(GetSafeLoggerOptions(options), executionId).GetLoadedRunner(),
+                (ExecuteOptions options) => new ExecuteLoader<TRunner>(GetSafeLoggerOptions(options)).GetLoadedRunner(),
                 HandleParseError<TRunner>);
 
         return runner;
@@ -78,22 +84,23 @@ public static class Bootstrap
     private static TRunner HandleParseError<TRunner>(IEnumerable<Error> errors) where TRunner : Runner
     {
         var errorsArray = errors.ToArray();
+        var (logger, serilogLogger) = GetDefaultLoggers();
 
         // If all errors are version requests handle the version request case
         if (errorsArray.All(err => err.Tag is ErrorType.VersionRequestedError))
         {
             const string qaasFrameworkAssemblyName = "QaaS.Framework.Executions";
-            Framework.Executions.Constants.DefaultLogger.LogInformation($"\nQaaS Framework Versions:\n" +
+            logger.LogInformation($"\nQaaS Framework Versions:\n" +
                                                    $"{qaasFrameworkAssemblyName} {GetAssemblyVersionFromName(qaasFrameworkAssemblyName)}\n");
-            return CreateRunner<TRunner>(DefaultScope, [], Framework.Executions.Constants.DefaultLogger, Framework.Executions.Constants.DefaultSerilogLogger);
+            return CreateRunner<TRunner>(DefaultScope, [], logger, serilogLogger);
         }
 
         // If all errors are help commands requested then the user asked for help and arguments are valid
         if (errorsArray.All(err => err.Tag is ErrorType.HelpRequestedError or ErrorType.HelpVerbRequestedError))
-            return CreateRunner<TRunner>(DefaultScope, [], Framework.Executions.Constants.DefaultLogger, Framework.Executions.Constants.DefaultSerilogLogger);
+            return CreateRunner<TRunner>(DefaultScope, [], logger, serilogLogger);
 
-        Framework.Executions.Constants.DefaultLogger.LogCritical("Failed to parse/process the command line arguments");
-        return CreateRunner<TRunner>(DefaultScope, [], Framework.Executions.Constants.DefaultLogger, Framework.Executions.Constants.DefaultSerilogLogger );
+        logger.LogCritical("Failed to parse/process the command line arguments");
+        return CreateRunner<TRunner>(DefaultScope, [], logger, serilogLogger);
     }
 
     // Create a custom runner using activator to dynamically get a new instance of any implementation of TRunner
@@ -116,6 +123,55 @@ public static class Bootstrap
     {
         return Assembly.Load(assemblyName)
             .GetCustomAttribute<AssemblyInformationalVersionAttribute>()!.InformationalVersion;
+    }
+
+    private static bool CanUseFrameworkDefaultLoggers()
+    {
+        try
+        {
+            _ = Framework.Executions.Constants.DefaultLogger;
+            _ = Framework.Executions.Constants.DefaultSerilogLogger;
+            return true;
+        }
+        catch (Exception exception) when (exception is TypeInitializationException or UriFormatException)
+        {
+            return false;
+        }
+    }
+
+    private static (ILogger logger, Serilog.ILogger serilogLogger) GetDefaultLoggers()
+    {
+        if (!ShouldForceDisableSendLogs.Value)
+            return (Framework.Executions.Constants.DefaultLogger, Framework.Executions.Constants.DefaultSerilogLogger);
+
+        var fallbackSerilogLogger = new LoggerConfiguration().WriteTo.Console().CreateLogger();
+        return (new SerilogLoggerFactory(fallbackSerilogLogger).CreateLogger("BootstrapFallbackLogger"),
+            fallbackSerilogLogger);
+    }
+
+    private static RunOptions GetSafeLoggerOptions(RunOptions options)
+    {
+        return ShouldForceDisableSendLogs.Value ? options with { SendLogs = false } : options;
+    }
+
+    private static ActOptions GetSafeLoggerOptions(ActOptions options)
+    {
+        return ShouldForceDisableSendLogs.Value ? options with { SendLogs = false } : options;
+    }
+
+    private static AssertOptions GetSafeLoggerOptions(AssertOptions options)
+    {
+        return ShouldForceDisableSendLogs.Value ? options with { SendLogs = false } : options;
+    }
+
+    private static TemplateOptions GetSafeLoggerOptions(TemplateOptions options)
+    {
+        return ShouldForceDisableSendLogs.Value ? options with { SendLogs = false } : options;
+    }
+
+    private static ExecuteOptions GetSafeLoggerOptions(ExecuteOptions options)
+    {
+        return ShouldForceDisableSendLogs.Value ? options with { SendLogs = false } : options;
     }
 
     private static ILifetimeScope BuildParentContainer()

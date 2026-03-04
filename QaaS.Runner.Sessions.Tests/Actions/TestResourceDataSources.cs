@@ -42,7 +42,8 @@ public static class TestResourceDataSources
             new TestGenerator1(),
             new TestGenerator2()
         };
-        var expectedData = generators.SelectMany(generator => generator.Generate(null, null));
+        var expectedData = generators.SelectMany(generator =>
+            generator.Generate(ImmutableList<SessionData>.Empty, ImmutableList<DataSource>.Empty));
         
         yield return new TestCaseData(
             new List<string>() { "Test", "Test2" }, // name filters
@@ -58,8 +59,8 @@ public static class TestResourceDataSources
             throw new NotImplementedException();
         }
 
-        public Context Context { get; set; }
-        
+        public Context Context { get; set; } = null!;
+
         public IEnumerable<Data<object>> Generate(IImmutableList<SessionData> sessionDataList, IImmutableList<DataSource> dataSourceList)
         {
             for (var i = 0; i < 100; i++)
@@ -76,8 +77,8 @@ public static class TestResourceDataSources
             throw new NotImplementedException();
         }
 
-        public Context Context { get; set; }
-        
+        public Context Context { get; set; } = null!;
+
         public IEnumerable<Data<object>> Generate(IImmutableList<SessionData> sessionDataList, IImmutableList<DataSource> dataSourceList)
         {
             var minuses = new List<int> { -100, -101, -102 };

@@ -1,8 +1,7 @@
-﻿using System.Net;
+using System.Net;
 using System.Text;
-using System.Text.Json;
-using ClosedLibsWrappers.interfaces;
 using Moq;
+using Moq.Protected;
 using NUnit.Framework;
 using QaaS.Runner.Artifactory;
 
@@ -11,10 +10,10 @@ namespace QaaS.Runner.Tests.ArtifactoryTests;
 public class JfrogArtifactoryHelperTests
 {
     [Test,
-     TestCase("REDA",
-         "REDA"),
-     TestCase("REDA",
-         "REDA")]
+     TestCase("https://test-artifactory.com/artifactory/repository/path",
+         "https://test-artifactory.com/artifactory/api/storage/repository/path"),
+     TestCase("http://localhost:8081/artifactory/libs-release-local/com/acme",
+         "http://localhost:8081/artifactory/api/storage/libs-release-local/com/acme")]
     public void
         TestParseArtifactoryFolderUrlToStorageApiUrl_CallFunctionWithValidArtifactoryUrl_ShouldReturnExpectedOutput
         (string folderUrl, string expectedStorageApiUrl)
@@ -27,8 +26,8 @@ public class JfrogArtifactoryHelperTests
     }
 
     [Test,
-     TestCase("REDA"),
-     TestCase("REDA"),
+     TestCase("not-a-valid-uri"),
+     TestCase("/relative/path"),
      TestCase("")]
     public void TestParseArtifactoryFolderUrlToStorageApiUrl_CallFunctionWithInvalidUrl_ShouldThrowUriFormatException
         (string invalidFolderUrl)
@@ -45,71 +44,41 @@ public class JfrogArtifactoryHelperTests
     {
         // Act + Assert
         Assert.Throws<ArgumentException>(() => JfrogArtifactoryHelper.ParseArtifactoryFolderUrlToStorageApiUrl
-            ("REDA"));
+            ("https://test-artifactory.com/repository/path"));
     }
 
     [Test]
     public void TestGetUrlsToAllFilesInArtifactoryFolder_WithNestedStructure_ReturnsAllFilePaths()
     {
         // Arrange
-        var mockHttpClient = new Mock<IHttpClient>();
-        var baseUrl = "https://test-artifactory.com/artifactory/folder1/folder2";
-        var storageApiUrl = "https://test-artifactory.com/artifactory/api/storage/folder1/folder2";
-
-        // Mock response for the storage API call
-        var responseContent = new ArtifactoryApiStorageResponse
-        {
-            Children = new List<ArtifactoryChild>
-            {
-                new ArtifactoryChild { Uri = "file1.txt" },
-                new ArtifactoryChild { Uri = "subfolder/" },
-                new ArtifactoryChild { Uri = "anotherfile.zip" }
-            }
-        };
-
-        var json = JsonSerializer.Serialize(responseContent);
-        var httpResponse = new HttpResponseMessage(HttpStatusCode.OK)
-        {
-            Content = new StringContent(json, Encoding.UTF8, "application/json")
-        };
-
-        mockHttpClient.Setup(http => http.GetAsync(storageApiUrl)).ReturnsAsync(httpResponse);
-
-        // Mock the recursive call for subfolder - need to include the full path
-        var subfolderResponseContent = new ArtifactoryApiStorageResponse
-        {
-            Children = new List<ArtifactoryChild>
-            {
-                new ArtifactoryChild { Uri = "nestedfile.txt" }
-            }
-        };
-        var subpathStorageApiUrls =
-            responseContent.Children
-                .Select(artifactoryItem =>
-                    Path.Combine(storageApiUrl, artifactoryItem.Uri!).Replace("\\", "/"))
-                .Append("https://test-artifactory.com/artifactory/api/storage/folder1/folder2/subfolder/nestedfile.txt")
-                .ToArray();
-
-        var subfolderJson = JsonSerializer.Serialize(subfolderResponseContent);
-        var subfolderHttpResponse = new HttpResponseMessage(HttpStatusCode.OK)
-        {
-            Content = new StringContent(subfolderJson, Encoding.UTF8, "application/json")
-        };
-
-        var subfileResponseContent = new ArtifactoryApiStorageResponse { };
-        var subfileJson = JsonSerializer.Serialize(subfileResponseContent);
-        var subfileHttpResponse = new HttpResponseMessage(HttpStatusCode.OK)
-        {
-            Content = new StringContent(subfileJson, Encoding.UTF8, "application/json")
-        };
-
-        mockHttpClient.Setup(http => http.GetAsync(It.IsIn(subpathStorageApiUrls)))
-            .ReturnsAsync((string s) => Path.HasExtension(s) ? subfileHttpResponse : subfolderHttpResponse);
-
         var helper = new JfrogArtifactoryHelper();
+        var baseUrl = "https://test-artifactory.com/artifactory/folder1/folder2";
+        var storageApiUrl = JfrogArtifactoryHelper.ParseArtifactoryFolderUrlToStorageApiUrl(baseUrl);
+        var fileStorageApiUrl = Path.Join(storageApiUrl, "file1.txt").Replace('\\', '/');
+        var subfolderStorageApiUrl = Path.Join(storageApiUrl, "subfolder/").Replace('\\', '/');
+        var zipStorageApiUrl = Path.Join(storageApiUrl, "anotherfile.zip").Replace('\\', '/');
+        var nestedFileStorageApiUrl = Path.Join(subfolderStorageApiUrl, "nestedfile.txt").Replace('\\', '/');
+
+        var responses = new Dictionary<string, HttpResponseMessage>
+        {
+            [storageApiUrl] = BuildOkJsonResponse(
+                """{"children":[{"uri":"file1.txt"},{"uri":"subfolder/"},{"uri":"anotherfile.zip"}]}"""),
+            [fileStorageApiUrl] = BuildOkJsonResponse("""{"children":null}"""),
+            [subfolderStorageApiUrl] = BuildOkJsonResponse("""{"children":[{"uri":"nestedfile.txt"}]}"""),
+            [zipStorageApiUrl] = BuildOkJsonResponse("""{"children":null}"""),
+            [nestedFileStorageApiUrl] = BuildOkJsonResponse("""{"children":null}""")
+        };
+
+        using var httpClient = BuildHttpClient(uri =>
+        {
+            if (responses.TryGetValue(uri.ToString(), out var response))
+                return response;
+
+            throw new InvalidOperationException($"Missing mocked response for uri {uri}");
+        });
 
         // Act
-        var result = helper.GetUrlsToAllFilesInArtifactoryFolder(baseUrl, mockHttpClient.Object).ToList();
+        var result = helper.GetUrlsToAllFilesInArtifactoryFolder(baseUrl, httpClient).ToList();
 
         // Assert
         Assert.That(result.Count, Is.EqualTo(3));
@@ -126,30 +95,16 @@ public class JfrogArtifactoryHelperTests
         string folderUrl, int expectedCount)
     {
         // Arrange
-        var mockHttpClient = new Mock<IHttpClient>();
-        var storageApiUrl = "https://test-artifactory.com/artifactory/api/storage/" +
-            folderUrl.Split('/').LastOrDefault() ?? "";
-
-        // Mock response for single file or empty children
-        // When Children is null, it represents a file, not a directory
-        var responseContent = new ArtifactoryApiStorageResponse
-        {
-            Children = null // No children means it's a file
-        };
-
-        var json = JsonSerializer.Serialize(responseContent);
-        var httpResponse = new HttpResponseMessage(HttpStatusCode.OK)
-        {
-            Content = new StringContent(json, Encoding.UTF8, "application/json")
-        };
-
-        mockHttpClient.Setup(http => http.GetAsync(storageApiUrl))
-            .ReturnsAsync(httpResponse);
+        var storageApiUrl = JfrogArtifactoryHelper.ParseArtifactoryFolderUrlToStorageApiUrl(folderUrl);
+        using var httpClient = BuildHttpClient(uri =>
+            uri.ToString() == storageApiUrl
+                ? BuildOkJsonResponse("""{"children":null}""")
+                : throw new InvalidOperationException($"Missing mocked response for uri {uri}"));
 
         var helper = new JfrogArtifactoryHelper();
 
         // Act
-        var result = helper.GetUrlsToAllFilesInArtifactoryFolder(folderUrl, mockHttpClient.Object).ToList();
+        var result = helper.GetUrlsToAllFilesInArtifactoryFolder(folderUrl, httpClient).ToList();
 
         // Assert
         Assert.That(result.Count, Is.EqualTo(expectedCount));
@@ -163,64 +118,56 @@ public class JfrogArtifactoryHelperTests
         HttpStatusCode statusCode, Type expectedExceptionType)
     {
         // Arrange
-        var mockHttpClient = new Mock<IHttpClient>();
         var folderUrl = "https://test-artifactory.com/artifactory/folder";
         var storageApiUrl = "https://test-artifactory.com/artifactory/api/storage/folder";
-
-        // Mock failed HTTP response
-        var httpResponse = new HttpResponseMessage(statusCode);
-
-        mockHttpClient.Setup(http => http.GetAsync(storageApiUrl))
-            .ReturnsAsync(httpResponse);
+        using var httpClient = BuildHttpClient(uri =>
+            uri.ToString() == storageApiUrl
+                ? new HttpResponseMessage(statusCode)
+                : throw new InvalidOperationException($"Missing mocked response for uri {uri}"));
 
         var helper = new JfrogArtifactoryHelper();
 
         // Act & Assert
         Assert.Throws(expectedExceptionType, () =>
-            helper.GetUrlsToAllFilesInArtifactoryFolder(folderUrl, mockHttpClient.Object).ToList());
+            helper.GetUrlsToAllFilesInArtifactoryFolder(folderUrl, httpClient).ToList());
     }
 
     [Test]
     public void TestGetUrlsToAllFilesInArtifactoryFolder_WhenChildHasNoUri_ThrowsArgumentException()
     {
         // Arrange
-        var mockHttpClient = new Mock<IHttpClient>();
         var folderUrl = "https://test-artifactory.com/artifactory/folder";
         var storageApiUrl = "https://test-artifactory.com/artifactory/api/storage/folder";
-
-        // Mock response with child that has no URI
-        var responseContent = new ArtifactoryApiStorageResponse
-        {
-            Children = new List<ArtifactoryChild>
-            {
-                new ArtifactoryChild { Uri = null } // Missing URI
-            }
-        };
-
-        var json = JsonSerializer.Serialize(responseContent);
-        var httpResponse = new HttpResponseMessage(HttpStatusCode.OK)
-        {
-            Content = new StringContent(json, Encoding.UTF8, "application/json")
-        };
-
-        mockHttpClient.Setup(http => http.GetAsync(storageApiUrl))
-            .ReturnsAsync(httpResponse);
+        using var httpClient = BuildHttpClient(uri =>
+            uri.ToString() == storageApiUrl
+                ? BuildOkJsonResponse("""{"children":[{}]}""")
+                : throw new InvalidOperationException($"Missing mocked response for uri {uri}"));
 
         var helper = new JfrogArtifactoryHelper();
 
         // Act & Assert
         Assert.Throws<ArgumentException>(() =>
-            helper.GetUrlsToAllFilesInArtifactoryFolder(folderUrl, mockHttpClient.Object).ToList());
+            helper.GetUrlsToAllFilesInArtifactoryFolder(folderUrl, httpClient).ToList());
     }
-}
 
-// Add these classes to support the tests (they would typically be in the main project)
-public class ArtifactoryApiStorageResponse
-{
-    public List<ArtifactoryChild>? Children { get; set; }
-}
+    private static HttpResponseMessage BuildOkJsonResponse(string json)
+    {
+        return new HttpResponseMessage(HttpStatusCode.OK)
+        {
+            Content = new StringContent(json, Encoding.UTF8, "application/json")
+        };
+    }
 
-public class ArtifactoryChild
-{
-    public string? Uri { get; set; }
+    private static HttpClient BuildHttpClient(Func<Uri, HttpResponseMessage> responseFactory)
+    {
+        var handler = new Mock<HttpMessageHandler>();
+        handler.Protected()
+            .Setup<Task<HttpResponseMessage>>(
+                "SendAsync",
+                ItExpr.IsAny<HttpRequestMessage>(),
+                ItExpr.IsAny<CancellationToken>())
+            .ReturnsAsync((HttpRequestMessage request, CancellationToken _) => responseFactory(request.RequestUri!));
+
+        return new HttpClient(handler.Object);
+    }
 }

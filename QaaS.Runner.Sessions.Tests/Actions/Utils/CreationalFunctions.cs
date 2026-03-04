@@ -1,8 +1,6 @@
 using System;
 using System.Collections.Generic;
-using System.IO;
 using System.Linq;
-using System.Runtime.Serialization.Formatters.Binary;
 using Moq;
 using QaaS.Framework.Policies;
 using QaaS.Framework.Protocols.Protocols;
@@ -70,10 +68,9 @@ public static class CreationalFunctions
     
     private static byte[] SerialiseData(string data)
     {
-        using var ms = new MemoryStream();
-        var formatter = new BinaryFormatter();
-        formatter.Serialize(ms, data);
-        return ms.ToArray();
+        var serializer = SerializerFactory.BuildSerializer(SerializationType.Binary);
+        return serializer?.Serialize(data) as byte[]
+               ?? throw new InvalidOperationException("Failed to serialize test data using binary serializer.");
     }
     
     public static List<Data<object>> InitSender(ref Mock<ISender> sender)

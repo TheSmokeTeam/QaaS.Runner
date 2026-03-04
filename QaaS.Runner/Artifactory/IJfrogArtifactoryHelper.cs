@@ -1,6 +1,4 @@
-﻿using ClosedLibsWrappers.interfaces;
-
-namespace QaaS.Runner.Artifactory;
+﻿namespace QaaS.Runner.Artifactory;
 
 /// <summary>
 ///     Contains helper functions for interacting with the jfrog artifactory
@@ -15,5 +13,5 @@ public interface IJfrogArtifactoryHelper
     /// <param name="httpClient"> The http client to perform get requests on the artifactory with </param>
     /// <returns> An enumerable of the urls to all child files under the given artifactoryFolderUrl </returns>
     public IEnumerable<string> GetUrlsToAllFilesInArtifactoryFolder(string artifactoryFolderUrl,
-        IHttpClient httpClient);
+        HttpClient httpClient);
 }

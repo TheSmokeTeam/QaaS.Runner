@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using NUnit.Framework;
+using NUnit.Framework.Legacy;
 using QaaS.Runner.Assertions.ConfigurationObjects.LinkConfigs;
 using QaaS.Runner.Assertions.LinkBuilders;
 
@@ -11,7 +12,7 @@ public class PrometheusLinkBuilderTests
     [Test]
     public void TestBuildWithAllAdditions_BuildUrlWithAllPossibleOptions_UrlShouldContainStringsFromAllOptions()
     {
-        const string url = "REDA",
+        const string url = "url",
             linkName = "test",
             metricA = "input",
             metricB = "output";

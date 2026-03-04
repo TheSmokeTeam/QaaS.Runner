@@ -20,8 +20,8 @@ namespace QaaS.Runner.Sessions.Tests.Actions.Collector;
 [TestFixture]
 public class CollectorBuilderTests
 {
-    private IList<ActionFailure> _actionFailures;
-    private string _sessionName;
+    private IList<ActionFailure> _actionFailures = null!;
+    private string _sessionName = null!;
 
     [SetUp]
     public void SetUp()

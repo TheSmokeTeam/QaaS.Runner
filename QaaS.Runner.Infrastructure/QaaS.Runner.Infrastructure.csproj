@@ -6,15 +6,20 @@
         <Nullable>enable</Nullable>
         <GenerateDocumentationFile>true</GenerateDocumentationFile>
         <VersionPrefix>0.0.0</VersionPrefix>
-        <IsPackable>true</IsPackable>
+        <IsPackable>false</IsPackable>
+        <PackageReadmeFile>README.md</PackageReadmeFile>
     </PropertyGroup>
 
     <ItemGroup>
-        <PackageReference Include="Autofac" Version="8.1.1"/>
-        <PackageReference Include="Microsoft.Extensions.Configuration" Version="10.0.0"/>
-        <PackageReference Include="Microsoft.Extensions.Configuration.Json" Version="10.0.0"/>
-        <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" Version="10.0.0"/>
-        <PackageReference Include="QaaS.Framework.Executions" Version="1.0.0-beta.19" />
+        <PackageReference Include="Autofac" Version="9.0.0" />
+        <PackageReference Include="Microsoft.Extensions.Configuration" Version="10.0.3" />
+        <PackageReference Include="Microsoft.Extensions.Configuration.Json" Version="10.0.3" />
+        <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" Version="10.0.3" />
+        <PackageReference Include="QaaS.Framework.Executions" Version="1.0.1-alpha.3" />
+    </ItemGroup>
+
+    <ItemGroup>
+        <None Include="..\README.md" Pack="true" PackagePath="\" Link="README.md" />
     </ItemGroup>
 
 </Project>

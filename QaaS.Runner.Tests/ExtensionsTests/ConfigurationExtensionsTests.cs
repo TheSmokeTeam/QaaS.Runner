@@ -22,7 +22,9 @@ public class ConfigurationExtensionsTests
                 {
                     Assertion = "test",
                     Name = "3",
-                    Category = "c1"
+                    Category = "c1",
+                    AssertionInstance = null,
+                    Reporter = null
                 });
                 continue;
             }
@@ -33,7 +35,9 @@ public class ConfigurationExtensionsTests
                 {
                     Assertion = "test",
                     Name = "5",
-                    Category = null
+                    Category = null,
+                    AssertionInstance = null,
+                    Reporter = null
                 });
                 continue;
             }
@@ -42,7 +46,9 @@ public class ConfigurationExtensionsTests
             {
                 Assertion = "test",
                 Name = i.ToString(),
-                Category = "c" + i
+                Category = "c" + i,
+                AssertionInstance = null,
+                Reporter = null
             });
         }
 
@@ -97,7 +103,7 @@ public class ConfigurationExtensionsTests
         var filteredAssertionNames = config.Select(assertion => assertion.Name!).ToList();
         filteredAssertionNames.Sort();
         Array.Sort(expectedFilteredAssertionNames);
-        CollectionAssert.AreEqual(filteredAssertionNames, expectedFilteredAssertionNames);
+        Assert.That(filteredAssertionNames, Is.EqualTo(expectedFilteredAssertionNames));
     }
 
     private static SessionBuilder[] CreateSessionConfiguration(int numberOfSessions)
@@ -249,7 +255,7 @@ public class ConfigurationExtensionsTests
             var filteredSessionNames = sessionConfig.Select(session => session.Name).ToList();
             filteredSessionNames.Sort();
             Array.Sort(expectedFilteredSessionNames);
-            CollectionAssert.AreEqual(expectedFilteredSessionNames, filteredSessionNames);
+            Assert.That(filteredSessionNames, Is.EqualTo(expectedFilteredSessionNames));
         }
     }
 
@@ -271,7 +277,7 @@ public class ConfigurationExtensionsTests
 
         var filteredAssertionNames = assertionConfig.Select(assertion => assertion.Name).ToList();
         filteredAssertionNames.Sort();
-        CollectionAssert.AreEqual(new List<string> { "1", "2", "3", "4", "5" }, filteredAssertionNames);
+        Assert.That(filteredAssertionNames, Is.EqualTo(new List<string> { "1", "2", "3", "4", "5" }));
     }
 
     [Test]
@@ -295,6 +301,6 @@ public class ConfigurationExtensionsTests
 
         var filteredSessionNames = sessionsConfig.Select(session => session.Name).ToList();
         filteredSessionNames.Sort();
-        CollectionAssert.AreEqual(new List<string> { "1", "2", "3", "4", "5" }, filteredSessionNames);
+        Assert.That(filteredSessionNames, Is.EqualTo(new List<string> { "1", "2", "3", "4", "5" }));
     }
 }

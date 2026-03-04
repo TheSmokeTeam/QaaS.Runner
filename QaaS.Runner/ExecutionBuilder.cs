@@ -42,7 +42,7 @@ namespace QaaS.Runner;
 /// Builds <see cref="Execution" /> instance
 /// </summary>
 [JsonSchema]
-public class ExecutionBuilder : BaseExecutionBuilder<InternalContext, ExecutionData>
+public class ExecutionBuilder() : BaseExecutionBuilder<InternalContext, ExecutionData>
 {
     /// <summary>
     /// List of all sessions to run.
@@ -100,9 +100,9 @@ public class ExecutionBuilder : BaseExecutionBuilder<InternalContext, ExecutionD
 
     private bool LoadedContext { get; }
 
-    private ILifetimeScope _scope;
+    private ILifetimeScope _scope = new ContainerBuilder().Build().BeginLifetimeScope();
 
-    private readonly List<ValidationResult> _validationResults;
+    private readonly List<ValidationResult> _validationResults = [];
 
     private readonly IList<string>? _sessionNamesToRun;
 
@@ -116,12 +116,6 @@ public class ExecutionBuilder : BaseExecutionBuilder<InternalContext, ExecutionD
     private string? _configuredCaseName;
     private string? _configuredExecutionId;
     private Dictionary<string, object?> _globalDict;
-
-    public ExecutionBuilder()
-    {
-        _validationResults = [];
-        _scope = new ContainerBuilder().Build().BeginLifetimeScope();
-    }
 
     internal ExecutionBuilder(InternalContext context, ExecutionType executionType, IList<string>? sessionNamesToRun,
         IList<string>? sessionCategoriesToRun, IList<string>? assertionNamesToRun,

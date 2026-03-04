@@ -5,15 +5,21 @@
         <ImplicitUsings>enable</ImplicitUsings>
         <Nullable>enable</Nullable>
         <EnableUnsafeBinaryFormatterSerialization>true</EnableUnsafeBinaryFormatterSerialization>
+        <IsPackable>false</IsPackable>
+        <PackageReadmeFile>README.md</PackageReadmeFile>
     </PropertyGroup>
 
     <ItemGroup>
         <PackageReference Include="morelinq" Version="4.4.0"/>
-        <PackageReference Include="StackExchange.Redis" Version="2.8.31"/>
+        <PackageReference Include="StackExchange.Redis" Version="2.11.8" />
     </ItemGroup>
 
     <ItemGroup>
         <ProjectReference Include="..\QaaS.Runner.Infrastructure\QaaS.Runner.Infrastructure.csproj"/>
+    </ItemGroup>
+
+    <ItemGroup>
+        <None Include="..\README.md" Pack="true" PackagePath="\" Link="README.md" />
     </ItemGroup>
 
 </Project>

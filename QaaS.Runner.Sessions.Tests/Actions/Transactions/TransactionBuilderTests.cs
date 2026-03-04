@@ -19,9 +19,9 @@ namespace QaaS.Runner.Sessions.Tests.Actions.Transactions;
 
 public class TransactionBuilderTests
 {
-    private InternalContext _context;
-    private IList<ActionFailure> _actionFailures;
-    private string _sessionName;
+    private InternalContext _context = null!;
+    private IList<ActionFailure> _actionFailures = null!;
+    private string _sessionName = null!;
 
     [SetUp]
     public void SetUp()

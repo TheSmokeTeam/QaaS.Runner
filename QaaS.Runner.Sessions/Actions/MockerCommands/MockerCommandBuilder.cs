@@ -83,11 +83,14 @@ public class MockerCommandBuilder
 
     internal MockerCommand? Build(InternalContext context, IList<ActionFailure> actionFailures, string sessionName)
     {
-        var supportedCommands = new List<object?>
-            { Command!.ChangeActionStub, Command.TriggerAction, Command!.Consume };
         object? type = null;
         try
         {
+            if (Command == null)
+                throw new InvalidOperationException($"Missing command configuration in Mocker Command {Name}");
+
+            var supportedCommands = new List<object?>
+                { Command.ChangeActionStub, Command.TriggerAction, Command.Consume };
             type = supportedCommands.FirstOrDefault(configuredType => configuredType != null) ??
                    throw new InvalidOperationException($"Missing supported type in Mocker Command {Name}");
             if (supportedCommands.Count(config => config != null) > 1)

@@ -1,16 +1,13 @@
-using System;
 using System.Collections.Generic;
 using System.Linq;
 using Moq;
 using NUnit.Framework;
+using NUnit.Framework.Legacy;
 using QaaS.Framework.Policies;
 using QaaS.Framework.Protocols.Protocols;
-using QaaS.Framework.SDK.ContextObjects;
 using QaaS.Framework.SDK.DataSourceObjects;
 using QaaS.Framework.SDK.Session;
 using QaaS.Framework.SDK.Session.DataObjects;
-using QaaS.Framework.SDK.Session.SessionDataObjects;
-using QaaS.Framework.SDK.Session.SessionDataObjects.RunningSessionsObjects;
 using QaaS.Runner.Sessions.Tests.Actions.Utils;
 using Serilog;
 using Serilog.Events;
@@ -21,8 +18,8 @@ namespace QaaS.Runner.Sessions.Tests.Actions.Transactions;
 [TestFixture]
 public class TransactionTests
 {
-    private static Mock<ITransactor>? _transactor;
-    private static List<Data<object>> _infoSent = [];
+    private static Mock<ITransactor> _transactor = null!;
+    private static List<Data<object>> _infoSent = null!;
 
     [Test,
      TestCaseSource(typeof(TestResourceDataSources),

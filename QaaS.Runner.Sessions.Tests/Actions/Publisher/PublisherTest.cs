@@ -6,6 +6,7 @@ using System.Threading;
 using Moq;
 using MoreLinq.Extensions;
 using NUnit.Framework;
+using NUnit.Framework.Legacy;
 using QaaS.Framework.Policies;
 using QaaS.Framework.Protocols.Protocols;
 using QaaS.Framework.SDK.DataSourceObjects;
