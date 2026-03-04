@@ -37,7 +37,7 @@ jobs:
         run: dotnet build ${{ env.SOLUTION_PATH }} --no-restore --configuration ${{ env.CONFIGURATION }}
 
       - name: Test solution
-        run: dotnet test ${{ env.SOLUTION_PATH }} --configuration ${{ env.CONFIGURATION }} --no-restore --no-build --maxcpucount
+        run: dotnet test ${{ env.SOLUTION_PATH }} --configuration ${{ env.CONFIGURATION }} --no-restore --maxcpucount
 
       # --- DEPLOYMENT STEPS (Run only on tags) ---
 
@@ -60,7 +60,7 @@ jobs:
         if: startsWith(github.ref, 'refs/tags/')
         run: |
           dotnet pack ${{ env.PROJECT_TO_PACK }} `
-            --no-restore --no-build `
+            --no-restore `
             --configuration ${{ env.CONFIGURATION }} `
             --include-symbols `
             -p:PackageVersion=${{ steps.version.outputs.version-without-v }} `
