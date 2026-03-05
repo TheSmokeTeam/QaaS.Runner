@@ -317,10 +317,10 @@ public partial class PublisherBuilder
                    throw new InvalidOperationException($"Missing supported type in publisher {Name}");
             
             var (sender, chunkSender) = SenderFactory.CreateSender(Chunk != null, type, context.Logger, DataFilter);
+            var publisherTypeName = sender?.GetType().Name ?? chunkSender?.GetType().Name ?? "Unknown";
             
-            context.Logger.LogDebugWithMetaData("Started building Publisher of type {type}", context.GetMetaDataFromContext(), sender != null 
-                ? sender.GetType().ToString().Split('.').Last()
-                : chunkSender?.GetType().ToString().Split('.').Last());
+            context.Logger.LogDebugWithMetaData("Started building Publisher of type {type}",
+                context.GetMetaDataFromContext(), new object?[] { publisherTypeName });
 
             return sender != null
                 ? new Publisher(Name!, sender, Stage, DataFilter, PolicyBuilder.BuildPolicies(Policies), Loop,

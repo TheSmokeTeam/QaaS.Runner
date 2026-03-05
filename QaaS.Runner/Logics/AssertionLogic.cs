@@ -36,7 +36,7 @@ public class AssertionLogic(IList<Assertion> assertions, InternalContext context
         {
             // Log before execution
             context.Logger.LogInformationWithMetaData("Running assertion {AssertionType} {AssertionName}",
-                metaData, assertion.AssertionName, assertion.Name);
+                metaData, new object?[] { assertion.AssertionName, assertion.Name });
 
             // Execute the assertion
             var result = assertion.Execute(executionData.SessionDatas.ToImmutableList(),
@@ -44,7 +44,7 @@ public class AssertionLogic(IList<Assertion> assertions, InternalContext context
 
             // Log debug with exit code after execution
             context.Logger.LogDebugWithMetaData("Assertion {AssertionName} completed with exit code: {ExitCode}",
-                metaData, assertion.Name, result.AssertionStatus.ToString());
+                metaData, new object?[] { assertion.Name, result.AssertionStatus.ToString() });
 
             assertionResults.Add(result);
         });

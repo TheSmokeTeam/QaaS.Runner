@@ -12,14 +12,14 @@ namespace QaaS.Runner.Assertions.AssertionObjects;
 
 public class Assertion
 {
-    public string Name { get; set; }
+    public string Name { get; set; } = string.Empty;
 
-    public string AssertionName { get; set; }
+    public string AssertionName { get; set; } = string.Empty;
 
 
-    public IAssertion AssertionHook { get; set; }
+    public IAssertion AssertionHook { get; set; } = default!;
     
-    public IList<AssertionStatus> StatussesToReport { get; set; }
+    public IList<AssertionStatus> StatussesToReport { get; set; } = [];
 
     public IConfiguration AssertionConfiguration { get; set; } = new ConfigurationBuilder().Build();
 

@@ -128,7 +128,9 @@ public class MockerCommandBuilder
                     $"Multiple configurations provided for Command '{Name}': {string.Join(", ", conflictingConfigs)}. " +
                     "Only one type is allowed at a time.");
             }
-            context.Logger.LogDebugWithMetaData("Started building MockerCommand of type {type}", context.GetMetaDataFromContext(), type.ToString());
+            var commandTypeName = type.GetType().Name;
+            context.Logger.LogDebugWithMetaData("Started building MockerCommand of type {type}",
+                context.GetMetaDataFromContext(), new object?[] { commandTypeName });
 
             return type switch
             {

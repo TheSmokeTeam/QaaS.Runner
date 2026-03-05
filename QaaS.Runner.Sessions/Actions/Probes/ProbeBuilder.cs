@@ -168,7 +168,9 @@ public class ProbeBuilder : IYamlConvertible
                             ?? throw new ArgumentException($"Probe {Name} of type" +
                                                            $" {Probe} was not found" +
                                                            " in provided probes.");
-            context.Logger.LogDebugWithMetaData("Started building Probe of type {type}", context.GetMetaDataFromContext(), probeHook.ToString());
+            var probeTypeName = probeHook.GetType().Name;
+            context.Logger.LogDebugWithMetaData("Started building Probe of type {type}",
+                context.GetMetaDataFromContext(), new object?[] { probeTypeName });
 
             return new Probe(Name!, Stage, probeHook, DataSourceNames, DataSourcePatterns, context.Logger);
         }

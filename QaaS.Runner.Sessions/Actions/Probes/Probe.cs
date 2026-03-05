@@ -25,8 +25,8 @@ public class Probe : StagedAction
         Logger.LogInformation("Initializing Probe {Name} of type {ProbeType}", Name, ProbeHook.GetType());
     }
 
-    public List<DataSource> DataSources { get; set; }
-    public List<SessionData> SessionDataList { get; set; }
+    public List<DataSource> DataSources { get; set; } = [];
+    public List<SessionData> SessionDataList { get; set; } = [];
 
     public IProbe ProbeHook { get; set; }
 

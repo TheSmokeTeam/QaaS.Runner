@@ -46,12 +46,12 @@ public class AllureWrapper
             RedirectStandardOutput = true,
             RedirectStandardError = true,
             UseShellExecute = false
-        });
+        }) ?? throw new InvalidOperationException("Failed to start Allure serve process.");
 
         // Log process output with logger
-        while (!allureServeProcess?.StandardOutput.EndOfStream ?? false)
+        while (!allureServeProcess.StandardOutput.EndOfStream)
             Console.Out.WriteLine(allureServeProcess.StandardOutput.ReadLine());
-        while (!allureServeProcess?.StandardError.EndOfStream ?? false)
+        while (!allureServeProcess.StandardError.EndOfStream)
             Console.Out.WriteLine(allureServeProcess.StandardError.ReadLine());
     }
 }

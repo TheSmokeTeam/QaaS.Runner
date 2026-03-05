@@ -140,15 +140,19 @@ public static class ConfigurationExtensions
         var assertionsToRun = FilterConfigurationByAssertion(assertionConfiguration, assertionNamesToRun,
             assertionCategoriesToRun, context);
 
-        var allSessions = sessionConfigurations.Select(session => session.Name).ToList();
+        var allSessions = sessionConfigurations
+            .Where(session => session.Name != null)
+            .Select(session => session.Name!)
+            .ToList();
         var sessionsInAssertions =
             assertionsToRun.Where(assertion => assertion.SessionNames != null)
                 .SelectMany(assertion => assertion.SessionNames!);
         var sessionNamePatternsInAssertions =
             assertionsToRun.Where(assertion => assertion.SessionNamePatterns != null)
                 .SelectMany(assertion => assertion.SessionNamePatterns!);
-        var sessionNamesInAssertions = allSessions.Where(s =>
-            sessionNamePatternsInAssertions.Any(p => Regex.IsMatch(s!, p)) || sessionsInAssertions.Contains(s));
+        var sessionNamesInAssertions = allSessions.Where(sessionName =>
+            sessionNamePatternsInAssertions.Any(pattern => Regex.IsMatch(sessionName, pattern)) ||
+            sessionsInAssertions.Contains(sessionName));
 
         sessionNamesToRun = sessionNamesToRun == null
             ? sessionNamesInAssertions.ToList()

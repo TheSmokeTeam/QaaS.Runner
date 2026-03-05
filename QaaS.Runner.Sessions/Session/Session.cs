@@ -192,8 +192,8 @@ public class Session : ISession
         _context.Logger.LogInformation("--- Session {SessionName} Summary ---", sessionData.Name);
         _context.Logger.LogInformationWithMetaData(
             "{SessionName} Duration In Milliseconds: {SessionDurationMilliseconds}",
-            _context.GetMetaDataFromContext(), sessionData.Name,
-            (sessionData.UtcEndTime - sessionData.UtcStartTime).TotalMilliseconds);
+            _context.GetMetaDataFromContext(),
+            new object?[] { sessionData.Name, (sessionData.UtcEndTime - sessionData.UtcStartTime).TotalMilliseconds });
         _context.Logger.LogInformation("Session Utc Start Time: {SessionUtcStartTime}",
             sessionData.UtcStartTime);
         _context.Logger.LogInformation("Session Utc End Time: {SessionUtcEndTime}", sessionData.UtcEndTime);

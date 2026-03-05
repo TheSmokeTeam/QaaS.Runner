@@ -37,7 +37,7 @@ public class Transaction : StagedAction
     private readonly ITransactor _transactor;
 
     private IEnumerable<Data<object>>? _generatedData;
-    private IterableSerializableDataIterator _iterableSerializableSaveIterator;
+    private IterableSerializableDataIterator _iterableSerializableSaveIterator = default!;
     private RunningCommunicationData<object> _receivedRunningCommunicationData;
     private RunningCommunicationData<object> _sentRunningCommunicationData;
 

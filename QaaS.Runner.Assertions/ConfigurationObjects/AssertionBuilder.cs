@@ -475,7 +475,7 @@ public class AssertionBuilder : IYamlConvertible
                                                         $" {Assertion} was not found" +
                                                         " in provided assertions."),
             StatussesToReport = StatusesToReport,
-            AssertionName = null
+            AssertionName = string.Empty
         };
 
         var allLinkBuilders = Links.Concat(linkBuilders ?? []).ToList();
@@ -499,9 +499,7 @@ public class AssertionBuilder : IYamlConvertible
     {
         Reporter = new AllureReporter
         {
-            Name = Name!,
-            Context = null,
-            FileSystem = null
+            Name = Name!
         };
 
         Reporter.DisplayTrace = DisplayTrace;

@@ -32,7 +32,7 @@ public abstract class MockerCommand : StagedAction
 
     protected readonly string ServerName;
     private RunningCommunicationData<object> _receivedRunningCommunicationData;
-    private RunningCommunicationData<object> _sentRunningCommunicationData;
+    private RunningCommunicationData<object> _sentRunningCommunicationData = default!;
     private IList<string> _serverInstanceNames;
 
     protected MockerCommand(string name, int stage, object commandConfig, RedisConfig redisConfig, string serverName,
@@ -129,14 +129,14 @@ public abstract class MockerCommand : StagedAction
         var pingRequestChannel = CommunicationMethods.CreateChannelRunnerToMocker(PingContentType, ServerName);
         var pingResponseChannel = CommunicationMethods.CreateChannelMockerToRunner(PingContentType, ServerName);
 
-        _redisSubscriber.SubscribeAsync(pingResponseChannel, PingResponseHandler);
+        _redisSubscriber.SubscribeAsync(RedisChannel.Literal(pingResponseChannel), PingResponseHandler);
         Logger.LogDebug("Subscribed to Ping Responses Channel");
 
         Thread.Sleep(_requestDurationMs);
         for (var retryIndex = 1; retryIndex <= _requestRetries; retryIndex++)
         {
             Logger.LogDebug("Ping Request {RetryIndex}", retryIndex);
-            _redisSubscriber.Publish(pingRequestChannel, PingRequestConstructor());
+            _redisSubscriber.Publish(RedisChannel.Literal(pingRequestChannel), PingRequestConstructor());
             Thread.Sleep(_requestDurationMs);
             if (_serverInstanceNames.Count != 0)
                 break;
@@ -172,7 +172,7 @@ public abstract class MockerCommand : StagedAction
         {
             var responseChannel = CommunicationMethods.CreateChannelMockerToRunner(CommandContentType,
                 ServerName, serverInstance);
-            _redisSubscriber.SubscribeAsync(responseChannel, CommandResponseHandler);
+            _redisSubscriber.SubscribeAsync(RedisChannel.Literal(responseChannel), CommandResponseHandler);
             Logger.LogDebug("Subscribed to '{ResponseChannel}' Response Channel", responseChannel);
         }
 
@@ -184,7 +184,7 @@ public abstract class MockerCommand : StagedAction
             {
                 var requestChannel = CommunicationMethods.CreateChannelRunnerToMocker(CommandContentType,
                     ServerName, serverInstance);
-                _redisSubscriber.Publish(requestChannel, CommandRequestConstructor());
+                _redisSubscriber.Publish(RedisChannel.Literal(requestChannel), CommandRequestConstructor());
             }
 
             Thread.Sleep(_requestDurationMs);

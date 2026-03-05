@@ -112,10 +112,10 @@ public class ExecutionBuilder() : BaseExecutionBuilder<InternalContext, Executio
 
     private readonly IList<string>? _assertionCategoriesToRun;
 
-    private ILogger _configuredLogger;
+    private ILogger _configuredLogger = default!;
     private string? _configuredCaseName;
     private string? _configuredExecutionId;
-    private Dictionary<string, object?> _globalDict;
+    private Dictionary<string, object?> _globalDict = new();
 
     internal ExecutionBuilder(InternalContext context, ExecutionType executionType, IList<string>? sessionNamesToRun,
         IList<string>? sessionCategoriesToRun, IList<string>? assertionNamesToRun,
@@ -391,7 +391,7 @@ public class ExecutionBuilder() : BaseExecutionBuilder<InternalContext, Executio
             containerBuilder.RegisterInstance(new ByNameObjectCreator(Context.Logger)).As<IByNameObjectCreator>();
 
             containerBuilder.Register<IComponentContext, IEnumerable<HookData<IAssertion>>>(_ =>
-                Assertions.Select(assertion => new HookData<IAssertion>
+                (Assertions ?? []).Select(assertion => new HookData<IAssertion>
                 {
                     Type = assertion.Assertion!,
                     Configuration = assertion.AssertionConfiguration,
@@ -399,7 +399,7 @@ public class ExecutionBuilder() : BaseExecutionBuilder<InternalContext, Executio
                 })
             ).InstancePerLifetimeScope(); // Loads all IAssertion hooks
             containerBuilder.Register<IComponentContext, IEnumerable<HookData<IGenerator>>>(_ =>
-                DataSources.Select(dataSourceConfig => new HookData<IGenerator>
+                (DataSources ?? []).Select(dataSourceConfig => new HookData<IGenerator>
                 {
                     Type = dataSourceConfig.Generator!,
                     Configuration = dataSourceConfig.GeneratorConfiguration,
@@ -408,13 +408,13 @@ public class ExecutionBuilder() : BaseExecutionBuilder<InternalContext, Executio
             ).InstancePerLifetimeScope(); // Loads all IGenerator hooks
             containerBuilder
                 .Register<IComponentContext, IEnumerable<HookData<IProbe>>>(_ =>
-                    Sessions.Select(sessionBuilder => sessionBuilder.Probes?.Select(probeBuilder =>
+                    (Sessions ?? []).SelectMany(sessionBuilder => sessionBuilder.Probes?.Select(probeBuilder =>
                         new HookData<IProbe>
                         {
                             Type = probeBuilder.Probe!,
                             Configuration = probeBuilder.ProbeConfiguration,
                             Name = probeBuilder.Name!
-                        })).SelectMany(probe => probe))
+                        }) ?? Enumerable.Empty<HookData<IProbe>>()))
                 .InstancePerLifetimeScope(); // Loads all IProbe hooks
             containerBuilder.RegisterModule(
                 new HooksLoaderModule<IAssertion>(_validationResults)); // Loads all IAssertion hooks
@@ -468,9 +468,9 @@ public class ExecutionBuilder() : BaseExecutionBuilder<InternalContext, Executio
     /// </summary>
     private void FilterConfigurationsBasedOnFlags()
     {
-        Assertions =
-            Assertions.FilterConfigurationByAssertion(_assertionNamesToRun, _assertionCategoriesToRun, Context);
-        Sessions = Sessions.FilterConfigurationBySessionsAndAssertions(Assertions, _sessionNamesToRun,
+        Assertions = (Assertions ?? [])
+            .FilterConfigurationByAssertion(_assertionNamesToRun, _assertionCategoriesToRun, Context);
+        Sessions = (Sessions ?? []).FilterConfigurationBySessionsAndAssertions(Assertions, _sessionNamesToRun,
             _assertionNamesToRun, _sessionCategoriesToRun, _assertionCategoriesToRun, Context);
     }
 

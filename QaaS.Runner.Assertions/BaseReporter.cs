@@ -19,12 +19,12 @@ public abstract class BaseReporter : IReporter
         ProtobufAttachmentType = "application/x-protobuff",
         MessagePackAttachmentType = "application/x-msgpack";
 
-    public Context Context;
+    public Context Context = default!;
 
-    public IFileSystem FileSystem;
+    public IFileSystem FileSystem = default!;
 
     public AssertionSeverity Severity { get; set; }
-    public string Name { get; set; }
+    public string Name { get; set; } = string.Empty;
     public bool SaveSessionData { get; set; }
     public bool SaveAttachments { get; set; }
     public bool SaveTemplate { get; set; }

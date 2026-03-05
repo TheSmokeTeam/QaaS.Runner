@@ -18,7 +18,7 @@ namespace QaaS.Runner.Sessions.Actions.Publishers;
 
 public abstract class BasePublisher : StagedAction
 {
-    protected RunningCommunicationData<object> RunningCommunicationData;
+    protected RunningCommunicationData<object> RunningCommunicationData = default!;
     protected readonly DataFilter DataFilter;
     private readonly string[]? _dataSourceNames;
     private readonly string[]? _dataSourcePatterns;
@@ -29,7 +29,7 @@ public abstract class BasePublisher : StagedAction
     protected readonly SerializationType? SerializationType;
     private readonly ISerializer? _serializer;
     protected IEnumerable<Data<object>>? GeneratedData;
-    protected IterableSerializableDataIterator IterableSerializableSaveIterator;
+    protected IterableSerializableDataIterator IterableSerializableSaveIterator = default!;
     protected SemaphoreSlim? ParallelismSemaphore;
 
     protected BasePublisher(string name, int stage, DataFilter dataFilter, string[]? dataSourceNames,

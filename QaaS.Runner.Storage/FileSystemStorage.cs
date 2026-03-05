@@ -29,9 +29,10 @@ public class FileSystemStorage : BaseStorage
         foreach (var fileNameSerializedSessionDataPair in sessionFileNameAndSerializedSessionDataItemsToStorePair)
         {
             var sessionDataFilePath = Path.Combine(directoryFullPath, fileNameSerializedSessionDataPair.Key);
+            var sessionDataDirectoryPath = Path.GetDirectoryName(sessionDataFilePath) ?? directoryFullPath;
             // Check if the directory needed to write the session data to exists, if not create it!
-            if (!_fileSystem.Directory.Exists(Path.GetDirectoryName(sessionDataFilePath)))
-                _fileSystem.Directory.CreateDirectory(Path.GetDirectoryName(sessionDataFilePath));
+            if (!_fileSystem.Directory.Exists(sessionDataDirectoryPath))
+                _fileSystem.Directory.CreateDirectory(sessionDataDirectoryPath);
 
             _context.Logger.LogDebug("Storing sessionData at file {SessionDataFilePath}", sessionDataFilePath);
             _fileSystem.File.WriteAllBytes(sessionDataFilePath, fileNameSerializedSessionDataPair.Value);

@@ -208,10 +208,10 @@ public partial class ConsumerBuilder
                    throw new InvalidOperationException($"Missing supported type in consumer {Name}");
 
             var (reader, chunkReader) = ReaderFactory.CreateReader(type, context.Logger, DataFilter);
+            var consumerTypeName = reader?.GetType().Name ?? chunkReader?.GetType().Name ?? "Unknown";
             
-            context.Logger.LogDebugWithMetaData("Started building Consumer of type {type}", context.GetMetaDataFromContext(), reader != null 
-                ? reader.GetType().ToString().Split('.').Last() 
-                : chunkReader?.GetType().ToString().Split('.').Last());
+            context.Logger.LogDebugWithMetaData("Started building Consumer of type {type}",
+                context.GetMetaDataFromContext(), new object?[] { consumerTypeName });
 
             return reader != null
                 ? new Consumer(Name!, reader, timeout, Stage, policies, DataFilter, serializationType,

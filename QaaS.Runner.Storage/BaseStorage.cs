@@ -17,7 +17,7 @@ public abstract class BaseStorage : IStorage
         this.jsonStorageFormat = jsonStorageFormat;
     }
 
-    public Context _context { get; set; }
+    public Context _context { get; set; } = default!;
 
     public void Store(ImmutableList<SessionData?>? sessionDataList, string? caseName)
     {

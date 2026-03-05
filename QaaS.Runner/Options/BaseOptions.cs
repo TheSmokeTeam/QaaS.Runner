@@ -22,14 +22,14 @@ public abstract record BaseOptions : LoggerOptions
     [Option('w', "with-files", Default = null,
         HelpText =
             "List of files to overwrite the qaas configuration with, The first file overwrites the qaas configuration file and then the one after it overwrite the result and so on...")]
-    public IList<string> OverwriteFiles { get; init; }
+    public IList<string> OverwriteFiles { get; init; } = Array.Empty<string>();
 
     [Option('r', "overwrite-arguments", Default = null,
         HelpText = @"
 List of arguments to overwrite the qaas configuration with, The first argument overwrites the qaas configuration and then the one after it overwrites the result and so on...
 For example: `Path:To:Variable:To:Overwrite=NewVariableValue`
 ")]
-    public IList<string> OverwriteArguments { get; init; }
+    public IList<string> OverwriteArguments { get; init; } = Array.Empty<string>();
 
     [Option('p', "push-references", Default = null,
         HelpText = @"

@@ -8,7 +8,7 @@ namespace QaaS.Runner.Assertions.AssertionObjects;
 /// </summary>
 public record AssertionResult : IAssertionResult
 {
-    public Assertion Assertion { get; set; }
+    public Assertion Assertion { get; set; } = default!;
 
     /// <summary>
     ///     The assertion's execution status
@@ -33,5 +33,5 @@ public record AssertionResult : IAssertionResult
     /// <summary>
     ///     Contain data about the flakiness of the assertion
     /// </summary>
-    public Flaky Flaky { get; init; }
+    public Flaky Flaky { get; init; } = default!;
 }

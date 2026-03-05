@@ -124,7 +124,9 @@ public class CollectorBuilder
 
             type = allTypes.FirstOrDefault(configuredType => configuredType != null) ??
                    throw new InvalidOperationException($"Missing supported type in collector {Name}");
-            context.Logger.LogDebugWithMetaData("Started building Collector of type {type}", context.GetMetaDataFromContext(), type.ToString());
+            var collectorTypeName = type.GetType().Name;
+            context.Logger.LogDebugWithMetaData("Started building Collector of type {type}",
+                context.GetMetaDataFromContext(), new object?[] { collectorTypeName });
 
             var fetcher = FetcherFactory.CreateFetcher(type, context.Logger);
             

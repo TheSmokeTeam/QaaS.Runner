@@ -18,7 +18,7 @@ public abstract class BaseConsumer : StagedAction
     private readonly Type? _deserializerSpecificType;
     protected readonly SerializationType? SerializationType;
     protected readonly TimeSpan TimeoutMs;
-    protected RunningCommunicationData<object> RunningCommunicationData;
+    protected RunningCommunicationData<object> RunningCommunicationData = default!;
 
     protected BaseConsumer(string name, TimeSpan timeoutMs, int stage, Policy? policies, DataFilter dataFilter,
         SerializationType? serializationType, Type? deserializerSpecificType, ILogger logger) : base(name, stage,
