@@ -48,7 +48,7 @@ public partial class SessionBuilder
 
     public SessionBuilder DiscardData()
     {
-        SaveData = true;
+        SaveData = false;
         return this;
     }
 
@@ -64,9 +64,53 @@ public partial class SessionBuilder
         return this;
     }
 
+    public SessionBuilder CreateConsumer(ConsumerBuilder consumerBuilder)
+    {
+        return AddConsumer(consumerBuilder);
+    }
+
+    public IReadOnlyList<ConsumerBuilder> ReadConsumers()
+    {
+        return Consumers ?? [];
+    }
+
+    public SessionBuilder UpdateConsumer(string name, ConsumerBuilder consumerBuilder)
+    {
+        Consumers = UpdateByName(Consumers, name, consumerBuilder, consumer => consumer.Name);
+        return this;
+    }
+
+    public SessionBuilder DeleteConsumer(string name)
+    {
+        Consumers = DeleteByName(Consumers, name, consumer => consumer.Name);
+        return this;
+    }
+
     public SessionBuilder AddPublisher(PublisherBuilder publisherBuilder)
     {
         Publishers = Publishers is null ? [publisherBuilder] : Publishers.Append(publisherBuilder).ToArray();
+        return this;
+    }
+
+    public SessionBuilder CreatePublisher(PublisherBuilder publisherBuilder)
+    {
+        return AddPublisher(publisherBuilder);
+    }
+
+    public IReadOnlyList<PublisherBuilder> ReadPublishers()
+    {
+        return Publishers ?? [];
+    }
+
+    public SessionBuilder UpdatePublisher(string name, PublisherBuilder publisherBuilder)
+    {
+        Publishers = UpdateByName(Publishers, name, publisherBuilder, publisher => publisher.Name);
+        return this;
+    }
+
+    public SessionBuilder DeletePublisher(string name)
+    {
+        Publishers = DeleteByName(Publishers, name, publisher => publisher.Name);
         return this;
     }
 
@@ -76,15 +120,81 @@ public partial class SessionBuilder
         return this;
     }
 
+    public SessionBuilder CreateTransaction(TransactionBuilder transactionBuilder)
+    {
+        return AddTransaction(transactionBuilder);
+    }
+
+    public IReadOnlyList<TransactionBuilder> ReadTransactions()
+    {
+        return Transactions ?? [];
+    }
+
+    public SessionBuilder UpdateTransaction(string name, TransactionBuilder transactionBuilder)
+    {
+        Transactions = UpdateByName(Transactions, name, transactionBuilder, transaction => transaction.Name);
+        return this;
+    }
+
+    public SessionBuilder DeleteTransaction(string name)
+    {
+        Transactions = DeleteByName(Transactions, name, transaction => transaction.Name);
+        return this;
+    }
+
     public SessionBuilder AddProbe(ProbeBuilder probeBuilder)
     {
         Probes = Probes is null ? [probeBuilder] : Probes.Append(probeBuilder).ToArray();
         return this;
     }
 
+    public SessionBuilder CreateProbe(ProbeBuilder probeBuilder)
+    {
+        return AddProbe(probeBuilder);
+    }
+
+    public IReadOnlyList<ProbeBuilder> ReadProbes()
+    {
+        return Probes ?? [];
+    }
+
+    public SessionBuilder UpdateProbe(string name, ProbeBuilder probeBuilder)
+    {
+        Probes = UpdateByName(Probes, name, probeBuilder, probe => probe.Name);
+        return this;
+    }
+
+    public SessionBuilder DeleteProbe(string name)
+    {
+        Probes = DeleteByName(Probes, name, probe => probe.Name);
+        return this;
+    }
+
     public SessionBuilder AddCollector(CollectorBuilder collectorBuilder)
     {
         Collectors = Collectors is null ? [collectorBuilder] : Collectors.Append(collectorBuilder).ToArray();
+        return this;
+    }
+
+    public SessionBuilder CreateCollector(CollectorBuilder collectorBuilder)
+    {
+        return AddCollector(collectorBuilder);
+    }
+
+    public IReadOnlyList<CollectorBuilder> ReadCollectors()
+    {
+        return Collectors ?? [];
+    }
+
+    public SessionBuilder UpdateCollector(string name, CollectorBuilder collectorBuilder)
+    {
+        Collectors = UpdateByName(Collectors, name, collectorBuilder, collector => collector.Name);
+        return this;
+    }
+
+    public SessionBuilder DeleteCollector(string name)
+    {
+        Collectors = DeleteByName(Collectors, name, collector => collector.Name);
         return this;
     }
 
@@ -96,12 +206,65 @@ public partial class SessionBuilder
         return this;
     }
 
+    public SessionBuilder CreateMockerCommand(MockerCommandBuilder mockerCommandBuilder)
+    {
+        return AddMockerCommand(mockerCommandBuilder);
+    }
+
+    public IReadOnlyList<MockerCommandBuilder> ReadMockerCommands()
+    {
+        return MockerCommands ?? [];
+    }
+
+    public SessionBuilder UpdateMockerCommand(string name, MockerCommandBuilder mockerCommandBuilder)
+    {
+        MockerCommands = UpdateByName(MockerCommands, name, mockerCommandBuilder, command => command.Name);
+        return this;
+    }
+
+    public SessionBuilder DeleteMockerCommand(string name)
+    {
+        MockerCommands = DeleteByName(MockerCommands, name, command => command.Name);
+        return this;
+    }
+
     public SessionBuilder AddStage(StageConfig stage)
     {
         Stages = Stages.Append(stage).ToArray();
         return this;
     }
 
+    public SessionBuilder CreateStage(StageConfig stage)
+    {
+        return AddStage(stage);
+    }
+
+    public IReadOnlyList<StageConfig> ReadStages()
+    {
+        return Stages;
+    }
+
+    public SessionBuilder UpdateStage(int stageNumber, StageConfig stage)
+    {
+        var existingIndex = Array.FindIndex(Stages, configuredStage => configuredStage.StageNumber == stageNumber);
+        if (existingIndex < 0)
+        {
+            return this;
+        }
+
+        Stages[existingIndex] = stage;
+        return this;
+    }
+
+    public SessionBuilder DeleteStage(int stageNumber)
+    {
+        Stages = Stages.Where(configuredStage => configuredStage.StageNumber != stageNumber).ToArray();
+        return this;
+    }
+
+    /// <summary>
+    /// Builds every configured action for the session, collects action-level failures, and groups staged actions.
+    /// </summary>
     internal Session Build(InternalContext context, IList<KeyValuePair<string, IProbe>> probeHooks)
     {
         var actionFailures = new List<ActionFailure>();
@@ -170,5 +333,27 @@ public partial class SessionBuilder
         }
 
         return stages;
+    }
+
+    private static T[]? UpdateByName<T>(T[]? values, string name, T replacement, Func<T, string?> nameSelector)
+    {
+        if (values == null)
+        {
+            return values;
+        }
+
+        var index = Array.FindIndex(values, value => nameSelector(value) == name);
+        if (index < 0)
+        {
+            return values;
+        }
+
+        values[index] = replacement;
+        return values;
+    }
+
+    private static T[]? DeleteByName<T>(T[]? values, string name, Func<T, string?> nameSelector)
+    {
+        return values?.Where(value => nameSelector(value) != name).ToArray();
     }
 }

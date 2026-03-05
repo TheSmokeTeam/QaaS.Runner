@@ -40,6 +40,29 @@ public class StorageBuilder
         return this;
     }
 
+    public StorageBuilder Create(IStorageConfig storageConfig)
+    {
+        return Configure(storageConfig);
+    }
+
+    public IStorageConfig? ReadConfiguration()
+    {
+        return (IStorageConfig?)S3 ?? FileSystem;
+    }
+
+    public StorageBuilder UpdateConfiguration(Func<IStorageConfig, IStorageConfig> update)
+    {
+        var currentConfig = ReadConfiguration() ??
+                            throw new InvalidOperationException("Storage configuration is not set");
+        return Configure(update(currentConfig));
+    }
+
+    public StorageBuilder DeleteConfiguration()
+    {
+        Reset();
+        return this;
+    }
+
     public StorageBuilder Configure(IStorageConfig storageConfig)
     {
         Reset();
@@ -56,9 +79,24 @@ public class StorageBuilder
         return this;
     }
 
+    /// <summary>
+    /// Builds a runtime storage instance from the configured type and wires the execution context into it.
+    /// </summary>
     internal IStorage Build(Context context)
     {
-        var storageType = new List<object?> { S3, FileSystem }.FirstOrDefault(storage => storage != null) ??
+        var configuredStorages = new List<object?> { S3, FileSystem };
+        if (configuredStorages.Count(storage => storage != null) > 1)
+        {
+            var conflictingConfigs = configuredStorages
+                .Where(storage => storage != null)
+                .Select(storage => storage!.GetType().Name)
+                .ToArray();
+            throw new InvalidOperationException(
+                $"Multiple configurations provided for Storage: {string.Join(", ", conflictingConfigs)}. " +
+                "Only one type is allowed at a time.");
+        }
+
+        var storageType = configuredStorages.FirstOrDefault(storage => storage != null) ??
                           throw new InvalidOperationException("Missing supported type for storage");
         BaseStorage storage = storageType! switch
         {

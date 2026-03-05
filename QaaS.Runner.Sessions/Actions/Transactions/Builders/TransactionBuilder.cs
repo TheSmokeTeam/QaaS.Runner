@@ -131,12 +131,22 @@ public class TransactionBuilder
         return this;
     }
 
+    public TransactionBuilder CreateDataSource(string dataSourceName)
+    {
+        return AddDataSource(dataSourceName);
+    }
+
     public TransactionBuilder AddDataSourcePattern(string dataSourcePattern)
     {
         var dataSourcePatternsList = DataSourcePatterns?.ToList() ?? [];
         dataSourcePatternsList.Add(dataSourcePattern);
         DataSourcePatterns = dataSourcePatternsList.ToArray();
         return this;
+    }
+
+    public TransactionBuilder CreateDataSourcePattern(string dataSourcePattern)
+    {
+        return AddDataSourcePattern(dataSourcePattern);
     }
 
     public TransactionBuilder InLoops()
@@ -149,6 +159,122 @@ public class TransactionBuilder
     {
         SleepTimeMs = sleepTimeMs;
         return this;
+    }
+
+    public TransactionBuilder AddPolicy(PolicyBuilder policy)
+    {
+        var policies = Policies.ToList();
+        policies.Add(policy);
+        Policies = policies.ToArray();
+        return this;
+    }
+
+    public TransactionBuilder CreatePolicy(PolicyBuilder policy)
+    {
+        return AddPolicy(policy);
+    }
+
+    public IReadOnlyList<PolicyBuilder> ReadPolicies()
+    {
+        return Policies;
+    }
+
+    public TransactionBuilder UpdatePolicyAt(int index, PolicyBuilder policy)
+    {
+        if (index < 0 || index >= Policies.Length)
+        {
+            throw new ArgumentOutOfRangeException(nameof(index));
+        }
+
+        Policies[index] = policy;
+        return this;
+    }
+
+    public TransactionBuilder DeletePolicyAt(int index)
+    {
+        if (index < 0 || index >= Policies.Length)
+        {
+            throw new ArgumentOutOfRangeException(nameof(index));
+        }
+
+        Policies = Policies.Where((_, i) => i != index).ToArray();
+        return this;
+    }
+
+    public IReadOnlyList<string> ReadDataSources()
+    {
+        return DataSourceNames ?? [];
+    }
+
+    public TransactionBuilder UpdateDataSource(string existingValue, string newValue)
+    {
+        if (DataSourceNames == null)
+        {
+            return this;
+        }
+
+        var index = Array.IndexOf(DataSourceNames, existingValue);
+        if (index >= 0)
+        {
+            DataSourceNames[index] = newValue;
+        }
+
+        return this;
+    }
+
+    public TransactionBuilder DeleteDataSource(string dataSourceName)
+    {
+        DataSourceNames = DataSourceNames?.Where(value => value != dataSourceName).ToArray();
+        return this;
+    }
+
+    public IReadOnlyList<string> ReadDataSourcePatterns()
+    {
+        return DataSourcePatterns ?? [];
+    }
+
+    public TransactionBuilder UpdateDataSourcePattern(string existingValue, string newValue)
+    {
+        if (DataSourcePatterns == null)
+        {
+            return this;
+        }
+
+        var index = Array.IndexOf(DataSourcePatterns, existingValue);
+        if (index >= 0)
+        {
+            DataSourcePatterns[index] = newValue;
+        }
+
+        return this;
+    }
+
+    public TransactionBuilder DeleteDataSourcePattern(string dataSourcePattern)
+    {
+        DataSourcePatterns = DataSourcePatterns?.Where(value => value != dataSourcePattern).ToArray();
+        return this;
+    }
+
+    public TransactionBuilder CreateConfiguration(ITransactorConfig config)
+    {
+        return Configure(config);
+    }
+
+    public ITransactorConfig? ReadConfiguration()
+    {
+        return (ITransactorConfig?)Http ?? Grpc;
+    }
+
+    public TransactionBuilder UpdateConfiguration(Func<ITransactorConfig, ITransactorConfig> update)
+    {
+        var currentConfig = ReadConfiguration() ??
+                            throw new InvalidOperationException("Transaction configuration is not set");
+        return Configure(update(currentConfig));
+    }
+
+    public TransactionBuilder DeleteConfiguration()
+    {
+        return Reset();
     }
 
     private TransactionBuilder Reset()
@@ -174,6 +300,10 @@ public class TransactionBuilder
         return this;
     }
 
+    /// <summary>
+    /// Builds a runtime transaction action with validated transactor configuration and policy pipeline.
+    /// Failures are collected in <paramref name="actionFailures"/> and return null.
+    /// </summary>
     internal Transaction? Build(InternalContext context, IList<ActionFailure> actionFailures, string sessionName)
     {
         ITransactorConfig? type = null;

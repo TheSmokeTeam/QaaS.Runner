@@ -56,6 +56,29 @@ public class CollectorBuilder
         return this;
     }
 
+    public CollectorBuilder Create(IFetcherConfig config)
+    {
+        return Configure(config);
+    }
+
+    public IFetcherConfig? ReadConfiguration()
+    {
+        return Prometheus;
+    }
+
+    public CollectorBuilder UpdateConfiguration(Func<IFetcherConfig, IFetcherConfig> update)
+    {
+        var currentConfig = ReadConfiguration() ??
+                            throw new InvalidOperationException("Collector configuration is not set");
+        return Configure(update(currentConfig));
+    }
+
+    public CollectorBuilder DeleteConfiguration()
+    {
+        Reset();
+        return this;
+    }
+
     private void Reset()
     {
         Prometheus = null;
@@ -76,6 +99,9 @@ public class CollectorBuilder
         return this;
     }
 
+    /// <summary>
+    /// Creates a runtime collector action and captures failures into <paramref name="actionFailures"/> instead of throwing.
+    /// </summary>
     internal Collector? Build(InternalContext context, IList<ActionFailure> actionFailures, string sessionName)
     {
         IFetcherConfig? type = null;

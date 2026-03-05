@@ -58,6 +58,69 @@ public partial class ConsumerBuilder
         return this;
     }
 
+    public ConsumerBuilder CreatePolicy(PolicyBuilder policy)
+    {
+        return AddPolicy(policy);
+    }
+
+    public IReadOnlyList<PolicyBuilder> ReadPolicies()
+    {
+        return Policies;
+    }
+
+    public ConsumerBuilder UpdatePolicyAt(int index, PolicyBuilder policy)
+    {
+        if (index < 0 || index >= Policies.Length)
+        {
+            throw new ArgumentOutOfRangeException(nameof(index));
+        }
+
+        Policies[index] = policy;
+        return this;
+    }
+
+    public ConsumerBuilder DeletePolicyAt(int index)
+    {
+        if (index < 0 || index >= Policies.Length)
+        {
+            throw new ArgumentOutOfRangeException(nameof(index));
+        }
+
+        Policies = Policies.Where((_, i) => i != index).ToArray();
+        return this;
+    }
+
+    public ConsumerBuilder CreateConfiguration(IReaderConfig config)
+    {
+        return Configure(config);
+    }
+
+    public IReaderConfig? ReadConfiguration()
+    {
+        if (RabbitMq != null) return RabbitMq;
+        if (KafkaTopic != null) return KafkaTopic;
+        if (Socket != null) return Socket;
+        if (IbmMqQueue != null) return IbmMqQueue;
+        if (PostgreSqlTable != null) return PostgreSqlTable;
+        if (OracleSqlTable != null) return OracleSqlTable;
+        if (MsSqlTable != null) return MsSqlTable;
+        if (TrinoSqlTable != null) return TrinoSqlTable;
+        if (ElasticIndices != null) return ElasticIndices;
+        return S3Bucket;
+    }
+
+    public ConsumerBuilder UpdateConfiguration(Func<IReaderConfig, IReaderConfig> update)
+    {
+        var currentConfig = ReadConfiguration() ??
+                            throw new InvalidOperationException("Consumer configuration is not set");
+        return Configure(update(currentConfig));
+    }
+
+    public ConsumerBuilder DeleteConfiguration()
+    {
+        return Reset();
+    }
+
     private ConsumerBuilder Reset()
     {
         RabbitMq = null;
@@ -113,6 +176,9 @@ public partial class ConsumerBuilder
         return this;
     }
 
+    /// <summary>
+    /// Builds a concrete consumer action and degrades to an action failure instead of throwing on invalid setup.
+    /// </summary>
     internal BaseConsumer? Build(InternalContext context, IList<ActionFailure> actionFailures, string sessionName)
     {
         IReaderConfig? type = null;

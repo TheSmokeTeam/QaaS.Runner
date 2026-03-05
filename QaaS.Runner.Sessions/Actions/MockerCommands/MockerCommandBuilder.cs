@@ -80,7 +80,32 @@ public class MockerCommandBuilder
         return this;
     }
 
+    public MockerCommandBuilder CreateCommand(CommandConfig command)
+    {
+        return WithCommand(command);
+    }
 
+    public CommandConfig? ReadCommand()
+    {
+        return Command;
+    }
+
+    public MockerCommandBuilder UpdateCommand(Func<CommandConfig, CommandConfig> update)
+    {
+        Command = update(Command ?? throw new InvalidOperationException("Command configuration is not set"));
+        return this;
+    }
+
+    public MockerCommandBuilder DeleteCommand()
+    {
+        Command = null;
+        return this;
+    }
+
+
+    /// <summary>
+    /// Builds the configured mocker command type and writes recoverable build failures to <paramref name="actionFailures"/>.
+    /// </summary>
     internal MockerCommand? Build(InternalContext context, IList<ActionFailure> actionFailures, string sessionName)
     {
         object? type = null;

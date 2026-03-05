@@ -26,6 +26,39 @@ public class LinkBuilder
         Name = name;
         return this;
     }
+
+    public LinkBuilder Create(ILinkConfig config)
+    {
+        return Configure(config);
+    }
+
+    public ILinkConfig? ReadConfiguration()
+    {
+        if (Kibana != null)
+        {
+            return Kibana;
+        }
+
+        if (Prometheus != null)
+        {
+            return Prometheus;
+        }
+
+        return Grafana;
+    }
+
+    public LinkBuilder UpdateConfiguration(Func<ILinkConfig, ILinkConfig> update)
+    {
+        var currentConfig = ReadConfiguration() ??
+                            throw new InvalidOperationException("Link configuration is not set");
+        return Configure(update(currentConfig));
+    }
+
+    public LinkBuilder DeleteConfiguration()
+    {
+        Reset();
+        return this;
+    }
     
     private LinkBuilder Reset()
     {
@@ -54,6 +87,9 @@ public class LinkBuilder
         return this;
     }
 
+    /// <summary>
+    /// Builds the concrete link implementation and validates only one link source is configured.
+    /// </summary>
     internal BaseLink Build()
     {
         var allTypes = new List<ILinkConfig?>

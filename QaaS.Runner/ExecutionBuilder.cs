@@ -214,9 +214,53 @@ public class ExecutionBuilder() : BaseExecutionBuilder<InternalContext, Executio
         return this;
     }
 
+    public ExecutionBuilder CreateSession(SessionBuilder sessionBuilder)
+    {
+        return AddSession(sessionBuilder);
+    }
+
+    public IReadOnlyList<SessionBuilder> ReadSessions()
+    {
+        return Sessions ?? [];
+    }
+
+    public ExecutionBuilder UpdateSession(string sessionName, SessionBuilder sessionBuilder)
+    {
+        Sessions = UpdateByName(Sessions, sessionName, sessionBuilder, session => session.Name);
+        return this;
+    }
+
+    public ExecutionBuilder DeleteSession(string sessionName)
+    {
+        Sessions = DeleteByName(Sessions, sessionName, session => session.Name);
+        return this;
+    }
+
     public ExecutionBuilder AddAssertion(AssertionBuilder assertionBuilder)
     {
         Assertions = Assertions is null ? [assertionBuilder] : Assertions.Append(assertionBuilder).ToArray();
+        return this;
+    }
+
+    public ExecutionBuilder CreateAssertion(AssertionBuilder assertionBuilder)
+    {
+        return AddAssertion(assertionBuilder);
+    }
+
+    public IReadOnlyList<AssertionBuilder> ReadAssertions()
+    {
+        return Assertions ?? [];
+    }
+
+    public ExecutionBuilder UpdateAssertion(string assertionName, AssertionBuilder assertionBuilder)
+    {
+        Assertions = UpdateByName(Assertions, assertionName, assertionBuilder, assertion => assertion.Name);
+        return this;
+    }
+
+    public ExecutionBuilder DeleteAssertion(string assertionName)
+    {
+        Assertions = DeleteByName(Assertions, assertionName, assertion => assertion.Name);
         return this;
     }
 
@@ -226,15 +270,81 @@ public class ExecutionBuilder() : BaseExecutionBuilder<InternalContext, Executio
         return this;
     }
 
+    public ExecutionBuilder CreateStorage(StorageBuilder storageBuilder)
+    {
+        return AddStorage(storageBuilder);
+    }
+
+    public IReadOnlyList<StorageBuilder> ReadStorages()
+    {
+        return Storages ?? [];
+    }
+
+    public ExecutionBuilder UpdateStorageAt(int index, StorageBuilder storageBuilder)
+    {
+        Storages = UpdateAt(Storages, index, storageBuilder);
+        return this;
+    }
+
+    public ExecutionBuilder DeleteStorageAt(int index)
+    {
+        Storages = DeleteAt(Storages, index);
+        return this;
+    }
+
     public ExecutionBuilder AddDataSource(DataSourceBuilder dataSourceBuilder)
     {
         DataSources = DataSources is null ? [dataSourceBuilder] : DataSources.Append(dataSourceBuilder).ToArray();
         return this;
     }
 
+    public ExecutionBuilder CreateDataSource(DataSourceBuilder dataSourceBuilder)
+    {
+        return AddDataSource(dataSourceBuilder);
+    }
+
+    public IReadOnlyList<DataSourceBuilder> ReadDataSources()
+    {
+        return DataSources ?? [];
+    }
+
+    public ExecutionBuilder UpdateDataSource(string dataSourceName, DataSourceBuilder dataSourceBuilder)
+    {
+        DataSources = UpdateByName(DataSources, dataSourceName, dataSourceBuilder, source => source.Name);
+        return this;
+    }
+
+    public ExecutionBuilder DeleteDataSource(string dataSourceName)
+    {
+        DataSources = DeleteByName(DataSources, dataSourceName, source => source.Name);
+        return this;
+    }
+
     public ExecutionBuilder AddLink(LinkBuilder linkBuilder)
     {
         Links = Links is null ? [linkBuilder] : Links.Append(linkBuilder).ToArray();
+        return this;
+    }
+
+    public ExecutionBuilder CreateLink(LinkBuilder linkBuilder)
+    {
+        return AddLink(linkBuilder);
+    }
+
+    public IReadOnlyList<LinkBuilder> ReadLinks()
+    {
+        return Links ?? [];
+    }
+
+    public ExecutionBuilder UpdateLinkAt(int index, LinkBuilder linkBuilder)
+    {
+        Links = UpdateAt(Links, index, linkBuilder);
+        return this;
+    }
+
+    public ExecutionBuilder DeleteLinkAt(int index)
+    {
+        Links = DeleteAt(Links, index);
         return this;
     }
 
@@ -417,5 +527,58 @@ public class ExecutionBuilder() : BaseExecutionBuilder<InternalContext, Executio
             AssertionLogic = assertionLogic, ReportLogic = reportLogic, SessionLogic = sessionLogic,
             TemplateLogic = templateLogic, DataSourceLogic = dataSourceLogic, StorageLogic = storageLogic
         };
+    }
+
+    private static T[]? UpdateByName<T>(T[]? items, string key, T replacement, Func<T, string?> keySelector)
+    {
+        if (items == null)
+        {
+            return null;
+        }
+
+        var index = Array.FindIndex(items, item => keySelector(item) == key);
+        if (index < 0)
+        {
+            return items;
+        }
+
+        items[index] = replacement;
+        return items;
+    }
+
+    private static T[]? DeleteByName<T>(T[]? items, string key, Func<T, string?> keySelector)
+    {
+        return items?.Where(item => keySelector(item) != key).ToArray();
+    }
+
+    private static T[]? UpdateAt<T>(T[]? items, int index, T replacement)
+    {
+        if (items == null)
+        {
+            return null;
+        }
+
+        if (index < 0 || index >= items.Length)
+        {
+            throw new ArgumentOutOfRangeException(nameof(index));
+        }
+
+        items[index] = replacement;
+        return items;
+    }
+
+    private static T[]? DeleteAt<T>(T[]? items, int index)
+    {
+        if (items == null)
+        {
+            return null;
+        }
+
+        if (index < 0 || index >= items.Length)
+        {
+            throw new ArgumentOutOfRangeException(nameof(index));
+        }
+
+        return items.Where((_, itemIndex) => itemIndex != index).ToArray();
     }
 }

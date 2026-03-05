@@ -237,6 +237,33 @@ public class AssertionBuilder : IYamlConvertible
         return this;
     }
 
+    public AssertionBuilder CreateDataSourceName(string dataSourceName)
+    {
+        return AddDataSourceName(dataSourceName);
+    }
+
+    public IReadOnlyList<string> ReadDataSourceNames()
+    {
+        return DataSourceNames;
+    }
+
+    public AssertionBuilder UpdateDataSourceName(string existingValue, string newValue)
+    {
+        var index = Array.IndexOf(DataSourceNames, existingValue);
+        if (index >= 0)
+        {
+            DataSourceNames[index] = newValue;
+        }
+
+        return this;
+    }
+
+    public AssertionBuilder DeleteDataSourceName(string dataSourceName)
+    {
+        DataSourceNames = DataSourceNames.Where(value => value != dataSourceName).ToArray();
+        return this;
+    }
+
     /// <summary>
     /// Adds a data source pattern filter
     /// </summary>
@@ -248,6 +275,33 @@ public class AssertionBuilder : IYamlConvertible
         return this;
     }
 
+    public AssertionBuilder CreateDataSourcePattern(string dataSourcePattern)
+    {
+        return AddDataSourcePattern(dataSourcePattern);
+    }
+
+    public IReadOnlyList<string> ReadDataSourcePatterns()
+    {
+        return DataSourcePatterns;
+    }
+
+    public AssertionBuilder UpdateDataSourcePattern(string existingValue, string newValue)
+    {
+        var index = Array.IndexOf(DataSourcePatterns, existingValue);
+        if (index >= 0)
+        {
+            DataSourcePatterns[index] = newValue;
+        }
+
+        return this;
+    }
+
+    public AssertionBuilder DeleteDataSourcePattern(string dataSourcePattern)
+    {
+        DataSourcePatterns = DataSourcePatterns.Where(value => value != dataSourcePattern).ToArray();
+        return this;
+    }
+
     /// <summary>
     /// Adds a session name filter
     /// </summary>
@@ -256,6 +310,38 @@ public class AssertionBuilder : IYamlConvertible
     public AssertionBuilder AddSessionName(string sessionName)
     {
         SessionNames = SessionNames == null ? [sessionName] : SessionNames.Append(sessionName).ToArray();
+        return this;
+    }
+
+    public AssertionBuilder CreateSessionName(string sessionName)
+    {
+        return AddSessionName(sessionName);
+    }
+
+    public IReadOnlyList<string> ReadSessionNames()
+    {
+        return SessionNames ?? [];
+    }
+
+    public AssertionBuilder UpdateSessionName(string existingValue, string newValue)
+    {
+        if (SessionNames == null)
+        {
+            return this;
+        }
+
+        var index = Array.IndexOf(SessionNames, existingValue);
+        if (index >= 0)
+        {
+            SessionNames[index] = newValue;
+        }
+
+        return this;
+    }
+
+    public AssertionBuilder DeleteSessionName(string sessionName)
+    {
+        SessionNames = SessionNames?.Where(value => value != sessionName).ToArray();
         return this;
     }
 
@@ -272,6 +358,38 @@ public class AssertionBuilder : IYamlConvertible
         return this;
     }
 
+    public AssertionBuilder CreateSessionPattern(string sessionPattern)
+    {
+        return AddSessionPattern(sessionPattern);
+    }
+
+    public IReadOnlyList<string> ReadSessionPatterns()
+    {
+        return SessionNamePatterns ?? [];
+    }
+
+    public AssertionBuilder UpdateSessionPattern(string existingValue, string newValue)
+    {
+        if (SessionNamePatterns == null)
+        {
+            return this;
+        }
+
+        var index = Array.IndexOf(SessionNamePatterns, existingValue);
+        if (index >= 0)
+        {
+            SessionNamePatterns[index] = newValue;
+        }
+
+        return this;
+    }
+
+    public AssertionBuilder DeleteSessionPattern(string sessionPattern)
+    {
+        SessionNamePatterns = SessionNamePatterns?.Where(value => value != sessionPattern).ToArray();
+        return this;
+    }
+
     /// <summary>
     /// Adds a link builder to the assertion
     /// </summary>
@@ -280,6 +398,33 @@ public class AssertionBuilder : IYamlConvertible
     public AssertionBuilder AddLink(LinkBuilder linkBuilder)
     {
         Links = Links.Append(linkBuilder).ToList();
+        return this;
+    }
+
+    public AssertionBuilder CreateLink(LinkBuilder linkBuilder)
+    {
+        return AddLink(linkBuilder);
+    }
+
+    public IReadOnlyList<LinkBuilder> ReadLinks()
+    {
+        return Links;
+    }
+
+    public AssertionBuilder UpdateLink(string name, LinkBuilder linkBuilder)
+    {
+        var index = Links.FindIndex(configuredLink => configuredLink.Name == name);
+        if (index >= 0)
+        {
+            Links[index] = linkBuilder;
+        }
+
+        return this;
+    }
+
+    public AssertionBuilder DeleteLink(string name)
+    {
+        Links = Links.Where(link => link.Name != name).ToList();
         return this;
     }
 
@@ -295,6 +440,25 @@ public class AssertionBuilder : IYamlConvertible
         return this;
     }
 
+    public IConfiguration ReadConfiguration()
+    {
+        return AssertionConfiguration;
+    }
+
+    public AssertionBuilder UpdateConfiguration(object configuration)
+    {
+        return Configure(configuration);
+    }
+
+    public AssertionBuilder DeleteConfiguration()
+    {
+        AssertionConfiguration = new ConfigurationBuilder().Build();
+        return this;
+    }
+
+    /// <summary>
+    /// Binds a configured assertion hook and merges local/global link builders into runtime links.
+    /// </summary>
     internal Assertion Build(IList<KeyValuePair<string, IAssertion>> assertions, IEnumerable<LinkBuilder>? linkBuilders)
     {
         AssertionInstance = new Assertion

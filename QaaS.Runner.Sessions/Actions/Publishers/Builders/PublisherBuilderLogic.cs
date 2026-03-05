@@ -61,11 +61,75 @@ public partial class PublisherBuilder
         return this;
     }
 
+    public PublisherBuilder CreateDataSource(string dataSourceName)
+    {
+        return AddDataSource(dataSourceName);
+    }
+
+    public IReadOnlyList<string> ReadDataSources()
+    {
+        return DataSourceNames ?? [];
+    }
+
+    public PublisherBuilder UpdateDataSource(string existingValue, string newValue)
+    {
+        if (DataSourceNames == null)
+        {
+            return this;
+        }
+
+        var index = Array.IndexOf(DataSourceNames, existingValue);
+        if (index >= 0)
+        {
+            DataSourceNames[index] = newValue;
+        }
+
+        return this;
+    }
+
+    public PublisherBuilder DeleteDataSource(string dataSourceName)
+    {
+        DataSourceNames = DataSourceNames?.Where(value => value != dataSourceName).ToArray();
+        return this;
+    }
+
     public PublisherBuilder AddDataSourcePattern(string dataSourcePattern)
     {
         var dataSourcePatternsList = DataSourcePatterns?.ToList() ?? [];
         dataSourcePatternsList.Add(dataSourcePattern);
         DataSourcePatterns = dataSourcePatternsList.ToArray();
+        return this;
+    }
+
+    public PublisherBuilder CreateDataSourcePattern(string dataSourcePattern)
+    {
+        return AddDataSourcePattern(dataSourcePattern);
+    }
+
+    public IReadOnlyList<string> ReadDataSourcePatterns()
+    {
+        return DataSourcePatterns ?? [];
+    }
+
+    public PublisherBuilder UpdateDataSourcePattern(string existingValue, string newValue)
+    {
+        if (DataSourcePatterns == null)
+        {
+            return this;
+        }
+
+        var index = Array.IndexOf(DataSourcePatterns, existingValue);
+        if (index >= 0)
+        {
+            DataSourcePatterns[index] = newValue;
+        }
+
+        return this;
+    }
+
+    public PublisherBuilder DeleteDataSourcePattern(string dataSourcePattern)
+    {
+        DataSourcePatterns = DataSourcePatterns?.Where(value => value != dataSourcePattern).ToArray();
         return this;
     }
 
@@ -95,10 +159,74 @@ public partial class PublisherBuilder
         return this;
     }
 
+    public PublisherBuilder CreatePolicy(PolicyBuilder policy)
+    {
+        return AddPolicy(policy);
+    }
+
+    public IReadOnlyList<PolicyBuilder> ReadPolicies()
+    {
+        return Policies;
+    }
+
+    public PublisherBuilder UpdatePolicyAt(int index, PolicyBuilder policy)
+    {
+        if (index < 0 || index >= Policies.Length)
+        {
+            throw new ArgumentOutOfRangeException(nameof(index));
+        }
+
+        Policies[index] = policy;
+        return this;
+    }
+
+    public PublisherBuilder DeletePolicyAt(int index)
+    {
+        if (index < 0 || index >= Policies.Length)
+        {
+            throw new ArgumentOutOfRangeException(nameof(index));
+        }
+
+        Policies = Policies.Where((_, i) => i != index).ToArray();
+        return this;
+    }
+
     public PublisherBuilder WithParallelism(int parallelism)
     {
         Parallel = new Parallel { Parallelism = parallelism };
         return this;
+    }
+
+    public PublisherBuilder CreateConfiguration(ISenderConfig config)
+    {
+        return Configure(config);
+    }
+
+    public ISenderConfig? ReadConfiguration()
+    {
+        if (RabbitMq != null) return RabbitMq;
+        if (KafkaTopic != null) return KafkaTopic;
+        if (Socket != null) return Socket;
+        if (Sftp != null) return Sftp;
+        if (PostgreSqlTable != null) return PostgreSqlTable;
+        if (OracleSqlTable != null) return OracleSqlTable;
+        if (MsSqlTable != null) return MsSqlTable;
+        if (ElasticIndex != null) return ElasticIndex;
+        if (Redis != null) return Redis;
+        if (S3Bucket != null) return S3Bucket;
+        return MongoDbCollection;
+    }
+
+    public PublisherBuilder UpdateConfiguration(Func<ISenderConfig, ISenderConfig> update)
+    {
+        var currentConfig = ReadConfiguration() ??
+                            throw new InvalidOperationException("Publisher configuration is not set");
+        return Configure(update(currentConfig));
+    }
+
+    public PublisherBuilder DeleteConfiguration()
+    {
+        return Reset();
     }
 
     private PublisherBuilder Reset()
@@ -160,6 +288,10 @@ public partial class PublisherBuilder
         return this;
     }
 
+    /// <summary>
+    /// Builds a concrete publisher action from the configured sender/chunk sender pair.
+    /// Any construction failure is written to <paramref name="actionFailures"/> and returns null.
+    /// </summary>
     internal BasePublisher? Build(InternalContext context, IList<ActionFailure> actionFailures, string sessionName)
     {
         ISenderConfig? type = null;

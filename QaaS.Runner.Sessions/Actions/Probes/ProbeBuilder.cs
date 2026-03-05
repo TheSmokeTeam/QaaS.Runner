@@ -86,11 +86,65 @@ public class ProbeBuilder : IYamlConvertible
         return this;
     }
 
+    public ProbeBuilder CreateDataSourceName(string dataSourceName)
+    {
+        return AddDataSourceName(dataSourceName);
+    }
+
+    public IReadOnlyList<string> ReadDataSourceNames()
+    {
+        return DataSourceNames;
+    }
+
+    public ProbeBuilder UpdateDataSourceName(string existingValue, string newValue)
+    {
+        var index = Array.IndexOf(DataSourceNames, existingValue);
+        if (index >= 0)
+        {
+            DataSourceNames[index] = newValue;
+        }
+
+        return this;
+    }
+
+    public ProbeBuilder RemoveDataSourceName(string dataSourceName)
+    {
+        DataSourceNames = DataSourceNames.Where(value => value != dataSourceName).ToArray();
+        return this;
+    }
+
     public ProbeBuilder AddDataSourcePattern(string dataSourcePattern)
     {
         var dataSourcePatternsList = DataSourcePatterns?.ToList() ?? [];
         dataSourcePatternsList.Add(dataSourcePattern);
         DataSourcePatterns = dataSourcePatternsList.ToArray();
+        return this;
+    }
+
+    public ProbeBuilder CreateDataSourcePattern(string dataSourcePattern)
+    {
+        return AddDataSourcePattern(dataSourcePattern);
+    }
+
+    public IReadOnlyList<string> ReadDataSourcePatterns()
+    {
+        return DataSourcePatterns;
+    }
+
+    public ProbeBuilder UpdateDataSourcePattern(string existingValue, string newValue)
+    {
+        var index = Array.IndexOf(DataSourcePatterns, existingValue);
+        if (index >= 0)
+        {
+            DataSourcePatterns[index] = newValue;
+        }
+
+        return this;
+    }
+
+    public ProbeBuilder RemoveDataSourcePattern(string dataSourcePattern)
+    {
+        DataSourcePatterns = DataSourcePatterns.Where(value => value != dataSourcePattern).ToArray();
         return this;
     }
 
@@ -101,6 +155,10 @@ public class ProbeBuilder : IYamlConvertible
         return this;
     }
 
+    /// <summary>
+    /// Resolves the configured probe hook and constructs a runtime <see cref="Probe"/> action.
+    /// Failures are captured into <paramref name="actionFailures"/> so session build can continue.
+    /// </summary>
     internal Probe? Build(InternalContext context, IList<KeyValuePair<string, IProbe>> probes,
         IList<ActionFailure> actionFailures, string sessionName)
     {
