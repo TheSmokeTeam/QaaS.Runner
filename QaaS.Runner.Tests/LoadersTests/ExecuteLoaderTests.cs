@@ -75,4 +75,35 @@ public class ExecuteLoaderTests
         // Assert
         Assert.That(commandsRan, Is.EqualTo(expectedOutput));
     }
+
+    [Test]
+    public void GetLoadedRunner_WhenExecutableCommandContainsExecute_ThrowsArgumentException()
+    {
+        var executablePath = Path.Combine(Path.GetTempPath(), $"qaas-executable-{Guid.NewGuid():N}.yaml");
+        File.WriteAllText(executablePath,
+            """
+            Commands:
+              - Id: Loop
+                Command: execute run TestData/test.qaas.yaml
+            """);
+
+        try
+        {
+            var loader = new ExecuteLoader<Runner>(new ExecuteOptions
+            {
+                ConfigurationFile = executablePath,
+                SendLogs = false
+            });
+
+            var ex = Assert.Throws<ArgumentException>(() => loader.GetLoadedRunner());
+            Assert.That(ex!.Message, Does.Contain("cannot be execute itself"));
+        }
+        finally
+        {
+            if (File.Exists(executablePath))
+            {
+                File.Delete(executablePath);
+            }
+        }
+    }
 }

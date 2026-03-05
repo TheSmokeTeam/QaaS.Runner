@@ -57,6 +57,66 @@ public class ExecutionBuilderTests
         });
     }
 
+    [Test]
+    public void Build_WithSessionWithoutConfiguredStage_AssignsIndexAsDefaultStage()
+    {
+        var builder = new ExecutionBuilder()
+            .AddSession(new SessionBuilder
+            {
+                Name = "session-without-stage",
+                Stage = null,
+                Probes = []
+            })
+            .ExecutionType(ExecutionType.Template)
+            .SetExecutionId("exec-stage")
+            .SetCase("case-stage")
+            .WithLogger(Globals.Logger)
+            .WithGlobalDict(new Dictionary<string, object?>())
+            .WithMetadata(new MetaDataConfig { Team = "Smoke", System = "QaaS" });
+
+        _ = builder.Build();
+
+        Assert.That(builder.ReadSessions(), Has.Count.EqualTo(1));
+        Assert.That(builder.ReadSessions()[0].Stage, Is.EqualTo(0));
+    }
+
+    [Test]
+    public void CrudOperations_WithNullConfiguredArrays_DoNotThrowAndKeepArraysNull()
+    {
+        var builder = new ExecutionBuilder
+        {
+            Sessions = null,
+            Assertions = null,
+            Storages = null,
+            DataSources = null,
+            Links = null
+        };
+
+        Assert.DoesNotThrow(() =>
+        {
+            builder.UpdateSession("missing", new SessionBuilder());
+            builder.DeleteSession("missing");
+            builder.UpdateAssertion("missing", new AssertionBuilder
+            {
+                AssertionInstance = null!,
+                Reporter = null!
+            });
+            builder.DeleteAssertion("missing");
+            builder.UpdateStorageAt(0, new StorageBuilder());
+            builder.DeleteStorageAt(0);
+            builder.UpdateDataSource("missing", new DataSourceBuilder());
+            builder.DeleteDataSource("missing");
+            builder.UpdateLinkAt(0, new LinkBuilder());
+            builder.DeleteLinkAt(0);
+        });
+
+        Assert.That(builder.Sessions, Is.Null);
+        Assert.That(builder.Assertions, Is.Null);
+        Assert.That(builder.Storages, Is.Null);
+        Assert.That(builder.DataSources, Is.Null);
+        Assert.That(builder.Links, Is.Null);
+    }
+
     private ExecutionBuilder CreateValidExecutionBuilder()
     {
         var builder = new ExecutionBuilder();

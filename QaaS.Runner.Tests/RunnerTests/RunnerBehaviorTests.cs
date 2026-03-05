@@ -107,6 +107,44 @@ public class RunnerBehaviorTests
             Is.All.EqualTo(ExecutionType.Template));
     }
 
+    [Test]
+    public void BuildExecutions_UsesSharedGlobalDictionaryAndConfiguredLoggerOnAllBuilders()
+    {
+        using var scope = BuildScope();
+        var logger = Globals.Logger;
+        var builders = new List<ExecutionBuilder>
+        {
+            CreateTemplateExecutionBuilder("case-1"),
+            CreateTemplateExecutionBuilder("case-2")
+        };
+
+        var runner = new ExposedRunner(scope, builders, logger, new Mock<Serilog.ILogger>().Object);
+        runner.InvokeBuildExecutions();
+
+        var globalDictField = typeof(ExecutionBuilder).GetField("_globalDict", BindingFlags.Instance | BindingFlags.NonPublic)!;
+        var configuredLoggerField = typeof(ExecutionBuilder).GetField("_configuredLogger", BindingFlags.Instance | BindingFlags.NonPublic)!;
+
+        var firstGlobalDict = globalDictField.GetValue(builders[0]);
+        var secondGlobalDict = globalDictField.GetValue(builders[1]);
+        var firstLogger = configuredLoggerField.GetValue(builders[0]);
+        var secondLogger = configuredLoggerField.GetValue(builders[1]);
+
+        Assert.That(firstGlobalDict, Is.SameAs(secondGlobalDict));
+        Assert.That(firstLogger, Is.SameAs(logger));
+        Assert.That(secondLogger, Is.SameAs(logger));
+    }
+
+    [Test]
+    public void StartExecutions_WithNoExecutions_ReturnsZero()
+    {
+        using var scope = BuildScope();
+        var runner = new ExposedRunner(scope, [], Globals.Logger, new Mock<Serilog.ILogger>().Object);
+
+        var result = runner.InvokeStartExecutions([]);
+
+        Assert.That(result, Is.Zero);
+    }
+
     private static ILifetimeScope BuildScope()
     {
         var builder = new ContainerBuilder();

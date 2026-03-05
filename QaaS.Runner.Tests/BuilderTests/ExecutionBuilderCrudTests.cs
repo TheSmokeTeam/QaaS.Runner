@@ -50,11 +50,25 @@ public class ExecutionBuilderCrudTests
     }
 
     [Test]
+    public void UpdateSession_WhenSessionNameNotFound_DoesNotChangeCollection()
+    {
+        var original = new SessionBuilder { Name = "session-a", Stage = 0, Probes = [] };
+        var replacement = new SessionBuilder { Name = "session-b", Stage = 1, Probes = [] };
+        var builder = new ExecutionBuilder().AddSession(original);
+
+        builder.UpdateSession("does-not-exist", replacement);
+
+        Assert.That(builder.ReadSessions(), Has.Count.EqualTo(1));
+        Assert.That(builder.ReadSessions()[0], Is.SameAs(original));
+    }
+
+    [Test]
     public void UpdateStorageAt_WithInvalidIndex_ShouldThrowArgumentOutOfRangeException()
     {
         var builder = new ExecutionBuilder().CreateStorage(new StorageBuilder().Configure(new S3Config()));
 
         Assert.Throws<ArgumentOutOfRangeException>(() => builder.UpdateStorageAt(3, new StorageBuilder()));
+        Assert.Throws<ArgumentOutOfRangeException>(() => builder.DeleteStorageAt(-1));
     }
 
     [Test]
