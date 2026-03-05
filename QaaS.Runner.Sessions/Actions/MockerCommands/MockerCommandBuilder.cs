@@ -1,8 +1,8 @@
-using System.ComponentModel;
+﻿using System.ComponentModel;
 using System.ComponentModel.DataAnnotations;
 using QaaS.Framework.SDK.ContextObjects;
 using QaaS.Framework.SDK.Extensions;
-using QaaS.Framework.SDK.MockerObjects.ConfigurationObjects.Command;
+using Qaas.Mocker.CommunicationObjects.ConfigurationObjects.Command;
 using QaaS.Framework.SDK.Session.SessionDataObjects;
 using QaaS.Runner.Sessions.ConfigurationObjects;
 using QaaS.Runner.Sessions.Extensions;
@@ -155,3 +155,4 @@ public class MockerCommandBuilder
         return null;
     }
 }
+

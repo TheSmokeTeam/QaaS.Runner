@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Runtime.CompilerServices;
@@ -8,9 +8,9 @@ using Moq;
 using NUnit.Framework;
 using QaaS.Framework.SDK.ContextObjects;
 using QaaS.Framework.SDK.ConfigurationObjects;
-using QaaS.Framework.SDK.MockerObjects;
-using QaaS.Framework.SDK.MockerObjects.ConfigurationObjects.Command;
-using QaaS.Framework.SDK.MockerObjects.ConfigurationObjects.Ping;
+using Qaas.Mocker.CommunicationObjects;
+using Qaas.Mocker.CommunicationObjects.ConfigurationObjects.Command;
+using Qaas.Mocker.CommunicationObjects.ConfigurationObjects.Ping;
 using QaaS.Framework.Serialization;
 using QaaS.Framework.SDK.Session;
 using QaaS.Framework.SDK.Session.CommunicationDataObjects;
@@ -23,6 +23,7 @@ using QaaS.Runner.Sessions.ConfigurationObjects;
 using QaaS.Framework.Serialization.Deserializers;
 using StackExchange.Redis;
 using SessionAction = QaaS.Runner.Sessions.Actions.Action;
+using CommunicationInputOutputState = Qaas.Mocker.CommunicationObjects.ConfigurationObjects.InputOutputState;
 
 namespace QaaS.Runner.Sessions.Tests.Actions.MockerCommands;
 
@@ -43,17 +44,17 @@ public class MockerCommandInternalsTests
                 Id = "cmd-id",
                 ServerName = "server-a",
                 ServerInstanceId = "instance-1",
-                ServerInputOutputState = InputOutputState.OnlyInput
+                ServerInputOutputState = CommunicationInputOutputState.OnlyInput
             }));
 
         var instances = (IList<string>)GetField(typeof(MockerCommand), command, "_serverInstanceNames");
-        var ioState = (InputOutputState?)typeof(MockerCommand)
+        var ioState = (CommunicationInputOutputState?)typeof(MockerCommand)
             .GetProperty("ServerInputOutputState", BindingFlags.Instance | BindingFlags.NonPublic)!
             .GetValue(command);
 
         Assert.That(instances, Has.Count.EqualTo(1));
         Assert.That(instances[0], Is.EqualTo("instance-1"));
-        Assert.That(ioState, Is.EqualTo(InputOutputState.OnlyInput));
+        Assert.That(ioState, Is.EqualTo(CommunicationInputOutputState.OnlyInput));
     }
 
     [Test]
@@ -68,7 +69,7 @@ public class MockerCommandInternalsTests
                 Id = "cmd-id",
                 ServerName = "server-a",
                 ServerInstanceId = "instance-1",
-                ServerInputOutputState = InputOutputState.OnlyInput
+                ServerInputOutputState = CommunicationInputOutputState.OnlyInput
             }));
 
         var exception = Assert.Throws<TargetInvocationException>(() =>
@@ -79,7 +80,7 @@ public class MockerCommandInternalsTests
                     Id = "cmd-id",
                     ServerName = "server-a",
                     ServerInstanceId = "instance-2",
-                    ServerInputOutputState = InputOutputState.OnlyOutput
+                    ServerInputOutputState = CommunicationInputOutputState.OnlyOutput
                 })));
 
         Assert.That(exception!.InnerException, Is.TypeOf<InvalidOperationException>());
@@ -107,11 +108,11 @@ public class MockerCommandInternalsTests
     }
 
     [Test]
-    public void CommandResponseHandler_WithFailedStatus_ThrowsException()
+    public void CommandResponseHandler_WithFailedStatus_StoresFailureWithoutThrowing()
     {
         var command = CreateUninitializedTriggerCommand();
 
-        var exception = Assert.Throws<TargetInvocationException>(() =>
+        Assert.DoesNotThrow(() =>
             InvokeNonPublicMethod(typeof(MockerCommand), command, "CommandResponseHandler",
                 RedisChannel.Literal("command-response"),
                 (RedisValue)JsonSerializer.SerializeToUtf8Bytes(new CommandResponse
@@ -123,8 +124,9 @@ public class MockerCommandInternalsTests
                     ExceptionMessage = "request failed"
                 })));
 
-        Assert.That(exception!.InnerException, Is.TypeOf<Exception>());
-        Assert.That(exception.InnerException!.Message, Is.EqualTo("request failed"));
+        var failedResponses = (IList<string>)GetField(typeof(MockerCommand), command, "_failedCommandResponses");
+        Assert.That(failedResponses, Has.Count.EqualTo(1));
+        Assert.That(failedResponses[0], Does.Contain("request failed"));
     }
 
     [Test]
@@ -215,7 +217,7 @@ public class MockerCommandInternalsTests
         var exception = Assert.Throws<TargetInvocationException>(() =>
             InvokeNonPublicMethod(typeof(MockerCommand), command, "Command"));
 
-        Assert.That(exception!.InnerException, Is.TypeOf<InvalidOperationException>());
+        Assert.That(exception!.InnerException, Is.TypeOf<MockerCommandRequestFailedException>());
     }
 
     [Test]
@@ -253,12 +255,12 @@ public class MockerCommandInternalsTests
     }
 
     [Test]
-    public void Dispose_WhenConnectionWasNotInitialized_ThrowsNullReferenceException()
+    public void Dispose_WhenConnectionWasNotInitialized_DoesNotThrow()
     {
         var command = CreateUninitializedTriggerCommand();
         SetField(typeof(MockerCommand), command, "_redisConnection", null);
 
-        Assert.Throws<NullReferenceException>(() => command.Dispose());
+        Assert.DoesNotThrow(() => command.Dispose());
     }
 
     [Test]
@@ -329,7 +331,7 @@ public class MockerCommandInternalsTests
     {
         var consumeCommand = CreateUninitializedConsumeCommand();
         typeof(MockerCommand).GetProperty("ServerInputOutputState", BindingFlags.Instance | BindingFlags.NonPublic)!
-            .SetValue(consumeCommand, InputOutputState.OnlyInput);
+            .SetValue(consumeCommand, CommunicationInputOutputState.OnlyInput);
 
         var inputQueue = CommunicationMethods.CreateConsumerEndpointInput("server-a");
         var dbMock = CreateRedisDbWithQueueData(new Dictionary<string, Queue<RedisValue>>
@@ -357,7 +359,7 @@ public class MockerCommandInternalsTests
     {
         var consumeCommand = CreateUninitializedConsumeCommand();
         typeof(MockerCommand).GetProperty("ServerInputOutputState", BindingFlags.Instance | BindingFlags.NonPublic)!
-            .SetValue(consumeCommand, InputOutputState.OnlyOutput);
+            .SetValue(consumeCommand, CommunicationInputOutputState.OnlyOutput);
 
         var outputQueue = CommunicationMethods.CreateConsumerEndpointOutput("server-a");
         var dbMock = CreateRedisDbWithQueueData(new Dictionary<string, Queue<RedisValue>>
@@ -411,7 +413,7 @@ public class MockerCommandInternalsTests
     {
         var consumeCommand = CreateUninitializedConsumeCommand();
         typeof(MockerCommand).GetProperty("ServerInputOutputState", BindingFlags.Instance | BindingFlags.NonPublic)!
-            .SetValue(consumeCommand, InputOutputState.NoInputOutput);
+            .SetValue(consumeCommand, CommunicationInputOutputState.NoInputOutput);
 
         var result =
             (ValueTuple<IEnumerable<DetailedData<object>>?, IEnumerable<DetailedData<object>>?>)
@@ -490,7 +492,7 @@ public class MockerCommandInternalsTests
         SetField(typeof(MockerCommand), consumeCommand, "_successfulCommandResponseToServerInstanceNames",
             new List<string> { "instance-1" });
         typeof(MockerCommand).GetProperty("ServerInputOutputState", BindingFlags.Instance | BindingFlags.NonPublic)!
-            .SetValue(consumeCommand, InputOutputState.BothInputOutput);
+            .SetValue(consumeCommand, CommunicationInputOutputState.BothInputOutput);
 
         SetField(typeof(ConsumeMockerCommand), consumeCommand, "_consumeConfig", new ConsumeConfig
         {
@@ -575,6 +577,7 @@ public class MockerCommandInternalsTests
         SetField(typeof(MockerCommand), command, "_redisHost", "localhost");
         SetField(typeof(MockerCommand), command, "_serverInstanceNames", new List<string>());
         SetField(typeof(MockerCommand), command, "_successfulCommandResponseToServerInstanceNames", new List<string>());
+        SetField(typeof(MockerCommand), command, "_failedCommandResponses", new List<string>());
         SetField(typeof(MockerCommand), command, "_receivedRunningCommunicationData", new RunningCommunicationData<object>());
         SetField(typeof(MockerCommand), command, "_sentRunningCommunicationData", new RunningCommunicationData<object>());
         SetField(typeof(MockerCommand), command, "RedisDatabase", new Mock<IDatabase>().Object);
@@ -598,6 +601,7 @@ public class MockerCommandInternalsTests
         SetField(typeof(MockerCommand), command, "_redisHost", "localhost");
         SetField(typeof(MockerCommand), command, "_serverInstanceNames", new List<string>());
         SetField(typeof(MockerCommand), command, "_successfulCommandResponseToServerInstanceNames", new List<string>());
+        SetField(typeof(MockerCommand), command, "_failedCommandResponses", new List<string>());
         SetField(typeof(MockerCommand), command, "_receivedRunningCommunicationData", new RunningCommunicationData<object>());
         SetField(typeof(MockerCommand), command, "_sentRunningCommunicationData", new RunningCommunicationData<object>());
         SetField(typeof(MockerCommand), command, "RedisDatabase", new Mock<IDatabase>().Object);
@@ -620,6 +624,7 @@ public class MockerCommandInternalsTests
         SetField(typeof(MockerCommand), command, "_redisHost", "localhost");
         SetField(typeof(MockerCommand), command, "_serverInstanceNames", new List<string>());
         SetField(typeof(MockerCommand), command, "_successfulCommandResponseToServerInstanceNames", new List<string>());
+        SetField(typeof(MockerCommand), command, "_failedCommandResponses", new List<string>());
         SetField(typeof(MockerCommand), command, "_receivedRunningCommunicationData", new RunningCommunicationData<object>());
         SetField(typeof(MockerCommand), command, "_sentRunningCommunicationData", new RunningCommunicationData<object>());
         SetField(typeof(MockerCommand), command, "RedisDatabase", new Mock<IDatabase>().Object);
@@ -669,3 +674,4 @@ public class MockerCommandInternalsTests
         return field.GetValue(target)!;
     }
 }
+

@@ -1,8 +1,8 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using NUnit.Framework;
 using QaaS.Framework.SDK.ContextObjects;
-using QaaS.Framework.SDK.MockerObjects.ConfigurationObjects.Command;
+using Qaas.Mocker.CommunicationObjects.ConfigurationObjects.Command;
 using QaaS.Framework.SDK.Session.SessionDataObjects;
 using QaaS.Runner.Sessions.Actions.MockerCommands;
 using QaaS.Runner.Sessions.ConfigurationObjects;
@@ -147,3 +147,4 @@ public class MockerCommandBuilderTests
         yield return new CommandConfig { Consume = new ConsumeConfig() };
     }
 }
+
