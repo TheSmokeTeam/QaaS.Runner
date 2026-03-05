@@ -9,11 +9,18 @@ using QaaS.Runner.Sessions.Session;
 namespace QaaS.Runner.Logics;
 
 /// <summary>
-///     Class that responsible for the logic behind Sessions' executions.
+/// Coordinates session execution during runtime, including stage ordering and stage-level blocking.
 /// </summary>
 public class SessionLogic(List<ISession> sessions, InternalContext context) : ILogic
 {
-    /// <inheritdoc />
+    /// <summary>
+    /// Determines whether session execution should run for the requested execution type.
+    /// </summary>
+    /// <param name="executionType">The active execution pipeline mode.</param>
+    /// <returns>
+    /// <see langword="true" /> for <see cref="ExecutionType.Act" /> and <see cref="ExecutionType.Run" />;
+    /// otherwise <see langword="false" />.
+    /// </returns>
     public bool ShouldRun(ExecutionType executionType)
     {
         return executionType is ExecutionType.Act or ExecutionType.Run;
@@ -21,9 +28,11 @@ public class SessionLogic(List<ISession> sessions, InternalContext context) : IL
 
 
     /// <summary>
-    ///     Runs all configured sessions in stages and responsible for blocking stages.
-    ///     Session's running order is determined by their SessionStage.
+    /// Runs all configured sessions in stage order and applies deferred blocking rules defined by
+    /// <see cref="ISession.RunUntilStage" />.
     /// </summary>
+    /// <param name="executionData">The mutable execution context that is populated with produced session data.</param>
+    /// <returns>The same <paramref name="executionData" /> instance after session execution completes.</returns>
     public ExecutionData Run(ExecutionData executionData)
     {
         context.Logger.LogInformation("Running {LogicType} Logic", "Sessions");

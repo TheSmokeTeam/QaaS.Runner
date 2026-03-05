@@ -12,19 +12,29 @@ using QaaS.Runner.Infrastructure;
 namespace QaaS.Runner.Logics;
 
 /// <summary>
-/// Logic triggerer of assertion to run with Execution data
+/// Executes configured assertions against the current execution data and stores their results.
 /// </summary>
 public class AssertionLogic(IList<Assertion> assertions, InternalContext context) : ILogic
 {
-    /// <inheritdoc />
+    /// <summary>
+    /// Determines whether assertion execution should run for the requested execution type.
+    /// </summary>
+    /// <param name="executionType">The active execution pipeline mode.</param>
+    /// <returns>
+    /// <see langword="true" /> for <see cref="ExecutionType.Assert" /> and <see cref="ExecutionType.Run" />;
+    /// otherwise <see langword="false" />.
+    /// </returns>
     public bool ShouldRun(ExecutionType executionType)
     {
         return executionType is ExecutionType.Assert or ExecutionType.Run;
     }
 
     /// <summary>
-    ///     Executes all assertions in parallel
+    /// Executes all assertions in parallel and appends their results to
+    /// <see cref="ExecutionData.AssertionResults" />.
     /// </summary>
+    /// <param name="executionData">The mutable execution context used as assertion input and output sink.</param>
+    /// <returns>The same <paramref name="executionData" /> instance after all assertions complete.</returns>
     public ExecutionData Run(ExecutionData executionData)
     {
         context.Logger.LogInformation("Running {LogicType} Logic", "Assertions");

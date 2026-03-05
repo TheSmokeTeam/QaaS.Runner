@@ -6,21 +6,27 @@ using QaaS.Framework.SDK.ExecutionObjects;
 namespace QaaS.Runner.Logics;
 
 /// <summary>
-/// Logic class for template command
+/// Generates and writes a template YAML configuration.
 /// </summary>
 public class TemplateLogic(Context context, TextWriter? writer = null) : ILogic
 {
     private TextWriter? _writer = writer;
 
-    /// <inheritdoc />
+    /// <summary>
+    /// Determines whether template generation should run for the requested execution type.
+    /// </summary>
+    /// <param name="executionType">The active execution pipeline mode.</param>
+    /// <returns><see langword="true" /> only when <paramref name="executionType" /> is <see cref="ExecutionType.Template" />.</returns>
     public bool ShouldRun(ExecutionType executionType)
     {
         return executionType == ExecutionType.Template;
     }
 
     /// <summary>
-    /// Outputs the configured objects 
+    /// Builds and writes the framework template as YAML.
     /// </summary>
+    /// <param name="executionData">The execution context passed through unchanged.</param>
+    /// <returns>The same <paramref name="executionData" /> instance.</returns>
     public ExecutionData Run(ExecutionData executionData)
     {
         var template =

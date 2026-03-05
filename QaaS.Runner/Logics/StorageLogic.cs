@@ -9,18 +9,26 @@ using QaaS.Runner.Storage;
 namespace QaaS.Runner.Logics;
 
 /// <summary>
-/// Logic class that stores or retrieves executions
+/// Stores or retrieves session data using configured storage providers.
 /// </summary>
 public class StorageLogic(IList<IStorage> storages, InternalContext context, ExecutionType executionType)
     : ILogic
 {
+    /// <summary>
+    /// Determines whether storage operations should run for the requested execution type.
+    /// </summary>
+    /// <param name="executionType">The active execution pipeline mode.</param>
+    /// <returns>
+    /// <see langword="true" /> for <see cref="ExecutionType.Act" /> and <see cref="ExecutionType.Assert" />;
+    /// otherwise <see langword="false" />.
+    /// </returns>
     public bool ShouldRun(ExecutionType executionType) => executionType is ExecutionType.Act or ExecutionType.Assert;
 
     /// <summary>
-    ///     Based on executionType, stores or retrieves all sessionData
+    /// Stores or retrieves session data based on the execution mode provided to the logic instance.
     /// </summary>
-    /// <param name="executionData"></param>
-    /// <returns></returns>
+    /// <param name="executionData">The mutable execution context containing session data.</param>
+    /// <returns>The same <paramref name="executionData" /> instance after storage operations complete.</returns>
     public ExecutionData Run(ExecutionData executionData)
     {
         if (executionType == ExecutionType.Assert)

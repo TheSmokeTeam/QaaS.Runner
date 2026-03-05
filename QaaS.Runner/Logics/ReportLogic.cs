@@ -9,11 +9,18 @@ using QaaS.Runner.Assertions.AssertionObjects;
 namespace QaaS.Runner.Logics;
 
 /// <summary>
-/// Logic class for reporters to report results
+/// Routes assertion results to configured reporters.
 /// </summary>
 public class ReportLogic(IList<IReporter> reporters, InternalContext context) : ILogic
 {
-    /// <inheritdoc />
+    /// <summary>
+    /// Determines whether reporting should run for the requested execution type.
+    /// </summary>
+    /// <param name="executionType">The active execution pipeline mode.</param>
+    /// <returns>
+    /// <see langword="true" /> for <see cref="ExecutionType.Run" /> and <see cref="ExecutionType.Assert" />;
+    /// otherwise <see langword="false" />.
+    /// </returns>
     public bool ShouldRun(ExecutionType executionType)
     {
         return executionType is ExecutionType.Run or ExecutionType.Assert;
@@ -21,8 +28,13 @@ public class ReportLogic(IList<IReporter> reporters, InternalContext context) : 
 
 
     /// <summary>
-    ///     Reports <see cref="AssertionResult" />s to the provided <see cref="IReporter" />s
+    /// Reports matching <see cref="AssertionResult" /> entries to each configured <see cref="IReporter" />.
     /// </summary>
+    /// <param name="executionData">The mutable execution context containing assertion results.</param>
+    /// <returns>The same <paramref name="executionData" /> instance after reporting completes.</returns>
+    /// <exception cref="ArgumentException">
+    /// Thrown when a configured reporter does not have a matching assertion result.
+    /// </exception>
     public ExecutionData Run(ExecutionData executionData)
     {
         context.Logger.LogInformation("Running {Reports} Logic", "Reports");
