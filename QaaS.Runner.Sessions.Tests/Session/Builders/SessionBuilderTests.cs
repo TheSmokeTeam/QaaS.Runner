@@ -101,7 +101,7 @@ public class SessionBuilderTests
         var builder = new SessionBuilder();
         builder.DiscardData();
 
-        Assert.That(builder.SaveData, Is.True);
+        Assert.That(builder.SaveData, Is.False);
     }
 
     [Test]
