@@ -1,4 +1,5 @@
-﻿using System.Reflection;
+using System.Collections.Concurrent;
+using System.Threading;
 using Moq;
 using NUnit.Framework;
 using QaaS.Framework.SDK.ContextObjects;
@@ -11,12 +12,6 @@ namespace QaaS.Runner.Tests.LogicsTests;
 
 public class SessionLogicTests
 {
-    private PropertyInfo _sessionStageInfo =
-        typeof(Session).GetProperty(nameof(Session.SessionStage), BindingFlags.Instance | BindingFlags.NonPublic)!;
-
-    private PropertyInfo _runUntilStageInfo =
-        typeof(Session).GetProperty(nameof(Session.RunUntilStage), BindingFlags.Instance | BindingFlags.NonPublic)!;
-
     [TestCase(ExecutionType.Assert, false)]
     [TestCase(ExecutionType.Run, true)]
     [TestCase(ExecutionType.Template, false)]
@@ -112,5 +107,113 @@ public class SessionLogicTests
         Assert.That(result, Is.Not.Null);
         Assert.That(result, Is.SameAs(executionData));
         Assert.That(executionData.SessionDatas, Has.Count.EqualTo(0));
+    }
+
+    [Test]
+    public void TestRun_WithUnsortedSessionStages_RunsInStageOrder()
+    {
+        // Arrange
+        var runOrder = new ConcurrentQueue<string>();
+        var stage2SessionData = new SessionData { Name = "Stage2Session" };
+        var stage1SessionData = new SessionData { Name = "Stage1Session" };
+
+        var stage2Session = new Mock<ISession>();
+        stage2Session.SetupGet(s => s.SessionStage).Returns(2);
+        stage2Session.SetupGet(s => s.RunUntilStage).Returns((int?)null);
+        stage2Session.Setup(s => s.Run(It.IsAny<ExecutionData>()))
+            .Callback(() => runOrder.Enqueue("stage-2"))
+            .Returns(stage2SessionData);
+
+        var stage1Session = new Mock<ISession>();
+        stage1Session.SetupGet(s => s.SessionStage).Returns(1);
+        stage1Session.SetupGet(s => s.RunUntilStage).Returns((int?)null);
+        stage1Session.Setup(s => s.Run(It.IsAny<ExecutionData>()))
+            .Callback(() => runOrder.Enqueue("stage-1"))
+            .Returns(stage1SessionData);
+
+        var sessionLogic = new SessionLogic([stage2Session.Object, stage1Session.Object], new InternalContext
+        {
+            Logger = Globals.Logger
+        });
+        var executionData = new ExecutionData();
+
+        // Act
+        sessionLogic.Run(executionData);
+
+        // Assert
+        Assert.That(executionData.SessionDatas, Has.Count.EqualTo(2));
+        Assert.That(runOrder.ToArray(), Is.EqualTo(new[] { "stage-1", "stage-2" }));
+    }
+
+    [Test]
+    public void TestRun_WithBlockingSession_WaitsForBlockerBeforeRunningBlockedStage()
+    {
+        // Arrange
+        var blockerCompleted = 0;
+
+        var blockingSession = new Mock<ISession>();
+        var blockedStageSession = new Mock<ISession>();
+
+        blockingSession.SetupGet(s => s.SessionStage).Returns(1);
+        blockingSession.SetupGet(s => s.RunUntilStage).Returns(2);
+        blockingSession.Setup(s => s.Run(It.IsAny<ExecutionData>()))
+            .Callback(() =>
+            {
+                Thread.Sleep(60);
+                Interlocked.Exchange(ref blockerCompleted, 1);
+            })
+            .Returns(new SessionData { Name = "BlockingSession" });
+
+        blockedStageSession.SetupGet(s => s.SessionStage).Returns(2);
+        blockedStageSession.SetupGet(s => s.RunUntilStage).Returns((int?)null);
+        blockedStageSession.Setup(s => s.Run(It.IsAny<ExecutionData>()))
+            .Callback(() => Assert.That(Interlocked.CompareExchange(ref blockerCompleted, 0, 0), Is.EqualTo(1)))
+            .Returns(new SessionData { Name = "BlockedStageSession" });
+
+        var sessionLogic = new SessionLogic([blockingSession.Object, blockedStageSession.Object], new InternalContext
+        {
+            Logger = Globals.Logger
+        });
+        var executionData = new ExecutionData();
+
+        // Act
+        sessionLogic.Run(executionData);
+
+        // Assert
+        Assert.That(executionData.SessionDatas, Has.Count.EqualTo(2));
+        blockingSession.Verify(s => s.Run(It.IsAny<ExecutionData>()), Times.Once);
+        blockedStageSession.Verify(s => s.Run(It.IsAny<ExecutionData>()), Times.Once);
+    }
+
+    [Test]
+    public void TestRun_WithBlockingSessionOnMissingTargetStage_AddsBlockingResultAtEnd()
+    {
+        // Arrange
+        var blockingSessionData = new SessionData { Name = "BlockingSession" };
+        var regularSessionData = new SessionData { Name = "RegularSession" };
+
+        var blockingSession = new Mock<ISession>();
+        blockingSession.SetupGet(s => s.SessionStage).Returns(1);
+        blockingSession.SetupGet(s => s.RunUntilStage).Returns(99);
+        blockingSession.Setup(s => s.Run(It.IsAny<ExecutionData>())).Returns(blockingSessionData);
+
+        var regularSession = new Mock<ISession>();
+        regularSession.SetupGet(s => s.SessionStage).Returns(1);
+        regularSession.SetupGet(s => s.RunUntilStage).Returns((int?)null);
+        regularSession.Setup(s => s.Run(It.IsAny<ExecutionData>())).Returns(regularSessionData);
+
+        var sessionLogic = new SessionLogic([blockingSession.Object, regularSession.Object], new InternalContext
+        {
+            Logger = Globals.Logger
+        });
+        var executionData = new ExecutionData();
+
+        // Act
+        sessionLogic.Run(executionData);
+
+        // Assert
+        Assert.That(executionData.SessionDatas, Has.Count.EqualTo(2));
+        Assert.That(executionData.SessionDatas, Contains.Item(blockingSessionData));
+        Assert.That(executionData.SessionDatas, Contains.Item(regularSessionData));
     }
 }
