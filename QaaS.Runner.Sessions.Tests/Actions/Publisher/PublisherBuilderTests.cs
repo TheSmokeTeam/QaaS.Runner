@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using System.ComponentModel.DataAnnotations;
 using System.Linq;
@@ -110,6 +111,37 @@ public class PublisherBuilderTests
     }
 
     [Test]
+    public void UpdateAndDeleteDataSourcePattern_ShouldApplyExpectedMutations()
+    {
+        var builder = new PublisherBuilder()
+            .AddDataSourcePattern("pattern1")
+            .AddDataSourcePattern("pattern2");
+
+        builder.UpdateDataSourcePattern("pattern1", "pattern1-updated");
+        builder.DeleteDataSourcePattern("pattern2");
+
+        Assert.That(builder.DataSourcePatterns, Is.EquivalentTo(new[] { "pattern1-updated" }));
+    }
+
+    [Test]
+    public void UpdateDataSource_WhenCollectionIsNull_DoesNothing()
+    {
+        var builder = new PublisherBuilder();
+
+        Assert.DoesNotThrow(() => builder.UpdateDataSource("missing", "new-value"));
+        Assert.That(builder.ReadDataSources(), Is.Empty);
+    }
+
+    [Test]
+    public void UpdateDataSourcePattern_WhenCollectionIsNull_DoesNothing()
+    {
+        var builder = new PublisherBuilder();
+
+        Assert.DoesNotThrow(() => builder.UpdateDataSourcePattern("missing", "new-value"));
+        Assert.That(builder.ReadDataSourcePatterns(), Is.Empty);
+    }
+
+    [Test]
     public void InLoops_Should_Set_Loop_Property()
     {
         var builder = new PublisherBuilder();
@@ -148,6 +180,34 @@ public class PublisherBuilderTests
     }
 
     [Test]
+    public void DeletePolicyAt_WithValidIndex_RemovesPolicy()
+    {
+        var builder = new PublisherBuilder()
+            .AddPolicy(new PolicyBuilder())
+            .AddPolicy(new PolicyBuilder());
+
+        builder.DeletePolicyAt(0);
+
+        Assert.That(builder.Policies.Length, Is.EqualTo(1));
+    }
+
+    [Test]
+    public void UpdatePolicyAt_WithInvalidIndex_ThrowsArgumentOutOfRangeException()
+    {
+        var builder = new PublisherBuilder();
+
+        Assert.Throws<ArgumentOutOfRangeException>(() => builder.UpdatePolicyAt(0, new PolicyBuilder()));
+    }
+
+    [Test]
+    public void DeletePolicyAt_WithInvalidIndex_ThrowsArgumentOutOfRangeException()
+    {
+        var builder = new PublisherBuilder();
+
+        Assert.Throws<ArgumentOutOfRangeException>(() => builder.DeletePolicyAt(0));
+    }
+
+    [Test]
     public void IsParallel_Should_Set_Async_Property()
     {
         var builder = new PublisherBuilder();
@@ -180,6 +240,29 @@ public class PublisherBuilderTests
 
         Assert.That(builder.Build(Globals.GetContextWithMetadata(), _actionFailures, _sessionName), Is.Null);
         Assert.That(_actionFailures.Count, Is.GreaterThan(0));
+    }
+
+    [Test]
+    public void Build_WithMultipleSenderConfigsAndValidRequiredFields_ReturnsNullAndActionFailure()
+    {
+        var builder = new PublisherBuilder()
+            .Named("publisher-conflict");
+
+        typeof(PublisherBuilder).GetProperty("RabbitMq", BindingFlags.Instance | BindingFlags.NonPublic)!
+            .SetValue(builder, new RabbitMqSenderConfig());
+        typeof(PublisherBuilder).GetProperty("KafkaTopic", BindingFlags.Instance | BindingFlags.NonPublic)!
+            .SetValue(builder, new KafkaTopicSenderConfig
+            {
+                TopicName = "topic",
+                HostNames = ["host:9092"],
+                Username = "user",
+                Password = "pass"
+            });
+
+        var result = builder.Build(Globals.GetContextWithMetadata(), _actionFailures, _sessionName);
+
+        Assert.That(result, Is.Null);
+        Assert.That(_actionFailures, Is.Not.Empty);
     }
 
     private class FakeSenderConfig : ISenderConfig;

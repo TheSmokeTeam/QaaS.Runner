@@ -1,5 +1,6 @@
 using System.Collections.Generic;
 using System.Net.Sockets;
+using System.Reflection;
 using Moq;
 using NUnit.Framework;
 using QaaS.Framework.Policies;
@@ -273,5 +274,32 @@ public class SessionBuilderTests
 
         // Assert
         Assert.That(session, Is.Not.Null);
+    }
+
+    [Test]
+    public void Build_WithMatchingStageConfig_AppliesStageTimeoutsToBuiltStage()
+    {
+        var builder = new SessionBuilder()
+            .Named("TestSession")
+            .AtStage(1)
+            .AddStage(new StageConfig(stageNumber: 2, timeoutBefore: 123, timeoutAfter: 456))
+            .AddPublisher(new PublisherBuilder()
+                .Named("publisher-stage-2")
+                .AtStage(2)
+                .Configure(new RabbitMqSenderConfig { Host = "https://test.com" }));
+
+        var session = builder.Build(_context, []);
+        var stagesField = typeof(global::QaaS.Runner.Sessions.Session.Session)
+            .GetField("_stages", BindingFlags.Instance | BindingFlags.NonPublic)!;
+        var stages = (Dictionary<int, global::QaaS.Runner.Sessions.Session.Stage>)stagesField.GetValue(session)!;
+        var stageTwo = stages[2];
+
+        var sleepBeforeField = typeof(global::QaaS.Runner.Sessions.Session.Stage).GetProperty("SleepBeforeMilliseconds",
+            BindingFlags.Instance | BindingFlags.NonPublic)!;
+        var sleepAfterField = typeof(global::QaaS.Runner.Sessions.Session.Stage).GetProperty("SleepAfterMilliseconds",
+            BindingFlags.Instance | BindingFlags.NonPublic)!;
+
+        Assert.That(sleepBeforeField.GetValue(stageTwo), Is.EqualTo(123));
+        Assert.That(sleepAfterField.GetValue(stageTwo), Is.EqualTo(456));
     }
 }

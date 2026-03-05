@@ -120,6 +120,26 @@ public class MockerCommandBuilderTests
         Assert.That(builder.ReadCommand(), Is.Null);
     }
 
+    [Test]
+    public void FluentSetters_AssignExpectedProperties()
+    {
+        var redis = new RedisConfig { Host = "localhost:6379" };
+        var builder = new MockerCommandBuilder()
+            .Named("mocker")
+            .AtStage(7)
+            .WithServerName("server-a")
+            .WithRedis(redis)
+            .WithRequestDurationMs(123)
+            .WithRequestRetries(9);
+
+        Assert.That(builder.Name, Is.EqualTo("mocker"));
+        Assert.That(builder.Stage, Is.EqualTo(7));
+        Assert.That(builder.ServerName, Is.EqualTo("server-a"));
+        Assert.That(builder.Redis, Is.SameAs(redis));
+        Assert.That(builder.RequestDurationMs, Is.EqualTo(123));
+        Assert.That(builder.RequestRetries, Is.EqualTo(9));
+    }
+
     private static IEnumerable<CommandConfig> ValidSupportedCommands()
     {
         yield return new CommandConfig { ChangeActionStub = new ChangeActionStub() };

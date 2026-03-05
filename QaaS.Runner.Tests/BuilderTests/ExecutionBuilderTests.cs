@@ -117,6 +117,19 @@ public class ExecutionBuilderTests
         Assert.That(builder.Links, Is.Null);
     }
 
+    [Test]
+    public void ReadStorages_WhenStoragesAreNull_ReturnsEmptyCollection()
+    {
+        var builder = new ExecutionBuilder
+        {
+            Storages = null
+        };
+
+        var storages = builder.ReadStorages();
+
+        Assert.That(storages, Is.Empty);
+    }
+
     private ExecutionBuilder CreateValidExecutionBuilder()
     {
         var builder = new ExecutionBuilder();

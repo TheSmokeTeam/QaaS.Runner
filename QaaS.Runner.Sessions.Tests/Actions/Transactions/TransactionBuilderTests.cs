@@ -1,7 +1,9 @@
+using System;
 using System.Collections.Generic;
 using System.ComponentModel.DataAnnotations;
 using System.Reflection;
 using NUnit.Framework;
+using QaaS.Framework.Policies;
 using QaaS.Framework.Configurations;
 using QaaS.Framework.Protocols.ConfigurationObjects.Grpc;
 using QaaS.Framework.Protocols.ConfigurationObjects.Http;
@@ -311,5 +313,58 @@ public class TransactionBuilderTests
         var exception = new BuildWithMissingPropertiesException("transactor");
 
         Assert.That(exception.Message, Does.Contain("no transactor set"));
+    }
+
+    [Test]
+    public void UpdatePolicyAt_WithInvalidIndex_ThrowsArgumentOutOfRangeException()
+    {
+        var builder = new TransactionBuilder();
+
+        Assert.Throws<ArgumentOutOfRangeException>(() => builder.UpdatePolicyAt(0, new PolicyBuilder()));
+    }
+
+    [Test]
+    public void DeletePolicyAt_WithInvalidIndex_ThrowsArgumentOutOfRangeException()
+    {
+        var builder = new TransactionBuilder();
+
+        Assert.Throws<ArgumentOutOfRangeException>(() => builder.DeletePolicyAt(0));
+    }
+
+    [Test]
+    public void UpdateDataSource_WhenCollectionIsNull_DoesNothing()
+    {
+        var builder = new TransactionBuilder();
+
+        Assert.DoesNotThrow(() => builder.UpdateDataSource("a", "b"));
+        Assert.That(builder.ReadDataSources(), Is.Empty);
+    }
+
+    [Test]
+    public void UpdateDataSourcePattern_WhenCollectionIsNull_DoesNothing()
+    {
+        var builder = new TransactionBuilder();
+
+        Assert.DoesNotThrow(() => builder.UpdateDataSourcePattern("a", "b"));
+        Assert.That(builder.ReadDataSourcePatterns(), Is.Empty);
+    }
+
+    [Test]
+    public void Build_WithMultipleTransactorConfigsConfigured_ReturnsNullAndAddsActionFailure()
+    {
+        var builder = new TransactionBuilder()
+            .Named("transaction-conflict")
+            .WithTimeout(1000)
+            .AddDataSource("source-a");
+
+        typeof(TransactionBuilder).GetProperty("Http", BindingFlags.Instance | BindingFlags.NonPublic)!
+            .SetValue(builder, new HttpTransactorConfig { Method = HttpMethods.Get, BaseAddress = "https://test.com" });
+        typeof(TransactionBuilder).GetProperty("Grpc", BindingFlags.Instance | BindingFlags.NonPublic)!
+            .SetValue(builder, new GrpcTransactorConfig());
+
+        var result = builder.Build(_context, _actionFailures, _sessionName);
+
+        Assert.That(result, Is.Null);
+        Assert.That(_actionFailures, Is.Not.Empty);
     }
 }

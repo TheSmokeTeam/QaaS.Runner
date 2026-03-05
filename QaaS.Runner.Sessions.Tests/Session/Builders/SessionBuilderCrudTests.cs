@@ -1,4 +1,5 @@
 using System.Linq;
+using System.Reflection;
 using NUnit.Framework;
 using QaaS.Runner.Sessions.Actions.Collectors;
 using QaaS.Runner.Sessions.Actions.Consumers.Builders;
@@ -87,5 +88,41 @@ public class SessionBuilderCrudTests
         builder.DeleteStage(2);
         Assert.That(builder.ReadStages(), Has.Count.EqualTo(1));
         Assert.That(builder.ReadStages()[0].StageNumber, Is.EqualTo(1));
+    }
+
+    [Test]
+    public void UpdateStage_WhenStageNumberDoesNotExist_DoesNotChangeStages()
+    {
+        var builder = new SessionBuilder()
+            .CreateStage(new StageConfig(stageNumber: 1, timeoutBefore: 10, timeoutAfter: 20));
+
+        builder.UpdateStage(99, new StageConfig(stageNumber: 99, timeoutBefore: 1, timeoutAfter: 1));
+
+        Assert.That(builder.ReadStages(), Has.Count.EqualTo(1));
+        Assert.That(builder.ReadStages()[0].StageNumber, Is.EqualTo(1));
+    }
+
+    [Test]
+    public void UpdateByName_WhenCollectionIsNull_DoesNotThrowAndKeepsCollectionNull()
+    {
+        var builder = new SessionBuilder();
+        typeof(SessionBuilder).GetProperty("Consumers", BindingFlags.Instance | BindingFlags.NonPublic)!
+            .SetValue(builder, null);
+
+        Assert.DoesNotThrow(() => builder.UpdateConsumer("missing", new ConsumerBuilder().Named("replacement")));
+        Assert.That(typeof(SessionBuilder).GetProperty("Consumers", BindingFlags.Instance | BindingFlags.NonPublic)!
+            .GetValue(builder), Is.Null);
+    }
+
+    [Test]
+    public void UpdateByName_WhenNameIsMissing_DoesNotMutateCollection()
+    {
+        var builder = new SessionBuilder()
+            .CreatePublisher(new PublisherBuilder().Named("publisher-a"));
+
+        builder.UpdatePublisher("publisher-missing", new PublisherBuilder().Named("publisher-updated"));
+
+        Assert.That(builder.ReadPublishers(), Has.Count.EqualTo(1));
+        Assert.That(builder.ReadPublishers()[0].Name, Is.EqualTo("publisher-a"));
     }
 }

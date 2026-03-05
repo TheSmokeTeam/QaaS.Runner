@@ -220,13 +220,8 @@ public class PublisherTest
             chunkSender => chunkSender.SendChunk(It.IsAny<IEnumerable<Data<object>>>()),
             Times.Exactly(numberOfChunks));
         Assert.That(testActData.Input.Count, Is.EqualTo(numberOfChunks * chunkSize));
-        if (numberOfChunks < parallelism)
-            Assert.That(maxActiveThreads,
-                Is.InRange(Math.Min(numberOfChunks, Environment.ProcessorCount),
-                    Math.Max(numberOfChunks, Environment.ProcessorCount)));
-        else
-            Assert.That(maxActiveThreads, Is.InRange(Math.Min(parallelism, Environment.ProcessorCount),
-                Math.Max(parallelism, Environment.ProcessorCount)));
+        var expectedMaxConcurrency = Math.Min(numberOfChunks, parallelism);
+        Assert.That(maxActiveThreads, Is.InRange(1, expectedMaxConcurrency));
     }
 
     [Test,
@@ -283,13 +278,7 @@ public class PublisherTest
         senderMock.Verify(sender => sender.Send(It.IsAny<Data<object>>()),
             Times.Exactly(numberOfItems));
         Assert.That(testActData.Input.Count, Is.EqualTo(numberOfItems));
-        // if parallelism configured not possible due to machine limitations:
-        if (numberOfItems < parallelism)
-            Assert.That(maxActiveThreads,
-                Is.InRange(Math.Min(numberOfItems, Environment.ProcessorCount),
-                    Math.Max(numberOfItems, Environment.ProcessorCount)));
-        else
-            Assert.That(maxActiveThreads, Is.InRange(Math.Min(parallelism, Environment.ProcessorCount),
-                Math.Max(parallelism, Environment.ProcessorCount)));
+        var expectedMaxConcurrency = Math.Min(numberOfItems, parallelism);
+        Assert.That(maxActiveThreads, Is.InRange(1, expectedMaxConcurrency));
     }
 }

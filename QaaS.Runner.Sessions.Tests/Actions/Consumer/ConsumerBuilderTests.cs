@@ -1,5 +1,7 @@
+using System;
 using System.Collections.Generic;
 using System.Net.Sockets;
+using System.Reflection;
 using Moq;
 using NUnit.Framework;
 using QaaS.Framework.Policies;
@@ -684,5 +686,47 @@ public class ConsumerBuilderTests
         // Assert
         Assert.That(result, Is.Null);
         Assert.That(_actionFailures.Count, Is.GreaterThan(0));
+    }
+
+    [Test]
+    public void UpdatePolicyAt_WithInvalidIndex_ThrowsArgumentOutOfRangeException()
+    {
+        var builder = new ConsumerBuilder();
+
+        Assert.Throws<ArgumentOutOfRangeException>(() => builder.UpdatePolicyAt(0, new PolicyBuilder()));
+    }
+
+    [Test]
+    public void DeletePolicyAt_WithInvalidIndex_ThrowsArgumentOutOfRangeException()
+    {
+        var builder = new ConsumerBuilder();
+
+        Assert.Throws<ArgumentOutOfRangeException>(() => builder.DeletePolicyAt(0));
+    }
+
+    [Test]
+    public void Build_WithMultipleReaderConfigsAndValidRequiredFields_ReturnsNullAndAddsActionFailure()
+    {
+        var builder = new ConsumerBuilder()
+            .Named("TestConsumer")
+            .WithTimeout(1000)
+            .FilterData(new DataFilter());
+
+        typeof(ConsumerBuilder).GetProperty("RabbitMq", BindingFlags.Instance | BindingFlags.NonPublic)!
+            .SetValue(builder, new RabbitMqReaderConfig());
+        typeof(ConsumerBuilder).GetProperty("KafkaTopic", BindingFlags.Instance | BindingFlags.NonPublic)!
+            .SetValue(builder, new KafkaTopicReaderConfig
+            {
+                TopicName = "topic",
+                GroupId = "group",
+                HostNames = ["host1:9092"],
+                Username = "user",
+                Password = "pass"
+            });
+
+        var result = builder.Build(Globals.GetContextWithMetadata(), _actionFailures, _sessionName);
+
+        Assert.That(result, Is.Null);
+        Assert.That(_actionFailures, Is.Not.Empty);
     }
 }
