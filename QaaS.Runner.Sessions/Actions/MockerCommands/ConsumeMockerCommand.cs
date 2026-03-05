@@ -14,6 +14,9 @@ using CommunicationInputOutputState = Qaas.Mocker.CommunicationObjects.Configura
 
 namespace QaaS.Runner.Sessions.Actions.MockerCommands;
 
+/// <summary>
+/// Mocker command that pulls captured input/output payloads from mocker redis queues.
+/// </summary>
 public class ConsumeMockerCommand : MockerCommand
 {
     private readonly ConsumeConfig _consumeConfig;
@@ -47,7 +50,7 @@ public class ConsumeMockerCommand : MockerCommand
     protected override CommandType CommandType => CommandType.Consume;
 
     /// <summary>
-    ///     Consumes from Mocker's cache via redis'.
+    /// Consumes mocker-captured inputs/outputs, filters them and applies optional deserialization.
     /// </summary>
     protected override (IEnumerable<DetailedData<object>>?, IEnumerable<DetailedData<object>>?)
         AdditionalDataExchangeWithTheMocker()
@@ -99,6 +102,9 @@ public class ConsumeMockerCommand : MockerCommand
         return _consumeConfig.OutputDeserialize?.Deserializer;
     }
 
+    /// <summary>
+    /// Reads queue items until timeout; timeout is reset after each successful pop.
+    /// </summary>
     private IEnumerable<DetailedData<byte[]>> Consume(string queueName, int timeoutMs)
     {
         Logger.LogDebug("Started consuming from Server - '{QueueName}'", queueName);

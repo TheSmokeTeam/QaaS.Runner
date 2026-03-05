@@ -9,6 +9,9 @@ using QaaS.Runner.Sessions.Extensions;
 
 namespace QaaS.Runner.Sessions.Actions.MockerCommands;
 
+/// <summary>
+/// Fluent builder for mocker command actions that validates command shape and creates the matching command runtime.
+/// </summary>
 public class MockerCommandBuilder
 {
     [Required]
@@ -38,42 +41,63 @@ public class MockerCommandBuilder
     [DefaultValue(3)]
     internal int RequestRetries { get; set; } = 3;
 
+    /// <summary>
+    /// Sets the command name.
+    /// </summary>
     public MockerCommandBuilder Named(string name)
     {
         Name = name;
         return this;
     }
 
+    /// <summary>
+    /// Sets the stage in which this command runs.
+    /// </summary>
     public MockerCommandBuilder AtStage(int stage)
     {
         Stage = stage;
         return this;
     }
 
+    /// <summary>
+    /// Sets the target mocker server name.
+    /// </summary>
     public MockerCommandBuilder WithServerName(string serverName)
     {
         ServerName = serverName;
         return this;
     }
 
+    /// <summary>
+    /// Sets redis connectivity used to communicate with the mocker.
+    /// </summary>
     public MockerCommandBuilder WithRedis(RedisConfig redis)
     {
         Redis = redis;
         return this;
     }
 
+    /// <summary>
+    /// Sets per-request wait duration in milliseconds between retries.
+    /// </summary>
     public MockerCommandBuilder WithRequestDurationMs(int requestDurationMs)
     {
         RequestDurationMs = requestDurationMs;
         return this;
     }
 
+    /// <summary>
+    /// Sets retry count for ping/command requests.
+    /// </summary>
     public MockerCommandBuilder WithRequestRetries(int requestRetries)
     {
         RequestRetries = requestRetries;
         return this;
     }
 
+    /// <summary>
+    /// Sets command-specific configuration. Exactly one supported command type must be configured.
+    /// </summary>
     public MockerCommandBuilder WithCommand(CommandConfig command)
     {
         Command = command;

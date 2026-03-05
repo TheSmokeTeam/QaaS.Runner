@@ -15,6 +15,9 @@ using CommunicationInputOutputState = Qaas.Mocker.CommunicationObjects.Configura
 
 namespace QaaS.Runner.Sessions.Actions.MockerCommands;
 
+/// <summary>
+/// Base runtime for commands sent to mocker instances through redis ping/request-response channels.
+/// </summary>
 public abstract class MockerCommand : StagedAction
 {
     private const string PingContentType = "ping";
@@ -77,9 +80,9 @@ public abstract class MockerCommand : StagedAction
     protected abstract CommandType CommandType { get; }
 
     /// <summary>
-    ///     Executes the mocker command
+    /// Executes discovery, command dispatch and optional data exchange with the mocker instances.
     /// </summary>
-    /// <returns> Act results </returns>
+    /// <returns>Input and output data returned by the command, when applicable.</returns>
     private (IEnumerable<DetailedData<object>>?, IEnumerable<DetailedData<object>>?) Command()
     {
         ScanForMockerInstances();
@@ -130,6 +133,9 @@ public abstract class MockerCommand : StagedAction
         return commandResult;
     }
 
+    /// <summary>
+    /// Discovers mocker instances by publishing ping requests and collecting responses with retries.
+    /// </summary>
     private void ScanForMockerInstances()
     {
         var pingRequestChannel = CommunicationMethods.CreateChannelRunnerToMocker(PingContentType, ServerName);
@@ -154,11 +160,17 @@ public abstract class MockerCommand : StagedAction
         _serverInstanceNames = _serverInstanceNames.Distinct().ToList();
     }
 
+    /// <summary>
+    /// Creates a serialized ping request for mocker instance discovery.
+    /// </summary>
     private string PingRequestConstructor()
     {
         return JsonSerializer.Serialize(new PingRequest { Id = _commandId });
     }
 
+    /// <summary>
+    /// Processes ping responses and records matching server instances for this command id/server pair.
+    /// </summary>
     private void PingResponseHandler(RedisChannel channel, RedisValue serializedMessage)
     {
         Logger.LogDebug("Ping channel '{Channel}' response: '{SerializedMessage}'", channel, serializedMessage);
@@ -174,6 +186,9 @@ public abstract class MockerCommand : StagedAction
                 $"Mocker Server instances does not have matching {nameof(CommunicationInputOutputState)} across all ping responses");
     }
 
+    /// <summary>
+    /// Sends the configured command to each discovered instance and waits for response acknowledgements.
+    /// </summary>
     private void CommandTheMockerInstances()
     {
         foreach (var serverInstance in _serverInstanceNames)
@@ -212,6 +227,9 @@ public abstract class MockerCommand : StagedAction
             .SequenceEqual(_successfulCommandResponseToServerInstanceNames.OrderBy(id => id));
     }
 
+    /// <summary>
+    /// Creates a serialized command request populated with command-specific configuration.
+    /// </summary>
     private string CommandRequestConstructor()
     {
         var commandRequest = new CommandRequest
@@ -223,6 +241,9 @@ public abstract class MockerCommand : StagedAction
         return JsonSerializer.Serialize(commandRequest);
     }
 
+    /// <summary>
+    /// Processes command responses and tracks success/failure by server instance.
+    /// </summary>
     private void CommandResponseHandler(RedisChannel channel, RedisValue serializedMessage)
     {
         Logger.LogDebug("Command channel '{Channel}' response: '{SerializedMessage}'", channel, serializedMessage);
@@ -248,12 +269,12 @@ public abstract class MockerCommand : StagedAction
     }
 
     /// <summary>
-    ///     Returns the serialization type the output data used in this transaction should be serializable to
+    /// Returns the expected serialization type for command input data saved by the runner.
     /// </summary>
     protected abstract SerializationType? GetInputCommunicationSerializationType();
 
     /// <summary>
-    ///     Returns the serialization type the input data used in this transaction should be serializable to
+    /// Returns the expected serialization type for command output data saved by the runner.
     /// </summary>
     protected abstract SerializationType? GetOutputCommunicationSerializationType();
 
