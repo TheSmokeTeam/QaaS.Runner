@@ -11,12 +11,12 @@
 
     <ItemGroup>
         <PackageReference Include="morelinq" Version="4.4.0"/>
+        <PackageReference Include="QaaS.Mocker.CommunicationObjects" Version="2.0.0-alpha.3" />
         <PackageReference Include="StackExchange.Redis" Version="2.11.8" />
     </ItemGroup>
 
     <ItemGroup>
         <ProjectReference Include="..\QaaS.Runner.Infrastructure\QaaS.Runner.Infrastructure.csproj"/>
-        <ProjectReference Include="..\Qaas.Mocker.CommunicationObjects\Qaas.Mocker.CommunicationObjects.csproj"/>
     </ItemGroup>
 
     <ItemGroup>
