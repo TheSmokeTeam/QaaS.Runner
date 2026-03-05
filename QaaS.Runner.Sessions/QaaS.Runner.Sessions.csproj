@@ -16,7 +16,7 @@
 
     <ItemGroup>
         <ProjectReference Include="..\QaaS.Runner.Infrastructure\QaaS.Runner.Infrastructure.csproj"/>
-        <ProjectReference Include="..\..\Qaas.Mocker.CommunicationObjects\Qaas.Mocker.CommunicationObjects\Qaas.Mocker.CommunicationObjects.csproj"/>
+        <ProjectReference Include="..\Qaas.Mocker.CommunicationObjects\Qaas.Mocker.CommunicationObjects.csproj"/>
     </ItemGroup>
 
     <ItemGroup>
