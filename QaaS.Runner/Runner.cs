@@ -53,7 +53,7 @@ public class Runner : IRunner
         var executions = BuildExecutions();
         var exitCode = StartExecutions(executions);
         Teardown();
-        Environment.Exit(exitCode);
+        ExitProcess(exitCode);
     }
 
     /// <summary>
@@ -62,7 +62,7 @@ public class Runner : IRunner
     protected virtual void Setup()
     {
         if (EmptyResults)
-            Scope.Resolve<AllureWrapper>().CleanTestResultsDirectory();
+            CleanResultsDirectory();
     }
 
     /// <summary>
@@ -75,7 +75,31 @@ public class Runner : IRunner
             disposableLogger.Dispose();
         
         if (ServeResults)
-            Scope.Resolve<AllureWrapper>().ServeTestResults();
+            ServeResultsInAllure();
+    }
+
+    /// <summary>
+    /// Cleans the allure results directory.
+    /// </summary>
+    protected virtual void CleanResultsDirectory()
+    {
+        Scope.Resolve<AllureWrapper>().CleanTestResultsDirectory();
+    }
+
+    /// <summary>
+    /// Serves allure results.
+    /// </summary>
+    protected virtual void ServeResultsInAllure()
+    {
+        Scope.Resolve<AllureWrapper>().ServeTestResults();
+    }
+
+    /// <summary>
+    /// Exits the process with the provided code.
+    /// </summary>
+    protected virtual void ExitProcess(int exitCode)
+    {
+        Environment.Exit(exitCode);
     }
 
     /// <summary>

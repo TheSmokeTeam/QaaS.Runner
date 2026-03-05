@@ -33,6 +33,12 @@ public class AllureWrapperTests
     }
 
     [Test]
+    public void TestServeTestResults_WithEchoCommand_ShouldReadStandardOutputWithoutException()
+    {
+        Assert.DoesNotThrow(() => _wrapper.ServeTestResults("echo"));
+    }
+
+    [Test]
     public void TestMethodExistence_ShouldHaveExpectedMethods()
     {
         // Act

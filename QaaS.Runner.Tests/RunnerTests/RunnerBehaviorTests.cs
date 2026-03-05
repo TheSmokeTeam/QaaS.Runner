@@ -30,6 +30,55 @@ public class RunnerBehaviorTests
         public int InvokeStartExecutions(List<Execution> executions) => base.StartExecutions(executions);
     }
 
+    private sealed class RunLifecycleRunner(
+        ILifetimeScope scope,
+        List<ExecutionBuilder> executionBuilders,
+        Microsoft.Extensions.Logging.ILogger logger,
+        Serilog.ILogger serilogLogger) : Runner(scope, executionBuilders, logger, serilogLogger)
+    {
+        public List<string> Calls { get; } = [];
+        public int? ExitCode { get; private set; }
+
+        protected override void Setup() => Calls.Add("setup");
+
+        protected override List<Execution> BuildExecutions()
+        {
+            Calls.Add("build");
+            return [];
+        }
+
+        protected override int StartExecutions(List<Execution> executions)
+        {
+            Calls.Add("start");
+            return 7;
+        }
+
+        protected override void Teardown() => Calls.Add("teardown");
+
+        protected override void ExitProcess(int exitCode)
+        {
+            Calls.Add("exit");
+            ExitCode = exitCode;
+        }
+    }
+
+    private sealed class ServeResultsRunner(
+        ILifetimeScope scope,
+        List<ExecutionBuilder> executionBuilders,
+        Microsoft.Extensions.Logging.ILogger logger,
+        Serilog.ILogger serilogLogger,
+        bool serveResults) : Runner(scope, executionBuilders, logger, serilogLogger, serveResults: serveResults)
+    {
+        public bool ServedResults { get; private set; }
+
+        public void InvokeTeardown() => base.Teardown();
+
+        protected override void ServeResultsInAllure()
+        {
+            ServedResults = true;
+        }
+    }
+
     [Test]
     public void Setup_WithEmptyResultsEnabled_CleansAllureResultsDirectory()
     {
@@ -66,6 +115,26 @@ public class RunnerBehaviorTests
         runner.InvokeTeardown();
 
         disposableLogger.Verify(logger => logger.Dispose(), Times.Once);
+    }
+
+    [Test]
+    public void Teardown_WithNonDisposableLogger_DoesNotThrow()
+    {
+        using var scope = BuildScope();
+        var runner = new ExposedRunner(scope, [], Globals.Logger, new Mock<Serilog.ILogger>().Object);
+
+        Assert.DoesNotThrow(() => runner.InvokeTeardown());
+    }
+
+    [Test]
+    public void Teardown_WithServeResultsEnabled_InvokesServeResultsHook()
+    {
+        using var scope = BuildScope();
+        var runner = new ServeResultsRunner(scope, [], Globals.Logger, new Mock<Serilog.ILogger>().Object, serveResults: true);
+
+        runner.InvokeTeardown();
+
+        Assert.That(runner.ServedResults, Is.True);
     }
 
     [Test]
@@ -143,6 +212,18 @@ public class RunnerBehaviorTests
         var result = runner.InvokeStartExecutions([]);
 
         Assert.That(result, Is.Zero);
+    }
+
+    [Test]
+    public void Run_InvokesLifecycleInOrder_AndPassesExitCode()
+    {
+        using var scope = BuildScope();
+        var runner = new RunLifecycleRunner(scope, [], Globals.Logger, new Mock<Serilog.ILogger>().Object);
+
+        runner.Run();
+
+        Assert.That(runner.Calls, Is.EqualTo(new[] { "setup", "build", "start", "teardown", "exit" }));
+        Assert.That(runner.ExitCode, Is.EqualTo(7));
     }
 
     private static ILifetimeScope BuildScope()
