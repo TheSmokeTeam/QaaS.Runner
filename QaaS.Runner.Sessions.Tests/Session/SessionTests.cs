@@ -17,6 +17,8 @@ namespace QaaS.Runner.Sessions.Tests.Session;
 [TestFixture]
 public class SessionTests
 {
+    private const int ConsumeMessageCount = 20;
+
     private static Mock<IReader> _reader = null!;
     private static Mock<IChunkReader> _chunkReader = null!;
 
@@ -38,7 +40,7 @@ public class SessionTests
         List<string> names,
         List<string> patterns)
     {
-        var stage1 = new Stage(context, [], sessionName, 0);
+        var stage1 = new Stage(context, [], sessionName, 0, 0, 0);
         stage1.AddCommunication(
             CreationalFunctions.CreateConsumer(
                 ref _reader!,
@@ -50,7 +52,7 @@ public class SessionTests
                 _messageToRead,
                 consumeMsgAmount));
 
-        var stage2 = new Stage(context, [], sessionName, 1);
+        var stage2 = new Stage(context, [], sessionName, 1, 0, 0);
         stage2.AddCommunication(
             CreationalFunctions.CreatePublisherWithIterations(
                 ref _sender!,
@@ -66,7 +68,7 @@ public class SessionTests
                 publisherChunkSize));
 
 
-        var stage3 = new Stage(context, [], sessionName, 2);
+        var stage3 = new Stage(context, [], sessionName, 2, 0, 0);
         stage3.AddCommunication(
             CreationalFunctions.CreateTransactorWithLoop(
                 ref _transactor!,
@@ -80,8 +82,8 @@ public class SessionTests
             sessionName,
             0,
             true,
-            1000,
-            1000,
+            0,
+            0,
             new Dictionary<int, Stage> { { 0, stage1 }, { 1, stage2 }, { 2, stage3 } },
             [], // add collector
             context,
@@ -98,7 +100,7 @@ public class SessionTests
         List<Data<object>> expectedData)
     {
         // Arrange
-        const int consumeMsgAmount = 100;
+        const int consumeMsgAmount = ConsumeMessageCount;
         const int pubChunkSize = 5;
         const string dataReadersReturn = "test";
         const string sessionName = "test session";
@@ -129,7 +131,7 @@ public class SessionTests
         List<Data<object>> expectedData)
     {
         // Arrange
-        const int consumeMsgAmount = 100;
+        const int consumeMsgAmount = ConsumeMessageCount;
         const int pubChunkSize = 5;
         const string dataReadersReturn = "test";
         const string sessionName = "test session";
@@ -166,7 +168,7 @@ public class SessionTests
         List<Data<object>> expectedSentData)
     {
         // Arrange
-        const int consumeMsgAmount = 100;
+        const int consumeMsgAmount = ConsumeMessageCount;
         const int pubChunkSize = 5;
         const string dataReadersReturn = "test";
         const string sessionName = "test session";
@@ -197,7 +199,7 @@ public class SessionTests
         List<Data<object>> expectedSentData)
     {
         // Arrange
-        const int consumeMsgAmount = 100;
+        const int consumeMsgAmount = ConsumeMessageCount;
         const int pubChunkSize = 5;
         const string dataReadersReturn = "test";
         const string sessionName = "test session";

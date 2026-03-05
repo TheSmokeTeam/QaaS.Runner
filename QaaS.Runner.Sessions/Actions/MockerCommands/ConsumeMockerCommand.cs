@@ -1,18 +1,21 @@
-using System.Diagnostics;
+﻿using System.Diagnostics;
 using System.Text.Json;
 using Microsoft.Extensions.Logging;
-using QaaS.Framework.SDK.ConfigurationObjects;
 using QaaS.Framework.SDK.Extensions;
-using QaaS.Framework.SDK.MockerObjects;
-using QaaS.Framework.SDK.MockerObjects.ConfigurationObjects.Command;
+using Qaas.Mocker.CommunicationObjects;
 using QaaS.Framework.SDK.Session;
 using QaaS.Framework.SDK.Session.DataObjects;
 using QaaS.Framework.Serialization;
 using QaaS.Framework.Serialization.Deserializers;
+using Qaas.Mocker.CommunicationObjects.ConfigurationObjects.Command;
 using QaaS.Runner.Sessions.ConfigurationObjects;
+using CommunicationInputOutputState = Qaas.Mocker.CommunicationObjects.ConfigurationObjects.InputOutputState;
 
 namespace QaaS.Runner.Sessions.Actions.MockerCommands;
 
+/// <summary>
+/// Mocker command that pulls captured input/output payloads from mocker redis queues.
+/// </summary>
 public class ConsumeMockerCommand : MockerCommand
 {
     private readonly ConsumeConfig _consumeConfig;
@@ -46,12 +49,12 @@ public class ConsumeMockerCommand : MockerCommand
     protected override CommandType CommandType => CommandType.Consume;
 
     /// <summary>
-    ///     Consumes from Mocker's cache via redis'.
+    /// Consumes mocker-captured inputs/outputs, filters them and applies optional deserialization.
     /// </summary>
     protected override (IEnumerable<DetailedData<object>>?, IEnumerable<DetailedData<object>>?)
         AdditionalDataExchangeWithTheMocker()
     {
-        if (ServerInputOutputState == InputOutputState.NoInputOutput)
+        if (ServerInputOutputState == CommunicationInputOutputState.NoInputOutput)
         {
             Logger.LogWarning("Server '{ServerName}' has not Inputs or outputs, nothing to consume from", ServerName);
             return (null, null);
@@ -60,13 +63,13 @@ public class ConsumeMockerCommand : MockerCommand
         var inputTypeToDeserializeTo = _consumeConfig.InputDeserialize?.SpecificType?.GetConfiguredType();
         var outputTypeToDeserializeTo = _consumeConfig.OutputDeserialize?.SpecificType?.GetConfiguredType();
 
-        var consumedInputData = ServerInputOutputState is InputOutputState.OnlyInput or InputOutputState.BothInputOutput
+        var consumedInputData = ServerInputOutputState is CommunicationInputOutputState.OnlyInput or CommunicationInputOutputState.BothInputOutput
             ? Consume(CommunicationMethods.CreateConsumerEndpointInput(ServerName),
                 _consumeConfig.TimeoutMs).Select(d => d.FilterData(_inputDataFilter))
             : null;
 
         var consumedOutputData =
-            ServerInputOutputState is InputOutputState.OnlyOutput or InputOutputState.BothInputOutput
+            ServerInputOutputState is CommunicationInputOutputState.OnlyOutput or CommunicationInputOutputState.BothInputOutput
                 ? Consume(CommunicationMethods.CreateConsumerEndpointOutput(ServerName),
                     _consumeConfig.TimeoutMs).Select(d => d.FilterData(_outputDataFilter))
                 : null;
@@ -98,6 +101,9 @@ public class ConsumeMockerCommand : MockerCommand
         return _consumeConfig.OutputDeserialize?.Deserializer;
     }
 
+    /// <summary>
+    /// Reads queue items until timeout; timeout is reset after each successful pop.
+    /// </summary>
     private IEnumerable<DetailedData<byte[]>> Consume(string queueName, int timeoutMs)
     {
         Logger.LogDebug("Started consuming from Server - '{QueueName}'", queueName);
@@ -115,3 +121,4 @@ public class ConsumeMockerCommand : MockerCommand
         Logger.LogInformation("Stopped consuming from Server - '{QueueName}'", queueName);
     }
 }
+

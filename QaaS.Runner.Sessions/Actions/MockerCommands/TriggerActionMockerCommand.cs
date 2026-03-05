@@ -1,5 +1,5 @@
-using Microsoft.Extensions.Logging;
-using QaaS.Framework.SDK.MockerObjects.ConfigurationObjects.Command;
+﻿using Microsoft.Extensions.Logging;
+using Qaas.Mocker.CommunicationObjects.ConfigurationObjects.Command;
 using QaaS.Framework.Serialization;
 using QaaS.Runner.Sessions.ConfigurationObjects;
 
@@ -36,3 +36,4 @@ public class TriggerActionMockerCommand(
         return null;
     }
 }
+

@@ -1,5 +1,5 @@
-using System.ComponentModel;
-using QaaS.Framework.SDK.MockerObjects.ConfigurationObjects.Command;
+﻿using System.ComponentModel;
+using Qaas.Mocker.CommunicationObjects.ConfigurationObjects.Command;
 using QaaS.Framework.Serialization;
 
 namespace QaaS.Runner.Sessions.ConfigurationObjects;
@@ -14,3 +14,4 @@ public record ConsumeConfig : Consume
     [DefaultValue(null)]
     public DeserializeConfig? OutputDeserialize { get; set; }
 }
+

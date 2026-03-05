@@ -1,4 +1,4 @@
-using NUnit.Framework;
+﻿using NUnit.Framework;
 using QaaS.Framework.Policies;
 using QaaS.Framework.Protocols.ConfigurationObjects.Grpc;
 using QaaS.Framework.Protocols.ConfigurationObjects.Http;
@@ -6,7 +6,7 @@ using QaaS.Framework.Protocols.ConfigurationObjects.Kafka;
 using QaaS.Framework.Protocols.ConfigurationObjects.Prometheus;
 using QaaS.Framework.Protocols.ConfigurationObjects.RabbitMq;
 using QaaS.Framework.Protocols.ConfigurationObjects.Socket;
-using QaaS.Framework.SDK.MockerObjects.ConfigurationObjects.Command;
+using Qaas.Mocker.CommunicationObjects.ConfigurationObjects.Command;
 using QaaS.Runner.Sessions.Actions.Collectors;
 using QaaS.Runner.Sessions.Actions.Consumers.Builders;
 using QaaS.Runner.Sessions.Actions.MockerCommands;
@@ -155,3 +155,4 @@ public class BuilderCrudTests
         Assert.That(builder.ReadCommand(), Is.Null);
     }
 }
+
