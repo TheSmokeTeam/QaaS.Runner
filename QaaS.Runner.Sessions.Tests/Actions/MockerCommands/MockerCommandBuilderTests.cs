@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using NUnit.Framework;
 using QaaS.Framework.SDK.ContextObjects;
@@ -82,6 +83,41 @@ public class MockerCommandBuilderTests
         Assert.That(_actionFailures, Has.Count.EqualTo(1));
         Assert.That(_actionFailures[0].Reason.Message, Is.Not.Empty);
         Assert.That(_actionFailures[0].Reason.Message, Does.Not.Contain("Missing supported type"));
+    }
+
+    [Test]
+    public void UpdateCommand_WithoutExistingCommand_ThrowsInvalidOperationException()
+    {
+        var builder = new MockerCommandBuilder();
+
+        Assert.Throws<InvalidOperationException>(() => builder.UpdateCommand(command =>
+        {
+            command.TriggerAction = new TriggerAction();
+            return command;
+        }));
+    }
+
+    [Test]
+    public void CreateReadUpdateDeleteCommand_PerformsExpectedCrudFlow()
+    {
+        var builder = new MockerCommandBuilder();
+        var initialCommand = new CommandConfig { TriggerAction = new TriggerAction() };
+
+        builder.CreateCommand(initialCommand);
+        Assert.That(builder.ReadCommand(), Is.SameAs(initialCommand));
+
+        builder.UpdateCommand(command =>
+        {
+            command.TriggerAction = null;
+            command.ChangeActionStub = new ChangeActionStub();
+            return command;
+        });
+
+        Assert.That(builder.ReadCommand()!.ChangeActionStub, Is.Not.Null);
+        Assert.That(builder.ReadCommand()!.TriggerAction, Is.Null);
+
+        builder.DeleteCommand();
+        Assert.That(builder.ReadCommand(), Is.Null);
     }
 
     private static IEnumerable<CommandConfig> ValidSupportedCommands()

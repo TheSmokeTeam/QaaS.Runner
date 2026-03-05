@@ -304,4 +304,12 @@ public class TransactionBuilderTests
         Assert.That(builder.Http, Is.Null);
         Assert.That(builder.Grpc, Is.Null);
     }
+
+    [Test]
+    public void BuildWithMissingPropertiesException_FormatsMessageWithMissingPropertyName()
+    {
+        var exception = new BuildWithMissingPropertiesException("transactor");
+
+        Assert.That(exception.Message, Does.Contain("no transactor set"));
+    }
 }

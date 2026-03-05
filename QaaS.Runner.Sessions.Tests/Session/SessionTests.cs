@@ -228,4 +228,27 @@ public class SessionTests
         
         Assert.That(outputCount, Is.EqualTo(
             consumeMsgAmount * 2 + 2)); } // number of messages read + chunk read + transaction read 
+
+    [Test]
+    public void Run_WhenSaveDataIsFalse_ReturnsNullAndRemovesRunningSessionEntry()
+    {
+        const string sessionName = "no-save-session";
+        var context = CreationalFunctions.CreateContext(sessionName, []);
+        var stage = new Stage(context, [], sessionName, 0, 0, 0);
+        var session = new Sessions.Session.Session(
+            sessionName,
+            0,
+            false,
+            0,
+            0,
+            new Dictionary<int, Stage> { { 0, stage } },
+            [],
+            context,
+            []);
+
+        var sessionData = session.Run(context.ExecutionData);
+
+        Assert.That(sessionData, Is.Null);
+        Assert.That(context.InternalRunningSessions.RunningSessionsDict.ContainsKey(sessionName), Is.False);
+    }
 }
