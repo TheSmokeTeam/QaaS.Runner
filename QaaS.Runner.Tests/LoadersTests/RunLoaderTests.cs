@@ -49,6 +49,12 @@ namespace QaaS.Runner.Tests.LoadersTests
 
         private sealed class TestJfrogArtifactoryHelper(IEnumerable<string> files) : IJfrogArtifactoryHelper
         {
+            public Task<IReadOnlyList<string>> GetUrlsToAllFilesInArtifactoryFolderAsync(string artifactoryFolderUrl,
+                HttpClient httpClient, CancellationToken cancellationToken = default)
+            {
+                return Task.FromResult<IReadOnlyList<string>>(files.ToList());
+            }
+
             public IEnumerable<string> GetUrlsToAllFilesInArtifactoryFolder(string artifactoryFolderUrl,
                 HttpClient httpClient)
             {
