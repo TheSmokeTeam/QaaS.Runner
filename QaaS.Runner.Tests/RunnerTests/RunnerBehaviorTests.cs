@@ -79,6 +79,33 @@ public class RunnerBehaviorTests
         }
     }
 
+    private sealed class FailingBuildRunner(
+        ILifetimeScope scope,
+        List<ExecutionBuilder> executionBuilders,
+        Microsoft.Extensions.Logging.ILogger logger,
+        Serilog.ILogger serilogLogger) : Runner(scope, executionBuilders, logger, serilogLogger)
+    {
+        public List<string> Calls { get; } = [];
+        public bool Disposed { get; private set; }
+
+        protected override void Setup() => Calls.Add("setup");
+
+        protected override List<Execution> BuildExecutions()
+        {
+            Calls.Add("build");
+            throw new InvalidOperationException("boom");
+        }
+
+        protected override void Teardown() => Calls.Add("teardown");
+
+        public override void Dispose()
+        {
+            Disposed = true;
+            Calls.Add("dispose");
+            base.Dispose();
+        }
+    }
+
     [Test]
     public void Setup_WithEmptyResultsEnabled_CleansAllureResultsDirectory()
     {
@@ -224,6 +251,18 @@ public class RunnerBehaviorTests
 
         Assert.That(runner.Calls, Is.EqualTo(new[] { "setup", "build", "start", "teardown", "exit" }));
         Assert.That(runner.ExitCode, Is.EqualTo(7));
+    }
+
+    [Test]
+    public void Run_WhenBuildExecutionsThrows_StillRunsTeardownAndDispose()
+    {
+        using var scope = BuildScope();
+        var runner = new FailingBuildRunner(scope, [], Globals.Logger, new Mock<Serilog.ILogger>().Object);
+
+        Assert.Throws<InvalidOperationException>(() => runner.Run());
+
+        Assert.That(runner.Calls, Is.EqualTo(new[] { "setup", "build", "teardown", "dispose" }));
+        Assert.That(runner.Disposed, Is.True);
     }
 
     private static ILifetimeScope BuildScope()

@@ -281,4 +281,54 @@ public class PublisherTest
         var expectedMaxConcurrency = Math.Min(numberOfItems, parallelism);
         Assert.That(maxActiveThreads, Is.InRange(1, expectedMaxConcurrency));
     }
+
+    [Test]
+    public void TestPublish_WithParallelism_PreservesReturnedTimestampPerBody()
+    {
+        var baseTime = DateTime.UtcNow;
+        var dataToPublish = Enumerable.Range(0, 6)
+            .Select(index => new Data<object>
+            {
+                Body = $"body-{index}",
+                MetaData = new MetaData()
+            })
+            .ToArray();
+
+        var expectedTimestamps = dataToPublish.ToDictionary(
+            item => (string)item.Body!,
+            item => baseTime.AddMilliseconds(int.Parse(item.Body!.ToString()!.Split('-')[1])));
+
+        var senderMock = new Mock<ISender>();
+        senderMock.Setup(sender => sender.Send(It.IsAny<Data<object>>()))
+            .Returns((Data<object> sentData) =>
+            {
+                var body = sentData.Body!.ToString()!;
+                var index = int.Parse(body.Split('-')[1]);
+                Thread.Sleep((dataToPublish.Length - index) * 10);
+                return new DetailedData<object>
+                {
+                    Body = sentData.Body,
+                    MetaData = sentData.MetaData,
+                    Timestamp = expectedTimestamps[body]
+                };
+            });
+
+        Sessions.Actions.Publishers.Publisher publisher = new("test", senderMock.Object, 0, new DataFilter(), null,
+            false, 4, 1, 0, null, [], [], Globals.Logger);
+        var testActData = new InternalCommunicationData<object>
+        {
+            Input = [],
+            InputSerializationType = SerializationType.Json
+        };
+        _iterableSerializableSaveIteratorField.SetValue(publisher,
+            new IterableSerializableDataIterator(dataToPublish, null));
+
+        typeof(Sessions.Actions.Publishers.Publisher).GetMethod("Publish",
+                BindingFlags.NonPublic | BindingFlags.Instance)!
+            .Invoke(publisher, [testActData]);
+
+        Assert.That(testActData.Input, Has.Count.EqualTo(dataToPublish.Length));
+        Assert.That(testActData.Input!.All(item =>
+            item.Timestamp == expectedTimestamps[item.Body!.ToString()!]), Is.True);
+    }
 }
