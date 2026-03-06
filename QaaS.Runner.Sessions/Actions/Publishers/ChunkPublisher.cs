@@ -51,31 +51,39 @@ public sealed class ChunkPublisher : BasePublisher
     /// <inheritdoc />
     protected override bool Publish(InternalCommunicationData<object> actData)
     {
-        var dataToPublish = IterableSerializableSaveIterator.IterateEnumerable();
+        var dataToPublish = IterableSerializableSaveIterator.IterateWithOriginal();
         var chunks = dataToPublish.Chunk(_chunkSize);
-        var publishedItemIndex = 0;
+
         try
         {
             IterableSerializableSaveIterator.ApplyToAll(chunks, chunk =>
             {
-                IEnumerable<DetailedData<object>>? sentData;
+                IReadOnlyList<DetailedData<object>> sentData;
                 try
                 {
                     ParallelismSemaphore?.Wait();
-                    sentData = _chunkSender!.SendChunk(chunk);
+                    sentData = _chunkSender!.SendChunk(chunk.Select(item => item.Serialized)).ToArray();
                 }
                 finally
                 {
                     ParallelismSemaphore?.Release();
                 }
 
-                foreach (var sentItem in sentData)
+                if (sentData.Count != chunk.Length)
+                {
+                    throw new InvalidOperationException(
+                        $"Chunk publisher {Name} sent {chunk.Length} items but received {sentData.Count} responses.");
+                }
+
+                foreach (var pair in chunk.Zip(sentData, (originalAndSerialized, sentItem) => new
+                         {
+                             originalAndSerialized.Original,
+                             SentItem = sentItem
+                         }))
                 {
                     LogData(
                         actData,
-                        IterableSerializableSaveIterator.GetDataBeforeSerialization(publishedItemIndex)
-                            .CloneDetailed(sentItem.Timestamp));
-                    Interlocked.Increment(ref publishedItemIndex);
+                        pair.Original.CloneDetailed(pair.SentItem.Timestamp));
                 }
 
                 if (Policies?.RunChain() == false)

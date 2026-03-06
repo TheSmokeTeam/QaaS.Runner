@@ -1,3 +1,4 @@
+using Autofac;
 using Microsoft.Extensions.Logging;
 using QaaS.Framework.Executions;
 using QaaS.Framework.SDK.ContextObjects;
@@ -18,15 +19,28 @@ namespace QaaS.Runner;
 /// </summary>
 public class Execution : BaseExecution
 {
+    private readonly ILifetimeScope? _ownedScope;
+
     /// <summary>
     /// Execution information and context
     /// </summary>
     /// <param name="type">Execution type</param>
     /// <param name="context">Context</param>
-    public Execution(ExecutionType type, Context context)
+    public Execution(ExecutionType type, Context context) : this(type, context, null)
+    {
+    }
+
+    /// <summary>
+    /// Execution information and context
+    /// </summary>
+    /// <param name="type">Execution type</param>
+    /// <param name="context">Context</param>
+    /// <param name="ownedScope">Autofac scope created for this execution.</param>
+    public Execution(ExecutionType type, Context context, ILifetimeScope? ownedScope = null)
     {
         Context = context;
         Type = type;
+        _ownedScope = ownedScope;
     }
 
     internal DataSourceLogic DataSourceLogic { get; init; } = null!;
@@ -92,5 +106,6 @@ public class Execution : BaseExecution
 
     public override void Dispose()
     {
+        _ownedScope?.Dispose();
     }
 }

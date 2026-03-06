@@ -66,7 +66,9 @@ public class RunLoader<TRunner, TOptions> : BaseLoader<TOptions, TRunner>
     {
         using var httpClient = new HttpClient();
         httpClient.Timeout = TimeSpan.FromSeconds(HttpClientTimeoutSeconds);
-        return _jfrogArtifactoryHelper.GetUrlsToAllFilesInArtifactoryFolder(casesDirectoryPath, httpClient)
+        return _jfrogArtifactoryHelper.GetUrlsToAllFilesInArtifactoryFolderAsync(casesDirectoryPath, httpClient)
+            .GetAwaiter()
+            .GetResult()
             .OrderBy(f => f)
             .Select(casePath => BuildContext(executionId, casePath))
             .ToList();

@@ -81,8 +81,6 @@ public class Session : ISession
         foreach (var (_, stage) in _stages.OrderBy(stage => stage.Key))
             actionsTasks.AddRange(stage.Run());
 
-        Task.WhenAll(actionsTasks).Wait();
-        actionsTasks.DisposeOfEnumerable("intermediate session tasks", _context.Logger);
         var sessionEndTimeUtc = GetCurrentUtcTime();
 
         // Perform end session operations
@@ -91,6 +89,7 @@ public class Session : ISession
         actionsTasks.AddRange(postSessionsTasks);
 
         var sessionData = CreateSessionData(actionsTasks, sessionStartTimeUtc, sessionEndTimeUtc);
+        actionsTasks.DisposeOfEnumerable("session tasks", _context.Logger);
 
         // Removing current session from running sessions
         _context.InternalRunningSessions.RunningSessionsDict.Remove(Name);
@@ -134,8 +133,6 @@ public class Session : ISession
             task.Start();
 
         await Task.WhenAll(collectorTasks);
-
-        collectorTasks.DisposeOfEnumerable("post session tasks", _context.Logger);
         return collectorTasks;
     }
 

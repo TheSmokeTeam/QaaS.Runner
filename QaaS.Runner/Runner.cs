@@ -9,8 +9,9 @@ namespace QaaS.Runner;
 /// <summary>
 /// Runner object representing a single QaaS.Runner run
 /// </summary>
-public class Runner : IRunner
+public class Runner : IRunner, IDisposable
 {
+    private bool _disposed;
     private ILifetimeScope Scope { get; set; }
     internal ILogger Logger { get; set; }
     private Serilog.ILogger SerilogLogger { get; set; }
@@ -49,11 +50,37 @@ public class Runner : IRunner
     /// </summary>
     public void Run()
     {
-        Setup();
-        var executions = BuildExecutions();
-        var exitCode = StartExecutions(executions);
-        Teardown();
-        ExitProcess(exitCode);
+        List<Execution>? executions = null;
+        var exitCode = 0;
+        var shouldExit = false;
+        try
+        {
+            Setup();
+            executions = BuildExecutions();
+            exitCode = StartExecutions(executions);
+            shouldExit = true;
+        }
+        finally
+        {
+            try
+            {
+                DisposeExecutions(executions);
+            }
+            finally
+            {
+                try
+                {
+                    Teardown();
+                }
+                finally
+                {
+                    Dispose();
+                }
+            }
+        }
+
+        if (shouldExit)
+            ExitProcess(exitCode);
     }
 
     /// <summary>
@@ -127,5 +154,21 @@ public class Runner : IRunner
     {
         Logger.LogInformation("Running {ExecutionCount} executions", executions.Count);
         return executions.Select(execution => execution.Start()).Sum();
+    }
+
+    protected virtual void DisposeExecutions(IEnumerable<Execution>? executions)
+    {
+        foreach (var execution in executions ?? Enumerable.Empty<Execution>())
+            execution.Dispose();
+    }
+
+    public virtual void Dispose()
+    {
+        if (_disposed)
+            return;
+
+        _disposed = true;
+        Scope.Dispose();
+        GC.SuppressFinalize(this);
     }
 }
