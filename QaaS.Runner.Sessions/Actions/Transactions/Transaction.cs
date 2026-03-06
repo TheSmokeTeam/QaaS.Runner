@@ -186,7 +186,11 @@ public class Transaction : StagedAction
 
     internal override void ExportRunningCommunicationData(InternalContext context, string sessionName)
     {
-        _receivedRunningCommunicationData = new RunningCommunicationData<object>();
+        _receivedRunningCommunicationData = new RunningCommunicationData<object>
+        {
+            Name = Name,
+            SerializationType = GetOutputCommunicationSerializationType()
+        };
         context.InternalRunningSessions.RunningSessionsDict[sessionName].Inputs!.Add(_sentRunningCommunicationData);
         context.InternalRunningSessions.RunningSessionsDict[sessionName].Outputs!
             .Add(_receivedRunningCommunicationData);

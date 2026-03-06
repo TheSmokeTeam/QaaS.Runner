@@ -102,7 +102,8 @@ public class ExecutionBuilder() : BaseExecutionBuilder<InternalContext, Executio
 
     private bool LoadedContext { get; }
 
-    private ILifetimeScope _scope = new ContainerBuilder().Build().BeginLifetimeScope();
+    private readonly Autofac.IContainer _container = new ContainerBuilder().Build();
+    private ILifetimeScope? _buildScope;
 
     private readonly List<ValidationResult> _validationResults = [];
 
@@ -150,14 +151,21 @@ public class ExecutionBuilder() : BaseExecutionBuilder<InternalContext, Executio
     /// <inheritdoc />
     protected override IEnumerable<DataSource> BuildDataSources()
     {
+        return BuildDataSources(_buildScope ?? throw new InvalidOperationException(
+            "ExecutionBuilder scope is not initialized."));
+    }
+
+    private IEnumerable<DataSource> BuildDataSources(ILifetimeScope scope)
+    {
         var configuredDataSources = DataSources ?? [];
         var dataSources = configuredDataSources.Select(dataSourceBuilder => dataSourceBuilder.Register()).ToImmutableList();
         var resolvedDataSources = configuredDataSources.Select(dataSourceBuilder =>
-            dataSourceBuilder.Build(Context,dataSources, _scope.Resolve<IList<KeyValuePair<string, IGenerator>>>()));
+            dataSourceBuilder.Build(Context, dataSources,
+                scope.Resolve<IList<KeyValuePair<string, IGenerator>>>()));
         return resolvedDataSources;
     }
 
-    private IEnumerable<ISession> BuildSessions()
+    private IEnumerable<ISession> BuildSessions(ILifetimeScope scope)
     {
         // Assigning session stage default as the index in Sessions list
         Sessions = Sessions is null ? [] : Sessions.Select((session, index) =>
@@ -171,7 +179,7 @@ public class ExecutionBuilder() : BaseExecutionBuilder<InternalContext, Executio
         {
             // Resolve hooks
             var hooks = session.Probes != null
-                ? _scope.Resolve<IList<KeyValuePair<string, IProbe>>>()
+                ? scope.Resolve<IList<KeyValuePair<string, IProbe>>>()
                 : new List<KeyValuePair<string, IProbe>>();
 
             return session.Build(Context, hooks);
@@ -180,11 +188,11 @@ public class ExecutionBuilder() : BaseExecutionBuilder<InternalContext, Executio
         return sessions;
     }
 
-    private IEnumerable<Assertion> BuildAssertions()
+    private IEnumerable<Assertion> BuildAssertions(ILifetimeScope scope)
     {
         if (Assertions is null) return [];
         var assertions = Assertions.Select(assertion =>
-            assertion.Build(_scope.Resolve<IList<KeyValuePair<string, IAssertion>>>(), Links));
+            assertion.Build(scope.Resolve<IList<KeyValuePair<string, IAssertion>>>(), Links));
         return assertions;
     }
 
@@ -383,9 +391,9 @@ public class ExecutionBuilder() : BaseExecutionBuilder<InternalContext, Executio
     /// <summary>
     ///     Loads the <see cref="ExecutionBuilder" /> scope with all context's dependencies
     /// </summary>
-    private void LoadContextScopeDependencies()
+    private ILifetimeScope LoadContextScopeDependencies()
     {
-        var contextScope = _scope.BeginLifetimeScope(containerBuilder =>
+        return _container.BeginLifetimeScope(containerBuilder =>
         {
             // Loads context into scope
             containerBuilder.RegisterInstance(Context).As<InternalContext>().SingleInstance();
@@ -428,8 +436,6 @@ public class ExecutionBuilder() : BaseExecutionBuilder<InternalContext, Executio
             containerBuilder.RegisterType<ReportLogic>().As<ReportLogic>();
             containerBuilder.RegisterType<TemplateLogic>().As<TemplateLogic>();
         });
-
-        _scope = contextScope;
     }
 
     private IEnumerable<HookData<IProbe>> BuildProbeHookData()
@@ -558,49 +564,61 @@ public class ExecutionBuilder() : BaseExecutionBuilder<InternalContext, Executio
 
 
         // loads all hooks & logics validate them
-        LoadContextScopeDependencies();
+        var scope = LoadContextScopeDependencies();
+        _buildScope = scope;
 
-        // filter session assertion list based on names & categories
-        FilterConfigurationsBasedOnFlags();
-
-        // validate configuration
-        _ = ValidationUtils.TryValidateObjectRecursive(this, _validationResults);
-        DeduplicateValidationResults();
-
-        if (_validationResults.Any())
+        try
         {
-            Context.Logger.LogCritical("Configurations are not valid. The validation results are: \n- " +
-                                       string.Join("\n- ", _validationResults.Select(result => result.ErrorMessage)));
-            throw new InvalidConfigurationsException("Configurations are not valid");
+            // filter session assertion list based on names & categories
+            FilterConfigurationsBasedOnFlags();
+
+            // validate configuration
+            _ = ValidationUtils.TryValidateObjectRecursive(this, _validationResults);
+            DeduplicateValidationResults();
+
+            if (_validationResults.Any())
+            {
+                Context.Logger.LogCritical("Configurations are not valid. The validation results are: \n- " +
+                                           string.Join("\n- ", _validationResults.Select(result => result.ErrorMessage)));
+                throw new InvalidConfigurationsException("Configurations are not valid");
+            }
+
+
+            // builds every list of domain objects
+            var dataSourceLogic =
+                scope.Resolve<DataSourceLogic>(
+                    new TypedParameter(typeof(IList<DataSource>), BuildDataSources(scope).ToList()));
+            var sessionLogic =
+                scope.Resolve<SessionLogic>(
+                    new TypedParameter(typeof(List<ISession>), BuildSessions(scope).ToList()));
+            var storageLogic =
+                scope.Resolve<StorageLogic>(new TypedParameter(typeof(IList<IStorage>), BuildStorages().ToList()),
+                    new TypedParameter(typeof(ExecutionType), Type));
+            var assertionLogic =
+                scope.Resolve<AssertionLogic>(
+                    new TypedParameter(typeof(IList<Assertion>), BuildAssertions(scope).ToList()));
+            var reportLogic =
+                scope.Resolve<ReportLogic>(new TypedParameter(typeof(IList<IReporter>), BuildReports().ToList()));
+            var templateLogic = scope.Resolve<TemplateLogic>(new TypedParameter(typeof(Context), Context));
+
+
+            Context.Logger.LogInformation(
+                "Finished building {Type} execution with executionId {ExecutionId} and case name {CaseName}", Type,
+                Context.ExecutionId, Context.CaseName);
+
+            // bind back context onto the executionBuilder object
+            return new Execution(Type, Context, scope)
+            {
+                AssertionLogic = assertionLogic, ReportLogic = reportLogic, SessionLogic = sessionLogic,
+                TemplateLogic = templateLogic, DataSourceLogic = dataSourceLogic, StorageLogic = storageLogic
+            };
         }
-
-
-        // builds every list of domain objects 
-        var dataSourceLogic =
-            _scope.Resolve<DataSourceLogic>(new TypedParameter(typeof(IList<DataSource>), BuildDataSources().ToList()));
-        var sessionLogic =
-            _scope.Resolve<SessionLogic>(
-                new TypedParameter(typeof(List<ISession>), BuildSessions().ToList()));
-        var storageLogic =
-            _scope.Resolve<StorageLogic>(new TypedParameter(typeof(IList<IStorage>), BuildStorages().ToList()),
-                new TypedParameter(typeof(ExecutionType), Type));
-        var assertionLogic =
-            _scope.Resolve<AssertionLogic>(new TypedParameter(typeof(IList<Assertion>), BuildAssertions().ToList()));
-        var reportLogic =
-            _scope.Resolve<ReportLogic>(new TypedParameter(typeof(IList<IReporter>), BuildReports().ToList()));
-        var templateLogic = _scope.Resolve<TemplateLogic>(new TypedParameter(typeof(Context), Context));
-
-
-        Context.Logger.LogInformation(
-            "Finished building {Type} execution with executionId {ExecutionId} and case name {CaseName}", Type,
-            Context.ExecutionId, Context.CaseName);
-
-        // bind back context onto the executionBuilder object
-        return new Execution(Type, Context)
+        catch
         {
-            AssertionLogic = assertionLogic, ReportLogic = reportLogic, SessionLogic = sessionLogic,
-            TemplateLogic = templateLogic, DataSourceLogic = dataSourceLogic, StorageLogic = storageLogic
-        };
+            scope.Dispose();
+            _buildScope = null;
+            throw;
+        }
     }
 
     private static T[]? UpdateByName<T>(T[]? items, string key, T replacement, Func<T, string?> keySelector)
