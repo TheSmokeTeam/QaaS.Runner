@@ -1,4 +1,5 @@
-﻿using Moq;
+using System.Linq;
+using Moq;
 using Moq.Protected;
 using NUnit.Framework;
 using QaaS.Framework.SDK.ContextObjects;
@@ -39,6 +40,7 @@ public class ReportLogicTests
         {
             var mockReporter = new Mock<IReporter>();
             mockReporter.SetupGet(r => r.Name).Returns($"Assertion{i + 1}");
+            mockReporter.SetupGet(r => r.AssertionName).Returns($"Assertion{i + 1}");
             mockReporters.Add(mockReporter);
             var assertion = new Assertion
             {
@@ -93,7 +95,8 @@ public class ReportLogicTests
     {
         // Arrange
         var mockReporter = new Mock<IReporter>();
-        mockReporter.Setup(r => r.Name).Returns("NonExistentReporter");
+        mockReporter.SetupGet(r => r.Name).Returns("Allure");
+        mockReporter.SetupGet(r => r.AssertionName).Returns("NonExistentAssertion");
 
         var assertionResult = new AssertionResult
         {
@@ -116,5 +119,48 @@ public class ReportLogicTests
 
         // Act & Assert
         Assert.Throws<ArgumentException>(() => reportLogic.Run(executionData));
+    }
+
+    [Test]
+    public void TestRun_WithMultipleReportersTargetingSameAssertion_WritesToEachReporter()
+    {
+        var firstReporter = new Mock<IReporter>();
+        firstReporter.SetupGet(r => r.Name).Returns("ReporterOne");
+        firstReporter.SetupGet(r => r.AssertionName).Returns("AssertionA");
+
+        var secondReporter = new Mock<IReporter>();
+        secondReporter.SetupGet(r => r.Name).Returns("ReporterTwo");
+        secondReporter.SetupGet(r => r.AssertionName).Returns("AssertionA");
+
+        var assertionResult = new AssertionResult
+        {
+            Assertion = new Assertion
+            {
+                Name = "AssertionA",
+                StatussesToReport =
+                [
+                    AssertionStatus.Broken,
+                    AssertionStatus.Failed,
+                    AssertionStatus.Passed,
+                    AssertionStatus.Skipped,
+                    AssertionStatus.Unknown
+                ],
+                AssertionName = null,
+                AssertionHook = null
+            },
+            AssertionStatus = AssertionStatus.Passed,
+            TestDurationMs = 0,
+            Flaky = null
+        };
+
+        var reportLogic = new ReportLogic([firstReporter.Object, secondReporter.Object], Globals.GetContextWithMetadata());
+        var executionData = new ExecutionData();
+        executionData.AssertionResults.Add(assertionResult);
+
+        var result = reportLogic.Run(executionData);
+
+        Assert.That(result, Is.SameAs(executionData));
+        firstReporter.Verify(reporter => reporter.WriteTestResults(assertionResult), Times.Once);
+        secondReporter.Verify(reporter => reporter.WriteTestResults(assertionResult), Times.Once);
     }
 }
