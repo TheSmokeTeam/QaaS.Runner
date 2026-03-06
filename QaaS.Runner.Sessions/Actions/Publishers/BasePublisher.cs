@@ -137,5 +137,5 @@ public abstract class BasePublisher : StagedAction
     }
 
     internal override void ExportRunningCommunicationData(InternalContext context, string sessionName)
-        => context.InternalRunningSessions.RunningSessionsDict[sessionName].Inputs!.Add(RunningCommunicationData);
+        => context.GetRunningSession(sessionName).Inputs!.Add(RunningCommunicationData);
 }

@@ -1,4 +1,3 @@
-﻿using Allure.Commons;
 using Microsoft.Extensions.Logging;
 using QaaS.Framework.Executions.Logics;
 using QaaS.Framework.SDK.ContextObjects;
@@ -24,26 +23,31 @@ public class ReportLogic(IList<IReporter> reporters, InternalContext context) : 
     public ExecutionData Run(ExecutionData executionData)
     {
         context.Logger.LogInformation("Running {Reports} Logic", "Reports");
-        context.Logger.LogInformation("Started writing assertion results to {ResultsDirectory}",
-            AllureLifecycle.Instance.ResultsDirectory);
+        context.Logger.LogInformation("Started writing assertion results using {ReporterCount} reporters",
+            reporters.Count);
+
+        var assertionResultsByName = executionData.AssertionResults
+            .OfType<AssertionResult>()
+            .ToDictionary(result => result.Assertion.Name, StringComparer.Ordinal);
 
         foreach (var reporter in reporters)
         {
-            var matchingResult = executionData.AssertionResults.FirstOrDefault(result =>
-                ((AssertionResult)result).Assertion.Name.Equals(reporter.Name));
-            
-            if (matchingResult is AssertionResult assertionResult)
+            if (assertionResultsByName.TryGetValue(reporter.AssertionName, out var assertionResult))
             {
-                // Report only if assertion result status matches one of the statuses to report
                 if (assertionResult.Assertion.StatussesToReport.Contains(assertionResult.AssertionStatus))
+                {
                     reporter.WriteTestResults(assertionResult);
+                }
             }
             else
-                throw new ArgumentException("Could not find any matching assertion result to reporter");
+            {
+                throw new ArgumentException(
+                    $"Could not find an assertion result for reporter '{reporter.Name}' targeting assertion '{reporter.AssertionName}'.");
+            }
         }
 
-        context.Logger.LogInformation("Finished writing assertion results to {ResultsDirectory}",
-            AllureLifecycle.Instance.ResultsDirectory);
+        context.Logger.LogInformation("Finished writing assertion results using {ReporterCount} reporters",
+            reporters.Count);
 
         return executionData;
     }

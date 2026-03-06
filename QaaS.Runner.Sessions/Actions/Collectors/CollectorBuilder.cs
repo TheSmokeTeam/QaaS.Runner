@@ -8,6 +8,7 @@ using QaaS.Framework.SDK.ContextObjects;
 using QaaS.Framework.SDK.Extensions;
 using QaaS.Framework.SDK.Session;
 using QaaS.Framework.SDK.Session.SessionDataObjects;
+using QaaS.Runner.Infrastructure;
 using QaaS.Runner.Sessions.ConfigurationObjects;
 using QaaS.Runner.Sessions.Extensions;
 
@@ -138,7 +139,7 @@ public class CollectorBuilder
                    throw new InvalidOperationException($"Missing supported type in collector {Name}");
             var collectorTypeName = type.GetType().Name;
             context.Logger.LogDebugWithMetaData("Started building Collector of type {type}",
-                context.GetMetaDataFromContext(), new object?[] { collectorTypeName });
+                context.GetMetaDataOrDefault(), new object?[] { collectorTypeName });
 
             var fetcher = FetcherFactory.CreateFetcher(type, context.Logger);
             

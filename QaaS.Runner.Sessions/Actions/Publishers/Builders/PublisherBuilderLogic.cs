@@ -16,6 +16,7 @@ using QaaS.Framework.SDK.Extensions;
 using QaaS.Framework.SDK.Session;
 using QaaS.Framework.SDK.Session.SessionDataObjects;
 using QaaS.Framework.Serialization;
+using QaaS.Runner.Infrastructure;
 using QaaS.Runner.Sessions.ConfigurationObjects;
 using QaaS.Runner.Sessions.Extensions;
 using Parallel = QaaS.Runner.Sessions.ConfigurationObjects.Parallel;
@@ -332,7 +333,7 @@ public partial class PublisherBuilder
             var publisherTypeName = sender?.GetType().Name ?? chunkSender?.GetType().Name ?? "Unknown";
             
             context.Logger.LogDebugWithMetaData("Started building Publisher of type {type}",
-                context.GetMetaDataFromContext(), new object?[] { publisherTypeName });
+                context.GetMetaDataOrDefault(), new object?[] { publisherTypeName });
 
             return sender != null
                 ? new Publisher(Name!, sender, Stage, DataFilter, PolicyBuilder.BuildPolicies(Policies), Loop,
