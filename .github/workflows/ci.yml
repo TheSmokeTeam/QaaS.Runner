@@ -67,6 +67,7 @@ jobs:
             --no-restore `
             --configuration ${{ env.CONFIGURATION }} `
             --include-symbols `
+            -p:SymbolPackageFormat=snupkg `
             -p:PackageVersion=${{ steps.version.outputs.version-without-v }} `
             --output ${{ env.PACKAGE_OUTPUT_DIRECTORY }}
 
@@ -79,5 +80,16 @@ jobs:
             # Only push the main QaaS.Runner package, not QaaS.Runner.* (e.g., QaaS.Runner.Assertions)
             if ($package.Name -match "^QaaS\.Runner\.[0-9]") {
               dotnet nuget push $package.FullName -k ${{ secrets.NUGET_AUTH_TOKEN }} -s https://api.nuget.org/v3/index.json
+            }
+          }
+
+      - name: Push QaaS.Runner symbols to NuGet
+        if: startsWith(github.ref, 'refs/tags/')
+        shell: powershell
+        run: |
+          $symbolPackages = Get-ChildItem "${{ env.PACKAGE_OUTPUT_DIRECTORY }}\QaaS.Runner.*.snupkg"
+          foreach ($symbolPackage in $symbolPackages) {
+            if ($symbolPackage.Name -match "^QaaS\.Runner\.[0-9]") {
+              dotnet nuget push $symbolPackage.FullName -k ${{ secrets.NUGET_AUTH_TOKEN }} -s https://api.nuget.org/v3/index.json
             }
           }
