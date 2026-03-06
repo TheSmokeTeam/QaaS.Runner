@@ -53,6 +53,9 @@ public class Runner : IRunner, IDisposable
         List<Execution>? executions = null;
         var exitCode = 0;
         var shouldExit = false;
+        Logger.LogInformation(
+            "Starting runner with {ExecutionCount} execution builders. EmptyResults={EmptyResults}, ServeResults={ServeResults}",
+            ExecutionBuilders.Count, EmptyResults, ServeResults);
         try
         {
             Setup();
@@ -79,6 +82,7 @@ public class Runner : IRunner, IDisposable
             }
         }
 
+        Logger.LogInformation("Runner completed. ExitCode={ExitCode}", exitCode);
         if (shouldExit)
             ExitProcess(exitCode);
     }
@@ -88,8 +92,18 @@ public class Runner : IRunner, IDisposable
     /// </summary>
     protected virtual void Setup()
     {
+        Logger.LogDebug("Runner setup started");
         if (EmptyResults)
+        {
+            Logger.LogInformation("Cleaning results directory before execution");
             CleanResultsDirectory();
+        }
+        else
+        {
+            Logger.LogDebug("Results directory cleanup is disabled for this run");
+        }
+
+        Logger.LogDebug("Runner setup completed");
     }
 
     /// <summary>
@@ -97,12 +111,25 @@ public class Runner : IRunner, IDisposable
     /// </summary>
     protected virtual void Teardown()
     {
+        Logger.LogDebug("Runner teardown started");
         // Disposing logger to enable sending logs to elastic
         if (SerilogLogger is IDisposable disposableLogger)
+        {
+            Logger.LogDebug("Disposing Serilog logger instance");
             disposableLogger.Dispose();
-        
+        }
+
         if (ServeResults)
+        {
+            Logger.LogInformation("Serving test results after execution");
             ServeResultsInAllure();
+        }
+        else
+        {
+            Logger.LogDebug("Result serving is disabled for this run");
+        }
+
+        Logger.LogDebug("Runner teardown completed");
     }
 
     /// <summary>
@@ -138,10 +165,12 @@ public class Runner : IRunner, IDisposable
         Logger.LogInformation("Building {ExecutionCount} executions", ExecutionBuilders.Count);
         var globalDict = new Dictionary<string, object?>();
         ExecutionBuilders.ForEach(builder => builder.WithGlobalDict(globalDict));
-        
+
         // passing the same logger reference to every builder
         ExecutionBuilders.ForEach(builder => builder.WithLogger(Logger));
-        return ExecutionBuilders.Select(builder => builder.Build()).ToList();
+        var executions = ExecutionBuilders.Select(builder => builder.Build()).ToList();
+        Logger.LogInformation("Built {ExecutionCount} executions successfully", executions.Count);
+        return executions;
     }
 
     /// <summary>
@@ -153,12 +182,16 @@ public class Runner : IRunner, IDisposable
     protected virtual int StartExecutions(List<Execution> executions)
     {
         Logger.LogInformation("Running {ExecutionCount} executions", executions.Count);
-        return executions.Select(execution => execution.Start()).Sum();
+        var exitCode = executions.Select(execution => execution.Start()).Sum();
+        Logger.LogInformation("Finished running executions. Aggregated exit code: {ExitCode}", exitCode);
+        return exitCode;
     }
 
     protected virtual void DisposeExecutions(IEnumerable<Execution>? executions)
     {
-        foreach (var execution in executions ?? Enumerable.Empty<Execution>())
+        var executionList = (executions ?? Enumerable.Empty<Execution>()).ToList();
+        Logger.LogDebug("Disposing {ExecutionCount} execution instances", executionList.Count);
+        foreach (var execution in executionList)
             execution.Dispose();
     }
 
@@ -168,6 +201,7 @@ public class Runner : IRunner, IDisposable
             return;
 
         _disposed = true;
+        Logger.LogDebug("Disposing runner scope");
         Scope.Dispose();
         GC.SuppressFinalize(this);
     }

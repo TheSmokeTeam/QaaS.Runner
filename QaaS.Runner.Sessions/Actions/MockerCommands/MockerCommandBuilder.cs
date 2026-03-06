@@ -174,7 +174,7 @@ public class MockerCommandBuilder
         catch (Exception e)
         {
             actionFailures.AppendActionFailure(e, sessionName, context.Logger, nameof(MockerCommand), Name!,
-                type?.GetType().ToString());
+                type?.GetType().Name);
         }
 
         return null;

@@ -69,16 +69,17 @@ public class Session : ISession
     /// <returns> If SaveData is set to true then it will return the session data </returns>
     public SessionData? Run(ExecutionData executionData)
     {
-        _context.Logger.LogDebug("Waiting the configured timeout of {TimeoutBeforeSessionMs}" +
-                                 " milliseconds before the start of the session {SessionName}",
+        _context.Logger.LogDebug("Waiting {TimeoutBeforeSessionMs} ms before starting session {SessionName}",
             TimeoutBeforeSessionMs, Name);
         Thread.Sleep(TimeSpan.FromMilliseconds(TimeoutBeforeSessionMs));
 
-        _context.Logger.LogInformation("Started running session - {SessionName}", Name);
+        _context.Logger.LogInformation("Starting session {SessionName}", Name);
         var sessionStartTimeUtc = GetCurrentUtcTime();
         var actionsTasks = new List<Task<Tuple<Action, InternalCommunicationData<object>>?>>();
 
         InitializeSessionRun(executionData);
+        _context.Logger.LogDebug("Session {SessionName} contains {StageCount} stage(s) and {CollectorCount} collector(s)",
+            Name, _stages.Count, _collectors?.Length ?? 0);
         foreach (var (_, stage) in _stages.OrderBy(stage => stage.Key))
             actionsTasks.AddRange(stage.Run());
 
@@ -99,10 +100,9 @@ public class Session : ISession
 
         // If session is configured to not save session data
         if (!SaveData)
-            _context.Logger.LogInformation("Not saving session output of session {SessionName}", Name);
+            _context.Logger.LogInformation("Session {SessionName} is configured not to persist output data", Name);
 
-        _context.Logger.LogDebug("Waiting the configured timeout of {TimeoutAfterSessionMs} " +
-                                 "milliseconds after the end of the session {SessionName}",
+        _context.Logger.LogDebug("Waiting {TimeoutAfterSessionMs} ms after finishing session {SessionName}",
             TimeoutAfterSessionMs, Name);
         Thread.Sleep(TimeSpan.FromMilliseconds(TimeoutAfterSessionMs));
 
@@ -116,6 +116,8 @@ public class Session : ISession
     private void InitializeSessionRun(ExecutionData executionData)
     {
         _context.SetRunningSession(Name, new RunningSessionData<object, object> { Inputs = [], Outputs = [] });
+        _context.Logger.LogDebug("Preparing session {SessionName} with {ExistingSessionCount} existing session result(s) and {DataSourceCount} data source(s)",
+            Name, executionData.SessionDatas.Count, executionData.DataSources.Count);
         foreach (var stage in _stages.Values)
         {
             stage.ExportRunningCommunicationData();
@@ -129,6 +131,8 @@ public class Session : ISession
         _collectors?.ForEach(collector => collector.SetCollectionTimes(sessionStartTimeUtc, sessionEndTimeUtc));
         var collectorTasks = _collectors?.Select(collector =>
             SessionExtensions.CreateTaskFromAction(_context, collector, Name, _actionFailures)).ToList() ?? [];
+        _context.Logger.LogDebug("Running {CollectorCount} collector task(s) after session {SessionName}",
+            collectorTasks.Count, Name);
         foreach (var task in collectorTasks)
             task.Start();
 
@@ -181,12 +185,16 @@ public class Session : ISession
             }
         }
 
+        _context.Logger.LogDebug(
+            "Built session data for {SessionName}. Inputs={InputCount}, Outputs={OutputCount}, Failures={FailureCount}",
+            Name, sessionData.Inputs.Count, sessionData.Outputs.Count, sessionData.SessionFailures.Count);
+
         return sessionData;
     }
 
     private void LogSessionSummary(SessionData sessionData)
     {
-        _context.Logger.LogInformation("--- Session {SessionName} Summary ---", sessionData.Name);
+        _context.Logger.LogInformation("Session summary for {SessionName}", sessionData.Name);
         _context.Logger.LogInformationWithMetaData(
             "{SessionName} Duration In Milliseconds: {SessionDurationMilliseconds}",
             _context.GetMetaDataOrDefault(),
@@ -213,6 +221,9 @@ public class Session : ISession
                 output.Name, numberOfOutputs);
         }
 
-        _context.Logger.LogInformation("--- End Of Summary ---");
+        _context.Logger.LogInformation(
+            "Session {SessionName} completed. Inputs={InputCount}, Outputs={OutputCount}, Failures={FailureCount}",
+            sessionData.Name, sessionData.Inputs?.Count ?? 0, sessionData.Outputs?.Count ?? 0,
+            sessionData.SessionFailures?.Count ?? 0);
     }
 }

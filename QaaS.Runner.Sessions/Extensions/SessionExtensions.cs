@@ -21,8 +21,7 @@ public static class SessionExtensions
         foreach (var item in array)
             item.Dispose();
 
-        logger.LogDebug("Disposed of {EnumerableLength} {EnumerableName}",
-            array.Length, enumerableName);
+        logger.LogDebug("Disposed {EnumerableLength} item(s) from {EnumerableName}", array.Length, enumerableName);
     }
 
     /// <summary>
@@ -38,10 +37,13 @@ public static class SessionExtensions
     public static void AppendActionFailure(this IList<ActionFailure> actionFailures, Exception exception,
         string sessionName, ILogger logger, string actionType, string actionRuntimeName, string? actionProtocol = null)
     {
-        var failedActionDescription = (actionProtocol != null ? $" {actionProtocol}" : "") + actionRuntimeName;
+        var failedActionDescription = string.IsNullOrWhiteSpace(actionProtocol)
+            ? actionRuntimeName
+            : $"{actionProtocol} {actionRuntimeName}";
         logger.LogError(
-            "{ActionType} {FailedAction} in {SessionName} failed due to the following exception \n{Exception}",
-            actionType, failedActionDescription, sessionName, exception);
+            exception,
+            "Action failure in session {SessionName}. ActionType={ActionType}, Action={ActionName}",
+            sessionName, actionType, failedActionDescription);
 
         actionFailures.Add(new ActionFailure
         {
@@ -59,10 +61,13 @@ public static class SessionExtensions
         string sessionName, ILogger logger, string actionType, string actionRuntimeName, string? actionProtocol = null,
         string? exceptionMessage = null)
     {
-        var failedActionDescription = actionProtocol + actionRuntimeName;
+        var failedActionDescription = string.IsNullOrWhiteSpace(actionProtocol)
+            ? actionRuntimeName
+            : $"{actionProtocol} {actionRuntimeName}";
         logger.LogError(
-            "{ActionType} {FailedAction} in {SessionName} failed due to the following exception \n{Exception}",
-            actionType, failedActionDescription, sessionName, exception);
+            exception,
+            "Action failure in session {SessionName}. ActionType={ActionType}, Action={ActionName}",
+            sessionName, actionType, failedActionDescription);
 
         actionFailures.Add(new ActionFailure
         {
@@ -83,6 +88,8 @@ public static class SessionExtensions
         {
             context.InternalRunningSessions.RunningSessionsDict[sessionName] = runningSessionData;
         }
+
+        context.Logger.LogDebug("Registered running session state for {SessionName}", sessionName);
     }
 
     public static RunningSessionData<object, object> GetRunningSession(this InternalContext context, string sessionName)
@@ -95,10 +102,14 @@ public static class SessionExtensions
 
     public static bool RemoveRunningSession(this InternalContext context, string sessionName)
     {
+        var removed = false;
         lock (context.InternalRunningSessions.RunningSessionsDict)
         {
-            return context.InternalRunningSessions.RunningSessionsDict.Remove(sessionName);
+            removed = context.InternalRunningSessions.RunningSessionsDict.Remove(sessionName);
         }
+
+        context.Logger.LogDebug("Removed running session state for {SessionName}: {Removed}", sessionName, removed);
+        return removed;
     }
 
     public static Task<Tuple<Action, InternalCommunicationData<object>>?> CreateTaskFromAction(InternalContext context,
@@ -108,6 +119,8 @@ public static class SessionExtensions
             {
                 try
                 {
+                    context.Logger.LogDebug("Starting action task {ActionType} {ActionName} in session {SessionName}",
+                        action.GetType().Name, action.Name, sessionName);
                     return new Tuple<Action, InternalCommunicationData<object>>(action, action.Act());
                 }
                 catch (Exception e)
@@ -121,9 +134,14 @@ public static class SessionExtensions
 
                     var exceptionMessage =
                         e is OperationCanceledException ? $"Action {action.Name} was canceled" : e.Message;
-                    actionFailures.AppendActionFailure(e, sessionName, context.Logger, action.GetType().ToString(),
+                    actionFailures.AppendActionFailure(e, sessionName, context.Logger, action.GetType().Name,
                         action.Name, "", exceptionMessage);
                     return default;
+                }
+                finally
+                {
+                    context.Logger.LogDebug("Finished action task {ActionType} {ActionName} in session {SessionName}",
+                        action.GetType().Name, action.Name, sessionName);
                 }
             }
         );

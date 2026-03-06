@@ -513,6 +513,9 @@ public class ExecutionBuilder() : BaseExecutionBuilder<InternalContext, Executio
 
         // saved context's metadata in globalDict
         Context.InsertValueIntoGlobalDictionary(Context.GetMetaDataPath(), MetaData);
+        Context.Logger.LogDebug(
+            "Initialized execution context. LoadedContext={LoadedContext}, ExecutionId={ExecutionId}, CaseName={CaseName}, GlobalKeys={GlobalKeyCount}",
+            LoadedContext, Context.ExecutionId, Context.CaseName, Context.InternalGlobalDict.Count);
     }
 
     /// <summary>
@@ -520,10 +523,15 @@ public class ExecutionBuilder() : BaseExecutionBuilder<InternalContext, Executio
     /// </summary>
     private void FilterConfigurationsBasedOnFlags()
     {
+        var sessionsBeforeFiltering = Sessions?.Length ?? 0;
+        var assertionsBeforeFiltering = Assertions?.Length ?? 0;
         Assertions = (Assertions ?? [])
             .FilterConfigurationByAssertion(_assertionNamesToRun, _assertionCategoriesToRun, Context);
         Sessions = (Sessions ?? []).FilterConfigurationBySessionsAndAssertions(Assertions, _sessionNamesToRun,
             _assertionNamesToRun, _sessionCategoriesToRun, _assertionCategoriesToRun, Context);
+        Context.Logger.LogDebug(
+            "Filtered execution configuration. Sessions: {SessionCountBefore} -> {SessionCountAfter}, Assertions: {AssertionCountBefore} -> {AssertionCountAfter}",
+            sessionsBeforeFiltering, Sessions.Length, assertionsBeforeFiltering, Assertions.Length);
     }
 
     /// <inheritdoc />
@@ -550,6 +558,7 @@ public class ExecutionBuilder() : BaseExecutionBuilder<InternalContext, Executio
 
             if (_validationResults.Any())
             {
+                Context.Logger.LogDebug("Validation produced {ValidationResultCount} result(s)", _validationResults.Count);
                 Context.Logger.LogCritical("Configurations are not valid. The validation results are: \n- " +
                                            string.Join("\n- ", _validationResults.Select(result => result.ErrorMessage)));
                 throw new InvalidConfigurationsException("Configurations are not valid");
@@ -557,22 +566,31 @@ public class ExecutionBuilder() : BaseExecutionBuilder<InternalContext, Executio
 
 
             // builds every list of domain objects
+            var builtDataSources = BuildDataSources(scope).ToList();
+            var builtSessions = BuildSessions(scope).ToList();
+            var builtStorages = BuildStorages().ToList();
+            var builtAssertions = BuildAssertions(scope).ToList();
+            var builtReports = BuildReports().ToList();
             var dataSourceLogic =
                 scope.Resolve<DataSourceLogic>(
-                    new TypedParameter(typeof(IList<DataSource>), BuildDataSources(scope).ToList()));
+                    new TypedParameter(typeof(IList<DataSource>), builtDataSources));
             var sessionLogic =
                 scope.Resolve<SessionLogic>(
-                    new TypedParameter(typeof(List<ISession>), BuildSessions(scope).ToList()));
+                    new TypedParameter(typeof(List<ISession>), builtSessions));
             var storageLogic =
-                scope.Resolve<StorageLogic>(new TypedParameter(typeof(IList<IStorage>), BuildStorages().ToList()),
+                scope.Resolve<StorageLogic>(new TypedParameter(typeof(IList<IStorage>), builtStorages),
                     new TypedParameter(typeof(ExecutionType), Type));
             var assertionLogic =
                 scope.Resolve<AssertionLogic>(
-                    new TypedParameter(typeof(IList<Assertion>), BuildAssertions(scope).ToList()));
+                    new TypedParameter(typeof(IList<Assertion>), builtAssertions));
             var reportLogic =
-                scope.Resolve<ReportLogic>(new TypedParameter(typeof(IList<IReporter>), BuildReports().ToList()));
+                scope.Resolve<ReportLogic>(new TypedParameter(typeof(IList<IReporter>), builtReports));
             var templateLogic = scope.Resolve<TemplateLogic>(new TypedParameter(typeof(Context), Context));
 
+            Context.Logger.LogDebug(
+                "Resolved execution components. DataSources={DataSourceCount}, Sessions={SessionCount}, Storages={StorageCount}, Assertions={AssertionCount}, Reporters={ReporterCount}",
+                builtDataSources.Count, builtSessions.Count, builtStorages.Count, builtAssertions.Count,
+                builtReports.Count);
 
             Context.Logger.LogInformation(
                 "Finished building {Type} execution with executionId {ExecutionId} and case name {CaseName}", Type,
@@ -587,6 +605,8 @@ public class ExecutionBuilder() : BaseExecutionBuilder<InternalContext, Executio
         }
         catch
         {
+            Context.Logger.LogDebug("Execution build failed. Disposing Autofac scope for execution {ExecutionId}",
+                Context.ExecutionId);
             scope.Dispose();
             _buildScope = null;
             throw;

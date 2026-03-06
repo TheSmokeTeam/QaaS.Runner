@@ -66,6 +66,10 @@ public abstract class BasePublisher : StagedAction
                 "DataSource List")).SelectMany(ds =>
                 ds.Retrieve(ranSessions.Where(sessionData => sessionData != null).ToImmutableList()!));
         IterableSerializableSaveIterator = new IterableSerializableDataIterator(GeneratedData, _serializer);
+        Logger.LogDebug(
+            "Prepared publisher {ActionName}. DataSourceNames={DataSourceNames}, DataSourcePatterns={DataSourcePatterns}, Parallelism={Parallelism}",
+            Name, _dataSourceNames == null ? "<none>" : string.Join(", ", _dataSourceNames),
+            _dataSourcePatterns == null ? "<none>" : string.Join(", ", _dataSourcePatterns), Parallelism);
     }
 
     /// <summary>
@@ -108,16 +112,17 @@ public abstract class BasePublisher : StagedAction
         int iteration = 0;
         while (shouldAct)
         {
-            Logger.LogDebug("Acting publishing action {ActionName} in {ActingType} in iteration number {Iteration}",
-                Name, _loop ? "Loop" : "Iteration", iteration + 1);
+            Logger.LogDebug("Starting publisher {ActionName} iteration {Iteration}. Mode={Mode}",
+                Name, iteration + 1, _loop ? "Loop" : "FixedIterations");
             shouldAct = Publish(data) && (_loop || _iterations > ++iteration);
-            Logger.LogDebug("Finished publishing action {ActionName} in {ActingType} in iteration number {Iteration}" +
-                            " - sleeping for {SleepTimeMs} Milliseconds",
-                Name, _loop ? "Loop" : "Iteration", iteration, _sleepTimeMs);
+            Logger.LogDebug("Finished publisher {ActionName} iteration {Iteration}. Sleeping {SleepTimeMs} ms",
+                Name, iteration, _sleepTimeMs);
             Thread.Sleep((int)_sleepTimeMs);
         }
 
         RunningCommunicationData.Data.CompleteAdding();
+        Logger.LogDebug("Finished publisher {ActionName}. LoggedInputCount={InputCount}",
+            Name, data.Input?.Count ?? 0);
         return data;
     }
 
