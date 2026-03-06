@@ -15,7 +15,7 @@
         <PackageReference Include="Microsoft.Extensions.Configuration" Version="10.0.3" />
         <PackageReference Include="Microsoft.Extensions.Configuration.Json" Version="10.0.3" />
         <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" Version="10.0.3" />
-        <PackageReference Include="QaaS.Framework.Executions" Version="1.1.0-alpha.4" />
+        <PackageReference Include="QaaS.Framework.Executions" Version="1.1.0-alpha.3" />
     </ItemGroup>
 
     <ItemGroup>
