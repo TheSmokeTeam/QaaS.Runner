@@ -605,7 +605,6 @@ public class ExecutionBuilder() : BaseExecutionBuilder<InternalContext, Executio
 
         Context.SetRenderedConfigurationTemplate(renderedTemplate);
     }
-
     /// <inheritdoc />
     public override Execution Build()
     {
