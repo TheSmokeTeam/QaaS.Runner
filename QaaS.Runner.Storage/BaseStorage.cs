@@ -54,6 +54,8 @@ public abstract class BaseStorage : IStorage
 
         if (duplicateFileNames.Count != 0)
         {
+            // Different session names can normalize to the same file name, so fail before writing
+            // instead of silently overwriting one session's persisted data with another.
             throw new InvalidOperationException(
                 "Multiple session data entries resolve to the same storage file name: " +
                 string.Join(", ", duplicateFileNames));
@@ -84,6 +86,8 @@ public abstract class BaseStorage : IStorage
 
     internal static string BuildStorageFileName(string sessionName)
     {
+        // Storage file names must go through the same normalization path everywhere so duplicate
+        // detection matches the actual file-system layout.
         return $"{FileSystemExtensions.MakeValidFileName(sessionName)}.json";
     }
 }

@@ -164,6 +164,8 @@ public class Runner : IRunner, IDisposable
     {
         Logger.LogInformation("Building {ExecutionCount} executions", ExecutionBuilders.Count);
         var globalDict = new Dictionary<string, object?>();
+        // Builders share a single global dictionary so metadata and runtime values written by one
+        // execution are visible to later executions in the same runner invocation.
         ExecutionBuilders.ForEach(builder => builder.WithGlobalDict(globalDict));
 
         // passing the same logger reference to every builder
