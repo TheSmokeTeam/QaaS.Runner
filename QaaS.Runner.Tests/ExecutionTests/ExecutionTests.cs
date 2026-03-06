@@ -1,4 +1,5 @@
 using System.Collections.Immutable;
+using Autofac;
 using Microsoft.Extensions.Configuration;
 using Moq;
 using NUnit.Framework;
@@ -134,10 +135,22 @@ public class ExecutionTests
         Assert.Throws<ArgumentOutOfRangeException>(() => execution.Start());
     }
 
-    private static Execution CreateExecution(ExecutionType executionType, InternalContext context,
-        IList<Assertion>? assertions = null, IList<IStorage>? storages = null)
+    [Test]
+    public void Dispose_WithOwnedScope_DisposesScope()
     {
-        return new Execution(executionType, context)
+        var context = CreateContext();
+        var scope = new Mock<ILifetimeScope>();
+        var execution = CreateExecution(ExecutionType.Template, context, ownedScope: scope.Object);
+
+        execution.Dispose();
+
+        scope.Verify(disposable => disposable.Dispose(), Times.Once);
+    }
+
+    private static Execution CreateExecution(ExecutionType executionType, InternalContext context,
+        IList<Assertion>? assertions = null, IList<IStorage>? storages = null, ILifetimeScope? ownedScope = null)
+    {
+        return new Execution(executionType, context, ownedScope)
         {
             DataSourceLogic = new DataSourceLogic([], context),
             SessionLogic = new SessionLogic([], context),
