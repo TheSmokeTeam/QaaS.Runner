@@ -84,6 +84,8 @@ public static class SessionExtensions
     public static void SetRunningSession(this InternalContext context, string sessionName,
         RunningSessionData<object, object> runningSessionData)
     {
+        // Running session data is shared across async actions, so updates must stay serialized to
+        // avoid partial state being observed by publishers, consumers, and transactions.
         lock (context.InternalRunningSessions.RunningSessionsDict)
         {
             context.InternalRunningSessions.RunningSessionsDict[sessionName] = runningSessionData;
@@ -94,6 +96,7 @@ public static class SessionExtensions
 
     public static RunningSessionData<object, object> GetRunningSession(this InternalContext context, string sessionName)
     {
+        // Reads use the same lock as writes so action cancellation and live session lookups stay coherent.
         lock (context.InternalRunningSessions.RunningSessionsDict)
         {
             return context.InternalRunningSessions.RunningSessionsDict[sessionName];
@@ -103,6 +106,7 @@ public static class SessionExtensions
     public static bool RemoveRunningSession(this InternalContext context, string sessionName)
     {
         var removed = false;
+        // Removing under the same lock prevents teardown from racing with actions that still resolve session state.
         lock (context.InternalRunningSessions.RunningSessionsDict)
         {
             removed = context.InternalRunningSessions.RunningSessionsDict.Remove(sessionName);

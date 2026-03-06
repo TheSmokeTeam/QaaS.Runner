@@ -492,6 +492,8 @@ public class ExecutionBuilder() : BaseExecutionBuilder<InternalContext, Executio
     private void InitializeContext()
     {
         var existingContext = LoadedContext ? Context : null;
+        // Missing MetaData in YAML should behave like an empty section so downstream readers can
+        // always resolve the metadata object from the global dictionary without duplicate failures.
         MetaData ??= new MetaDataConfig();
 
         var logger = _configuredLogger;
@@ -566,6 +568,8 @@ public class ExecutionBuilder() : BaseExecutionBuilder<InternalContext, Executio
 
 
             // builds every list of domain objects
+            // Materializing the builders once keeps component counts stable for logging and avoids
+            // rebuilding hook-backed objects when the lists are resolved into execution logics.
             var builtDataSources = BuildDataSources(scope).ToList();
             var builtSessions = BuildSessions(scope).ToList();
             var builtStorages = BuildStorages().ToList();
