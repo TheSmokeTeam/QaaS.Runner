@@ -10,7 +10,6 @@ Execution orchestration package for running QaaS test workflows from YAML config
 - [Overview](#overview)
 - [Packages](#packages)
 - [Projects](#projects)
-- [Architecture](#architecture)
 - [Quick Start](#quick-start)
 - [Documentation](#documentation)
 
@@ -47,28 +46,6 @@ This repository contains one solution: [`QaaS.Runner.sln`](./QaaS.Runner.sln).
 
 ### [QaaS.Runner.Infrastructure](./QaaS.Runner.Infrastructure/)
 - Small shared cross-project helpers (filesystem and date/time utilities).
-
-## Architecture
-```mermaid
-flowchart LR
-  A["CLI args"] --> B["Bootstrap"]
-  B --> C["RunLoader or ExecuteLoader"]
-  C --> D["ExecutionBuilder"]
-  D --> E["Execution"]
-
-  E --> F["DataSourceLogic"]
-  E --> G["SessionLogic"]
-  E --> H["StorageLogic"]
-  E --> I["AssertionLogic"]
-  E --> J["ReportLogic"]
-  J --> K["Allure output"]
-
-  L["run"] --> M["DataSources -> Sessions -> Assertions -> Reports"]
-  N["act"] --> O["DataSources -> Sessions -> Storage"]
-  P["assert"] --> Q["DataSources -> Storage -> Assertions -> Reports"]
-  R["template"] --> S["Template rendering"]
-  T["execute"] --> U["Sequential command execution from executable yaml"]
-```
 
 ## Quick Start
 Install package:
