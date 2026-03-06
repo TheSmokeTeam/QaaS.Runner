@@ -87,6 +87,8 @@ public class Stage
             Actions.Select(action =>
                 SessionExtensions.CreateTaskFromAction(_context, action, _sessionName, _actionFailures)).ToList();
         stageTasks.ForEach(task => task.Start());
+        // The stage is an ordering boundary: all actions in this stage may run concurrently, but the
+        // session must not advance to the next stage until every task here has completed.
         Task.WhenAll(stageTasks).GetAwaiter().GetResult();
 
         _context.Logger.LogInformation("Finished session {SessionName} stage {StageNumber}", _sessionName, _stage);
