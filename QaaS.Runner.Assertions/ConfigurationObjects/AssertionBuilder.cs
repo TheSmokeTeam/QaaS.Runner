@@ -499,7 +499,8 @@ public class AssertionBuilder : IYamlConvertible
     {
         Reporter = new AllureReporter
         {
-            Name = Name!
+            Name = Name!,
+            AssertionName = Name!
         };
 
         Reporter.DisplayTrace = DisplayTrace;
@@ -513,5 +514,11 @@ public class AssertionBuilder : IYamlConvertible
 
         Reporter.FileSystem = fileSystem ?? new FileSystem();
         return Reporter;
+    }
+
+    internal IEnumerable<IReporter> BuildReporters(Context context, DateTime testSuiteStartTimeUtc,
+        IFileSystem? fileSystem = null)
+    {
+        yield return Build(context, testSuiteStartTimeUtc, fileSystem);
     }
 }

@@ -135,7 +135,7 @@ public class ExecutionBuilder() : BaseExecutionBuilder<InternalContext, Executio
         Assertions = blankRunBuilderFromContext.Assertions;
         Sessions = blankRunBuilderFromContext.Sessions;
         Links = blankRunBuilderFromContext.Links;
-        MetaData = blankRunBuilderFromContext.MetaData;
+        MetaData = blankRunBuilderFromContext.MetaData ?? new MetaDataConfig();
 
         _sessionNamesToRun = sessionNamesToRun != null && !sessionNamesToRun.Any() ? null : sessionNamesToRun;
         _sessionCategoriesToRun = sessionCategoriesToRun != null && !sessionCategoriesToRun.Any()
@@ -198,8 +198,8 @@ public class ExecutionBuilder() : BaseExecutionBuilder<InternalContext, Executio
     private IEnumerable<IReporter> BuildReports()
     {
         if (Assertions is null) return [];
-        var resolvedReports = Assertions.Select(assertionReport =>
-            assertionReport.Build(Context, DateTime.UtcNow));
+        var resolvedReports = Assertions.SelectMany(assertionReport =>
+            assertionReport.BuildReporters(Context, DateTime.UtcNow));
         return resolvedReports;
     }
 
@@ -492,6 +492,7 @@ public class ExecutionBuilder() : BaseExecutionBuilder<InternalContext, Executio
     private void InitializeContext()
     {
         var existingContext = LoadedContext ? Context : null;
+        MetaData ??= new MetaDataConfig();
 
         var logger = _configuredLogger;
         var caseName = _configuredCaseName ?? existingContext?.CaseName;
