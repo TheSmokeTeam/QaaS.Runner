@@ -54,10 +54,14 @@ public abstract class BaseConsumer : StagedAction
         };
 
         Policies?.SetupChain();
-        Logger.LogDebug("Acting consuming action {ActionName}", Name);
+        Logger.LogDebug(
+            "Starting consumer {ActionName}. TimeoutMs={TimeoutMs}, SerializationType={SerializationType}",
+            Name, TimeoutMs.TotalMilliseconds, SerializationType);
         Consume(data);
 
         RunningCommunicationData.Data.CompleteAdding();
+        Logger.LogDebug("Finished consumer {ActionName}. CollectedOutputCount={OutputCount}",
+            Name, data.Output?.Count ?? 0);
         return data;
     }
 

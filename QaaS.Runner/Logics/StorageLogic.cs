@@ -30,23 +30,31 @@ public class StorageLogic(IList<IStorage> storages, InternalContext context, Exe
                     // If session name is not already present in sessionData list add it to session data
                     if (executionData.SessionDatas.All(alreadySavedSessionData =>
                             alreadySavedSessionData?.Name != sessionData.Name))
+                    {
                         executionData.SessionDatas.Add(sessionData);
+                        context.Logger.LogDebug("Retrieved session data {SessionName} from storage {StorageType}",
+                            sessionData.Name, storage.GetType().Name);
+                    }
 
                     else
-                        context.Logger.LogWarning("Session data with name {SessionName} was already found in" +
-                                                  " configured storage sources, only retrieving the first instance found of it",
-                            sessionData.Name);
+                        context.Logger.LogWarning("Session data {SessionName} was found more than once across storage providers. Keeping the first instance and skipping the duplicate from {StorageType}",
+                            sessionData.Name, storage.GetType().Name);
                 })
             );
+            context.Logger.LogInformation("Finished retrieving session data from {StorageCount} storage provider(s)",
+                storages.Count);
         }
         else
         {
             context.Logger.LogInformation("Running {LogicType} Logic", "Storages Store");
             storages.ForEach(storage =>
             {
-                context.Logger.LogDebug("Storing in {StorageType} storage", storage.GetType().Name);
+                context.Logger.LogDebug("Persisting {SessionCount} session result(s) to storage {StorageType}",
+                    executionData.SessionDatas.Count, storage.GetType().Name);
                 storage.Store(executionData.SessionDatas.ToImmutableList(), context.CaseName);
             });
+            context.Logger.LogInformation("Finished storing session data in {StorageCount} storage provider(s)",
+                storages.Count);
         }
 
         return executionData;

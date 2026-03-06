@@ -10,7 +10,7 @@ public abstract class Action
     {
         Name = name;
         Logger = logger;
-        Logger.LogDebug("Initialized action {ActionName}", Name);
+        Logger.LogDebug("Initialized action {ActionType} {ActionName}", GetType().Name, Name);
     }
 
     public string Name { get; init; }

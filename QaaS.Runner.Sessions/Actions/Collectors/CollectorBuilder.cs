@@ -149,7 +149,7 @@ public class CollectorBuilder
         catch (Exception e)
         {
             actionFailures.AppendActionFailure(e, sessionName, context.Logger, nameof(Collector), Name!,
-                type?.GetType().ToString());
+                type?.GetType().Name);
         }
 
         return null;

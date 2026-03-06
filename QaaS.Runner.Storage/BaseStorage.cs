@@ -1,6 +1,7 @@
 using System.Collections.Immutable;
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using Microsoft.Extensions.Logging;
 using QaaS.Framework.SDK.ContextObjects;
 using QaaS.Framework.SDK.Session;
 using QaaS.Framework.SDK.Session.SessionDataObjects;
@@ -22,9 +23,12 @@ public abstract class BaseStorage : IStorage
 
     public void Store(ImmutableList<SessionData?>? sessionDataList, string? caseName)
     {
+        var logger = _context?.Logger;
         var sessionsToStore = (sessionDataList ?? []).Where(sessionData => sessionData is not null)
             .Select(sessionData => sessionData!)
             .ToList();
+        logger?.LogDebug("Preparing {SessionCount} session item(s) for storage in case {CaseName}",
+            sessionsToStore.Count, caseName);
         var invalidNames = sessionsToStore
             .Where(sessionData => string.IsNullOrWhiteSpace(sessionData.Name))
             .Select(sessionData => sessionData.Name)
@@ -55,16 +59,22 @@ public abstract class BaseStorage : IStorage
                 string.Join(", ", duplicateFileNames));
         }
 
+        logger?.LogDebug("Serialized {SessionCount} session item(s) for storage using format {Formatting}",
+            serializedSessionDataList.Count, jsonStorageFormat);
         StoreSerialized(serializedSessionDataList, caseName);
     }
 
     public ImmutableList<SessionData> Retrieve(string? caseName)
     {
-        return RetrieveSerialized(caseName)
+        var logger = _context?.Logger;
+        var retrievedSessions = RetrieveSerialized(caseName)
             .Select(serializedSessionData =>
                 SessionDataSerialization.DeserializeSessionData(serializedSessionData,
                     new JsonSerializerOptions { DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull }))
             .ToImmutableList();
+        logger?.LogDebug("Deserialized {SessionCount} session item(s) retrieved from storage for case {CaseName}",
+            retrievedSessions.Count, caseName);
+        return retrievedSessions;
     }
 
     protected abstract void StoreSerialized(

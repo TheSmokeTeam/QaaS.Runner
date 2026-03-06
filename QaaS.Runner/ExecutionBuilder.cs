@@ -638,7 +638,6 @@ public class ExecutionBuilder() : BaseExecutionBuilder<InternalContext, Executio
                 throw new InvalidConfigurationsException("Configurations are not valid");
             }
 
-
             // builds every list of domain objects
             // Materializing the builders once keeps component counts stable for logging and avoids
             // rebuilding hook-backed objects when the lists are resolved into execution logics.

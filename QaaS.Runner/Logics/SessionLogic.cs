@@ -22,7 +22,7 @@ public class SessionLogic(List<ISession> sessions, InternalContext context) : IL
     public ExecutionData Run(ExecutionData executionData)
     {
         context.Logger.LogInformation("Running {LogicType} Logic", "Sessions");
-        context.Logger.LogInformation("{NumberOfSessions} sessions were given", sessions.Count);
+        context.Logger.LogInformation("Received {SessionCount} session definitions for execution", sessions.Count);
 
         var stages = new SortedDictionary<int, List<ISession>>();
         foreach (var session in sessions)
@@ -31,6 +31,7 @@ public class SessionLogic(List<ISession> sessions, InternalContext context) : IL
                 stages[session.SessionStage] = [];
             stages[session.SessionStage].Add(session);
         }
+        context.Logger.LogDebug("Grouped sessions into {StageCount} stage buckets", stages.Count);
 
         var blockingSessions = new Dictionary<int, List<Task<SessionData?>>>();
         foreach (var (stage, stageSessions) in stages)
@@ -39,10 +40,16 @@ public class SessionLogic(List<ISession> sessions, InternalContext context) : IL
             var sessionsInThisStage = new List<Task<SessionData?>>();
 
             if (blockingSessions.TryGetValue(stage, out var blockers))
+            {
+                context.Logger.LogDebug(
+                    "Waiting for {BlockingSessionCount} deferred session(s) before starting stage {Stage}",
+                    blockers.Count, stage);
                 Task.WhenAll(blockers).Wait();
+            }
 
-            context.Logger.LogInformation("Starting session stage number {Stage} containing {SessionsCount} sessions",
-                stage, stageSessions.Count);
+            context.Logger.LogInformation(
+                "Starting session stage {Stage} with {SessionCount} session(s): {SessionNames}",
+                stage, stageSessions.Count, string.Join(", ", stageSessions.Select(session => session.Name)));
             foreach (var session in stageSessions)
             {
                 if (session.RunUntilStage == null)
@@ -57,11 +64,17 @@ public class SessionLogic(List<ISession> sessions, InternalContext context) : IL
             }
 
             executionData.SessionDatas.AddRange(sessionsInThisStage.Select(s => s.Result));
+            context.Logger.LogInformation(
+                "Finished session stage {Stage}. Immediate session results captured: {CapturedSessionCount}",
+                stage, sessionsInThisStage.Count);
         }
 
         blockingSessions.Select(stageToSessions => stageToSessions.Value)
             .ForEach(sessionsTasks => sessionsTasks
                 .ForEach(sessionTask => executionData.SessionDatas.Add(sessionTask.Result)));
+
+        context.Logger.LogInformation("Session logic completed. Total collected session results: {SessionDataCount}",
+            executionData.SessionDatas.Count);
 
         return executionData;
     }

@@ -34,9 +34,18 @@ public class ReportLogic(IList<IReporter> reporters, InternalContext context) : 
         {
             if (assertionResultsByName.TryGetValue(reporter.AssertionName, out var assertionResult))
             {
+                context.Logger.LogDebug(
+                    "Routing assertion {AssertionName} with status {AssertionStatus} to reporter {ReporterName}",
+                    assertionResult.Assertion.Name, assertionResult.AssertionStatus, reporter.Name);
                 if (assertionResult.Assertion.StatussesToReport.Contains(assertionResult.AssertionStatus))
                 {
                     reporter.WriteTestResults(assertionResult);
+                }
+                else
+                {
+                    context.Logger.LogDebug(
+                        "Skipping reporter {ReporterName} for assertion {AssertionName} because status {AssertionStatus} is not configured for reporting",
+                        reporter.Name, assertionResult.Assertion.Name, assertionResult.AssertionStatus);
                 }
             }
             else

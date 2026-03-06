@@ -351,7 +351,7 @@ public class TransactionBuilder
         catch (Exception e)
         {
             actionFailures.AppendActionFailure(e, sessionName, context.Logger, nameof(Transaction), Name!,
-                type?.GetType().ToString()!);
+                type?.GetType().Name);
         }
 
         return null;

@@ -57,7 +57,8 @@ public class ConsumeMockerCommand : MockerCommand
     {
         if (ServerInputOutputState == CommunicationInputOutputState.NoInputOutput)
         {
-            Logger.LogWarning("Server '{ServerName}' has not Inputs or outputs, nothing to consume from", ServerName);
+            Logger.LogWarning("Server {ServerName} exposes no input or output queues. Skipping consume step.",
+                ServerName);
             return (null, null);
         }
 
@@ -107,7 +108,8 @@ public class ConsumeMockerCommand : MockerCommand
     /// </summary>
     private IEnumerable<DetailedData<byte[]>> Consume(string queueName, int timeoutMs)
     {
-        Logger.LogDebug("Started consuming from Server - '{QueueName}'", queueName);
+        Logger.LogDebug("Starting Redis queue consume from {QueueName} with idle timeout {TimeoutMs} ms",
+            queueName, timeoutMs);
         var stopwatch = new Stopwatch();
         stopwatch.Restart();
         while (stopwatch.ElapsedMilliseconds < timeoutMs)
@@ -119,7 +121,8 @@ public class ConsumeMockerCommand : MockerCommand
             stopwatch.Restart();
         }
 
-        Logger.LogInformation("Stopped consuming from Server - '{QueueName}'", queueName);
+        Logger.LogInformation("Stopped Redis queue consume from {QueueName} after {TimeoutMs} ms of inactivity",
+            queueName, timeoutMs);
     }
 }
 
