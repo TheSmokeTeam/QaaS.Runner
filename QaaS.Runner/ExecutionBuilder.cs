@@ -5,6 +5,7 @@ using System.Runtime.CompilerServices;
 using Autofac;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Logging.Abstractions;
 using QaaS.Framework.Configurations;
 using QaaS.Framework.Configurations.CustomAttributes;
 using QaaS.Framework.Configurations.CustomExceptions;
@@ -95,7 +96,7 @@ public class ExecutionBuilder() : BaseExecutionBuilder<InternalContext, Executio
     /// The metadata for the tests' run
     /// </summary>
     [Description("The metadata for the tests' run")]
-    public MetaDataConfig MetaData { get; internal set; } = new();
+    public MetaDataConfig? MetaData { get; internal set; }
 
     private ExecutionType Type { get; set; }
 
@@ -135,7 +136,7 @@ public class ExecutionBuilder() : BaseExecutionBuilder<InternalContext, Executio
         Assertions = blankRunBuilderFromContext.Assertions;
         Sessions = blankRunBuilderFromContext.Sessions;
         Links = blankRunBuilderFromContext.Links;
-        MetaData = blankRunBuilderFromContext.MetaData ?? new MetaDataConfig();
+        MetaData = blankRunBuilderFromContext.MetaData;
 
         _sessionNamesToRun = sessionNamesToRun != null && !sessionNamesToRun.Any() ? null : sessionNamesToRun;
         _sessionCategoriesToRun = sessionCategoriesToRun != null && !sessionCategoriesToRun.Any()
@@ -492,11 +493,12 @@ public class ExecutionBuilder() : BaseExecutionBuilder<InternalContext, Executio
     private void InitializeContext()
     {
         var existingContext = LoadedContext ? Context : null;
-        // Missing MetaData in YAML should behave like an empty section so downstream readers can
-        // always resolve the metadata object from the global dictionary without duplicate failures.
-        MetaData ??= new MetaDataConfig();
+        // Missing MetaData in YAML should behave like an empty section at runtime, but the builder
+        // keeps the property null so configuration validation does not fabricate required-field
+        // failures for a section that was never provided by the user.
+        var metaData = MetaData ?? new MetaDataConfig();
 
-        var logger = _configuredLogger;
+        var logger = _configuredLogger ?? existingContext?.Logger ?? NullLogger.Instance;
         var caseName = _configuredCaseName ?? existingContext?.CaseName;
         var executionId = _configuredExecutionId ?? existingContext?.ExecutionId;
         var rootConfiguration = existingContext?.RootConfiguration ?? new ConfigurationBuilder().Build();
@@ -514,7 +516,7 @@ public class ExecutionBuilder() : BaseExecutionBuilder<InternalContext, Executio
         };
 
         // saved context's metadata in globalDict
-        Context.InsertValueIntoGlobalDictionary(Context.GetMetaDataPath(), MetaData);
+        Context.InsertValueIntoGlobalDictionary(Context.GetMetaDataPath(), metaData);
         Context.Logger.LogDebug(
             "Initialized execution context. LoadedContext={LoadedContext}, ExecutionId={ExecutionId}, CaseName={CaseName}, GlobalKeys={GlobalKeyCount}",
             LoadedContext, Context.ExecutionId, Context.CaseName, Context.InternalGlobalDict.Count);
@@ -534,6 +536,32 @@ public class ExecutionBuilder() : BaseExecutionBuilder<InternalContext, Executio
         Context.Logger.LogDebug(
             "Filtered execution configuration. Sessions: {SessionCountBefore} -> {SessionCountAfter}, Assertions: {AssertionCountBefore} -> {AssertionCountAfter}",
             sessionsBeforeFiltering, Sessions.Length, assertionsBeforeFiltering, Assertions.Length);
+    }
+
+    private void DeduplicateValidationResults()
+    {
+        if (_validationResults.Count < 2)
+        {
+            return;
+        }
+
+        var distinctValidationResults = _validationResults
+            .GroupBy(result => new
+            {
+                Message = result.ErrorMessage ?? string.Empty,
+                MemberNames = string.Join("|", result.MemberNames.OrderBy(memberName => memberName,
+                    StringComparer.Ordinal))
+            })
+            .Select(group => group.First())
+            .ToList();
+
+        if (distinctValidationResults.Count == _validationResults.Count)
+        {
+            return;
+        }
+
+        _validationResults.Clear();
+        _validationResults.AddRange(distinctValidationResults);
     }
 
     /// <inheritdoc />
@@ -557,6 +585,7 @@ public class ExecutionBuilder() : BaseExecutionBuilder<InternalContext, Executio
 
             // validate configuration
             _ = ValidationUtils.TryValidateObjectRecursive(this, _validationResults);
+            DeduplicateValidationResults();
 
             if (_validationResults.Any())
             {
