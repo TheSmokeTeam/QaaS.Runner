@@ -100,6 +100,24 @@ public class ProbeBuilderTests
     }
 
     [Test]
+    public void Build_WithSessionScopedProbeKey_Should_Return_Probe()
+    {
+        var probes = new List<KeyValuePair<string, IProbe>>
+        {
+            new(ProbeBuilder.BuildScopedHookName("Session1", "TestProbe"), _mockProbe.Object)
+        };
+
+        var actionFailures = new List<ActionFailure>();
+        var builder = new ProbeBuilder()
+            .Named("TestProbe")
+            .HookNamed("TestHook");
+
+        var probe = builder.Build(_context, probes, actionFailures, "Session1");
+
+        Assert.That(probe, Is.Not.Null);
+    }
+
+    [Test]
     public void Build_When_Probe_Not_Found_Should_Add_Failure_And_Return_Null()
     {
         var probes = new List<KeyValuePair<string, IProbe>>();

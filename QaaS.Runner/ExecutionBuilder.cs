@@ -27,6 +27,7 @@ using QaaS.Runner.Assertions;
 using QaaS.Runner.Assertions.AssertionObjects;
 using QaaS.Runner.Assertions.ConfigurationObjects;
 using QaaS.Runner.Extensions;
+using QaaS.Runner.Sessions.Actions.Probes;
 using QaaS.Runner.Logics;
 using QaaS.Runner.Sessions.Session;
 using QaaS.Runner.Sessions.Session.Builders;
@@ -389,6 +390,7 @@ public class ExecutionBuilder() : BaseExecutionBuilder<InternalContext, Executio
             containerBuilder.RegisterInstance(Context).As<InternalContext>().SingleInstance();
             containerBuilder.RegisterInstance(Context).As<Context>().SingleInstance();
             containerBuilder.RegisterInstance(new ByNameObjectCreator(Context.Logger)).As<IByNameObjectCreator>();
+            ValidateProbeDefinitions();
 
             containerBuilder.Register<IComponentContext, IEnumerable<HookData<IAssertion>>>(_ =>
                 (Assertions ?? []).Select(assertion => new HookData<IAssertion>
@@ -408,13 +410,7 @@ public class ExecutionBuilder() : BaseExecutionBuilder<InternalContext, Executio
             ).InstancePerLifetimeScope(); // Loads all IGenerator hooks
             containerBuilder
                 .Register<IComponentContext, IEnumerable<HookData<IProbe>>>(_ =>
-                    (Sessions ?? []).SelectMany(sessionBuilder => sessionBuilder.Probes?.Select(probeBuilder =>
-                        new HookData<IProbe>
-                        {
-                            Type = probeBuilder.Probe!,
-                            Configuration = probeBuilder.ProbeConfiguration,
-                            Name = probeBuilder.Name!
-                        }) ?? Enumerable.Empty<HookData<IProbe>>()))
+                    BuildProbeHookData())
                 .InstancePerLifetimeScope(); // Loads all IProbe hooks
             containerBuilder.RegisterModule(
                 new HooksLoaderModule<IAssertion>(_validationResults)); // Loads all IAssertion hooks
@@ -433,6 +429,55 @@ public class ExecutionBuilder() : BaseExecutionBuilder<InternalContext, Executio
         });
 
         _scope = contextScope;
+    }
+
+    private IEnumerable<HookData<IProbe>> BuildProbeHookData()
+    {
+        foreach (var sessionBuilder in Sessions ?? [])
+        {
+            foreach (var probeBuilder in sessionBuilder.Probes ?? [])
+            {
+                if (string.IsNullOrWhiteSpace(sessionBuilder.Name) ||
+                    string.IsNullOrWhiteSpace(probeBuilder.Name) ||
+                    string.IsNullOrWhiteSpace(probeBuilder.Probe))
+                    continue;
+
+                yield return new HookData<IProbe>
+                {
+                    Type = probeBuilder.Probe,
+                    Configuration = probeBuilder.ProbeConfiguration,
+                    Name = ProbeBuilder.BuildScopedHookName(sessionBuilder.Name, probeBuilder.Name)
+                };
+            }
+        }
+    }
+
+    private void ValidateProbeDefinitions()
+    {
+        foreach (var sessionBuilder in Sessions ?? [])
+        {
+            foreach (var probeBuilder in sessionBuilder.Probes ?? [])
+            {
+                if (string.IsNullOrWhiteSpace(sessionBuilder.Name))
+                {
+                    _validationResults.Add(new ValidationResult("Session name is required when configuring probes."));
+                }
+
+                if (string.IsNullOrWhiteSpace(probeBuilder.Name))
+                {
+                    _validationResults.Add(new ValidationResult(
+                        $"Probe name is required for session '{sessionBuilder.Name}'.",
+                        [nameof(ProbeBuilder.Name)]));
+                }
+
+                if (string.IsNullOrWhiteSpace(probeBuilder.Probe))
+                {
+                    _validationResults.Add(new ValidationResult(
+                        $"Probe type is required for probe '{probeBuilder.Name}' in session '{sessionBuilder.Name}'.",
+                        [nameof(ProbeBuilder.Probe)]));
+                }
+            }
+        }
     }
 
     /// <summary>

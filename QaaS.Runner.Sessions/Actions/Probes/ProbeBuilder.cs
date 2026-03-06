@@ -162,11 +162,21 @@ public class ProbeBuilder : IYamlConvertible
     internal Probe? Build(InternalContext context, IList<KeyValuePair<string, IProbe>> probes,
         IList<ActionFailure> actionFailures, string sessionName)
     {
+        var probeName = Name ?? "<missing-probe-name>";
+        var probeType = Probe ?? "<missing-probe-type>";
+
         try
         {
-            var probeHook = probes.FirstOrDefault(pair => pair.Key == Name!).Value
+            if (string.IsNullOrWhiteSpace(Name))
+            {
+                throw new ValidationException("Probe Name is required.");
+            }
+
+            var scopedHookName = BuildScopedHookName(sessionName, Name);
+            var probeHook = probes.FirstOrDefault(pair => pair.Key == scopedHookName).Value
+                            ?? probes.FirstOrDefault(pair => pair.Key == Name).Value
                             ?? throw new ArgumentException($"Probe {Name} of type" +
-                                                           $" {Probe} was not found" +
+                                                           $" {Probe} in session {sessionName} was not found" +
                                                            " in provided probes.");
             var probeTypeName = probeHook.GetType().Name;
             context.Logger.LogDebugWithMetaData("Started building Probe of type {type}",
@@ -176,9 +186,16 @@ public class ProbeBuilder : IYamlConvertible
         }
         catch (Exception e)
         {
-            actionFailures.AppendActionFailure(e, sessionName, context.Logger, "Probe", Name!, Probe!);
+            actionFailures.AppendActionFailure(e, sessionName, context.Logger, "Probe", probeName, probeType);
         }
 
         return null;
+    }
+
+    internal static string BuildScopedHookName(string sessionName, string probeName)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(sessionName);
+        ArgumentException.ThrowIfNullOrWhiteSpace(probeName);
+        return $"{sessionName.Length}:{sessionName}{probeName}";
     }
 }
