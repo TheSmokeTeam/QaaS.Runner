@@ -13,6 +13,7 @@ using QaaS.Framework.SDK.Extensions;
 using QaaS.Framework.SDK.Session;
 using QaaS.Framework.SDK.Session.SessionDataObjects;
 using QaaS.Framework.Serialization;
+using QaaS.Runner.Infrastructure;
 using QaaS.Runner.Sessions.Extensions;
 using InvalidOperationException = System.InvalidOperationException;
 
@@ -211,7 +212,7 @@ public partial class ConsumerBuilder
             var consumerTypeName = reader?.GetType().Name ?? chunkReader?.GetType().Name ?? "Unknown";
             
             context.Logger.LogDebugWithMetaData("Started building Consumer of type {type}",
-                context.GetMetaDataFromContext(), new object?[] { consumerTypeName });
+                context.GetMetaDataOrDefault(), new object?[] { consumerTypeName });
 
             return reader != null
                 ? new Consumer(Name!, reader, timeout, Stage, policies, DataFilter, serializationType,

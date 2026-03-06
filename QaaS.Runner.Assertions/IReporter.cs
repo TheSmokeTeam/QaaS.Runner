@@ -5,6 +5,7 @@ namespace QaaS.Runner.Assertions;
 public interface IReporter
 {
     public string Name { get; set; }
+    public string AssertionName { get; set; }
 
     public bool SaveSessionData { get; set; }
 

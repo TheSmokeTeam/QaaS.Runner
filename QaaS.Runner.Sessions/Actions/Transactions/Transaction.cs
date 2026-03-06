@@ -191,8 +191,9 @@ public class Transaction : StagedAction
             Name = Name,
             SerializationType = GetOutputCommunicationSerializationType()
         };
-        context.InternalRunningSessions.RunningSessionsDict[sessionName].Inputs!.Add(_sentRunningCommunicationData);
-        context.InternalRunningSessions.RunningSessionsDict[sessionName].Outputs!
+        var runningSession = context.GetRunningSession(sessionName);
+        runningSession.Inputs!.Add(_sentRunningCommunicationData);
+        runningSession.Outputs!
             .Add(_receivedRunningCommunicationData);
     }
 

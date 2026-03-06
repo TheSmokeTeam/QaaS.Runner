@@ -2,6 +2,7 @@ using System.Collections.Concurrent;
 using Microsoft.Extensions.Logging;
 using QaaS.Framework.SDK.ContextObjects;
 using QaaS.Framework.SDK.Session.SessionDataObjects;
+using QaaS.Framework.SDK.Session.SessionDataObjects.RunningSessionsObjects;
 using QaaS.Runner.Sessions.Actions;
 using Action = QaaS.Runner.Sessions.Actions.Action;
 
@@ -75,6 +76,31 @@ public static class SessionExtensions
         });
     }
 
+    public static void SetRunningSession(this InternalContext context, string sessionName,
+        RunningSessionData<object, object> runningSessionData)
+    {
+        lock (context.InternalRunningSessions.RunningSessionsDict)
+        {
+            context.InternalRunningSessions.RunningSessionsDict[sessionName] = runningSessionData;
+        }
+    }
+
+    public static RunningSessionData<object, object> GetRunningSession(this InternalContext context, string sessionName)
+    {
+        lock (context.InternalRunningSessions.RunningSessionsDict)
+        {
+            return context.InternalRunningSessions.RunningSessionsDict[sessionName];
+        }
+    }
+
+    public static bool RemoveRunningSession(this InternalContext context, string sessionName)
+    {
+        lock (context.InternalRunningSessions.RunningSessionsDict)
+        {
+            return context.InternalRunningSessions.RunningSessionsDict.Remove(sessionName);
+        }
+    }
+
     public static Task<Tuple<Action, InternalCommunicationData<object>>?> CreateTaskFromAction(InternalContext context,
         Action action, string sessionName, ConcurrentBag<ActionFailure> actionFailures)
     {
@@ -87,9 +113,10 @@ public static class SessionExtensions
                 catch (Exception e)
                 {
                     // When action fails all actions that getting its results live will fail as well
-                    context.InternalRunningSessions.RunningSessionsDict[sessionName].Inputs
+                    var runningSession = context.GetRunningSession(sessionName);
+                    runningSession.Inputs
                         ?.FirstOrDefault(input => input.Name == action.Name)?.DataCancellationTokenSource.Cancel();
-                    context.InternalRunningSessions.RunningSessionsDict[sessionName].Outputs
+                    runningSession.Outputs
                         ?.FirstOrDefault(output => output.Name == action.Name)?.DataCancellationTokenSource.Cancel();
 
                     var exceptionMessage =

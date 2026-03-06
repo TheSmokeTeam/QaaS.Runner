@@ -4,6 +4,7 @@ using System.Text.Json.Serialization;
 using QaaS.Framework.SDK.ContextObjects;
 using QaaS.Framework.SDK.Session;
 using QaaS.Framework.SDK.Session.SessionDataObjects;
+using QaaS.Runner.Infrastructure;
 using QaaS.Runner.Storage.ConfigurationObjects;
 
 namespace QaaS.Runner.Storage;
@@ -21,16 +22,40 @@ public abstract class BaseStorage : IStorage
 
     public void Store(ImmutableList<SessionData?>? sessionDataList, string? caseName)
     {
-        var serializedSessionDataList = sessionDataList?.Where(sessionData =>
-                sessionData is not null).Select(sessionData => new KeyValuePair<string, byte[]>(
-                $"{sessionData!.Name}.json",
+        var sessionsToStore = (sessionDataList ?? []).Where(sessionData => sessionData is not null)
+            .Select(sessionData => sessionData!)
+            .ToList();
+        var invalidNames = sessionsToStore
+            .Where(sessionData => string.IsNullOrWhiteSpace(sessionData.Name))
+            .Select(sessionData => sessionData.Name)
+            .ToList();
+
+        if (invalidNames.Count != 0)
+            throw new InvalidOperationException("Session data names must be set before storing.");
+
+        var serializedSessionDataList = sessionsToStore.Select(sessionData => new KeyValuePair<string, byte[]>(
+                BuildStorageFileName(sessionData.Name!),
                 SessionDataSerialization.SerializeSessionData(sessionData, new JsonSerializerOptions
                 {
                     WriteIndented = jsonStorageFormat == Formatting.Indented,
                     DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull
                 })))
             .ToList();
-        StoreSerialized(serializedSessionDataList ?? [], caseName);
+
+        var duplicateFileNames = serializedSessionDataList
+            .GroupBy(pair => pair.Key, StringComparer.OrdinalIgnoreCase)
+            .Where(group => group.Count() > 1)
+            .Select(group => group.Key)
+            .ToList();
+
+        if (duplicateFileNames.Count != 0)
+        {
+            throw new InvalidOperationException(
+                "Multiple session data entries resolve to the same storage file name: " +
+                string.Join(", ", duplicateFileNames));
+        }
+
+        StoreSerialized(serializedSessionDataList, caseName);
     }
 
     public ImmutableList<SessionData> Retrieve(string? caseName)
@@ -46,4 +71,9 @@ public abstract class BaseStorage : IStorage
         IList<KeyValuePair<string, byte[]>> sessionFileNameAndSerializedSessionDataItemsToStorePair, string? caseName);
 
     protected abstract IEnumerable<byte[]> RetrieveSerialized(string? caseName);
+
+    internal static string BuildStorageFileName(string sessionName)
+    {
+        return $"{FileSystemExtensions.MakeValidFileName(sessionName)}.json";
+    }
 }

@@ -10,6 +10,7 @@ using QaaS.Framework.SDK.Session.CommunicationDataObjects;
 using QaaS.Framework.SDK.Session.DataObjects;
 using QaaS.Framework.Serialization;
 using QaaS.Runner.Sessions.ConfigurationObjects;
+using QaaS.Runner.Sessions.Extensions;
 using StackExchange.Redis;
 using CommunicationInputOutputState = Qaas.Mocker.CommunicationObjects.ConfigurationObjects.InputOutputState;
 
@@ -31,6 +32,7 @@ public abstract class MockerCommand : StagedAction
     private readonly int _requestDurationMs;
     private readonly int _requestRetries;
     private readonly IList<string> _failedCommandResponses;
+    private object? _responseStateLock = new();
     private readonly IList<string> _successfulCommandResponseToServerInstanceNames;
     protected readonly object CommandConfig;
     protected readonly IDatabase RedisDatabase;
@@ -86,8 +88,9 @@ public abstract class MockerCommand : StagedAction
     private (IEnumerable<DetailedData<object>>?, IEnumerable<DetailedData<object>>?) Command()
     {
         ScanForMockerInstances();
+        var serverInstanceNames = GetServerInstanceNamesSnapshot();
 
-        if (_serverInstanceNames.Count == 0)
+        if (serverInstanceNames.Count == 0)
         {
             Logger.LogDebug(
                 "No mocker instances of {ServerName} found in redis server {RedisServer} and database {RedisDataBase}",
@@ -95,10 +98,10 @@ public abstract class MockerCommand : StagedAction
             throw new ArgumentException($"No mocker server instances found for '{ServerName}'");
         }
 
-        Logger.LogInformation("Found {ServerInstances} instances for server {ServerName}", _serverInstanceNames.Count,
+        Logger.LogInformation("Found {ServerInstances} instances for server {ServerName}", serverInstanceNames.Count,
             ServerName);
         Logger.LogDebug("All servers instances found for server {ServerName}: {ServerInstances}",
-            ServerName, string.Join(", ", _serverInstanceNames));
+            ServerName, string.Join(", ", serverInstanceNames));
 
         CommandTheMockerInstances();
 
@@ -106,14 +109,16 @@ public abstract class MockerCommand : StagedAction
 
         if (!allCommandRequestsAreSuccessful)
         {
+            var successfulInstances = GetSuccessfulResponseNamesSnapshot();
+            var failedResponses = GetFailedResponsesSnapshot();
             Logger.LogDebug(
                 "Received {SuccessfulCommandResponses} successful commands responses from {ServerInstancesCount} server instances",
-                _successfulCommandResponseToServerInstanceNames.Count, _serverInstanceNames.Count);
+                successfulInstances.Count, serverInstanceNames.Count);
             throw new MockerCommandRequestFailedException(
                 $"Not all command requests were successful for server '{ServerName}'. " +
-                $"Expected instances: {string.Join(", ", _serverInstanceNames)}. " +
-                $"Succeeded: {string.Join(", ", _successfulCommandResponseToServerInstanceNames.Distinct())}. " +
-                $"Failures: {string.Join(" | ", _failedCommandResponses.Distinct())}");
+                $"Expected instances: {string.Join(", ", serverInstanceNames)}. " +
+                $"Succeeded: {string.Join(", ", successfulInstances.Distinct(StringComparer.Ordinal))}. " +
+                $"Failures: {string.Join(" | ", failedResponses.Distinct(StringComparer.Ordinal))}");
         }
 
         if (!HandlesData)
@@ -148,7 +153,7 @@ public abstract class MockerCommand : StagedAction
         {
             Logger.LogDebug("Ping Request {RetryIndex}", retryIndex);
             _redisSubscriber.Publish(RedisChannel.Literal(pingRequestChannel), PingRequestConstructor());
-            if (_serverInstanceNames.Count != 0)
+            if (GetServerInstanceNamesSnapshot().Count != 0)
                 break;
             if (retryIndex < _requestRetries)
                 Thread.Sleep(_requestDurationMs);
@@ -157,7 +162,13 @@ public abstract class MockerCommand : StagedAction
         _redisSubscriber.UnsubscribeAllAsync();
         Logger.LogDebug("Unsubscribed to all channels");
 
-        _serverInstanceNames = _serverInstanceNames.Distinct().ToList();
+        lock (ResponseStateLock)
+        {
+            _serverInstanceNames = _serverInstanceNames
+                .Where(serverInstance => !string.IsNullOrWhiteSpace(serverInstance))
+                .Distinct(StringComparer.Ordinal)
+                .ToList();
+        }
     }
 
     /// <summary>
@@ -177,13 +188,30 @@ public abstract class MockerCommand : StagedAction
         var pingResponse = JsonSerializer.Deserialize<PingResponse>((byte[])serializedMessage!)!;
         if (pingResponse.Id != _commandId) return;
         if (pingResponse.ServerName != ServerName) return;
-        _serverInstanceNames.Add(pingResponse.ServerInstanceId);
+
+        if (string.IsNullOrWhiteSpace(pingResponse.ServerInstanceId))
+            return;
+
+        lock (ResponseStateLock)
+        {
+            if (!_serverInstanceNames.Contains(pingResponse.ServerInstanceId, StringComparer.Ordinal))
+            {
+                _serverInstanceNames.Add(pingResponse.ServerInstanceId);
+            }
+
+            if (ServerInputOutputState == null)
+            {
+                ServerInputOutputState = pingResponse.ServerInputOutputState;
+            }
+            else if (ServerInputOutputState != pingResponse.ServerInputOutputState)
+            {
+                throw new InvalidOperationException(
+                    $"Mocker Server instances does not have matching {nameof(CommunicationInputOutputState)} across all ping responses");
+            }
+        }
+
         Logger.LogInformation("Discovered mocker server instance '{ServerInstanceId}' for server '{ServerName}'",
             pingResponse.ServerInstanceId, ServerName);
-        if (ServerInputOutputState == null) ServerInputOutputState = pingResponse.ServerInputOutputState;
-        else if (ServerInputOutputState != pingResponse.ServerInputOutputState)
-            throw new InvalidOperationException(
-                $"Mocker Server instances does not have matching {nameof(CommunicationInputOutputState)} across all ping responses");
     }
 
     /// <summary>
@@ -191,7 +219,8 @@ public abstract class MockerCommand : StagedAction
     /// </summary>
     private void CommandTheMockerInstances()
     {
-        foreach (var serverInstance in _serverInstanceNames)
+        var serverInstances = GetServerInstanceNamesSnapshot();
+        foreach (var serverInstance in serverInstances)
         {
             var responseChannel = CommunicationMethods.CreateChannelMockerToRunner(CommandContentType,
                 ServerName, serverInstance);
@@ -203,7 +232,7 @@ public abstract class MockerCommand : StagedAction
         for (var retryIndex = 1; retryIndex <= _requestRetries; retryIndex++)
         {
             Logger.LogDebug("Command Request {RetryIndex}", retryIndex);
-            foreach (var serverInstance in _serverInstanceNames)
+            foreach (var serverInstance in serverInstances)
             {
                 var requestChannel = CommunicationMethods.CreateChannelRunnerToMocker(CommandContentType,
                     ServerName, serverInstance);
@@ -223,8 +252,17 @@ public abstract class MockerCommand : StagedAction
 
     private bool AllCommandsRequestsAreSuccessful()
     {
-        return _serverInstanceNames.OrderBy(id => id)
-            .SequenceEqual(_successfulCommandResponseToServerInstanceNames.OrderBy(id => id));
+        lock (ResponseStateLock)
+        {
+            return _serverInstanceNames
+                .Where(id => !string.IsNullOrWhiteSpace(id))
+                .Distinct(StringComparer.Ordinal)
+                .OrderBy(id => id, StringComparer.Ordinal)
+                .SequenceEqual(_successfulCommandResponseToServerInstanceNames
+                    .Where(id => !string.IsNullOrWhiteSpace(id))
+                    .Distinct(StringComparer.Ordinal)
+                    .OrderBy(id => id, StringComparer.Ordinal), StringComparer.Ordinal);
+        }
     }
 
     /// <summary>
@@ -252,15 +290,30 @@ public abstract class MockerCommand : StagedAction
         if (commandResponse.Command != CommandType) return;
         if (commandResponse.Status == Status.Succeeded)
         {
-            _successfulCommandResponseToServerInstanceNames.Add(commandResponse.ServerInstanceId);
+            if (string.IsNullOrWhiteSpace(commandResponse.ServerInstanceId))
+                return;
+
+            lock (ResponseStateLock)
+            {
+                if (!_successfulCommandResponseToServerInstanceNames.Contains(commandResponse.ServerInstanceId,
+                        StringComparer.Ordinal))
+                {
+                    _successfulCommandResponseToServerInstanceNames.Add(commandResponse.ServerInstanceId);
+                }
+            }
+
             Logger.LogInformation(
                 "Command '{CommandType}' succeeded on server instance '{ServerInstanceId}'",
                 commandResponse.Command, commandResponse.ServerInstanceId);
         }
         else
         {
-            _failedCommandResponses.Add(
-                $"{commandResponse.ServerInstanceId}: {commandResponse.ExceptionMessage ?? "Unknown command error"}");
+            lock (ResponseStateLock)
+            {
+                _failedCommandResponses.Add(
+                    $"{commandResponse.ServerInstanceId}: {commandResponse.ExceptionMessage ?? "Unknown command error"}");
+            }
+
             Logger.LogWarning(
                 "Command '{CommandType}' failed on server instance '{ServerInstanceId}' with error '{Error}'",
                 commandResponse.Command, commandResponse.ServerInstanceId,
@@ -323,8 +376,9 @@ public abstract class MockerCommand : StagedAction
             SerializationType = GetOutputCommunicationSerializationType()
         };
 
-        context.InternalRunningSessions.RunningSessionsDict[sessionName].Inputs!.Add(_sentRunningCommunicationData);
-        context.InternalRunningSessions.RunningSessionsDict[sessionName].Outputs!
+        var runningSession = context.GetRunningSession(sessionName);
+        runningSession.Inputs!.Add(_sentRunningCommunicationData);
+        runningSession.Outputs!
             .Add(_receivedRunningCommunicationData);
     }
 
@@ -332,5 +386,31 @@ public abstract class MockerCommand : StagedAction
     {
         return $"Mocker Command {Name} of type {GetType}";
     }
+
+    private List<string> GetServerInstanceNamesSnapshot()
+    {
+        lock (ResponseStateLock)
+        {
+            return _serverInstanceNames.ToList();
+        }
+    }
+
+    private List<string> GetSuccessfulResponseNamesSnapshot()
+    {
+        lock (ResponseStateLock)
+        {
+            return _successfulCommandResponseToServerInstanceNames.ToList();
+        }
+    }
+
+    private List<string> GetFailedResponsesSnapshot()
+    {
+        lock (ResponseStateLock)
+        {
+            return _failedCommandResponses.ToList();
+        }
+    }
+
+    private object ResponseStateLock => _responseStateLock ??= new object();
 }
 
