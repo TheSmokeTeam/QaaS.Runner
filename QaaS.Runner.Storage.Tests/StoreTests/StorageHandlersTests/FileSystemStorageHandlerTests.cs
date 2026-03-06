@@ -36,7 +36,7 @@ public class FileSystemStorageHandlerTests
         // Create items to store
         var itemsToStore = new List<SessionData>();
         for (var itemToStoreIndex = 0; itemToStoreIndex < numberOfItemsToStore; itemToStoreIndex++)
-            itemsToStore.Add(new SessionData());
+            itemsToStore.Add(new SessionData { Name = $"session-{itemToStoreIndex}" });
 
         var storageHandler = new FileSystemStorage(new FilesInFileSystemConfig { Path = "somePath" },
             mockFileSystem.Object, Formatting.Indented)

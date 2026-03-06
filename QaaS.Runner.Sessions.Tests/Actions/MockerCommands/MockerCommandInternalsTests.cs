@@ -58,6 +58,28 @@ public class MockerCommandInternalsTests
     }
 
     [Test]
+    public void PingResponseHandler_WithDuplicateResponse_AddsServerInstanceOnlyOnce()
+    {
+        var command = CreateUninitializedTriggerCommand();
+        var response = (RedisValue)JsonSerializer.SerializeToUtf8Bytes(new PingResponse
+        {
+            Id = "cmd-id",
+            ServerName = "server-a",
+            ServerInstanceId = "instance-1",
+            ServerInputOutputState = CommunicationInputOutputState.OnlyInput
+        });
+
+        InvokeNonPublicMethod(typeof(MockerCommand), command, "PingResponseHandler",
+            RedisChannel.Literal("ping-response"), response);
+        InvokeNonPublicMethod(typeof(MockerCommand), command, "PingResponseHandler",
+            RedisChannel.Literal("ping-response"), response);
+
+        var instances = (IList<string>)GetField(typeof(MockerCommand), command, "_serverInstanceNames");
+
+        Assert.That(instances, Has.Count.EqualTo(1));
+    }
+
+    [Test]
     public void PingResponseHandler_WithDifferentCommandId_IgnoresResponse()
     {
         var command = CreateUninitializedTriggerCommand();
@@ -153,6 +175,29 @@ public class MockerCommandInternalsTests
             (IList<string>)GetField(typeof(MockerCommand), command, "_successfulCommandResponseToServerInstanceNames");
         Assert.That(successfulInstances, Has.Count.EqualTo(1));
         Assert.That(successfulInstances[0], Is.EqualTo("instance-1"));
+    }
+
+    [Test]
+    public void CommandResponseHandler_WithDuplicateSuccessResponse_AddsSuccessfulInstanceOnlyOnce()
+    {
+        var command = CreateUninitializedTriggerCommand();
+        var response = (RedisValue)JsonSerializer.SerializeToUtf8Bytes(new CommandResponse
+        {
+            Id = "cmd-id",
+            Command = CommandType.TriggerAction,
+            ServerInstanceId = "instance-1",
+            Status = Status.Succeeded
+        });
+
+        InvokeNonPublicMethod(typeof(MockerCommand), command, "CommandResponseHandler",
+            RedisChannel.Literal("command-response"), response);
+        InvokeNonPublicMethod(typeof(MockerCommand), command, "CommandResponseHandler",
+            RedisChannel.Literal("command-response"), response);
+
+        var successfulInstances =
+            (IList<string>)GetField(typeof(MockerCommand), command, "_successfulCommandResponseToServerInstanceNames");
+
+        Assert.That(successfulInstances, Has.Count.EqualTo(1));
     }
 
     [Test]

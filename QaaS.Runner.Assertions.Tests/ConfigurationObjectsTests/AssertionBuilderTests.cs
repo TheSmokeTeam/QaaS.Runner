@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using Microsoft.Extensions.Configuration;
 using NUnit.Framework;
 using QaaS.Framework.SDK.ContextObjects;
@@ -99,6 +100,7 @@ public class AssertionBuilderTests
 
         Assert.That(allureReporter, Is.Not.Null);
         Assert.That(allureReporter!.Name, Is.EqualTo("assertion-display"));
+        Assert.That(allureReporter.AssertionName, Is.EqualTo("assertion-display"));
         Assert.That(allureReporter.Context, Is.SameAs(context));
         Assert.That(allureReporter.SaveSessionData, Is.False);
         Assert.That(allureReporter.SaveAttachments, Is.False);
@@ -108,6 +110,22 @@ public class AssertionBuilderTests
         Assert.That(allureReporter.FileSystem, Is.SameAs(fileSystem));
         Assert.That(allureReporter.EpochTestSuiteStartTime,
             Is.EqualTo(new DateTimeOffset(startTime, TimeSpan.Zero).ToUnixTimeMilliseconds()));
+    }
+
+    [Test]
+    public void BuildReporters_ReturnsSingleReporterTargetingTheAssertion()
+    {
+        var builder = CreateBuilder().Named("assertion-display");
+        var context = new Context
+        {
+            Logger = Globals.Logger,
+            RootConfiguration = new ConfigurationBuilder().Build()
+        };
+
+        var reporters = builder.BuildReporters(context, new DateTime(2025, 1, 1, 10, 0, 0, DateTimeKind.Utc)).ToList();
+
+        Assert.That(reporters, Has.Count.EqualTo(1));
+        Assert.That(reporters[0].AssertionName, Is.EqualTo("assertion-display"));
     }
 
     [Test]
