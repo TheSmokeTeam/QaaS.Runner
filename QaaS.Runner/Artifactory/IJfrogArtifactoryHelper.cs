@@ -7,6 +7,17 @@ public interface IJfrogArtifactoryHelper
 {
     /// <summary>
     ///     Gets the paths to all files under the given artifactory folder recursively,
+    ///     meaning sub files will also be given.
+    /// </summary>
+    /// <param name="artifactoryFolderUrl"> The url to the jfrog artifactory folder </param>
+    /// <param name="httpClient"> The http client to perform get requests on the artifactory with </param>
+    /// <param name="cancellationToken"> Cancellation token controlling the recursive fetch. </param>
+    /// <returns> The urls to all child files under the given artifactoryFolderUrl. </returns>
+    public Task<IReadOnlyList<string>> GetUrlsToAllFilesInArtifactoryFolderAsync(string artifactoryFolderUrl,
+        HttpClient httpClient, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    ///     Gets the paths to all files under the given artifactory folder recursively,
     ///     meaning sub files will also be given
     /// </summary>
     /// <param name="artifactoryFolderUrl"> The url to the jfrog artifactory folder </param>

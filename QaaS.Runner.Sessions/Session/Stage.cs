@@ -83,6 +83,7 @@ public class Stage
             Actions.Select(action =>
                 SessionExtensions.CreateTaskFromAction(_context, action, _sessionName, _actionFailures)).ToList();
         stageTasks.ForEach(task => task.Start());
+        Task.WhenAll(stageTasks).GetAwaiter().GetResult();
 
         _context.Logger.LogInformation(
             "Finished Session {SessionName}'s stage number {StageNumber}. Sleeping {WaitTimeMs} milliseconds",

@@ -49,18 +49,17 @@ public sealed class Publisher : BasePublisher
     /// <inheritdoc />
     protected override bool Publish(InternalCommunicationData<object> actData)
     {
-        var dataToPublish = IterableSerializableSaveIterator.IterateEnumerable();
-        var publishedItemIndex = 0;
-        DetailedData<object>? sentData;
+        var dataToPublish = IterableSerializableSaveIterator.IterateWithOriginal();
 
         try
         {
-            IterableSerializableSaveIterator.ApplyToAll(dataToPublish, data =>
+            IterableSerializableSaveIterator.ApplyToAll(dataToPublish, dataPair =>
             {
+                DetailedData<object>? sentData;
                 try
                 {
                     ParallelismSemaphore?.Wait();
-                    sentData = _sender!.Send(data);
+                    sentData = _sender!.Send(dataPair.Serialized);
                 }
                 finally
                 {
@@ -69,10 +68,8 @@ public sealed class Publisher : BasePublisher
 
                 LogData(
                     actData,
-                    IterableSerializableSaveIterator.GetDataBeforeSerialization(publishedItemIndex)
-                        .CloneDetailed(sentData?.Timestamp)
+                    dataPair.Original.CloneDetailed(sentData?.Timestamp)
                 );
-                Interlocked.Increment(ref publishedItemIndex);
                 if (Policies?.RunChain() == false)
                     throw new StopActionException("Policy ruled to be stopped");
             }, Parallelism != null);
