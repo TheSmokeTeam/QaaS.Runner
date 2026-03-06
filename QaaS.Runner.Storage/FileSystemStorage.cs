@@ -22,7 +22,7 @@ public class FileSystemStorage : BaseStorage
     {
         var directoryFullPath = GetDirectoryFullPath(caseName);
         _context.Logger.LogInformation(
-            "Storing {NumberOfSessionDataItemsToStore} session data items at {DirectoryPath}",
+            "Storing {SessionCount} session data item(s) in directory {DirectoryPath}",
             sessionFileNameAndSerializedSessionDataItemsToStorePair.Count, directoryFullPath);
 
         foreach (var fileNameSerializedSessionDataPair in sessionFileNameAndSerializedSessionDataItemsToStorePair)
@@ -35,7 +35,7 @@ public class FileSystemStorage : BaseStorage
             if (!_fileSystem.Directory.Exists(sessionDataDirectoryPath))
                 _fileSystem.Directory.CreateDirectory(sessionDataDirectoryPath);
 
-            _context.Logger.LogDebug("Storing sessionData at file {SessionDataFilePath}", sessionDataFilePath);
+            _context.Logger.LogDebug("Writing session data file {SessionDataFilePath}", sessionDataFilePath);
             _fileSystem.File.WriteAllBytes(sessionDataFilePath, fileNameSerializedSessionDataPair.Value);
         }
     }
@@ -45,14 +45,15 @@ public class FileSystemStorage : BaseStorage
         var directoryFullPath = GetDirectoryFullPath(caseName);
         if (!_fileSystem.Directory.Exists(directoryFullPath))
         {
-            _context.Logger.LogWarning("Storage directory {DirectoryPath} was not found during retrieval",
+            _context.Logger.LogWarning("Storage directory {DirectoryPath} was not found during retrieval. Returning no session data.",
                 directoryFullPath);
             return [];
         }
 
         var files = _fileSystem.Directory.GetFiles(directoryFullPath,
             _configuration.SearchPattern, SearchOption.AllDirectories);
-        _context.Logger.LogInformation("Found {FileCount} files to retrieve", files.Length);
+        _context.Logger.LogInformation("Found {FileCount} file(s) to retrieve from {DirectoryPath}",
+            files.Length, directoryFullPath);
         return files.Select(file => _fileSystem.File.ReadAllBytes(file));
     }
 

@@ -112,8 +112,7 @@ public class AllureReporter : BaseReporter
         const string sessionAttachmentsDirectory = "SessionsData";
         var sessionDataAttachmentDirectory = GetAttachmentDirectory(sessionAttachmentsDirectory);
         var attachmentFile = $"{sessionData.Name}.json";
-        Context.Logger.LogDebug("Storing {SessionName} session data items relevant to the assertion as attachments"
-            , sessionData.Name);
+        Context.Logger.LogDebug("Saving session data for {SessionName} as an Allure attachment", sessionData.Name);
         return SaveDataToAllure(data: SessionDataSerialization.SerializeSessionData(sessionData,
                 new JsonSerializerOptions
                 {
@@ -130,7 +129,7 @@ public class AllureReporter : BaseReporter
         const string attachmentFile = "template.yaml";
         const string templateAttachmentsDirectory = "Templates";
         var templateAttachmentsDirectoryFullPath = GetAttachmentDirectory(templateAttachmentsDirectory);
-        Context.Logger.LogDebug("Storing qaas-template result - relevant to the assertion - as attachments");
+        Context.Logger.LogDebug("Saving the execution configuration template as an Allure attachment");
         return SaveDataToAllure(
             data: Encoding.UTF8.GetBytes(
                 configuration.BuildConfigurationAsYaml(Infrastructure.Constants.ConfigurationSectionNames)),
@@ -147,7 +146,7 @@ public class AllureReporter : BaseReporter
             assertionResult.Assertion.Name);
 
         var attachments = new List<Attachment>();
-        Context.Logger.LogDebug("Storing {AssertionName} assertion's attachments",
+        Context.Logger.LogDebug("Saving custom assertion attachments for {AssertionName}",
             assertionResult.Assertion.Name);
 
         // validating unique paths

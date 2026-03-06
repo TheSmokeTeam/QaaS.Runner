@@ -32,7 +32,7 @@ public class Probe : StagedAction
 
     internal override InternalCommunicationData<object> Act()
     {
-        Logger.LogDebug("Acting probe action {ActionName} ", Name);
+        Logger.LogDebug("Running probe {ActionName}", Name);
         ProbeHook.Run(SessionDataList.ToImmutableList(), DataSources.ToImmutableList());
         // probe doesn't initialize either input and output
         return new InternalCommunicationData<object>();
@@ -58,5 +58,7 @@ public class Probe : StagedAction
                 NameFilters.DataSource,
                 "DataSource List")).ToList();
         SessionDataList = ranSessions.Where(sessionData => sessionData != null).ToList()!;
+        Logger.LogDebug("Prepared probe {ActionName}. SessionCount={SessionCount}, DataSourceCount={DataSourceCount}",
+            Name, SessionDataList.Count, DataSources.Count);
     }
 }

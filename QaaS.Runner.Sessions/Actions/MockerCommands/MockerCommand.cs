@@ -100,7 +100,7 @@ public abstract class MockerCommand : StagedAction
 
         Logger.LogInformation("Found {ServerInstances} instances for server {ServerName}", serverInstanceNames.Count,
             ServerName);
-        Logger.LogDebug("All servers instances found for server {ServerName}: {ServerInstances}",
+        Logger.LogDebug("Discovered mocker instances for server {ServerName}: {ServerInstances}",
             ServerName, string.Join(", ", serverInstanceNames));
 
         CommandTheMockerInstances();
@@ -151,7 +151,8 @@ public abstract class MockerCommand : StagedAction
 
         for (var retryIndex = 1; retryIndex <= _requestRetries; retryIndex++)
         {
-            Logger.LogDebug("Ping Request {RetryIndex}", retryIndex);
+            Logger.LogDebug("Publishing ping request attempt {Attempt}/{MaxAttempts} for server {ServerName}",
+                retryIndex, _requestRetries, ServerName);
             _redisSubscriber.Publish(RedisChannel.Literal(pingRequestChannel), PingRequestConstructor());
             if (GetServerInstanceNamesSnapshot().Count != 0)
                 break;
@@ -160,7 +161,7 @@ public abstract class MockerCommand : StagedAction
         }
 
         _redisSubscriber.UnsubscribeAllAsync();
-        Logger.LogDebug("Unsubscribed to all channels");
+        Logger.LogDebug("Unsubscribed from ping response channels for server {ServerName}", ServerName);
 
         lock (ResponseStateLock)
         {
@@ -184,7 +185,7 @@ public abstract class MockerCommand : StagedAction
     /// </summary>
     private void PingResponseHandler(RedisChannel channel, RedisValue serializedMessage)
     {
-        Logger.LogDebug("Ping channel '{Channel}' response: '{SerializedMessage}'", channel, serializedMessage);
+        Logger.LogDebug("Received ping response on channel {Channel}", channel);
         var pingResponse = JsonSerializer.Deserialize<PingResponse>((byte[])serializedMessage!)!;
         if (pingResponse.Id != _commandId) return;
         if (pingResponse.ServerName != ServerName) return;
@@ -231,7 +232,8 @@ public abstract class MockerCommand : StagedAction
 
         for (var retryIndex = 1; retryIndex <= _requestRetries; retryIndex++)
         {
-            Logger.LogDebug("Command Request {RetryIndex}", retryIndex);
+            Logger.LogDebug("Publishing command request attempt {Attempt}/{MaxAttempts} for server {ServerName}",
+                retryIndex, _requestRetries, ServerName);
             foreach (var serverInstance in serverInstances)
             {
                 var requestChannel = CommunicationMethods.CreateChannelRunnerToMocker(CommandContentType,
@@ -247,7 +249,7 @@ public abstract class MockerCommand : StagedAction
         }
 
         _redisSubscriber.UnsubscribeAllAsync();
-        Logger.LogDebug("Unsubscribed to all channels");
+        Logger.LogDebug("Unsubscribed from command response channels for server {ServerName}", ServerName);
     }
 
     private bool AllCommandsRequestsAreSuccessful()
@@ -284,7 +286,7 @@ public abstract class MockerCommand : StagedAction
     /// </summary>
     private void CommandResponseHandler(RedisChannel channel, RedisValue serializedMessage)
     {
-        Logger.LogDebug("Command channel '{Channel}' response: '{SerializedMessage}'", channel, serializedMessage);
+        Logger.LogDebug("Received command response on channel {Channel}", channel);
         var commandResponse = JsonSerializer.Deserialize<CommandResponse>((byte[])serializedMessage!)!;
         if (commandResponse.Id != _commandId) return;
         if (commandResponse.Command != CommandType) return;
