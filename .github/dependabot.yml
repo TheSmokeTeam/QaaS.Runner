@@ -1,0 +1,10 @@
+version: 2
+updates:
+  - package-ecosystem: "nuget"
+    directory: "/"
+    schedule:
+      interval: "monthly"
+    ignore:
+      - dependency-name: "*"
+        # This ignores any version containing a hyphen (standard for pre-releases)
+        versions: ["*-*"]
