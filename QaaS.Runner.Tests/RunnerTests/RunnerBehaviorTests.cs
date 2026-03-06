@@ -5,6 +5,7 @@ using Moq;
 using NUnit.Framework;
 using QaaS.Framework.SDK;
 using QaaS.Framework.SDK.ContextObjects;
+using QaaS.Framework.SDK.Extensions;
 using QaaS.Framework.SDK.ExecutionObjects;
 using QaaS.Framework.SDK.Session.SessionDataObjects;
 using QaaS.Framework.SDK.Session.SessionDataObjects.RunningSessionsObjects;
@@ -304,7 +305,7 @@ public class RunnerBehaviorTests
             RootConfiguration = new ConfigurationBuilder().Build(),
             InternalRunningSessions = new RunningSessions(new Dictionary<string, RunningSessionData<object, object>>())
         };
-        context.InsertValueIntoGlobalDictionary([nameof(MetaDataConfig)], new MetaDataConfig
+        context.InsertValueIntoGlobalDictionary(context.GetMetaDataPath(), new MetaDataConfig
         {
             Team = "Smoke",
             System = "QaaS"
