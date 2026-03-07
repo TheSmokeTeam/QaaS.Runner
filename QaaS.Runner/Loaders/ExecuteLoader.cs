@@ -7,6 +7,7 @@ using QaaS.Framework.Configurations.ConfigurationBuilderExtensions;
 using QaaS.Framework.Executions.Loaders;
 using QaaS.Framework.SDK.Session.SessionDataObjects;
 using QaaS.Framework.SDK.Session.SessionDataObjects.RunningSessionsObjects;
+using QaaS.Runner.Assertions;
 using QaaS.Runner.ConfigurationObjects;
 using QaaS.Runner.WrappedExternals;
 using ExecuteOptions = QaaS.Runner.Options.ExecuteOptions;
@@ -44,6 +45,7 @@ public class ExecuteLoader<TRunner> : BaseLoader<ExecuteOptions, TRunner> where 
         return parentScope.BeginLifetimeScope(scope =>
         {
             scope.RegisterInstance(new AllureWrapper()).SingleInstance();
+            scope.RegisterType<ReportPortalLaunchManager>().SingleInstance();
             scope.RegisterInstance(new RunningSessions(new Dictionary<string, RunningSessionData<object, object>>()))
                 .As<IInternalRunningSessions>();
 

@@ -6,6 +6,7 @@ using QaaS.Framework.Executions.Loaders;
 using QaaS.Framework.SDK.ContextObjects;
 using QaaS.Framework.SDK.Session.SessionDataObjects;
 using QaaS.Framework.SDK.Session.SessionDataObjects.RunningSessionsObjects;
+using QaaS.Runner.Assertions;
 using QaaS.Runner.Artifactory;
 using QaaS.Runner.Options;
 using QaaS.Runner.WrappedExternals;
@@ -120,6 +121,7 @@ public class RunLoader<TRunner, TOptions> : BaseLoader<TOptions, TRunner>
         return new ContainerBuilder().Build().BeginLifetimeScope(scope =>
         {
             scope.RegisterInstance(new AllureWrapper()).SingleInstance();
+            scope.RegisterType<ReportPortalLaunchManager>().SingleInstance();
             scope.RegisterInstance(new RunningSessions(new Dictionary<string, RunningSessionData<object, object>>()))
                 .As<IInternalRunningSessions>();
             // Must not be single instance so it builds a new configuration builder for every context

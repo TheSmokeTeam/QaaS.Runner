@@ -1,6 +1,7 @@
 using Autofac;
 using Microsoft.Extensions.Logging;
 using QaaS.Framework.Executions;
+using QaaS.Runner.Assertions;
 using QaaS.Runner.WrappedExternals;
 using ILogger = Microsoft.Extensions.Logging.ILogger;
 
@@ -112,6 +113,13 @@ public class Runner : IRunner, IDisposable
     protected virtual void Teardown()
     {
         Logger.LogDebug("Runner teardown started");
+        if (Scope.IsRegistered<ReportPortalLaunchManager>())
+        {
+            var reportPortalLaunchManager = Scope.Resolve<ReportPortalLaunchManager>();
+            Logger.LogDebug("Finishing ReportPortal launch before teardown completes");
+            reportPortalLaunchManager.FinishLaunchAsync(Logger).GetAwaiter().GetResult();
+        }
+
         // Disposing logger to enable sending logs to elastic
         if (SerilogLogger is IDisposable disposableLogger)
         {
@@ -164,12 +172,17 @@ public class Runner : IRunner, IDisposable
     {
         Logger.LogInformation("Building {ExecutionCount} executions", ExecutionBuilders.Count);
         var globalDict = new Dictionary<string, object?>();
+        var reportPortalLaunchManager = Scope.IsRegistered<ReportPortalLaunchManager>()
+            ? Scope.Resolve<ReportPortalLaunchManager>()
+            : null;
         // Builders share a single global dictionary so metadata and runtime values written by one
         // execution are visible to later executions in the same runner invocation.
         ExecutionBuilders.ForEach(builder => builder.WithGlobalDict(globalDict));
 
         // passing the same logger reference to every builder
         ExecutionBuilders.ForEach(builder => builder.WithLogger(Logger));
+        if (reportPortalLaunchManager is not null)
+            ExecutionBuilders.ForEach(builder => builder.WithReportPortalLaunchManager(reportPortalLaunchManager));
         var executions = ExecutionBuilders.Select(builder => builder.Build()).ToList();
         Logger.LogInformation("Built {ExecutionCount} executions successfully", executions.Count);
         return executions;

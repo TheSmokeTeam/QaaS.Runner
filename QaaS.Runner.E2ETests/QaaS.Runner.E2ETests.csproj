@@ -27,6 +27,9 @@
         <None Update="test.rabbit.qaas.yaml">
             <CopyToOutputDirectory>Always</CopyToOutputDirectory>
         </None>
+        <None Update="reportportal.e2e.qaas.yaml">
+            <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+        </None>
         <None Update="executable.yaml">
             <CopyToOutputDirectory>Always</CopyToOutputDirectory>
         </None>

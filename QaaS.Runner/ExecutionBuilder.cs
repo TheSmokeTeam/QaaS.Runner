@@ -98,6 +98,12 @@ public class ExecutionBuilder() : BaseExecutionBuilder<InternalContext, Executio
     [Description("The metadata for the tests' run")]
     public MetaDataConfig? MetaData { get; internal set; }
 
+    /// <summary>
+    /// Optional configuration for publishing the same assertion results to ReportPortal.
+    /// </summary>
+    [Description("Optional configuration for publishing the same assertion results to ReportPortal.")]
+    public ReportPortalConfig? ReportPortal { get; internal set; }
+
     private ExecutionType Type { get; set; }
 
     private bool LoadedContext { get; }
@@ -119,6 +125,7 @@ public class ExecutionBuilder() : BaseExecutionBuilder<InternalContext, Executio
     private string? _configuredCaseName;
     private string? _configuredExecutionId;
     private Dictionary<string, object?> _globalDict = new();
+    private ReportPortalLaunchManager? _reportPortalLaunchManager;
 
     internal ExecutionBuilder(InternalContext context, ExecutionType executionType, IList<string>? sessionNamesToRun,
         IList<string>? sessionCategoriesToRun, IList<string>? assertionNamesToRun,
@@ -137,6 +144,7 @@ public class ExecutionBuilder() : BaseExecutionBuilder<InternalContext, Executio
         Sessions = blankRunBuilderFromContext.Sessions;
         Links = blankRunBuilderFromContext.Links;
         MetaData = blankRunBuilderFromContext.MetaData;
+        ReportPortal = blankRunBuilderFromContext.ReportPortal;
 
         _sessionNamesToRun = sessionNamesToRun != null && !sessionNamesToRun.Any() ? null : sessionNamesToRun;
         _sessionCategoriesToRun = sessionCategoriesToRun != null && !sessionCategoriesToRun.Any()
@@ -199,8 +207,9 @@ public class ExecutionBuilder() : BaseExecutionBuilder<InternalContext, Executio
     private IEnumerable<IReporter> BuildReports()
     {
         if (Assertions is null) return [];
+        var reportPortalSettings = ReportPortalConfig.Resolve(ReportPortal);
         var resolvedReports = Assertions.SelectMany(assertionReport =>
-            assertionReport.BuildReporters(Context, DateTime.UtcNow));
+            assertionReport.BuildReporters(Context, DateTime.UtcNow, reportPortalSettings, _reportPortalLaunchManager));
         return resolvedReports;
     }
 
@@ -367,6 +376,12 @@ public class ExecutionBuilder() : BaseExecutionBuilder<InternalContext, Executio
     internal ExecutionBuilder WithLogger(ILogger logger)
     {
         _configuredLogger = logger;
+        return this;
+    }
+
+    internal ExecutionBuilder WithReportPortalLaunchManager(ReportPortalLaunchManager reportPortalLaunchManager)
+    {
+        _reportPortalLaunchManager = reportPortalLaunchManager;
         return this;
     }
 

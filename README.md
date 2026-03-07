@@ -27,12 +27,13 @@ This repository contains one solution: [`QaaS.Runner.sln`](./QaaS.Runner.sln).
 ### [QaaS.Runner](./QaaS.Runner/)
 - CLI/bootstrap entrypoint for `run`, `act`, `assert`, `template`, and `execute` verbs.
 - Builds execution contexts and routes each execution type through the right logic chain.
-- Orchestrates setup/teardown and optional Allure result serving.
+- Orchestrates setup/teardown, optional Allure result serving, and optional ReportPortal launch finalization.
 
 ### [QaaS.Runner.Assertions](./QaaS.Runner.Assertions/)
 - Builds assertion runtime objects from configured hooks and filters.
 - Executes assertions against session/data-source outputs.
 - Writes Allure results, links, and attachments.
+- Can also publish the same runner-produced assertion results into ReportPortal.
 
 ### [QaaS.Runner.Sessions](./QaaS.Runner.Sessions/)
 - Session runtime with staged action execution.
@@ -65,3 +66,4 @@ dotnet restore
 - Official docs: [thesmoketeam.github.io/qaas-docs](https://thesmoketeam.github.io/qaas-docs/)
 - CI workflow: [`.github/workflows/ci.yml`](./.github/workflows/ci.yml)
 - NuGet package page: [QaaS.Runner on NuGet](https://www.nuget.org/packages/QaaS.Runner/)
+- ReportPortal integration: [`docs/reportportal-integration.md`](./docs/reportportal-integration.md)

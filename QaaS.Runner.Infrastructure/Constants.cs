@@ -17,6 +17,7 @@ public static class Constants
         "DataSources",
         "Sessions",
         "Assertions",
+        "ReportPortal",
         "Links",
         "MetaData"
     ];

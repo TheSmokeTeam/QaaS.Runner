@@ -1,0 +1,29 @@
+MetaData:
+  Team: Smoke
+  System: QaaS
+
+ReportPortal:
+  Enabled: true
+  LaunchName: QaaS Runner E2E
+  Description: End-to-end runner validation for dual Allure and ReportPortal reporting.
+  DebugMode: true
+  Attributes:
+    Environment: local
+    Source: e2e
+
+DataSources:
+  - Name: TestDataSource
+    Generator: TestGenerator
+    GeneratorConfiguration:
+      Count: 3
+      ComplexConfigList:
+        - SomeItem: ItemA
+
+Assertions:
+  - Name: ReportPortalPassedAssertion
+    Assertion: PassedAssertion
+
+  - Name: ReportPortalDataSourceAssertion
+    Assertion: WithDataSourceAssertion
+    DataSourceNames:
+      - TestDataSource
