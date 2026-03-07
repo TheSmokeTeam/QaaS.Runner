@@ -144,7 +144,7 @@ public class AssertionBuilderTests
             Endpoint = "http://localhost:8080",
             Project = "QaaS",
             ApiKey = "api-key"
-        });
+        }, CreateRunDescriptor());
         using var launchManager = new ReportPortalLaunchManager();
 
         var reporters = builder.BuildReporters(
@@ -175,7 +175,7 @@ public class AssertionBuilderTests
             Endpoint = "http://localhost:8080",
             Project = "QaaS",
             ApiKey = "api-key"
-        });
+        }, CreateRunDescriptor());
 
         Assert.Throws<InvalidOperationException>(() =>
             builder.BuildReporters(
@@ -201,5 +201,15 @@ public class AssertionBuilderTests
             AssertionInstance = null!,
             Reporter = null!
         };
+    }
+
+    private static ReportPortalRunDescriptor CreateRunDescriptor()
+    {
+        return new ReportPortalRunDescriptor(
+            "Smoke",
+            "QaaS",
+            ["session-1"],
+            "run",
+            new DateTimeOffset(2025, 1, 1, 10, 0, 0, TimeSpan.Zero));
     }
 }

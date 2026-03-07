@@ -83,7 +83,8 @@ public class ExecutionBuilderTests
             .SetCase("case-stage")
             .WithLogger(Globals.Logger)
             .WithGlobalDict(new Dictionary<string, object?>())
-            .WithMetadata(new MetaDataConfig { Team = "Smoke", System = "QaaS" });
+            .WithMetadata(new MetaDataConfig { Team = "Smoke", System = "QaaS" })
+            .WithReportPortal(new ReportPortalConfig { Enabled = false });
 
         _ = builder.Build();
 
@@ -175,7 +176,8 @@ public class ExecutionBuilderTests
             .SetCase("probe-scope-case")
             .WithLogger(Globals.Logger)
             .WithGlobalDict(new Dictionary<string, object?>())
-            .WithMetadata(new MetaDataConfig { Team = "Smoke", System = "QaaS" });
+            .WithMetadata(new MetaDataConfig { Team = "Smoke", System = "QaaS" })
+            .WithReportPortal(new ReportPortalConfig { Enabled = false });
 
         var execution = builder.Build();
         var exitCode = execution.Start();
@@ -206,7 +208,8 @@ public class ExecutionBuilderTests
             .SetCase("invalid-probe-name-case")
             .WithLogger(Globals.Logger)
             .WithGlobalDict(new Dictionary<string, object?>())
-            .WithMetadata(new MetaDataConfig { Team = "Smoke", System = "QaaS" });
+            .WithMetadata(new MetaDataConfig { Team = "Smoke", System = "QaaS" })
+            .WithReportPortal(new ReportPortalConfig { Enabled = false });
 
         Assert.Throws<InvalidConfigurationsException>(() => builder.Build());
     }
@@ -216,6 +219,7 @@ public class ExecutionBuilderTests
     {
         var context = CreateLoadedContext(new Dictionary<string, string?>
         {
+            ["ReportPortal:Enabled"] = "false",
             ["Sessions:0:Name"] = "context-session"
         });
         var builder = new ExecutionBuilder(context, ExecutionType.Run, null, null, null, null);
@@ -229,6 +233,7 @@ public class ExecutionBuilderTests
         var context = CreateLoadedContext(new Dictionary<string, string?>
         {
             ["MetaData:System"] = "QaaS",
+            ["ReportPortal:Enabled"] = "false",
             ["Sessions:0:Name"] = "context-session"
         });
         var builder = new ExecutionBuilder(context, ExecutionType.Run, null, null, null, null);
@@ -284,7 +289,8 @@ public class ExecutionBuilderTests
 
         return builder.SetExecutionId("test").SetCase("valid").WithLogger(Globals.Logger)
             .WithMetadata(new MetaDataConfig { Team = "Smoke", System = "QaaS" })
-            .WithGlobalDict(new Dictionary<string, object?>());
+            .WithGlobalDict(new Dictionary<string, object?>())
+            .WithReportPortal(new ReportPortalConfig { Enabled = false });
     }
 
     private ExecutionBuilder CreateInvalidExecutionBuilder()
@@ -321,7 +327,8 @@ public class ExecutionBuilderTests
 
         return builder.ExecutionType(ExecutionType.Run).SetExecutionId("test").SetCase("invalid")
             .WithLogger(Globals.Logger).WithGlobalDict(new Dictionary<string, object?>())
-            .WithMetadata(new MetaDataConfig { System = "QaaS", Team = "Smoke" });
+            .WithMetadata(new MetaDataConfig { System = "QaaS", Team = "Smoke" })
+            .WithReportPortal(new ReportPortalConfig { Enabled = false });
     }
 
     private static InternalContext CreateLoadedContext(IConfiguration configuration)

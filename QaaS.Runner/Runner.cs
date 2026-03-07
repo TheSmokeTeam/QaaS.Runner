@@ -2,6 +2,7 @@ using Autofac;
 using Microsoft.Extensions.Logging;
 using QaaS.Framework.Executions;
 using QaaS.Runner.Assertions;
+using QaaS.Runner.Assertions.ConfigurationObjects;
 using QaaS.Runner.WrappedExternals;
 using ILogger = Microsoft.Extensions.Logging.ILogger;
 
@@ -178,6 +179,7 @@ public class Runner : IRunner, IDisposable
         var reportPortalLaunchManager = Scope.IsRegistered<ReportPortalLaunchManager>()
             ? Scope.Resolve<ReportPortalLaunchManager>()
             : null;
+        var reportPortalRunDescriptor = BuildReportPortalRunDescriptor();
         // Builders share a single global dictionary so metadata and runtime values written by one
         // execution are visible to later executions in the same runner invocation.
         ExecutionBuilders.ForEach(builder => builder.WithGlobalDict(globalDict));
@@ -186,6 +188,8 @@ public class Runner : IRunner, IDisposable
         ExecutionBuilders.ForEach(builder => builder.WithLogger(Logger));
         if (reportPortalLaunchManager is not null)
             ExecutionBuilders.ForEach(builder => builder.WithReportPortalLaunchManager(reportPortalLaunchManager));
+        if (reportPortalRunDescriptor is not null)
+            ExecutionBuilders.ForEach(builder => builder.WithReportPortalRunDescriptor(reportPortalRunDescriptor));
         var executions = ExecutionBuilders.Select(builder => builder.Build()).ToList();
         Logger.LogInformation("Built {ExecutionCount} executions successfully", executions.Count);
         return executions;
@@ -222,5 +226,104 @@ public class Runner : IRunner, IDisposable
         Logger.LogDebug("Disposing runner scope");
         Scope.Dispose();
         GC.SuppressFinalize(this);
+    }
+
+    /// <summary>
+    /// Builds the runner-scoped ReportPortal launch descriptor used by every execution builder in this invocation.
+    /// The descriptor enforces one project/team per run and provides stable launch naming defaults.
+    /// </summary>
+    private ReportPortalRunDescriptor? BuildReportPortalRunDescriptor()
+    {
+        var startedAtLocal = DateTimeOffset.Now;
+        var builderSettings = ExecutionBuilders
+            .Select(builder => new
+            {
+                Builder = builder,
+                Settings = ReportPortalConfig.Resolve(builder.ReportPortal, BuildSingleBuilderRunDescriptor(builder, startedAtLocal))
+            })
+            .Where(item => item.Settings.Enabled)
+            .ToList();
+
+        if (builderSettings.Count == 0)
+        {
+            Logger.LogDebug("ReportPortal is disabled for all execution builders in this runner invocation.");
+            return null;
+        }
+
+        var distinctTeams = builderSettings
+            .Select(item => item.Builder.MetaData?.Team?.Trim())
+            .Where(team => !string.IsNullOrWhiteSpace(team))
+            .Distinct(StringComparer.Ordinal)
+            .ToList();
+        if (distinctTeams.Count > 1)
+        {
+            throw new InvalidOperationException(
+                "A single runner invocation cannot mix multiple MetaData.Team values when ReportPortal reporting is enabled. " +
+                $"Resolved teams: {string.Join(", ", distinctTeams)}");
+        }
+
+        var distinctProjects = builderSettings.Select(item => item.Settings.Project)
+            .Distinct(StringComparer.Ordinal)
+            .ToList();
+        if (distinctProjects.Count > 1)
+        {
+            throw new InvalidOperationException(
+                "A single runner invocation cannot publish to multiple ReportPortal projects. " +
+                $"Resolved projects: {string.Join(", ", distinctProjects)}");
+        }
+
+        var distinctSystems = builderSettings
+            .Select(item => item.Builder.MetaData?.System?.Trim())
+            .Where(system => !string.IsNullOrWhiteSpace(system))
+            .Distinct(StringComparer.Ordinal)
+            .ToList();
+        var systemName = distinctSystems.Count switch
+        {
+            0 => "Unknown System",
+            1 => distinctSystems[0]!,
+            _ => "Mixed Systems"
+        };
+
+        var sessionNames = builderSettings
+            .SelectMany(item => item.Builder.ReadSessions())
+            .Select(session => session.Name)
+            .Where(sessionName => !string.IsNullOrWhiteSpace(sessionName))
+            .Select(sessionName => sessionName!)
+            .Distinct(StringComparer.Ordinal)
+            .OrderBy(sessionName => sessionName, StringComparer.Ordinal)
+            .ToArray();
+        var executionModes = builderSettings.Select(item => item.Builder.ReadExecutionType().ToString().ToLowerInvariant())
+            .Distinct(StringComparer.Ordinal)
+            .ToList();
+        var executionMode = executionModes.Count == 1 ? executionModes[0] : "mixed";
+        var descriptor = new ReportPortalRunDescriptor(
+            distinctTeams.SingleOrDefault(),
+            systemName,
+            sessionNames,
+            executionMode,
+            startedAtLocal);
+
+        Logger.LogDebug(
+            "Built ReportPortal run descriptor for project {ProjectName}. Team={TeamName}, System={SystemName}, Sessions=[{SessionNames}], ExecutionMode={ExecutionMode}",
+            distinctProjects[0], descriptor.TeamName ?? "<none>", descriptor.SystemName, string.Join(", ", descriptor.SessionNames),
+            descriptor.ExecutionMode);
+        return descriptor;
+    }
+
+    private static ReportPortalRunDescriptor BuildSingleBuilderRunDescriptor(ExecutionBuilder builder,
+        DateTimeOffset startedAtLocal)
+    {
+        var sessionNames = builder.ReadSessions()
+            .Select(session => session.Name)
+            .Where(sessionName => !string.IsNullOrWhiteSpace(sessionName))
+            .Select(sessionName => sessionName!)
+            .ToArray();
+
+        return new ReportPortalRunDescriptor(
+            builder.MetaData?.Team,
+            builder.MetaData?.System,
+            sessionNames,
+            builder.ReadExecutionType().ToString().ToLowerInvariant(),
+            startedAtLocal);
     }
 }

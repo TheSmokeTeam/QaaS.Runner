@@ -14,12 +14,22 @@ namespace QaaS.Runner.Assertions;
 public sealed class ReportPortalLaunchManager : IDisposable
 {
     private readonly SemaphoreSlim _launchLock = new(1, 1);
+    private readonly ReportPortalProvisioningClient _provisioningClient;
     private Service? _service;
     private string? _launchUuid;
     private ReportPortalSettings? _settings;
     private DateTime _launchStartTimeUtc;
     private bool _launchFinished;
     private bool _disposed;
+
+    public ReportPortalLaunchManager() : this(new ReportPortalProvisioningClient())
+    {
+    }
+
+    internal ReportPortalLaunchManager(ReportPortalProvisioningClient provisioningClient)
+    {
+        _provisioningClient = provisioningClient;
+    }
 
     /// <summary>
     /// Starts the shared ReportPortal launch on first use and returns the launch context required by reporters.
@@ -52,7 +62,10 @@ public sealed class ReportPortalLaunchManager : IDisposable
             settings.Validate();
             _settings = settings;
             _launchStartTimeUtc = DateTime.UtcNow;
-            _service = new Service(new Uri(settings.Endpoint!, UriKind.Absolute), settings.Project!, settings.ApiKey!);
+            var provisioningResult = await _provisioningClient
+                .EnsureProjectAccessAsync(settings, logger, cancellationToken)
+                .ConfigureAwait(false);
+            _service = new Service(settings.EndpointUri, provisioningResult.Project, provisioningResult.ApiKey);
 
             try
             {
@@ -68,7 +81,7 @@ public sealed class ReportPortalLaunchManager : IDisposable
                 _launchUuid = launch.Uuid;
                 logger.LogInformation(
                     "Started ReportPortal launch {LaunchUuid} in project {ProjectName} using endpoint {Endpoint}",
-                    _launchUuid, settings.Project, settings.Endpoint);
+                    _launchUuid, provisioningResult.Project, settings.Endpoint);
 
                 return new ReportPortalLaunchContext(_service, _launchUuid);
             }
@@ -142,6 +155,7 @@ public sealed class ReportPortalLaunchManager : IDisposable
         _disposed = true;
         _launchLock.Dispose();
         _service?.Dispose();
+        _provisioningClient.Dispose();
         GC.SuppressFinalize(this);
     }
 }

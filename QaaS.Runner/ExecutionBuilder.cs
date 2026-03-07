@@ -126,6 +126,7 @@ public class ExecutionBuilder() : BaseExecutionBuilder<InternalContext, Executio
     private string? _configuredExecutionId;
     private Dictionary<string, object?> _globalDict = new();
     private ReportPortalLaunchManager? _reportPortalLaunchManager;
+    private ReportPortalRunDescriptor? _reportPortalRunDescriptor;
 
     internal ExecutionBuilder(InternalContext context, ExecutionType executionType, IList<string>? sessionNamesToRun,
         IList<string>? sessionCategoriesToRun, IList<string>? assertionNamesToRun,
@@ -207,7 +208,14 @@ public class ExecutionBuilder() : BaseExecutionBuilder<InternalContext, Executio
     private IEnumerable<IReporter> BuildReports()
     {
         if (Assertions is null) return [];
-        var reportPortalSettings = ReportPortalConfig.Resolve(ReportPortal);
+        var reportPortalRunDescriptor = _reportPortalRunDescriptor ?? new ReportPortalRunDescriptor(
+            MetaData?.Team,
+            MetaData?.System,
+            ReadSessions().Select(session => session.Name).Where(sessionName => !string.IsNullOrWhiteSpace(sessionName))
+                .Select(sessionName => sessionName!).ToArray(),
+            Type.ToString().ToLowerInvariant(),
+            DateTimeOffset.Now);
+        var reportPortalSettings = ReportPortalConfig.Resolve(ReportPortal, reportPortalRunDescriptor);
         var resolvedReports = Assertions.SelectMany(assertionReport =>
             assertionReport.BuildReporters(Context, DateTime.UtcNow, reportPortalSettings, _reportPortalLaunchManager));
         return resolvedReports;
@@ -385,6 +393,17 @@ public class ExecutionBuilder() : BaseExecutionBuilder<InternalContext, Executio
         return this;
     }
 
+    internal ExecutionBuilder WithReportPortalRunDescriptor(ReportPortalRunDescriptor reportPortalRunDescriptor)
+    {
+        _reportPortalRunDescriptor = reportPortalRunDescriptor;
+        return this;
+    }
+
+    internal ExecutionType ReadExecutionType()
+    {
+        return Type;
+    }
+
     public ExecutionBuilder SetCase(string caseName)
     {
         _configuredCaseName = caseName;
@@ -400,6 +419,12 @@ public class ExecutionBuilder() : BaseExecutionBuilder<InternalContext, Executio
     public ExecutionBuilder WithMetadata(MetaDataConfig metaDataConfig)
     {
         MetaData = metaDataConfig;
+        return this;
+    }
+
+    internal ExecutionBuilder WithReportPortal(ReportPortalConfig reportPortalConfig)
+    {
+        ReportPortal = reportPortalConfig;
         return this;
     }
 

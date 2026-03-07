@@ -254,6 +254,44 @@ public class RunnerBehaviorTests
     }
 
     [Test]
+    public void BuildExecutions_AssignsSharedReportPortalRunDescriptorToAllBuilders()
+    {
+        using var scope = BuildScope();
+        var builders = new List<ExecutionBuilder>
+        {
+            CreateTemplateExecutionBuilder("case-1", team: "Smoke", system: "QaaS"),
+            CreateTemplateExecutionBuilder("case-2", team: "Smoke", system: "QaaS")
+        };
+
+        var runner = new ExposedRunner(scope, builders, Globals.Logger, new Mock<Serilog.ILogger>().Object);
+        _ = runner.InvokeBuildExecutions();
+
+        var descriptorField = typeof(ExecutionBuilder)
+            .GetField("_reportPortalRunDescriptor", BindingFlags.Instance | BindingFlags.NonPublic)!;
+        var firstDescriptor = descriptorField.GetValue(builders[0]);
+        var secondDescriptor = descriptorField.GetValue(builders[1]);
+
+        Assert.That(firstDescriptor, Is.Not.Null);
+        Assert.That(secondDescriptor, Is.SameAs(firstDescriptor));
+    }
+
+    [Test]
+    public void BuildExecutions_WithMixedTeams_ThrowsInvalidOperationException()
+    {
+        using var scope = BuildScope();
+        var builders = new List<ExecutionBuilder>
+        {
+            CreateTemplateExecutionBuilder("case-1", team: "Smoke", system: "QaaS"),
+            CreateTemplateExecutionBuilder("case-2", team: "AnotherTeam", system: "QaaS")
+        };
+        var runner = new ExposedRunner(scope, builders, Globals.Logger, new Mock<Serilog.ILogger>().Object);
+
+        var exception = Assert.Throws<InvalidOperationException>(() => runner.InvokeBuildExecutions());
+
+        Assert.That(exception!.Message, Does.Contain("multiple MetaData.Team values"));
+    }
+
+    [Test]
     public void StartExecutions_WithNoExecutions_ReturnsZero()
     {
         using var scope = BuildScope();
@@ -306,7 +344,8 @@ public class RunnerBehaviorTests
         return markerFile;
     }
 
-    private static ExecutionBuilder CreateTemplateExecutionBuilder(string caseName)
+    private static ExecutionBuilder CreateTemplateExecutionBuilder(string caseName, string team = "Smoke",
+        string system = "QaaS")
     {
         return new ExecutionBuilder()
             .ExecutionType(ExecutionType.Template)
@@ -314,8 +353,8 @@ public class RunnerBehaviorTests
             .SetCase(caseName)
             .WithMetadata(new MetaDataConfig
             {
-                Team = "Smoke",
-                System = "QaaS"
+                Team = team,
+                System = system
             });
     }
 

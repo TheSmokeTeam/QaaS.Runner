@@ -263,8 +263,30 @@ public class ReportPortalReporter : BaseReporter
             {
                 Key = "severity",
                 Value = AssertionSeverityToAttributeValueMap[Severity]
+            },
+            new()
+            {
+                Key = "team",
+                Value = Settings.Team
+            },
+            new()
+            {
+                Key = "system",
+                Value = Settings.System
             }
         };
+
+        foreach (var sessionName in assertionResult.Assertion.SessionDataList
+                     .Select(session => session.Name)
+                     .Where(sessionName => !string.IsNullOrWhiteSpace(sessionName))
+                     .Distinct(StringComparer.Ordinal))
+        {
+            attributes.Add(new ItemAttribute
+            {
+                Key = "session",
+                Value = sessionName
+            });
+        }
 
         if (!string.IsNullOrWhiteSpace(Context.ExecutionId))
         {

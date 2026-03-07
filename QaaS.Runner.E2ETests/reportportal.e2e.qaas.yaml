@@ -1,15 +1,9 @@
 MetaData:
-  Team: Smoke
-  System: QaaS
+  Team: QaaS
+  System: BlackBox Demo
 
-ReportPortal:
-  Enabled: true
-  LaunchName: QaaS Runner E2E
-  Description: End-to-end runner validation for dual Allure and ReportPortal reporting.
-  DebugMode: true
-  Attributes:
-    Environment: local
-    Source: e2e
+Sessions:
+  - Name: API Session
 
 DataSources:
   - Name: TestDataSource

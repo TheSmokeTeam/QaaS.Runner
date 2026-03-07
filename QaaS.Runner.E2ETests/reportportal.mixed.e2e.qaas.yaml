@@ -1,0 +1,17 @@
+MetaData:
+  Team: QaaS
+  System: BlackBox Demo
+
+Sessions:
+  - Name: API Session
+  - Name: Background Jobs
+
+Assertions:
+  - Name: ReportPortalMixedPassedAssertion
+    Assertion: PassedAssertion
+
+  - Name: ReportPortalMixedFailedAssertion
+    Assertion: FailedAssertion
+
+  - Name: ReportPortalMixedAttachmentsAssertion
+    Assertion: AttachmentsAssertion
