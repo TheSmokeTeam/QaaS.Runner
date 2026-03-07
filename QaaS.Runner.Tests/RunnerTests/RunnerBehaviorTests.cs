@@ -9,6 +9,7 @@ using QaaS.Framework.SDK.Extensions;
 using QaaS.Framework.SDK.ExecutionObjects;
 using QaaS.Framework.SDK.Session.SessionDataObjects;
 using QaaS.Framework.SDK.Session.SessionDataObjects.RunningSessionsObjects;
+using QaaS.Runner.Assertions;
 using QaaS.Runner.WrappedExternals;
 using Allure.Commons;
 
@@ -232,6 +233,27 @@ public class RunnerBehaviorTests
     }
 
     [Test]
+    public void BuildExecutions_WithRegisteredReportPortalLaunchManager_AssignsItToAllBuilders()
+    {
+        using var scope = BuildScope(registerReportPortalLaunchManager: true);
+        var builders = new List<ExecutionBuilder>
+        {
+            CreateTemplateExecutionBuilder("case-1"),
+            CreateTemplateExecutionBuilder("case-2")
+        };
+
+        var runner = new ExposedRunner(scope, builders, Globals.Logger, new Mock<Serilog.ILogger>().Object);
+        _ = runner.InvokeBuildExecutions();
+
+        var managerField = typeof(ExecutionBuilder)
+            .GetField("_reportPortalLaunchManager", BindingFlags.Instance | BindingFlags.NonPublic)!;
+        var registeredManager = scope.Resolve<ReportPortalLaunchManager>();
+
+        Assert.That(managerField.GetValue(builders[0]), Is.SameAs(registeredManager));
+        Assert.That(managerField.GetValue(builders[1]), Is.SameAs(registeredManager));
+    }
+
+    [Test]
     public void StartExecutions_WithNoExecutions_ReturnsZero()
     {
         using var scope = BuildScope();
@@ -266,10 +288,12 @@ public class RunnerBehaviorTests
         Assert.That(runner.Disposed, Is.True);
     }
 
-    private static ILifetimeScope BuildScope()
+    private static ILifetimeScope BuildScope(bool registerReportPortalLaunchManager = false)
     {
         var builder = new ContainerBuilder();
         builder.RegisterType<AllureWrapper>().SingleInstance();
+        if (registerReportPortalLaunchManager)
+            builder.RegisterType<ReportPortalLaunchManager>().SingleInstance();
         return builder.Build().BeginLifetimeScope();
     }
 

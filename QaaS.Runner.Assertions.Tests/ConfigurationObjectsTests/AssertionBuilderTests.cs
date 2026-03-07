@@ -5,6 +5,7 @@ using Microsoft.Extensions.Configuration;
 using NUnit.Framework;
 using QaaS.Framework.SDK.ContextObjects;
 using QaaS.Framework.SDK.Hooks.Assertion;
+using QaaS.Runner.Assertions;
 using QaaS.Runner.Assertions.AssertionObjects;
 using QaaS.Runner.Assertions.ConfigurationObjects;
 using QaaS.Runner.Assertions.ConfigurationObjects.LinkConfigs;
@@ -99,7 +100,7 @@ public class AssertionBuilderTests
         var allureReporter = reporter as AllureReporter;
 
         Assert.That(allureReporter, Is.Not.Null);
-        Assert.That(allureReporter!.Name, Is.EqualTo("assertion-display"));
+        Assert.That(allureReporter!.Name, Is.EqualTo("assertion-display (Allure)"));
         Assert.That(allureReporter.AssertionName, Is.EqualTo("assertion-display"));
         Assert.That(allureReporter.Context, Is.SameAs(context));
         Assert.That(allureReporter.SaveSessionData, Is.False);
@@ -126,6 +127,62 @@ public class AssertionBuilderTests
 
         Assert.That(reporters, Has.Count.EqualTo(1));
         Assert.That(reporters[0].AssertionName, Is.EqualTo("assertion-display"));
+    }
+
+    [Test]
+    public void BuildReporters_WithEnabledReportPortal_ReturnsAllureAndReportPortalReporters()
+    {
+        var builder = CreateBuilder().Named("assertion-display");
+        var context = new Context
+        {
+            Logger = Globals.Logger,
+            RootConfiguration = new ConfigurationBuilder().Build()
+        };
+        var reportPortalSettings = ReportPortalConfig.Resolve(new ReportPortalConfig
+        {
+            Enabled = true,
+            Endpoint = "http://localhost:8080",
+            Project = "QaaS",
+            ApiKey = "api-key"
+        });
+        using var launchManager = new ReportPortalLaunchManager();
+
+        var reporters = builder.BuildReporters(
+            context,
+            new DateTime(2025, 1, 1, 10, 0, 0, DateTimeKind.Utc),
+            reportPortalSettings,
+            launchManager).ToList();
+
+        Assert.That(reporters, Has.Count.EqualTo(2));
+        Assert.That(reporters[0], Is.TypeOf<AllureReporter>());
+        Assert.That(reporters[1], Is.TypeOf<ReportPortalReporter>());
+        Assert.That(reporters.Select(reporter => reporter.Name),
+            Is.EquivalentTo(["assertion-display (Allure)", "assertion-display (ReportPortal)"]));
+    }
+
+    [Test]
+    public void BuildReporters_WithEnabledReportPortalAndMissingLaunchManager_ThrowsInvalidOperationException()
+    {
+        var builder = CreateBuilder().Named("assertion-display");
+        var context = new Context
+        {
+            Logger = Globals.Logger,
+            RootConfiguration = new ConfigurationBuilder().Build()
+        };
+        var reportPortalSettings = ReportPortalConfig.Resolve(new ReportPortalConfig
+        {
+            Enabled = true,
+            Endpoint = "http://localhost:8080",
+            Project = "QaaS",
+            ApiKey = "api-key"
+        });
+
+        Assert.Throws<InvalidOperationException>(() =>
+            builder.BuildReporters(
+                    context,
+                    new DateTime(2025, 1, 1, 10, 0, 0, DateTimeKind.Utc),
+                    reportPortalSettings)
+                .ToList());
     }
 
     [Test]
