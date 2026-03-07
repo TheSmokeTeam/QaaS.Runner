@@ -67,6 +67,7 @@ jobs:
             --no-restore `
             --configuration ${{ env.CONFIGURATION }} `
             --include-symbols `
+            -p:SymbolPackageFormat=snupkg `
             -p:PackageVersion=${{ steps.version.outputs.version-without-v }} `
             --output ${{ env.PACKAGE_OUTPUT_DIRECTORY }}
 
@@ -81,3 +82,4 @@ jobs:
               dotnet nuget push $package.FullName -k ${{ secrets.NUGET_AUTH_TOKEN }} -s https://api.nuget.org/v3/index.json
             }
           }
+

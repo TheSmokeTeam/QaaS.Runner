@@ -1,33 +1,67 @@
 # QaaS.Runner
 
-The `QaaS.Runner` is a package available as part of the `QaaS` Framework that is
-used for running backend and e2e testing projects.
+Execution orchestration package for running QaaS test workflows from YAML configuration.
 
-> Written In C# 14 & .net 10
+[![CI](https://img.shields.io/badge/CI-GitHub_Actions-2088FF)](./.github/workflows/ci.yml)
+[![Docs](https://img.shields.io/badge/docs-qaas--docs-blue)](https://thesmoketeam.github.io/qaas-docs/)
+[![.NET](https://img.shields.io/badge/.NET-10.0-512BD4)](https://dotnet.microsoft.com/)
+
+## Contents
+- [Overview](#overview)
+- [Packages](#packages)
+- [Projects](#projects)
+- [Quick Start](#quick-start)
+- [Documentation](#documentation)
+
+## Overview
+This repository contains one solution: [`QaaS.Runner.sln`](./QaaS.Runner.sln).
+
+`QaaS.Runner` is published to NuGet and includes the runner runtime plus packaged project outputs from this solution that are required at runtime (sessions/assertions/storage orchestration flow).
+
+## Packages
+| Package | Latest Version | Total Downloads |
+|---|---|---|
+| [QaaS.Runner](https://www.nuget.org/packages/QaaS.Runner/) | [![NuGet](https://img.shields.io/nuget/v/QaaS.Runner?logo=nuget)](https://www.nuget.org/packages/QaaS.Runner/) | [![Downloads](https://img.shields.io/nuget/dt/QaaS.Runner?logo=nuget)](https://www.nuget.org/packages/QaaS.Runner/) |
 
 ## Projects
+### [QaaS.Runner](./QaaS.Runner/)
+- CLI/bootstrap entrypoint for `run`, `act`, `assert`, `template`, and `execute` verbs.
+- Builds execution contexts and routes each execution type through the right logic chain.
+- Orchestrates setup/teardown and optional Allure result serving.
 
-### User Interfaces
+### [QaaS.Runner.Assertions](./QaaS.Runner.Assertions/)
+- Builds assertion runtime objects from configured hooks and filters.
+- Executes assertions against session/data-source outputs.
+- Writes Allure results, links, and attachments.
 
-* `QaaS.Runner` - From here the QaaS run is initialized, can be treated as the QaaS entrypoint that acts like a CLI
- and should receive the command line arguments given to the dotnet run.
-* `QaaS.Runner.SchemaGenerator` - A project that generates a `json schema` for `.qaas.yaml` configuration files, used in CI to
- automatically generate the schema as an artifact.
+### [QaaS.Runner.Sessions](./QaaS.Runner.Sessions/)
+- Session runtime with staged action execution.
+- Supports publishers, consumers, transactions, probes, and collectors.
+- Produces session data and failure/flakiness metadata.
 
-### Functional Projects
+### [QaaS.Runner.Storage](./QaaS.Runner.Storage/)
+- Storage abstraction for storing and retrieving serialized session data.
+- Built-in implementations: filesystem and S3-compatible backends.
+- Shared builder-based configuration for act/assert flows.
 
-* `QaaS.Runner.Storage` - Responsible for managing the storage of QaaS Objects.
+### [QaaS.Runner.Infrastructure](./QaaS.Runner.Infrastructure/)
+- Small shared cross-project helpers (filesystem and date/time utilities).
 
-* `QaaS.Runner.Sessions` - Responsible for running sessions according to given configuration.
+## Quick Start
+Install package:
 
-* `QaaS.Runner.Assertions` - Responsible for building, running and writing the results of given assertions according to given configuration.
+```bash
+dotnet add package QaaS.Runner
+```
 
-### Packages
+Upgrade package:
 
-* `QaaS.Runner.Infrastructure` - Any common functionality used across different QaaS projects that is too small to have a project of its own.
+```bash
+dotnet add package QaaS.Runner --version <target-version>
+dotnet restore
+```
 
-### Tests
-
-* `QaaS.Runner.IntegrationTests` - Integration test project for all QaaS projects with any outside source.
-
-* `QaaS.Runner.<OtherQaaSRunnerProjectName>.Tests` - NUnit test project for the other project referenced in the name.
+## Documentation
+- Official docs: [thesmoketeam.github.io/qaas-docs](https://thesmoketeam.github.io/qaas-docs/)
+- CI workflow: [`.github/workflows/ci.yml`](./.github/workflows/ci.yml)
+- NuGet package page: [QaaS.Runner on NuGet](https://www.nuget.org/packages/QaaS.Runner/)

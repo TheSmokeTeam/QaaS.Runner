@@ -6,6 +6,7 @@ using QaaS.Framework.SDK.DataSourceObjects;
 using QaaS.Framework.SDK.ExecutionObjects;
 using QaaS.Runner.Assertions.ConfigurationObjects;
 using QaaS.Runner.Assertions.ConfigurationObjects.LinkConfigs;
+using QaaS.Runner.Sessions.Actions.Probes;
 using QaaS.Runner.Sessions.Session.Builders;
 using QaaS.Runner.Storage;
 using QaaS.Runner.Storage.ConfigurationObjects;
@@ -16,6 +17,12 @@ namespace QaaS.Runner.Tests.BuilderTests;
 
 public class ExecutionBuilderTests
 {
+    [SetUp]
+    public void SetUp()
+    {
+        ProbeRunRecorder.Reset();
+    }
+
     [Test]
     public void TestBuild_CallFunctionWithValidAndInvalidConfiguration_ShouldThrowErrorOnInvalid()
     {
@@ -128,6 +135,76 @@ public class ExecutionBuilderTests
         var storages = builder.ReadStorages();
 
         Assert.That(storages, Is.Empty);
+    }
+
+    [Test]
+    public void Start_WithSameProbeNameAcrossDifferentSessions_UsesSessionScopedProbeConfiguration()
+    {
+        const string sharedProbeName = "shared-probe";
+        var builder = new ExecutionBuilder()
+            .AddSession(new SessionBuilder
+            {
+                Name = "session-1",
+                Stage = 0,
+                Probes =
+                [
+                    new ProbeBuilder()
+                        .Named(sharedProbeName)
+                        .HookNamed(nameof(FirstTestProbe))
+                        .Configure(new ProbeMarkerConfig { Marker = "first-config" })
+                ]
+            })
+            .AddSession(new SessionBuilder
+            {
+                Name = "session-2",
+                Stage = 1,
+                Probes =
+                [
+                    new ProbeBuilder()
+                        .Named(sharedProbeName)
+                        .HookNamed(nameof(SecondTestProbe))
+                        .Configure(new ProbeMarkerConfig { Marker = "second-config" })
+                ]
+            })
+            .ExecutionType(ExecutionType.Run)
+            .SetExecutionId("probe-scope")
+            .SetCase("probe-scope-case")
+            .WithLogger(Globals.Logger)
+            .WithGlobalDict(new Dictionary<string, object?>())
+            .WithMetadata(new MetaDataConfig { Team = "Smoke", System = "QaaS" });
+
+        var execution = builder.Build();
+        var exitCode = execution.Start();
+        var runs = ProbeRunRecorder.GetRuns();
+
+        Assert.That(exitCode, Is.EqualTo(0));
+        Assert.That(runs, Has.Count.EqualTo(2));
+        Assert.That(runs, Contains.Item((nameof(FirstTestProbe), "first-config")));
+        Assert.That(runs, Contains.Item((nameof(SecondTestProbe), "second-config")));
+    }
+
+    [Test]
+    public void Build_WithProbeMissingName_ThrowsInvalidConfigurationsException()
+    {
+        var builder = new ExecutionBuilder()
+            .AddSession(new SessionBuilder
+            {
+                Name = "session-missing-probe-name",
+                Stage = 0,
+                Probes =
+                [
+                    new ProbeBuilder()
+                        .HookNamed(nameof(FirstTestProbe))
+                ]
+            })
+            .ExecutionType(ExecutionType.Template)
+            .SetExecutionId("invalid-probe-name")
+            .SetCase("invalid-probe-name-case")
+            .WithLogger(Globals.Logger)
+            .WithGlobalDict(new Dictionary<string, object?>())
+            .WithMetadata(new MetaDataConfig { Team = "Smoke", System = "QaaS" });
+
+        Assert.Throws<InvalidConfigurationsException>(() => builder.Build());
     }
 
     private ExecutionBuilder CreateValidExecutionBuilder()
