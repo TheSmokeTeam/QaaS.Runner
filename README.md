@@ -66,4 +66,3 @@ dotnet restore
 - Official docs: [thesmoketeam.github.io/qaas-docs](https://thesmoketeam.github.io/qaas-docs/)
 - CI workflow: [`.github/workflows/ci.yml`](./.github/workflows/ci.yml)
 - NuGet package page: [QaaS.Runner on NuGet](https://www.nuget.org/packages/QaaS.Runner/)
-- ReportPortal integration: [`docs/reportportal-integration.md`](./docs/reportportal-integration.md)

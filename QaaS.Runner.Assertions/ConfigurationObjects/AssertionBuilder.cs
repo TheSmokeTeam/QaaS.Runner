@@ -516,6 +516,16 @@ public class AssertionBuilder : IYamlConvertible
         return Reporter;
     }
 
+    /// <summary>
+    /// Builds all reporters that should receive this assertion result. Allure is always present, while ReportPortal is
+    /// appended only when the resolved runner configuration enables it.
+    /// </summary>
+    /// <param name="context">The execution context for the current assertion.</param>
+    /// <param name="testSuiteStartTimeUtc">The test-suite start timestamp used by downstream reporters.</param>
+    /// <param name="reportPortalSettings">Resolved ReportPortal settings for the current runner invocation.</param>
+    /// <param name="reportPortalLaunchManager">The runner-scoped launch manager used to share one launch across assertions.</param>
+    /// <param name="fileSystem">Optional filesystem abstraction for tests.</param>
+    /// <returns>The reporter list that should receive this assertion result.</returns>
     internal IEnumerable<IReporter> BuildReporters(Context context, DateTime testSuiteStartTimeUtc,
         ReportPortalSettings? reportPortalSettings = null,
         ReportPortalLaunchManager? reportPortalLaunchManager = null,

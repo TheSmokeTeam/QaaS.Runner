@@ -108,7 +108,8 @@ public class Runner : IRunner, IDisposable
     }
 
     /// <summary>
-    /// Called after all executions have finished, writes the tests results to the results directory
+    /// Called after all executions have finished. Finalizes the shared ReportPortal launch first,
+    /// then disposes logging resources, and finally serves Allure results when requested.
     /// </summary>
     protected virtual void Teardown()
     {
@@ -165,7 +166,9 @@ public class Runner : IRunner, IDisposable
     }
 
     /// <summary>
-    /// Builds the list of <see cref="Execution" />s from <see cref="ExecutionBuilders" />
+    /// Builds the list of <see cref="Execution" />s from <see cref="ExecutionBuilders" />.
+    /// During this step the runner injects shared runtime services such as the global dictionary,
+    /// the configured logger, and the runner-scoped ReportPortal launch manager.
     /// </summary>
     /// <returns>List of built <see cref="Execution" />s</returns>
     protected virtual List<Execution> BuildExecutions()

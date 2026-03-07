@@ -8,7 +8,8 @@ using QaaS.Runner.Assertions.ConfigurationObjects;
 namespace QaaS.Runner.Assertions;
 
 /// <summary>
-/// Owns a single ReportPortal launch for the lifetime of a runner invocation.
+/// Owns the single ReportPortal launch used by one runner invocation. The manager starts the launch lazily
+/// when the first assertion is reported, reuses that launch for every later assertion, and finishes it during teardown.
 /// </summary>
 public sealed class ReportPortalLaunchManager : IDisposable
 {
@@ -20,6 +21,16 @@ public sealed class ReportPortalLaunchManager : IDisposable
     private bool _launchFinished;
     private bool _disposed;
 
+    /// <summary>
+    /// Starts the shared ReportPortal launch on first use and returns the launch context required by reporters.
+    /// Subsequent calls reuse the same launch and verify that the requested settings are compatible.
+    /// </summary>
+    /// <param name="settings">The resolved ReportPortal settings for the current execution.</param>
+    /// <param name="logger">Logger used for lifecycle diagnostics.</param>
+    /// <param name="cancellationToken">Cancellation token for the remote API call.</param>
+    /// <returns>
+    /// The active launch context, or <see langword="null" /> when ReportPortal publishing is disabled for this run.
+    /// </returns>
     internal async Task<ReportPortalLaunchContext?> EnsureLaunchStartedAsync(ReportPortalSettings settings,
         ILogger logger, CancellationToken cancellationToken = default)
     {
@@ -77,6 +88,12 @@ public sealed class ReportPortalLaunchManager : IDisposable
         }
     }
 
+    /// <summary>
+    /// Finishes the shared ReportPortal launch if one was started. This is called from runner teardown so the launch
+    /// closes cleanly before any optional Allure serving step blocks the process.
+    /// </summary>
+    /// <param name="logger">Logger used for lifecycle diagnostics.</param>
+    /// <param name="cancellationToken">Cancellation token for the remote API call.</param>
     public async Task FinishLaunchAsync(ILogger logger, CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(logger);
@@ -114,6 +131,9 @@ public sealed class ReportPortalLaunchManager : IDisposable
             "Use one consistent ReportPortal configuration per runner invocation.");
     }
 
+    /// <summary>
+    /// Releases the underlying client resources owned by the launch manager.
+    /// </summary>
     public void Dispose()
     {
         if (_disposed)
@@ -126,4 +146,9 @@ public sealed class ReportPortalLaunchManager : IDisposable
     }
 }
 
+/// <summary>
+/// Lightweight runtime context shared by reporters after the launch has started.
+/// </summary>
+/// <param name="Service">The active ReportPortal client service.</param>
+/// <param name="LaunchUuid">The UUID of the live launch.</param>
 internal sealed record ReportPortalLaunchContext(IClientService Service, string LaunchUuid);

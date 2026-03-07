@@ -16,7 +16,10 @@ using AssertionSeverity = QaaS.Runner.Assertions.AssertionObjects.AssertionSever
 
 namespace QaaS.Runner.Assertions;
 
-/// <inheritdoc />
+/// <summary>
+/// Publishes QaaS runner assertion results into ReportPortal while preserving the existing Allure writer.
+/// Each QaaS assertion result is mapped to one ReportPortal test item plus logs and attachments.
+/// </summary>
 public class ReportPortalReporter : BaseReporter
 {
     private static readonly IDictionary<AssertionStatus, Status> AssertionStatusToReportPortalStatusMap =
@@ -42,6 +45,11 @@ public class ReportPortalReporter : BaseReporter
     public required ReportPortalSettings Settings { get; init; }
     public required ReportPortalLaunchManager LaunchManager { get; init; }
 
+    /// <summary>
+    /// Writes one runner-produced assertion result into the shared ReportPortal launch.
+    /// The reporter creates the test item, sends outcome/session/template/attachment logs, and then finalizes the item.
+    /// </summary>
+    /// <param name="assertionResult">The QaaS assertion result produced by the runner pipeline.</param>
     public override void WriteTestResults(AssertionResult assertionResult)
     {
         ArgumentNullException.ThrowIfNull(assertionResult);

@@ -5,7 +5,8 @@ using ReportPortal.Client.Abstractions.Models;
 namespace QaaS.Runner.Assertions.ConfigurationObjects;
 
 /// <summary>
-/// Optional ReportPortal publishing configuration for runner assertion results.
+/// Defines optional ReportPortal settings for publishing the same runner-generated assertion results
+/// that already flow into Allure. Values can come from YAML, environment variables, or both.
 /// </summary>
 public class ReportPortalConfig
 {
@@ -43,6 +44,12 @@ public class ReportPortalConfig
     [Description("Static launch attributes to add to every launch.")]
     public Dictionary<string, string> Attributes { get; set; } = new(StringComparer.OrdinalIgnoreCase);
 
+    /// <summary>
+    /// Resolves the effective runtime settings by applying environment-variable overrides,
+    /// normalizing the endpoint, and validating required fields when publishing is enabled.
+    /// </summary>
+    /// <param name="config">The YAML-bound configuration, if present.</param>
+    /// <returns>The resolved runtime settings used by the reporter and launch manager.</returns>
     internal static ReportPortalSettings Resolve(ReportPortalConfig? config)
     {
         var enabled = ReadBooleanValue(EnabledEnvironmentVariable) ?? config?.Enabled ?? false;
@@ -110,6 +117,10 @@ public class ReportPortalConfig
     }
 }
 
+    /// <summary>
+    /// Converts the raw configuration into immutable runtime settings that can be safely reused
+    /// across all executions inside a single runner invocation.
+    /// </summary>
 public sealed class ReportPortalSettings(
     bool enabled,
     string? endpoint,
@@ -131,6 +142,9 @@ public sealed class ReportPortalSettings(
     public bool DebugMode { get; } = debugMode;
     public IReadOnlyDictionary<string, string> Attributes { get; } = attributes;
 
+    /// <summary>
+    /// Validates that all fields required for live publishing are present after overrides are applied.
+    /// </summary>
     public void Validate()
     {
         if (!Enabled)
@@ -149,6 +163,10 @@ public sealed class ReportPortalSettings(
                 $"ReportPortal reporting is enabled but neither `ReportPortal.ApiKey` nor {ReportPortalConfig.ApiKeyEnvironmentVariable} was provided.");
     }
 
+    /// <summary>
+    /// Builds the launch-level attributes that will be attached once when the runner opens the launch.
+    /// </summary>
+    /// <returns>The launch attributes in ReportPortal's request model.</returns>
     public IList<ItemAttribute> BuildLaunchAttributes()
     {
         var launchAttributes = new List<ItemAttribute>
@@ -172,6 +190,12 @@ public sealed class ReportPortalSettings(
         return launchAttributes;
     }
 
+    /// <summary>
+    /// Verifies that another settings instance targets the same ReportPortal launch contract.
+    /// This prevents a single runner invocation from mixing multiple endpoints, projects, or credentials.
+    /// </summary>
+    /// <param name="other">The other settings instance to compare.</param>
+    /// <returns><see langword="true" /> when both settings are launch-compatible; otherwise <see langword="false" />.</returns>
     public bool IsCompatibleWith(ReportPortalSettings other)
     {
         return Enabled == other.Enabled &&
