@@ -31,6 +31,9 @@
         <PackageReference Include="Microsoft.Extensions.Configuration" Version="10.0.3" />
         <PackageReference Include="Microsoft.Extensions.Configuration.Json" Version="10.0.3" />
         <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" Version="10.0.3" />
+        <PackageReference Include="NUnit" Version="4.5.0" />
+        <PackageReference Include="QaaS.Framework.Executions" Version="1.1.0" />
+        <PackageReference Include="QaaS.Mocker.CommunicationObjects" Version="2.0.0-alpha.3" />
         <PackageReference Include="morelinq" Version="4.4.0" />
         <PackageReference Include="Serilog.Extensions.Logging" Version="10.0.0" />
         <PackageReference Include="Serilog.Settings.Configuration" Version="10.0.0" />
