@@ -1,0 +1,139 @@
+MetaData:
+  Team: Wonder
+  System: Young
+  ExtraLabels:
+    Component: Catalog
+    Area: Search
+    Owner: Wonder
+    Environment: Lab
+    Scenario: Stress
+    ReleaseRing: Pilot
+    Tenant: Nova
+
+ReportPortal:
+  Attributes:
+    Variation: WonderYoungStress
+    Suite: ReportPortalE2E
+    Profile: Stress
+    StressLevel: High
+
+DataSources:
+  - Name: WonderYoungStressSearchPayloads
+    Generator: ReportPortalPayloadGenerator
+    GeneratorConfiguration:
+      Count: 8
+      PayloadPrefix: wonder-young-search
+      Component: Catalog
+      Area: Search
+      Owner: Wonder
+      EnvironmentName: Lab
+      Capability: SearchBurst
+      Region: IL
+      Scenario: Stress
+      EvidenceCount: 3
+  - Name: WonderYoungStressSuggestPayloads
+    Generator: ReportPortalPayloadGenerator
+    GeneratorConfiguration:
+      Count: 5
+      PayloadPrefix: wonder-young-suggest
+      Component: Catalog
+      Area: Suggest
+      Owner: Wonder
+      EnvironmentName: Lab
+      Capability: SuggestFallback
+      Region: IL
+      Scenario: Stress
+      EvidenceCount: 2
+
+Sessions:
+  - Name: Wonder Search Session
+    Probes:
+      - Name: WonderSearchProbe
+        Probe: ReportPortalDiagnosticProbe
+        ProbeConfiguration:
+          StepName: Wonder Search Pressure
+          TraceMessage: Search pressure path completed.
+          DelayMilliseconds: 115
+  - Name: Wonder Suggest Session
+    Probes:
+      - Name: WonderSuggestProbe
+        Probe: ReportPortalDiagnosticProbe
+        ProbeConfiguration:
+          StepName: Wonder Suggest Instability
+          TraceMessage: Suggest path failed intentionally.
+          DelayMilliseconds: 95
+          ThrowOnRun: true
+  - Name: Wonder Ranking Session
+    Probes:
+      - Name: WonderRankingProbe
+        Probe: ReportPortalDiagnosticProbe
+        ProbeConfiguration:
+          StepName: Wonder Ranking Audit
+          TraceMessage: Ranking audit completed.
+          DelayMilliseconds: 75
+
+Assertions:
+  - Name: WonderYoungStressPassed
+    Assertion: ReportPortalRichAssertion
+    Severity: Blocker
+    SessionNamePatterns:
+      - Wonder.*Session
+    DataSourcePatterns:
+      - WonderYoungStress.*Payloads
+    AssertionConfiguration:
+      Outcome: Passed
+      Message: Wonder Young stress pass assertion message
+      TracePrefix: Wonder Young stress pass trace
+      AttachmentCount: 3
+      AttachmentKinds:
+        - Json
+        - Yaml
+        - Binary
+      TraceSectionRepeats: 2
+
+  - Name: WonderYoungStressFailed
+    Assertion: ReportPortalRichAssertion
+    Severity: Critical
+    SessionNamePatterns:
+      - Wonder.*Session
+    DataSourceNames:
+      - WonderYoungStressSuggestPayloads
+    AssertionConfiguration:
+      Outcome: Failed
+      Message: Wonder Young stress failed assertion message
+      TracePrefix: Wonder Young stress failed trace
+      AttachmentCount: 2
+      AttachmentKinds:
+        - Json
+        - Binary
+
+  - Name: WonderYoungStressBroken
+    Assertion: ReportPortalRichAssertion
+    Severity: Blocker
+    SessionNamePatterns:
+      - Wonder.*Session
+    AssertionConfiguration:
+      Outcome: Broken
+      Message: Wonder Young stress broken assertion message
+      TracePrefix: Wonder Young stress broken trace
+      AttachmentCount: 1
+      AttachmentKinds:
+        - Yaml
+
+  - Name: WonderYoungStressMinimal
+    Assertion: ReportPortalRichAssertion
+    Severity: Trivial
+    DisplayTrace: false
+    SaveSessionData: false
+    SaveAttachments: false
+    SaveTemplate: false
+    SessionNamePatterns:
+      - Wonder.*Session
+    AssertionConfiguration:
+      Outcome: Passed
+      Message: Wonder Young stress minimal assertion message
+      TracePrefix: Wonder Young stress minimal trace
+      AttachmentCount: 1
+      AttachmentKinds:
+        - Json
+      IncludeFailureRollupInMessage: false

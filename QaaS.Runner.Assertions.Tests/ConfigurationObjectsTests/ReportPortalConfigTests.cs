@@ -15,15 +15,7 @@ public class ReportPortalConfigTests
         ReportPortalConfig.EnabledEnvironmentVariable,
         ReportPortalConfig.EndpointEnvironmentVariable,
         ReportPortalConfig.ProjectEnvironmentVariable,
-        ReportPortalConfig.ApiKeyEnvironmentVariable,
-        ReportPortalConfig.LaunchNameEnvironmentVariable,
-        ReportPortalConfig.DescriptionEnvironmentVariable,
-        ReportPortalConfig.DebugModeEnvironmentVariable,
-        ReportPortalConfig.BootstrapUsernameEnvironmentVariable,
-        ReportPortalConfig.BootstrapPasswordEnvironmentVariable,
-        ReportPortalConfig.BootstrapClientIdEnvironmentVariable,
-        ReportPortalConfig.BootstrapClientSecretEnvironmentVariable,
-        ReportPortalConfig.BotPasswordSeedEnvironmentVariable
+        ReportPortalConfig.ApiKeyEnvironmentVariable
     ];
 
     private Dictionary<string, string?> _originalEnvironment = null!;
@@ -48,45 +40,58 @@ public class ReportPortalConfigTests
     }
 
     [Test]
-    public void Resolve_WithNoOverrides_DefaultsToEnabledLocalManagedConfiguration()
+    public void Resolve_WithNoOverrides_DefaultsToPassiveEnabledConfiguration()
     {
         var settings = ReportPortalConfig.Resolve(null, CreateRunDescriptor());
 
         Assert.That(settings.Enabled, Is.True);
-        Assert.That(settings.Endpoint, Is.EqualTo("http://localhost:8080/api/"));
-        Assert.That(settings.Project, Is.EqualTo("Smoke"));
+        Assert.That(settings.Endpoint, Is.Null);
+        Assert.That(settings.RequestedProjectName, Is.EqualTo("Smoke"));
         Assert.That(settings.ApiKey, Is.Null);
-        Assert.That(settings.UsesManagedProjectBot, Is.True);
-        Assert.That(settings.LaunchName, Is.EqualTo("QaaS Run | QaaS | Session A, Session B | 2025-01-01 10:00:00"));
+        Assert.That(settings.LaunchName, Is.EqualTo("QaaS Run | Smoke | QaaS | Session A, Session B"));
         Assert.That(settings.Description,
             Is.EqualTo(
-                "QaaS captured this run directly from the runner pipeline: live sessions, real assertion outcomes, and the exact shape of QaaS at 2025-01-01 10:00:00."));
-        Assert.That(settings.BootstrapUsername, Is.EqualTo("superadmin"));
-        Assert.That(settings.BootstrapPassword, Is.EqualTo("erebus"));
-        Assert.That(settings.BootstrapClientId, Is.EqualTo("ui"));
-        Assert.That(settings.BootstrapClientSecret, Is.EqualTo("uiman"));
-        Assert.That(settings.BotPasswordSeed, Is.EqualTo("qaas-reportportal-local"));
+                "QaaS captured this run directly from the runner pipeline: live sessions, real assertion outcomes, and the exact shape of QaaS at 2025-01-01 10:00:00. Sessions=[Session A, Session B]. LaunchAttributes=[No additional launch attributes.]"));
     }
 
     [Test]
-    public void Resolve_WithGatewayEndpoint_NormalizesEndpointToApiPath()
+    public void TryGetEndpointUri_WithGatewayEndpoint_NormalizesEndpointToApiPath()
     {
+        Environment.SetEnvironmentVariable(ReportPortalConfig.EndpointEnvironmentVariable, "http://localhost:8080");
+
         var settings = ReportPortalConfig.Resolve(new ReportPortalConfig
         {
-            Endpoint = "http://localhost:8080",
             Project = "QaaS",
             ApiKey = "local-api-key"
         }, CreateRunDescriptor());
 
-        Assert.That(settings.Endpoint, Is.EqualTo("http://localhost:8080/api/"));
+        var succeeded = settings.TryGetEndpointUri(out var endpointUri, out var failureReason);
+
+        Assert.That(succeeded, Is.True);
+        Assert.That(failureReason, Is.Null);
+        Assert.That(endpointUri, Is.Not.Null);
+        Assert.That(endpointUri!.AbsoluteUri, Is.EqualTo("http://localhost:8080/api/"));
     }
 
     [Test]
-    public void Resolve_WithEnvironmentOverrides_UsesEnvironmentValues()
+    public void Resolve_WithEndpointAndApiKeyOnlyInYaml_IgnoresThemBecauseRuntimeUsesEnvironmentVariables()
+    {
+        var settings = ReportPortalConfig.Resolve(new ReportPortalConfig
+        {
+            Endpoint = "http://from-yaml.local",
+            ApiKey = "yaml-api-key"
+        }, CreateRunDescriptor());
+
+        Assert.That(settings.Endpoint, Is.Null);
+        Assert.That(settings.ApiKey, Is.Null);
+    }
+
+    [Test]
+    public void Resolve_WithEnvironmentOverrides_UsesEnvironmentValuesButStillRoutesByTeam()
     {
         Environment.SetEnvironmentVariable(ReportPortalConfig.EnabledEnvironmentVariable, "true");
         Environment.SetEnvironmentVariable(ReportPortalConfig.EndpointEnvironmentVariable, "http://localhost:8080");
-        Environment.SetEnvironmentVariable(ReportPortalConfig.ProjectEnvironmentVariable, "QaaS");
+        Environment.SetEnvironmentVariable(ReportPortalConfig.ProjectEnvironmentVariable, "IgnoredProject");
         Environment.SetEnvironmentVariable(ReportPortalConfig.ApiKeyEnvironmentVariable, "env-api-key");
 
         var settings = ReportPortalConfig.Resolve(new ReportPortalConfig
@@ -98,10 +103,10 @@ public class ReportPortalConfigTests
         }, CreateRunDescriptor());
 
         Assert.That(settings.Enabled, Is.True);
-        Assert.That(settings.Endpoint, Is.EqualTo("http://localhost:8080/api/"));
-        Assert.That(settings.Project, Is.EqualTo("QaaS"));
+        Assert.That(settings.Endpoint, Is.EqualTo("http://localhost:8080"));
+        Assert.That(settings.RequestedProjectName, Is.EqualTo("Smoke"));
         Assert.That(settings.ApiKey, Is.EqualTo("env-api-key"));
-        Assert.That(settings.UsesManagedProjectBot, Is.False);
+        Assert.That(settings.IgnoredProjectOverride, Is.EqualTo("IgnoredProject"));
     }
 
     [Test]
@@ -113,22 +118,61 @@ public class ReportPortalConfigTests
         }, null);
 
         Assert.That(settings.Enabled, Is.False);
-        Assert.That(settings.Endpoint, Is.EqualTo("http://localhost:8080/api/"));
+        Assert.That(settings.Endpoint, Is.Null);
+        Assert.That(settings.RequestedProjectName, Is.Null);
     }
 
     [Test]
-    public void Resolve_WhenProjectCannotBeDerived_ThrowsInvalidOperationException()
+    public void Resolve_WhenProjectCannotBeDerived_DoesNotThrowAndLeavesRequestedProjectNameNull()
     {
-        var exception = Assert.Throws<InvalidOperationException>(() => ReportPortalConfig.Resolve(
+        var settings = ReportPortalConfig.Resolve(
             new ReportPortalConfig
             {
                 Enabled = true,
                 Endpoint = "http://localhost:8080"
             },
             new ReportPortalRunDescriptor(null, "QaaS", ["Session A"], "run",
-                new DateTimeOffset(2025, 1, 1, 10, 0, 0, TimeSpan.Zero))));
+                new DateTimeOffset(2025, 1, 1, 10, 0, 0, TimeSpan.Zero)));
 
-        Assert.That(exception!.Message, Does.Contain("MetaData.Team"));
+        Assert.That(settings.RequestedProjectName, Is.Null);
+        Assert.That(settings.System, Is.EqualTo("QaaS"));
+    }
+
+    [Test]
+    public void TryGetEndpointUri_WithMissingEndpoint_ReturnsFailureReason()
+    {
+        var settings = ReportPortalConfig.Resolve(new ReportPortalConfig
+        {
+            Enabled = true
+        }, CreateRunDescriptor());
+
+        var succeeded = settings.TryGetEndpointUri(out var endpointUri, out var failureReason);
+
+        Assert.That(succeeded, Is.False);
+        Assert.That(endpointUri, Is.Null);
+        Assert.That(failureReason, Does.Contain(ReportPortalConfig.EndpointEnvironmentVariable));
+    }
+
+    [Test]
+    public void BuildLaunchAttributes_IncludesTeamSystemSessionsAndStaticAttributes()
+    {
+        var settings = ReportPortalConfig.Resolve(new ReportPortalConfig
+        {
+            Attributes = new Dictionary<string, string>
+            {
+                ["Component"] = "Auth",
+                ["Owner"] = "Smoke Team"
+            }
+        }, CreateRunDescriptor());
+
+        var attributes = settings.BuildLaunchAttributes();
+
+        Assert.That(attributes.Any(attribute => attribute.Key == "tool" && attribute.Value == "QaaS"), Is.True);
+        Assert.That(attributes.Any(attribute => attribute.Key == "team" && attribute.Value == "Smoke"), Is.True);
+        Assert.That(attributes.Any(attribute => attribute.Key == "system" && attribute.Value == "QaaS"), Is.True);
+        Assert.That(attributes.Count(attribute => attribute.Key == "session"), Is.EqualTo(2));
+        Assert.That(attributes.Any(attribute => attribute.Key == "Component" && attribute.Value == "Auth"), Is.True);
+        Assert.That(attributes.Any(attribute => attribute.Key == "Owner" && attribute.Value == "Smoke Team"), Is.True);
     }
 
     private static ReportPortalRunDescriptor CreateRunDescriptor()

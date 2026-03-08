@@ -410,10 +410,26 @@ public class ExecutionBuilder() : BaseExecutionBuilder<InternalContext, Executio
         return this;
     }
 
+    /// <summary>
+    /// Reads the configured case name before the execution context is fully built.
+    /// </summary>
+    internal string? ReadCase()
+    {
+        return _configuredCaseName;
+    }
+
     public ExecutionBuilder SetExecutionId(string executionId)
     {
         _configuredExecutionId = executionId;
         return this;
+    }
+
+    /// <summary>
+    /// Reads the configured execution identifier before the execution context is fully built.
+    /// </summary>
+    internal string? ReadExecutionId()
+    {
+        return _configuredExecutionId;
     }
 
     public ExecutionBuilder WithMetadata(MetaDataConfig metaDataConfig)

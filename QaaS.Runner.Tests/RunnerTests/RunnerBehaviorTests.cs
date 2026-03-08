@@ -276,7 +276,7 @@ public class RunnerBehaviorTests
     }
 
     [Test]
-    public void BuildExecutions_WithMixedTeams_ThrowsInvalidOperationException()
+    public void BuildExecutions_WithMixedTeams_AssignsDifferentReportPortalDescriptorsPerTeam()
     {
         using var scope = BuildScope();
         var builders = new List<ExecutionBuilder>
@@ -286,9 +286,47 @@ public class RunnerBehaviorTests
         };
         var runner = new ExposedRunner(scope, builders, Globals.Logger, new Mock<Serilog.ILogger>().Object);
 
-        var exception = Assert.Throws<InvalidOperationException>(() => runner.InvokeBuildExecutions());
+        _ = runner.InvokeBuildExecutions();
 
-        Assert.That(exception!.Message, Does.Contain("multiple MetaData.Team values"));
+        var descriptorField = typeof(ExecutionBuilder)
+            .GetField("_reportPortalRunDescriptor", BindingFlags.Instance | BindingFlags.NonPublic)!;
+        var firstDescriptor = (ReportPortalRunDescriptor?)descriptorField.GetValue(builders[0]);
+        var secondDescriptor = (ReportPortalRunDescriptor?)descriptorField.GetValue(builders[1]);
+
+        Assert.That(firstDescriptor, Is.Not.Null);
+        Assert.That(secondDescriptor, Is.Not.Null);
+        Assert.That(secondDescriptor, Is.Not.SameAs(firstDescriptor));
+        Assert.That(firstDescriptor!.TeamName, Is.EqualTo("Smoke"));
+        Assert.That(secondDescriptor!.TeamName, Is.EqualTo("AnotherTeam"));
+        Assert.That(firstDescriptor.SystemName, Is.EqualTo("QaaS"));
+        Assert.That(secondDescriptor.SystemName, Is.EqualTo("QaaS"));
+    }
+
+    [Test]
+    public void BuildExecutions_WithMixedSystems_AssignsDifferentReportPortalDescriptorsPerSystem()
+    {
+        using var scope = BuildScope();
+        var builders = new List<ExecutionBuilder>
+        {
+            CreateTemplateExecutionBuilder("case-1", team: "Smoke", system: "QaaS"),
+            CreateTemplateExecutionBuilder("case-2", team: "Smoke", system: "Smooth")
+        };
+        var runner = new ExposedRunner(scope, builders, Globals.Logger, new Mock<Serilog.ILogger>().Object);
+
+        _ = runner.InvokeBuildExecutions();
+
+        var descriptorField = typeof(ExecutionBuilder)
+            .GetField("_reportPortalRunDescriptor", BindingFlags.Instance | BindingFlags.NonPublic)!;
+        var firstDescriptor = (ReportPortalRunDescriptor?)descriptorField.GetValue(builders[0]);
+        var secondDescriptor = (ReportPortalRunDescriptor?)descriptorField.GetValue(builders[1]);
+
+        Assert.That(firstDescriptor, Is.Not.Null);
+        Assert.That(secondDescriptor, Is.Not.Null);
+        Assert.That(secondDescriptor, Is.Not.SameAs(firstDescriptor));
+        Assert.That(firstDescriptor!.TeamName, Is.EqualTo("Smoke"));
+        Assert.That(secondDescriptor!.TeamName, Is.EqualTo("Smoke"));
+        Assert.That(firstDescriptor.SystemName, Is.EqualTo("QaaS"));
+        Assert.That(secondDescriptor.SystemName, Is.EqualTo("Smooth"));
     }
 
     [Test]

@@ -27,9 +27,6 @@
         <None Update="test.rabbit.qaas.yaml">
             <CopyToOutputDirectory>Always</CopyToOutputDirectory>
         </None>
-        <None Update="reportportal.e2e.qaas.yaml">
-            <CopyToOutputDirectory>Always</CopyToOutputDirectory>
-        </None>
         <None Update="executable.yaml">
             <CopyToOutputDirectory>Always</CopyToOutputDirectory>
         </None>
@@ -40,6 +37,12 @@
 
     <ItemGroup>
         <None Update="Cases\**\*.*">
+            <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+        </None>
+    </ItemGroup>
+
+    <ItemGroup>
+        <None Update="Configs\**\*.*">
             <CopyToOutputDirectory>Always</CopyToOutputDirectory>
         </None>
     </ItemGroup>

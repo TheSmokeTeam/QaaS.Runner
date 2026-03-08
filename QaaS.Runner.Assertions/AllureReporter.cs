@@ -110,33 +110,31 @@ public class AllureReporter : BaseReporter
     private Attachment SaveSessionsDataToAllure(SessionData sessionData)
     {
         const string sessionAttachmentsDirectory = "SessionsData";
-        var sessionDataAttachmentDirectory = GetAttachmentDirectory(sessionAttachmentsDirectory);
-        var attachmentFile = $"{sessionData.Name}.json";
         Context.Logger.LogDebug("Saving session data for {SessionName} as an Allure attachment", sessionData.Name);
-        return SaveDataToAllure(data: SessionDataSerialization.SerializeSessionData(sessionData,
-                new JsonSerializerOptions
-                {
-                    WriteIndented = true, DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull
-                }),
-            attachmentFile,
-            sessionDataAttachmentDirectory,
+        var sessionArtifact = BuildSessionArtifact(sessionData)
+                              ?? throw new InvalidOperationException(
+                                  "Session attachment export must be enabled before saving session data to Allure.");
+        return SaveDataToAllure(
+            sessionArtifact.Content,
+            sessionArtifact.Name,
+            GetAttachmentDirectory(sessionAttachmentsDirectory),
             nameof(SessionData),
-            JsonAttachmentType);
+            sessionArtifact.ContentType);
     }
 
     private Attachment SaveConfigurationTemplateToAllure(IConfiguration configuration)
     {
-        const string attachmentFile = "template.yaml";
         const string templateAttachmentsDirectory = "Templates";
-        var templateAttachmentsDirectoryFullPath = GetAttachmentDirectory(templateAttachmentsDirectory);
         Context.Logger.LogDebug("Saving the execution configuration template as an Allure attachment");
+        var templateArtifact = BuildTemplateArtifact()
+                               ?? throw new InvalidOperationException(
+                                   "Template attachment export must be enabled before saving the configuration template to Allure.");
         return SaveDataToAllure(
-            data: Encoding.UTF8.GetBytes(
-                configuration.BuildConfigurationAsYaml(Infrastructure.Constants.ConfigurationSectionNames)),
-            fileName: attachmentFile,
-            attachmentDirectory: templateAttachmentsDirectoryFullPath,
-            name: attachmentFile,
-            type: YamlAttachmentType);
+            templateArtifact.Content,
+            templateArtifact.Name,
+            GetAttachmentDirectory(templateAttachmentsDirectory),
+            templateArtifact.Name,
+            templateArtifact.ContentType);
     }
 
     private List<Attachment> SaveAssertionAttachmentsToAllure(AssertionResult assertionResult)
@@ -150,8 +148,9 @@ public class AllureReporter : BaseReporter
             assertionResult.Assertion.Name);
 
         // validating unique paths
-        var assertionAttachmentsPaths = assertionResult.Assertion.AssertionHook?.AssertionAttachments
-            .Select(attachment => RunnerFileSystemExtensions.NormalizeRelativePath(attachment.Path));
+        var assertionArtifacts = BuildAssertionArtifacts(assertionResult);
+        var assertionAttachmentsPaths = assertionArtifacts
+            .Select(attachment => RunnerFileSystemExtensions.NormalizeRelativePath(attachment.RelativePath));
         var duplicatePaths = assertionAttachmentsPaths?.GroupBy(path => path, StringComparer.OrdinalIgnoreCase)
             .Where(paths => paths.Count() > 1)
             .Select(item => item.Key).ToList();
@@ -162,22 +161,18 @@ public class AllureReporter : BaseReporter
                 $"Found duplicate attachment paths for assertion {assertionResult.Assertion.Name}");
         }
 
-        foreach (var assertionAttachment in assertionResult.Assertion.AssertionHook?.AssertionAttachments ?? [])
+        foreach (var assertionArtifact in assertionArtifacts)
         {
-            var attachmentPath = RunnerFileSystemExtensions.NormalizeRelativePath(assertionAttachment.Path);
+            var attachmentPath = RunnerFileSystemExtensions.NormalizeRelativePath(assertionArtifact.RelativePath);
             var attachmentFileName = Path.GetFileName(attachmentPath);
             if (string.IsNullOrWhiteSpace(attachmentFileName))
                 throw new InvalidOperationException("Assertion attachment path must include a file name.");
 
             var attachmentDirectoryName = Path.GetDirectoryName(attachmentPath) ?? string.Empty;
 
-            var serializer = SerializerFactory.BuildSerializer(assertionAttachment.SerializationType);
-            var assertionData = serializer?.Serialize(assertionAttachment.Data) ??
-                                (assertionAttachment.Data != null ? (byte[])assertionAttachment.Data! : []);
-
-            attachments.Add(SaveDataToAllure(assertionData, attachmentFileName,
+            attachments.Add(SaveDataToAllure(assertionArtifact.Content, attachmentFileName,
                 Path.Join(specificAssertionAttachmentDirectory, attachmentDirectoryName), attachmentPath,
-                GetAttachmentTypeBySerializationType(assertionAttachment.SerializationType)));
+                assertionArtifact.ContentType));
         }
 
         return attachments;
@@ -278,20 +273,17 @@ public class AllureReporter : BaseReporter
 
     private StatusDetails GetStatusDetailsAccordingToStatus(AssertionResult assertionResult)
     {
+        var assertionTextDetails = BuildAssertionTextDetails(assertionResult);
         var normalStatusDetails = new StatusDetails
         {
-            message = assertionResult.Assertion.AssertionHook?.AssertionMessage ?? string.Empty,
-            trace = DisplayTrace
-                ? assertionResult.Assertion.AssertionHook?.AssertionTrace ?? string.Empty
-                : TraceDisplayFalseMessage,
+            message = assertionTextDetails.Message,
+            trace = assertionTextDetails.Trace,
             flaky = assertionResult.Flaky.IsFlaky
         };
         var brokenStatusDetails = new StatusDetails
         {
-            message = assertionResult.BrokenAssertionException?.Message ?? string.Empty,
-            trace = DisplayTrace
-                ? assertionResult.BrokenAssertionException?.ToString() ?? string.Empty
-                : TraceDisplayFalseMessage,
+            message = assertionTextDetails.Message,
+            trace = assertionTextDetails.Trace,
             flaky = assertionResult.Flaky.IsFlaky
         };
         return assertionResult.AssertionStatus switch

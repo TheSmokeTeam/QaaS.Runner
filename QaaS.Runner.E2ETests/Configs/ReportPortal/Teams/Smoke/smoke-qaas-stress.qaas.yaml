@@ -1,0 +1,175 @@
+MetaData:
+  Team: Smoke
+  System: QaaS
+  ExtraLabels:
+    Component: Gateway
+    Area: Auth
+    Owner: Smoke
+    Environment: Lab
+    Scenario: Stress
+    ReleaseRing: Canary
+    Tenant: Alpha
+
+ReportPortal:
+  Attributes:
+    Variation: SmokeQaaSStress
+    Suite: ReportPortalE2E
+    Profile: Stress
+    StressLevel: High
+
+DataSources:
+  - Name: SmokeQaaSStressPrimaryPayloads
+    Generator: ReportPortalPayloadGenerator
+    GeneratorConfiguration:
+      Count: 8
+      PayloadPrefix: smoke-qaas-stress-primary
+      Component: Gateway
+      Area: Auth
+      Owner: Smoke
+      EnvironmentName: Lab
+      Capability: AuthScale
+      Region: IL
+      Scenario: Stress
+      EvidenceCount: 4
+      Tags:
+        - Smoke
+        - QaaS
+        - Stress
+        - Primary
+  - Name: SmokeQaaSStressSecondaryPayloads
+    Generator: ReportPortalPayloadGenerator
+    GeneratorConfiguration:
+      Count: 6
+      PayloadPrefix: smoke-qaas-stress-secondary
+      Component: Gateway
+      Area: SessionReplay
+      Owner: Smoke
+      EnvironmentName: Lab
+      Capability: ReplayPressure
+      Region: IL
+      Scenario: Stress
+      EvidenceCount: 3
+      Tags:
+        - Smoke
+        - QaaS
+        - Stress
+        - Secondary
+
+Sessions:
+  - Name: Smoke Auth Session
+    Probes:
+      - Name: SmokeAuthProbe
+        Probe: ReportPortalDiagnosticProbe
+        ProbeConfiguration:
+          StepName: Smoke Auth Pressure
+          TraceMessage: Primary auth pressure path completed.
+          DelayMilliseconds: 140
+  - Name: Smoke Replay Session
+    Probes:
+      - Name: SmokeReplayProbe
+        Probe: ReportPortalDiagnosticProbe
+        ProbeConfiguration:
+          StepName: Smoke Replay Pressure
+          TraceMessage: Replay path failed intentionally under stress.
+          DelayMilliseconds: 90
+          ThrowOnRun: true
+          Notes:
+            - replay queue saturation detected
+  - Name: Smoke Audit Session
+    Probes:
+      - Name: SmokeAuditProbe
+        Probe: ReportPortalDiagnosticProbe
+        ProbeConfiguration:
+          StepName: Smoke Audit Trail
+          TraceMessage: Audit trail probe completed.
+          DelayMilliseconds: 70
+
+Assertions:
+  - Name: SmokeQaaSStressPassed
+    Assertion: ReportPortalRichAssertion
+    Severity: Blocker
+    SessionNamePatterns:
+      - Smoke.*Session
+    DataSourcePatterns:
+      - SmokeQaaSStress.*Payloads
+    Links:
+      - Name: Smoke QaaS Stress Dashboard
+        Grafana:
+          Url: https://grafana.example.local
+          DashboardId: smoke-qaas-stress
+          Variables:
+            - Key: system
+              Value: QaaS
+            - Key: scenario
+              Value: Stress
+      - Name: Smoke Replay Rate
+        Prometheus:
+          Url: https://prometheus.example.local
+          Expressions:
+            - rate(smoke_replay_failures_total[5m])
+            - sum(rate(smoke_auth_requests_total[1m]))
+    AssertionConfiguration:
+      Outcome: Passed
+      Message: Smoke QaaS stress pass assertion message
+      TracePrefix: Smoke QaaS stress pass trace
+      AttachmentCount: 3
+      AttachmentKinds:
+        - Json
+        - Yaml
+        - Binary
+      TraceSectionRepeats: 2
+      AdditionalTraceSections:
+        - Stress path aggregates multiple data sources and all sessions.
+        - Use this result for per-system dashboard validation under higher payload volume.
+
+  - Name: SmokeQaaSStressFailed
+    Assertion: ReportPortalRichAssertion
+    Severity: Critical
+    DataSourceNames:
+      - SmokeQaaSStressSecondaryPayloads
+    SessionNamePatterns:
+      - Smoke Replay Session
+    AssertionConfiguration:
+      Outcome: Failed
+      Message: Smoke QaaS stress failed assertion message
+      TracePrefix: Smoke QaaS stress failed trace
+      AttachmentCount: 2
+      AttachmentKinds:
+        - Json
+        - Binary
+      AdditionalTraceSections:
+        - Secondary payload set should correlate with the replay failure session.
+
+  - Name: SmokeQaaSStressBroken
+    Assertion: ReportPortalRichAssertion
+    Severity: Blocker
+    SessionNamePatterns:
+      - Smoke.*Session
+    AssertionConfiguration:
+      Outcome: Broken
+      Message: Smoke QaaS stress broken assertion message
+      TracePrefix: Smoke QaaS stress broken trace
+      AttachmentCount: 2
+      AttachmentKinds:
+        - Yaml
+      TraceSectionRepeats: 2
+
+  - Name: SmokeQaaSStressMinimal
+    Assertion: ReportPortalRichAssertion
+    Severity: Trivial
+    DisplayTrace: false
+    SaveSessionData: false
+    SaveAttachments: false
+    SaveTemplate: false
+    SessionNamePatterns:
+      - Smoke.*Session
+    DataSourcePatterns:
+      - SmokeQaaSStressPrimary.*
+    AssertionConfiguration:
+      Outcome: Passed
+      Message: Smoke QaaS stress minimal assertion message
+      TracePrefix: Smoke QaaS stress minimal trace
+      AttachmentCount: 1
+      AttachmentKinds:
+        - Json
+      IncludeFailureRollupInMessage: false

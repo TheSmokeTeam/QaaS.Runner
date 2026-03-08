@@ -10,7 +10,8 @@ public sealed class ReportPortalRunDescriptor(
     string? systemName,
     IReadOnlyList<string> sessionNames,
     string executionMode,
-    DateTimeOffset startedAtLocal)
+    DateTimeOffset startedAtLocal,
+    IReadOnlyDictionary<string, string>? launchAttributes = null)
 {
     public string? TeamName { get; } = string.IsNullOrWhiteSpace(teamName) ? null : teamName.Trim();
     public string SystemName { get; } = string.IsNullOrWhiteSpace(systemName) ? "Unknown System" : systemName.Trim();
@@ -22,13 +23,20 @@ public sealed class ReportPortalRunDescriptor(
         .ToArray();
     public string ExecutionMode { get; } = string.IsNullOrWhiteSpace(executionMode) ? "run" : executionMode.Trim();
     public DateTimeOffset StartedAtLocal { get; } = startedAtLocal;
+    public IReadOnlyDictionary<string, string> LaunchAttributes { get; } =
+        new Dictionary<string, string>(launchAttributes ?? new Dictionary<string, string>(),
+            StringComparer.OrdinalIgnoreCase);
 
     /// <summary>
     /// Builds the default ReportPortal launch title for this runner invocation.
+    /// The title stays stable across runs so ReportPortal widgets can group by the same
+    /// team/system/session identity without being fragmented by timestamps.
     /// </summary>
     public string BuildDefaultLaunchName()
     {
-        return $"QaaS Run | {SystemName} | {BuildSessionSummary()} | {StartedAtLocal:yyyy-MM-dd HH:mm:ss}";
+        return string.IsNullOrWhiteSpace(TeamName)
+            ? $"QaaS Run | {SystemName} | {BuildSessionSummary()}"
+            : $"QaaS Run | {TeamName} | {SystemName} | {BuildSessionSummary()}";
     }
 
     /// <summary>
@@ -36,7 +44,13 @@ public sealed class ReportPortalRunDescriptor(
     /// </summary>
     public string BuildDefaultDescription()
     {
-        return $"QaaS captured this run directly from the runner pipeline: live sessions, real assertion outcomes, and the exact shape of {SystemName} at {StartedAtLocal:yyyy-MM-dd HH:mm:ss}.";
+        var launchAttributeSummary = LaunchAttributes.Count == 0
+            ? "No additional launch attributes."
+            : string.Join(", ",
+                LaunchAttributes.OrderBy(attribute => attribute.Key, StringComparer.OrdinalIgnoreCase)
+                    .Select(attribute => $"{attribute.Key}={attribute.Value}"));
+        return
+            $"QaaS captured this {ExecutionMode} directly from the runner pipeline: live sessions, real assertion outcomes, and the exact shape of {SystemName} at {StartedAtLocal:yyyy-MM-dd HH:mm:ss}. Sessions=[{string.Join(", ", SessionNames)}]. LaunchAttributes=[{launchAttributeSummary}]";
     }
 
     private string BuildSessionSummary()

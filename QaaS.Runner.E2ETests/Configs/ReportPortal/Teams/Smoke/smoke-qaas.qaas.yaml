@@ -1,0 +1,162 @@
+MetaData:
+  Team: Smoke
+  System: QaaS
+  ExtraLabels:
+    Component: Gateway
+    Area: Auth
+    Owner: Smoke
+    Environment: Lab
+    Scenario: Baseline
+
+ReportPortal:
+  Attributes:
+    Variation: SmokeQaaS
+    Suite: ReportPortalE2E
+    Profile: Baseline
+    Visibility: Core
+
+DataSources:
+  - Name: SmokeQaaSPayloads
+    Generator: ReportPortalPayloadGenerator
+    GeneratorConfiguration:
+      Count: 3
+      PayloadPrefix: smoke-qaas
+      Component: Gateway
+      Area: Auth
+      Owner: Smoke
+      EnvironmentName: Lab
+      Capability: AuthFlow
+      Region: IL
+      Scenario: Baseline
+      EvidenceCount: 3
+      Tags:
+        - Smoke
+        - QaaS
+        - Gateway
+        - Auth
+      Notes:
+        - Smoke baseline coverage for gateway login.
+        - Includes mixed assertion outcomes for dashboard seeding.
+
+Sessions:
+  - Name: Smoke API Session
+    Probes:
+      - Name: SmokeApiProbe
+        Probe: ReportPortalDiagnosticProbe
+        ProbeConfiguration:
+          StepName: Smoke API Diagnostics
+          TraceMessage: API probe completed without failure.
+          DelayMilliseconds: 120
+          Notes:
+            - API warm path
+            - latency within baseline window
+
+  - Name: Smoke Background Session
+    Probes:
+      - Name: SmokeBackgroundProbe
+        Probe: ReportPortalDiagnosticProbe
+        ProbeConfiguration:
+          StepName: Smoke Background Failure
+          TraceMessage: Background probe failed intentionally to enrich session history.
+          DelayMilliseconds: 80
+          ThrowOnRun: true
+          Notes:
+            - replay backlog exceeded threshold
+            - retry loop escalated to failure
+
+Assertions:
+  - Name: SmokeQaaSPassed
+    Assertion: ReportPortalRichAssertion
+    Severity: Critical
+    SessionNamePatterns:
+      - Smoke.*Session
+    DataSourceNames:
+      - SmokeQaaSPayloads
+    Links:
+      - Name: Smoke Gateway Dashboard
+        Grafana:
+          Url: https://grafana.example.local
+          DashboardId: smoke-gateway-overview
+          Variables:
+            - Key: system
+              Value: QaaS
+            - Key: component
+              Value: Gateway
+      - Name: Smoke Auth Error Rate
+        Prometheus:
+          Url: https://prometheus.example.local
+          Expressions:
+            - rate(smoke_auth_failures_total[5m])
+            - histogram_quantile(0.95, sum(rate(smoke_auth_latency_bucket[5m])) by (le))
+    AssertionConfiguration:
+      Outcome: Passed
+      Message: Smoke QaaS passed assertion message
+      TracePrefix: Smoke QaaS passed assertion trace
+      AttachmentCount: 2
+      AttachmentKinds:
+        - Json
+        - Yaml
+        - Binary
+      AdditionalTraceSections:
+        - Smoke gateway baseline passed with links, template export, and session data enabled.
+        - Use this assertion to validate attachment fan-out and metadata-based grouping.
+
+  - Name: SmokeQaaSFailed
+    Assertion: ReportPortalRichAssertion
+    Severity: Blocker
+    SessionNamePatterns:
+      - Smoke.*Session
+    DataSourceNames:
+      - SmokeQaaSPayloads
+    AssertionConfiguration:
+      Outcome: Failed
+      Message: Smoke QaaS failed assertion message
+      TracePrefix: Smoke QaaS failed assertion trace
+      AttachmentCount: 1
+      AttachmentKinds:
+        - Json
+        - Binary
+      AdditionalTraceSections:
+        - Failure path should expose the background-session action failure in both Allure and ReportPortal.
+        - The assertion remains deterministic so history grouping stays stable.
+
+  - Name: SmokeQaaSBroken
+    Assertion: ReportPortalRichAssertion
+    Severity: Normal
+    SessionNamePatterns:
+      - Smoke.*Session
+    AssertionConfiguration:
+      Outcome: Broken
+      Message: Smoke QaaS broken assertion message
+      TracePrefix: Smoke QaaS broken assertion trace
+      AttachmentCount: 1
+      AttachmentKinds:
+        - Yaml
+      AdditionalTraceSections:
+        - Broken assertions should preserve stack traces and the full generated trace payload.
+
+  - Name: SmokeQaaSNoTrace
+    Assertion: ReportPortalRichAssertion
+    Severity: Minor
+    DisplayTrace: false
+    SaveTemplate: false
+    SaveAttachments: false
+    DataSourcePatterns:
+      - Smoke.*Payloads
+    SessionNamePatterns:
+      - Smoke.*Session
+    Links:
+      - Name: Smoke Auth Discover
+        Kibana:
+          Url: https://kibana.example.local
+          DataViewId: smoke-auth-logs
+          KqlQuery: 'service.name : "smoke-auth" and labels.system : "QaaS"'
+    AssertionConfiguration:
+      Outcome: Passed
+      Message: Smoke QaaS no-trace assertion message
+      TracePrefix: Smoke QaaS hidden trace
+      AttachmentCount: 1
+      AttachmentKinds:
+        - Json
+      AdditionalTraceSections:
+        - This assertion verifies that hidden traces still keep rich message and link data.

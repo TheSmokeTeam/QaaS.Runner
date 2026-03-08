@@ -1,0 +1,139 @@
+MetaData:
+  Team: Wonder
+  System: Britian
+  ExtraLabels:
+    Component: Reporting
+    Area: Export
+    Owner: Wonder
+    Environment: Lab
+    Scenario: Stress
+    ReleaseRing: Pilot
+    Tenant: Orbit
+
+ReportPortal:
+  Attributes:
+    Variation: WonderBritianStress
+    Suite: ReportPortalE2E
+    Profile: Stress
+    StressLevel: High
+
+DataSources:
+  - Name: WonderBritianStressExportPayloads
+    Generator: ReportPortalPayloadGenerator
+    GeneratorConfiguration:
+      Count: 8
+      PayloadPrefix: wonder-britian-export
+      Component: Reporting
+      Area: Export
+      Owner: Wonder
+      EnvironmentName: Lab
+      Capability: ExportBurst
+      Region: IL
+      Scenario: Stress
+      EvidenceCount: 3
+  - Name: WonderBritianStressArchivePayloads
+    Generator: ReportPortalPayloadGenerator
+    GeneratorConfiguration:
+      Count: 5
+      PayloadPrefix: wonder-britian-archive
+      Component: Reporting
+      Area: Archive
+      Owner: Wonder
+      EnvironmentName: Lab
+      Capability: ArchivePressure
+      Region: IL
+      Scenario: Stress
+      EvidenceCount: 2
+
+Sessions:
+  - Name: Wonder Export Session
+    Probes:
+      - Name: WonderExportProbe
+        Probe: ReportPortalDiagnosticProbe
+        ProbeConfiguration:
+          StepName: Wonder Export Burst
+          TraceMessage: Export burst completed.
+          DelayMilliseconds: 120
+  - Name: Wonder Archive Session
+    Probes:
+      - Name: WonderArchiveProbe
+        Probe: ReportPortalDiagnosticProbe
+        ProbeConfiguration:
+          StepName: Wonder Archive Instability
+          TraceMessage: Archive session failed intentionally.
+          DelayMilliseconds: 100
+          ThrowOnRun: true
+  - Name: Wonder Reporting Audit Session
+    Probes:
+      - Name: WonderReportingAuditProbe
+        Probe: ReportPortalDiagnosticProbe
+        ProbeConfiguration:
+          StepName: Wonder Reporting Audit
+          TraceMessage: Reporting audit completed.
+          DelayMilliseconds: 70
+
+Assertions:
+  - Name: WonderBritianStressPassed
+    Assertion: ReportPortalRichAssertion
+    Severity: Blocker
+    SessionNamePatterns:
+      - Wonder.*Session
+    DataSourcePatterns:
+      - WonderBritianStress.*Payloads
+    AssertionConfiguration:
+      Outcome: Passed
+      Message: Wonder Britian stress pass assertion message
+      TracePrefix: Wonder Britian stress pass trace
+      AttachmentCount: 3
+      AttachmentKinds:
+        - Json
+        - Yaml
+        - Binary
+      TraceSectionRepeats: 2
+
+  - Name: WonderBritianStressFailed
+    Assertion: ReportPortalRichAssertion
+    Severity: Critical
+    SessionNamePatterns:
+      - Wonder.*Session
+    DataSourceNames:
+      - WonderBritianStressArchivePayloads
+    AssertionConfiguration:
+      Outcome: Failed
+      Message: Wonder Britian stress failed assertion message
+      TracePrefix: Wonder Britian stress failed trace
+      AttachmentCount: 2
+      AttachmentKinds:
+        - Json
+        - Binary
+
+  - Name: WonderBritianStressBroken
+    Assertion: ReportPortalRichAssertion
+    Severity: Blocker
+    SessionNamePatterns:
+      - Wonder.*Session
+    AssertionConfiguration:
+      Outcome: Broken
+      Message: Wonder Britian stress broken assertion message
+      TracePrefix: Wonder Britian stress broken trace
+      AttachmentCount: 1
+      AttachmentKinds:
+        - Yaml
+
+  - Name: WonderBritianStressMinimal
+    Assertion: ReportPortalRichAssertion
+    Severity: Trivial
+    DisplayTrace: false
+    SaveSessionData: false
+    SaveAttachments: false
+    SaveTemplate: false
+    SessionNamePatterns:
+      - Wonder.*Session
+    AssertionConfiguration:
+      Outcome: Passed
+      Message: Wonder Britian stress minimal assertion message
+      TracePrefix: Wonder Britian stress minimal trace
+      AttachmentCount: 1
+      AttachmentKinds:
+        - Json
+      IncludeFailureRollupInMessage: false

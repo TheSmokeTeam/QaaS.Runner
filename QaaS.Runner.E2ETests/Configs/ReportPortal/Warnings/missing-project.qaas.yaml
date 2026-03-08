@@ -1,0 +1,32 @@
+MetaData:
+  Team: GhostTeam
+  System: QaaS
+  ExtraLabels:
+    Component: MissingProject
+    Area: Validation
+    Owner: QaaS
+
+ReportPortal:
+  Attributes:
+    Variation: MissingProject
+    Suite: ReportPortalE2E
+
+Sessions:
+  - Name: Missing Project Session
+    Probes:
+      - Name: MissingProjectProbe
+        Probe: ReportPortalDiagnosticProbe
+        ProbeConfiguration:
+          StepName: Missing Project Diagnostics
+          TraceMessage: This run should warn because the ReportPortal project does not exist.
+
+Assertions:
+  - Name: MissingProjectAssertion
+    Assertion: ReportPortalRichAssertion
+    AssertionConfiguration:
+      Outcome: Passed
+      Message: Missing project warning assertion message
+      TracePrefix: Missing project warning assertion trace
+      AttachmentCount: 1
+      AttachmentKinds:
+        - Json

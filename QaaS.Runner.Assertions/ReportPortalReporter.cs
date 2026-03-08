@@ -1,24 +1,20 @@
+using Microsoft.Extensions.Logging;
 using System.Text;
-using System.Text.Json;
-using System.Text.Json.Serialization;
-using Microsoft.Extensions.Configuration;
-using QaaS.Framework.Configurations;
-using QaaS.Framework.SDK.Session;
-using QaaS.Framework.SDK.Session.SessionDataObjects;
-using QaaS.Framework.Serialization;
 using ReportPortal.Client.Abstractions.Models;
 using ReportPortal.Client.Abstractions.Requests;
+using QaaS.Framework.Configurations;
+using QaaS.Framework.SDK.Hooks.Assertion;
+using QaaS.Framework.SDK.Session.SessionDataObjects;
 using QaaS.Runner.Assertions.AssertionObjects;
 using QaaS.Runner.Assertions.ConfigurationObjects;
-using QaaS.Framework.SDK.Hooks.Assertion;
-using AssertionResult = QaaS.Runner.Assertions.AssertionObjects.AssertionResult;
 using AssertionSeverity = QaaS.Runner.Assertions.AssertionObjects.AssertionSeverity;
+using ReportPortalLogLevel = ReportPortal.Client.Abstractions.Models.LogLevel;
 
 namespace QaaS.Runner.Assertions;
 
 /// <summary>
-/// Publishes QaaS runner assertion results into ReportPortal while preserving the existing Allure writer.
-/// Each QaaS assertion result is mapped to one ReportPortal test item plus logs and attachments.
+/// Publishes QaaS runner assertion results into ReportPortal while preserving the existing Allure writer. Publishing is
+/// best-effort: failures are logged as warnings and never change the runner exit code.
 /// </summary>
 public class ReportPortalReporter : BaseReporter
 {
@@ -46,20 +42,42 @@ public class ReportPortalReporter : BaseReporter
     public required ReportPortalLaunchManager LaunchManager { get; init; }
 
     /// <summary>
-    /// Writes one runner-produced assertion result into the shared ReportPortal launch.
-    /// The reporter creates the test item, sends outcome/session/template/attachment logs, and then finalizes the item.
+    /// Writes one runner-produced assertion result into the shared ReportPortal launch for the corresponding team project
+    /// and system. Any publishing failure is downgraded to a warning so QaaS can continue running.
     /// </summary>
-    /// <param name="assertionResult">The QaaS assertion result produced by the runner pipeline.</param>
     public override void WriteTestResults(AssertionResult assertionResult)
     {
         ArgumentNullException.ThrowIfNull(assertionResult);
 
+        try
+        {
+            WriteTestResultsCore(assertionResult);
+        }
+        catch (Exception exception)
+        {
+            Context.Logger.LogWarning(exception,
+                "Could not publish assertion {AssertionName} to ReportPortal for team {TeamName} and system {SystemName}. The run will continue.",
+                assertionResult.Assertion.Name,
+                Settings.Team ?? "<missing-team>",
+                Settings.System);
+        }
+    }
+
+    private void WriteTestResultsCore(AssertionResult assertionResult)
+    {
         var launch = LaunchManager.EnsureLaunchStartedAsync(Settings, Context.Logger).GetAwaiter().GetResult();
         if (launch is null)
             return;
 
-        var startTimeUtc = GetAssertionStartTime(assertionResult);
-        var finishTimeUtc = startTimeUtc.AddMilliseconds(Math.Max(assertionResult.TestDurationMs, 0));
+        var requestedStartTimeUtc = GetAssertionStartTime(assertionResult);
+        var startTimeUtc = requestedStartTimeUtc < launch.LaunchStartTimeUtc
+            ? launch.LaunchStartTimeUtc
+            : requestedStartTimeUtc;
+        var finishTimeUtc = startTimeUtc.AddMilliseconds(Math.Max(assertionResult.TestDurationMs, 1));
+        var itemAttributes = BuildItemAttributes(assertionResult);
+        var stableIdentity = BuildStableReportPortalIdentity(assertionResult,
+            Settings.Team ?? "Unknown Team",
+            Settings.System);
         var itemUuid = launch.Service.TestItem.StartAsync(new StartTestItemRequest
         {
             LaunchUuid = launch.LaunchUuid,
@@ -67,15 +85,16 @@ public class ReportPortalReporter : BaseReporter
             Description = BuildDescription(assertionResult),
             StartTime = startTimeUtc,
             Type = TestItemType.Test,
-            UniqueId = BuildUniqueId(assertionResult),
-            TestCaseId = BuildUniqueId(assertionResult),
-            CodeReference = BuildCodeReference(assertionResult),
+            UniqueId = stableIdentity,
+            TestCaseId = stableIdentity,
+            CodeReference = BuildCodeReference(stableIdentity),
             Parameters = BuildParameters(assertionResult),
-            Attributes = BuildItemAttributes(assertionResult)
+            Attributes = itemAttributes
         }).GetAwaiter().GetResult().Uuid;
 
         try
         {
+            WriteAssertionContextLog(launch, itemUuid, assertionResult, stableIdentity);
             WriteAssertionOutcomeLog(launch, itemUuid, assertionResult);
             WriteLinksLog(launch, itemUuid, assertionResult);
             WriteSessionLogs(launch, itemUuid, assertionResult);
@@ -88,7 +107,7 @@ public class ReportPortalReporter : BaseReporter
                 EndTime = finishTimeUtc,
                 Status = AssertionStatusToReportPortalStatusMap[assertionResult.AssertionStatus],
                 Description = BuildDescription(assertionResult),
-                Attributes = BuildItemAttributes(assertionResult)
+                Attributes = itemAttributes
             }).GetAwaiter().GetResult();
         }
         catch
@@ -98,25 +117,56 @@ public class ReportPortalReporter : BaseReporter
         }
     }
 
+    private void WriteAssertionContextLog(ReportPortalLaunchContext launch, string itemUuid, AssertionResult assertionResult,
+        string stableIdentity)
+    {
+        var metadataAttributes = BuildMetadataAttributes();
+        var contextText = new StringBuilder()
+            .AppendLine("Assertion context:")
+            .AppendLine($"- Stable identity: {stableIdentity}")
+            .AppendLine($"- Team: {Settings.Team ?? "<missing-team>"}")
+            .AppendLine($"- System: {Settings.System}")
+            .AppendLine($"- ExecutionId: {Context.ExecutionId ?? "<none>"}")
+            .AppendLine($"- CaseName: {Context.CaseName ?? "<none>"}")
+            .AppendLine($"- Sessions: {assertionResult.Assertion.SessionDataList.Count}")
+            .AppendLine($"- Data sources: {assertionResult.Assertion.DataSourceList?.Count ?? 0}")
+            .AppendLine()
+            .AppendLine("Metadata:")
+            .AppendLine(BuildMetadataSummaryText(metadataAttributes))
+            .ToString()
+            .Trim();
+
+        CreateLogItem(launch, itemUuid, ReportPortalLogLevel.Info, contextText,
+            BuildAssertionContextArtifact(assertionResult, Settings.Team, Settings.System));
+    }
+
     private void WriteAssertionOutcomeLog(ReportPortalLaunchContext launch, string itemUuid, AssertionResult assertionResult)
     {
         var logLevel = assertionResult.AssertionStatus switch
         {
-            AssertionStatus.Passed => LogLevel.Info,
-            AssertionStatus.Skipped => LogLevel.Warning,
-            AssertionStatus.Unknown => LogLevel.Warning,
-            AssertionStatus.Failed => LogLevel.Error,
-            AssertionStatus.Broken => LogLevel.Error,
-            _ => LogLevel.Info
+            AssertionStatus.Passed => ReportPortalLogLevel.Info,
+            AssertionStatus.Skipped => ReportPortalLogLevel.Warning,
+            AssertionStatus.Unknown => ReportPortalLogLevel.Warning,
+            AssertionStatus.Failed => ReportPortalLogLevel.Error,
+            AssertionStatus.Broken => ReportPortalLogLevel.Error,
+            _ => ReportPortalLogLevel.Info
         };
 
-        var outcomeText = assertionResult.AssertionStatus switch
+        var assertionTextDetails = BuildAssertionTextDetails(assertionResult);
+        var text = new StringBuilder()
+            .AppendLine($"Assertion status: {assertionResult.AssertionStatus}")
+            .AppendLine()
+            .AppendLine(string.IsNullOrWhiteSpace(assertionTextDetails.Message)
+                ? "No assertion message was provided."
+                : assertionTextDetails.Message);
+
+        if (!string.IsNullOrWhiteSpace(assertionTextDetails.Trace))
         {
-            AssertionStatus.Broken => BuildBrokenAssertionText(assertionResult),
-            _ => BuildRegularAssertionText(assertionResult)
-        };
+            text.AppendLine()
+                .AppendLine(assertionTextDetails.Trace);
+        }
 
-        CreateLogItem(launch, itemUuid, logLevel, outcomeText, null, null);
+        CreateLogItem(launch, itemUuid, logLevel, text.ToString().Trim(), null);
     }
 
     private void WriteLinksLog(ReportPortalLaunchContext launch, string itemUuid, AssertionResult assertionResult)
@@ -133,7 +183,7 @@ public class ReportPortalReporter : BaseReporter
             .AppendJoin(Environment.NewLine, links.Select(link => $"- {link.Key}: {link.Value}"))
             .ToString();
 
-        CreateLogItem(launch, itemUuid, LogLevel.Info, text, null, null);
+        CreateLogItem(launch, itemUuid, ReportPortalLogLevel.Info, text, null);
     }
 
     private void WriteSessionLogs(ReportPortalLaunchContext launch, string itemUuid, AssertionResult assertionResult)
@@ -141,70 +191,43 @@ public class ReportPortalReporter : BaseReporter
         foreach (var sessionData in assertionResult.Assertion.SessionDataList)
         {
             var summary = BuildSessionSummaryText(sessionData);
-            if (SaveSessionData)
-            {
-                CreateLogItem(launch, itemUuid, sessionData.SessionFailures.Any() ? LogLevel.Error : LogLevel.Info,
-                    summary,
-                    SessionDataSerialization.SerializeSessionData(sessionData,
-                        new JsonSerializerOptions
-                        {
-                            WriteIndented = true,
-                            DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull
-                        }),
-                    $"{sessionData.Name}.json",
-                    JsonAttachmentType);
-            }
-            else
-            {
-                CreateLogItem(launch, itemUuid, sessionData.SessionFailures.Any() ? LogLevel.Error : LogLevel.Info,
-                    summary, null, null);
-            }
+            var sessionArtifact = BuildSessionArtifact(sessionData);
+            CreateLogItem(launch, itemUuid,
+                sessionData.SessionFailures.Any() ? ReportPortalLogLevel.Error : ReportPortalLogLevel.Info,
+                summary,
+                sessionArtifact);
 
             foreach (var actionFailure in sessionData.SessionFailures)
             {
-                CreateLogItem(launch, itemUuid, LogLevel.Error, BuildActionFailureText(sessionData, actionFailure),
-                    null, null);
+                CreateLogItem(launch, itemUuid, ReportPortalLogLevel.Error,
+                    BuildActionFailureText(sessionData, actionFailure), null);
             }
         }
     }
 
     private void WriteTemplateAttachment(ReportPortalLaunchContext launch, string itemUuid)
     {
-        if (!SaveTemplate)
+        var templateArtifact = BuildTemplateArtifact();
+        if (templateArtifact is null)
             return;
 
-        CreateLogItem(launch, itemUuid, LogLevel.Info, "Execution configuration template.",
-            Encoding.UTF8.GetBytes(
-                Context.RootConfiguration.BuildConfigurationAsYaml(QaaS.Runner.Infrastructure.Constants
-                    .ConfigurationSectionNames)),
-            "template.yaml",
-            YamlAttachmentType);
+        CreateLogItem(launch, itemUuid, ReportPortalLogLevel.Info, "Execution configuration template.",
+            templateArtifact);
     }
 
     private void WriteAssertionAttachments(ReportPortalLaunchContext launch, string itemUuid, AssertionResult assertionResult)
     {
-        if (!SaveAttachments)
-            return;
-
-        foreach (var assertionAttachment in assertionResult.Assertion.AssertionHook?.AssertionAttachments ?? [])
+        foreach (var artifact in BuildAssertionArtifacts(assertionResult))
         {
-            var serializer = SerializerFactory.BuildSerializer(assertionAttachment.SerializationType);
-            var serializedData = serializer?.Serialize(assertionAttachment.Data) ??
-                                 (assertionAttachment.Data as byte[] ?? []);
-            var attachmentName = Path.GetFileName(assertionAttachment.Path);
-            if (string.IsNullOrWhiteSpace(attachmentName))
-                attachmentName = "attachment.bin";
-
-            CreateLogItem(launch, itemUuid, LogLevel.Info,
-                $"Assertion attachment: {assertionAttachment.Path}",
-                serializedData,
-                attachmentName,
-                GetAttachmentTypeBySerializationType(assertionAttachment.SerializationType));
+            CreateLogItem(launch, itemUuid, ReportPortalLogLevel.Info,
+                $"Assertion attachment: {artifact.RelativePath}",
+                artifact);
         }
     }
 
-    private void CreateLogItem(ReportPortalLaunchContext launch, string itemUuid, LogLevel level, string text,
-        byte[]? attachmentBytes, string? attachmentName, string? attachmentType = null)
+    private void CreateLogItem(ReportPortalLaunchContext launch, string itemUuid, ReportPortalLogLevel level,
+        string text,
+        ReportArtifact? artifact)
     {
         var request = new CreateLogItemRequest
         {
@@ -215,11 +238,11 @@ public class ReportPortalReporter : BaseReporter
             Time = DateTime.UtcNow
         };
 
-        if (attachmentBytes is not null)
+        if (artifact is not null)
         {
-            request.Attach = new LogItemAttach(attachmentType ?? RawDataAttachmentType, attachmentBytes)
+            request.Attach = new LogItemAttach(artifact.ContentType ?? RawDataAttachmentType, artifact.Content)
             {
-                Name = attachmentName ?? Guid.NewGuid().ToString("N")
+                Name = Path.GetFileName(artifact.Name)
             };
         }
 
@@ -236,13 +259,31 @@ public class ReportPortalReporter : BaseReporter
 
     private IList<KeyValuePair<string, string>> BuildParameters(AssertionResult assertionResult)
     {
-        return new List<KeyValuePair<string, string>>
+        var parameters = new List<KeyValuePair<string, string>>
         {
             new("Session Names",
                 $"[{string.Join(", ", assertionResult.Assertion.SessionDataList.Select(session => session.Name))}]"),
             new("Data Sources",
                 $"[{string.Join(", ", assertionResult.Assertion.DataSourceList?.Select(dataSource => dataSource.Name) ?? [])}]")
         };
+
+        if (!string.IsNullOrWhiteSpace(Settings.Team))
+            parameters.Add(new KeyValuePair<string, string>("Team", Settings.Team));
+        if (!string.IsNullOrWhiteSpace(Settings.System))
+            parameters.Add(new KeyValuePair<string, string>("System", Settings.System));
+        if (!string.IsNullOrWhiteSpace(Context.ExecutionId))
+            parameters.Add(new KeyValuePair<string, string>("Execution Id", Context.ExecutionId));
+        if (!string.IsNullOrWhiteSpace(Context.CaseName))
+            parameters.Add(new KeyValuePair<string, string>("Case Name", Context.CaseName));
+
+        foreach (var metadataAttribute in BuildMetadataAttributes()
+                     .Where(attribute => !string.IsNullOrWhiteSpace(attribute.Key)))
+        {
+            parameters.Add(new KeyValuePair<string, string>(metadataAttribute.Key.Trim(),
+                metadataAttribute.Value?.Trim() ?? string.Empty));
+        }
+
+        return parameters;
     }
 
     private IList<ItemAttribute> BuildItemAttributes(AssertionResult assertionResult)
@@ -263,23 +304,31 @@ public class ReportPortalReporter : BaseReporter
             {
                 Key = "severity",
                 Value = AssertionSeverityToAttributeValueMap[Severity]
-            },
-            new()
+            }
+        };
+
+        if (!string.IsNullOrWhiteSpace(Settings.Team))
+        {
+            attributes.Add(new ItemAttribute
             {
                 Key = "team",
                 Value = Settings.Team
-            },
-            new()
+            });
+        }
+
+        if (!string.IsNullOrWhiteSpace(Settings.System))
+        {
+            attributes.Add(new ItemAttribute
             {
                 Key = "system",
                 Value = Settings.System
-            }
-        };
+            });
+        }
 
         foreach (var sessionName in assertionResult.Assertion.SessionDataList
                      .Select(session => session.Name)
                      .Where(sessionName => !string.IsNullOrWhiteSpace(sessionName))
-                     .Distinct(StringComparer.Ordinal))
+                     .Distinct(StringComparer.OrdinalIgnoreCase))
         {
             attributes.Add(new ItemAttribute
             {
@@ -306,12 +355,56 @@ public class ReportPortalReporter : BaseReporter
             });
         }
 
+        foreach (var attribute in Settings.Attributes.Where(attribute => !string.IsNullOrWhiteSpace(attribute.Key)))
+        {
+            attributes.Add(new ItemAttribute
+            {
+                Key = attribute.Key.Trim(),
+                Value = attribute.Value?.Trim() ?? string.Empty
+            });
+        }
+
+        foreach (var metadataAttribute in BuildMetadataAttributes()
+                     .Where(attribute => !string.IsNullOrWhiteSpace(attribute.Key)))
+        {
+            attributes.Add(new ItemAttribute
+            {
+                Key = metadataAttribute.Key.Trim(),
+                Value = metadataAttribute.Value?.Trim() ?? string.Empty
+            });
+        }
+
         return attributes;
     }
 
     private string BuildDescription(AssertionResult assertionResult)
     {
-        var description = new StringBuilder()
+        var assertionTextDetails = BuildAssertionTextDetails(assertionResult);
+        var metadataAttributes = BuildMetadataAttributes();
+        var description = new StringBuilder();
+
+        if (!string.IsNullOrWhiteSpace(assertionTextDetails.Message))
+        {
+            description.AppendLine("Assertion message:")
+                .AppendLine(assertionTextDetails.Message.Trim());
+        }
+
+        description.AppendLine()
+            .AppendLine("Execution context:")
+            .AppendLine($"- Team: {Settings.Team ?? "<missing-team>"}")
+            .AppendLine($"- System: {Settings.System}")
+            .AppendLine($"- Execution Id: {Context.ExecutionId ?? "<none>"}")
+            .AppendLine($"- Case Name: {Context.CaseName ?? "<none>"}")
+            .AppendLine($"- Sessions: {string.Join(", ", assertionResult.Assertion.SessionDataList.Select(session => session.Name))}")
+            .AppendLine($"- Data Sources: {string.Join(", ", assertionResult.Assertion.DataSourceList?.Select(dataSource => dataSource.Name) ?? [])}");
+
+        description.AppendLine()
+            .AppendLine("Metadata attributes:")
+            .AppendLine("```text")
+            .AppendLine(BuildMetadataSummaryText(metadataAttributes))
+            .AppendLine("```");
+
+        description.AppendLine()
             .AppendLine("Assertion configuration:")
             .AppendLine("```yaml")
             .AppendLine(assertionResult.Assertion.AssertionConfiguration.BuildConfigurationAsYaml())
@@ -326,97 +419,9 @@ public class ReportPortalReporter : BaseReporter
         return description.ToString().Trim();
     }
 
-    private string BuildUniqueId(AssertionResult assertionResult)
+    private static string BuildCodeReference(string stableIdentity)
     {
-        return string.Join("::",
-            new[]
-            {
-                Context.ExecutionId ?? "runner",
-                Context.CaseName ?? "default",
-                assertionResult.Assertion.Name
-            });
-    }
-
-    private string BuildCodeReference(AssertionResult assertionResult)
-    {
-        return string.Join("/",
-            new[]
-            {
-                Context.ExecutionId ?? "runner",
-                Context.CaseName ?? "default",
-                assertionResult.Assertion.AssertionName,
-                assertionResult.Assertion.Name
-            });
-    }
-
-    private string BuildRegularAssertionText(AssertionResult assertionResult)
-    {
-        var message = assertionResult.Assertion.AssertionHook?.AssertionMessage ?? string.Empty;
-        var trace = DisplayTrace
-            ? assertionResult.Assertion.AssertionHook?.AssertionTrace ?? string.Empty
-            : TraceDisplayFalseMessage;
-
-        if (string.IsNullOrWhiteSpace(message) && string.IsNullOrWhiteSpace(trace))
-            return $"Assertion completed with status {assertionResult.AssertionStatus}.";
-
-        return string.IsNullOrWhiteSpace(trace)
-            ? message
-            : $"{message}{Environment.NewLine}{Environment.NewLine}{trace}".Trim();
-    }
-
-    private string BuildBrokenAssertionText(AssertionResult assertionResult)
-    {
-        var trace = DisplayTrace
-            ? assertionResult.BrokenAssertionException?.ToString() ?? string.Empty
-            : TraceDisplayFalseMessage;
-
-        return $"{assertionResult.BrokenAssertionException?.Message ?? "Broken assertion"}{Environment.NewLine}{Environment.NewLine}{trace}"
-            .Trim();
-    }
-
-    private static string BuildSessionSummaryText(SessionData sessionData)
-    {
-        return
-            $"Session: {sessionData.Name}{Environment.NewLine}" +
-            $"Inputs: [{string.Join(", ", (sessionData.Inputs ?? []).Select(input => input.Name))}]{Environment.NewLine}" +
-            $"Outputs: [{string.Join(", ", (sessionData.Outputs ?? []).Select(output => output.Name))}]{Environment.NewLine}" +
-            $"Start: {sessionData.UtcStartTime:O}{Environment.NewLine}" +
-            $"End: {sessionData.UtcEndTime:O}{Environment.NewLine}" +
-            $"Failures: {sessionData.SessionFailures.Count}";
-    }
-
-    private static string BuildActionFailureText(SessionData sessionData, ActionFailure actionFailure)
-    {
-        return
-            $"Session `{sessionData.Name}` action failure.{Environment.NewLine}" +
-            $"Action: {actionFailure.Action}{Environment.NewLine}" +
-            $"Action type: {actionFailure.ActionType}{Environment.NewLine}" +
-            $"Name: {actionFailure.Name}{Environment.NewLine}" +
-            $"Reason: {actionFailure.Reason.Description}{Environment.NewLine}" +
-            $"Message: {actionFailure.Reason.Message}";
-    }
-
-    private static string BuildFlakinessText(
-        IEnumerable<KeyValuePair<string, List<ActionFailure>>> flakinessReasons)
-    {
-        var builder = new StringBuilder("Flakiness reasons:");
-        foreach (var sessionFailurePair in flakinessReasons)
-        {
-            foreach (var sessionFailure in sessionFailurePair.Value)
-            {
-                builder.AppendLine()
-                    .Append("- Session ")
-                    .Append(sessionFailurePair.Key)
-                    .Append(": ")
-                    .Append(sessionFailure.Name)
-                    .Append(" (")
-                    .Append(sessionFailure.ActionType)
-                    .Append(") -> ")
-                    .Append(sessionFailure.Reason.Message);
-            }
-        }
-
-        return builder.ToString();
+        return $"qaas/{stableIdentity.Replace("::", "/", StringComparison.Ordinal)}";
     }
 
     private void TryFinishAsFailed(ReportPortalLaunchContext launch, string itemUuid)

@@ -1,7 +1,41 @@
-﻿Commands:
-  - Command: run test.qaas.yaml -w Variables/local.yaml
-    Id: PreTest
-  - Command: act test.qaas.yaml -w Variables/k8s.yaml -c Cases -v
-    Id: Act
-  - Command: assert test.qaas.yaml -w Variables/k8s.yaml -c Cases -v
-    Id: Assert
+Commands:
+  # Compose mixed-team and mixed-system runs by passing multiple command IDs to the outer execute command.
+  # Examples:
+  #   execute executable.yaml -c SmokeQaaS -c SmokeQaaSStress
+  #   execute executable.yaml -c SmokeQaaS -c SmokeSmooth -c SmokeSmoothStress
+  #   execute executable.yaml -c SmokeQaaSStress -c TactiCrawlerStress -c WonderYoungStress
+  #   execute executable.yaml -c SmokeQaaS -c WonderYoung -c WonderBritianStress
+  # For InvalidApiKey set QAAS_REPORTPORTAL_API_KEY to an invalid value before running execute.
+  # For MissingEndpoint unset QAAS_REPORTPORTAL_ENDPOINT before running execute.
+  - Id: SmokeQaaS
+    Command: run Configs/ReportPortal/Teams/Smoke/smoke-qaas.qaas.yaml
+  - Id: SmokeQaaSStress
+    Command: run Configs/ReportPortal/Teams/Smoke/smoke-qaas-stress.qaas.yaml
+  - Id: SmokeSmooth
+    Command: run Configs/ReportPortal/Teams/Smoke/smoke-smooth.qaas.yaml
+  - Id: SmokeSmoothStress
+    Command: run Configs/ReportPortal/Teams/Smoke/smoke-smooth-stress.qaas.yaml
+  - Id: TactiCrawler
+    Command: run Configs/ReportPortal/Teams/Tacti/tacti-crawler.qaas.yaml
+  - Id: TactiCrawlerStress
+    Command: run Configs/ReportPortal/Teams/Tacti/tacti-crawler-stress.qaas.yaml
+  - Id: TactiMifal
+    Command: run Configs/ReportPortal/Teams/Tacti/tacti-mifal.qaas.yaml
+  - Id: TactiMifalStress
+    Command: run Configs/ReportPortal/Teams/Tacti/tacti-mifal-stress.qaas.yaml
+  - Id: WonderYoung
+    Command: run Configs/ReportPortal/Teams/Wonder/wonder-young.qaas.yaml
+  - Id: WonderYoungStress
+    Command: run Configs/ReportPortal/Teams/Wonder/wonder-young-stress.qaas.yaml
+  - Id: WonderBritian
+    Command: run Configs/ReportPortal/Teams/Wonder/wonder-britian.qaas.yaml
+  - Id: WonderBritianStress
+    Command: run Configs/ReportPortal/Teams/Wonder/wonder-britian-stress.qaas.yaml
+  - Id: MissingProject
+    Command: run Configs/ReportPortal/Warnings/missing-project.qaas.yaml
+  - Id: CaseInsensitiveTeam
+    Command: run Configs/ReportPortal/Warnings/case-insensitive-team.qaas.yaml
+  - Id: InvalidApiKey
+    Command: run Configs/ReportPortal/Warnings/smoke-warning-safe.qaas.yaml
+  - Id: MissingEndpoint
+    Command: run Configs/ReportPortal/Warnings/smoke-warning-safe.qaas.yaml

@@ -8,39 +8,31 @@ using QaaS.Runner.Assertions.ConfigurationObjects;
 namespace QaaS.Runner.Assertions;
 
 /// <summary>
-/// Owns the single ReportPortal launch used by one runner invocation. The manager starts the launch lazily
-/// when the first assertion is reported, reuses that launch for every later assertion, and finishes it during teardown.
+/// Owns the ReportPortal launches used by one runner invocation. QaaS opens at most one launch per
+/// endpoint/project/system combination and reuses it across all matching assertions in the invocation.
 /// </summary>
 public sealed class ReportPortalLaunchManager : IDisposable
 {
     private readonly SemaphoreSlim _launchLock = new(1, 1);
-    private readonly ReportPortalProvisioningClient _provisioningClient;
-    private Service? _service;
-    private string? _launchUuid;
-    private ReportPortalSettings? _settings;
-    private DateTime _launchStartTimeUtc;
-    private bool _launchFinished;
+    private readonly ReportPortalAccessValidator _accessValidator;
+    private readonly Dictionary<string, ManagedLaunch> _launches = new(StringComparer.Ordinal);
+    private readonly HashSet<string> _suppressedLaunchKeys = new(StringComparer.Ordinal);
     private bool _disposed;
 
-    public ReportPortalLaunchManager() : this(new ReportPortalProvisioningClient())
+    public ReportPortalLaunchManager() : this(new ReportPortalAccessValidator())
     {
     }
 
-    internal ReportPortalLaunchManager(ReportPortalProvisioningClient provisioningClient)
+    internal ReportPortalLaunchManager(ReportPortalAccessValidator accessValidator)
     {
-        _provisioningClient = provisioningClient;
+        _accessValidator = accessValidator;
     }
 
     /// <summary>
-    /// Starts the shared ReportPortal launch on first use and returns the launch context required by reporters.
-    /// Subsequent calls reuse the same launch and verify that the requested settings are compatible.
+    /// Starts or reuses the shared launch for the resolved ReportPortal project and system. When the minimal access
+    /// checks fail or launch creation fails, the manager logs a warning and returns <see langword="null" /> so the
+    /// caller can keep the run green.
     /// </summary>
-    /// <param name="settings">The resolved ReportPortal settings for the current execution.</param>
-    /// <param name="logger">Logger used for lifecycle diagnostics.</param>
-    /// <param name="cancellationToken">Cancellation token for the remote API call.</param>
-    /// <returns>
-    /// The active launch context, or <see langword="null" /> when ReportPortal publishing is disabled for this run.
-    /// </returns>
     internal async Task<ReportPortalLaunchContext?> EnsureLaunchStartedAsync(ReportPortalSettings settings,
         ILogger logger, CancellationToken cancellationToken = default)
     {
@@ -50,49 +42,65 @@ public sealed class ReportPortalLaunchManager : IDisposable
         if (!settings.Enabled)
             return null;
 
+        var accessResult = await _accessValidator.EnsureWriteAccessAsync(settings, logger, cancellationToken)
+            .ConfigureAwait(false);
+        if (!accessResult.CanPublish ||
+            accessResult.EndpointUri is null ||
+            string.IsNullOrWhiteSpace(accessResult.Project) ||
+            string.IsNullOrWhiteSpace(accessResult.ApiKey))
+        {
+            return null;
+        }
+
+        var launchKey = settings.BuildLaunchGroupKey(accessResult.Project, accessResult.EndpointUri);
+
         await _launchLock.WaitAsync(cancellationToken).ConfigureAwait(false);
         try
         {
-            if (_launchUuid is not null && _service is not null)
-            {
-                EnsureCompatibleSettings(settings);
-                return new ReportPortalLaunchContext(_service, _launchUuid);
-            }
+            if (_launches.TryGetValue(launchKey, out var existingLaunch))
+                return existingLaunch.ToContext();
 
-            settings.Validate();
-            _settings = settings;
-            _launchStartTimeUtc = DateTime.UtcNow;
-            var provisioningResult = await _provisioningClient
-                .EnsureProjectAccessAsync(settings, logger, cancellationToken)
-                .ConfigureAwait(false);
-            _service = new Service(settings.EndpointUri, provisioningResult.Project, provisioningResult.ApiKey);
+            if (_suppressedLaunchKeys.Contains(launchKey))
+                return null;
+
+            IClientService service = new Service(accessResult.EndpointUri, accessResult.Project, accessResult.ApiKey);
+            var launchStartTimeUtc = DateTime.UtcNow;
 
             try
             {
-                var launch = await _service.Launch.StartAsync(new StartLaunchRequest
+                var launch = await service.Launch.StartAsync(new StartLaunchRequest
                 {
                     Name = settings.LaunchName,
                     Description = settings.Description,
                     Mode = settings.DebugMode ? LaunchMode.Debug : LaunchMode.Default,
-                    StartTime = _launchStartTimeUtc,
+                    StartTime = launchStartTimeUtc,
                     Attributes = settings.BuildLaunchAttributes()
                 }, cancellationToken).ConfigureAwait(false);
 
-                _launchUuid = launch.Uuid;
-                logger.LogInformation(
-                    "Started ReportPortal launch {LaunchUuid} in project {ProjectName} using endpoint {Endpoint}",
-                    _launchUuid, provisioningResult.Project, settings.Endpoint);
+                var managedLaunch = new ManagedLaunch(
+                    launchKey,
+                    accessResult.Project,
+                    settings.System,
+                    launchStartTimeUtc,
+                    service,
+                    launch.Uuid);
+                _launches[launchKey] = managedLaunch;
 
-                return new ReportPortalLaunchContext(_service, _launchUuid);
+                logger.LogInformation(
+                    "Started ReportPortal launch {LaunchUuid} in project {ProjectName} for system {SystemName}.",
+                    launch.Uuid, accessResult.Project, settings.System);
+
+                return managedLaunch.ToContext();
             }
-            catch
+            catch (Exception exception)
             {
-                _service.Dispose();
-                _service = null;
-                _settings = null;
-                _launchUuid = null;
-                _launchStartTimeUtc = default;
-                throw;
+                if (service is IDisposable disposableService)
+                    disposableService.Dispose();
+                _suppressedLaunchKeys.Add(launchKey);
+                logger.LogWarning(exception,
+                    "Could not start ReportPortal launch for project {ProjectName} and system {SystemName}. ReportPortal publishing will be skipped for this launch group.",
+                    accessResult.Project, settings.System);
+                return null;
             }
         }
         finally
@@ -102,11 +110,8 @@ public sealed class ReportPortalLaunchManager : IDisposable
     }
 
     /// <summary>
-    /// Finishes the shared ReportPortal launch if one was started. This is called from runner teardown so the launch
-    /// closes cleanly before any optional Allure serving step blocks the process.
+    /// Finishes every launch that was started during the invocation. Launch finalization is best-effort and never throws.
     /// </summary>
-    /// <param name="logger">Logger used for lifecycle diagnostics.</param>
-    /// <param name="cancellationToken">Cancellation token for the remote API call.</param>
     public async Task FinishLaunchAsync(ILogger logger, CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(logger);
@@ -114,19 +119,32 @@ public sealed class ReportPortalLaunchManager : IDisposable
         await _launchLock.WaitAsync(cancellationToken).ConfigureAwait(false);
         try
         {
-            if (_launchFinished || _launchUuid is null || _service is null)
+            if (_launches.Count == 0)
             {
-                logger.LogDebug("ReportPortal launch finalization skipped because no launch is active.");
+                logger.LogDebug("ReportPortal launch finalization skipped because no launches were started.");
                 return;
             }
 
-            await _service.Launch.FinishAsync(_launchUuid, new FinishLaunchRequest
+            foreach (var launch in _launches.Values.Where(launch => !launch.IsFinished))
             {
-                EndTime = DateTime.UtcNow
-            }, cancellationToken).ConfigureAwait(false);
-
-            _launchFinished = true;
-            logger.LogInformation("Finished ReportPortal launch {LaunchUuid}", _launchUuid);
+                try
+                {
+                    await launch.Service.Launch.FinishAsync(launch.LaunchUuid, new FinishLaunchRequest
+                    {
+                        EndTime = DateTime.UtcNow
+                    }, cancellationToken).ConfigureAwait(false);
+                    launch.IsFinished = true;
+                    logger.LogInformation(
+                        "Finished ReportPortal launch {LaunchUuid} in project {ProjectName} for system {SystemName}.",
+                        launch.LaunchUuid, launch.Project, launch.System);
+                }
+                catch (Exception exception)
+                {
+                    logger.LogWarning(exception,
+                        "Could not finish ReportPortal launch {LaunchUuid} in project {ProjectName}.",
+                        launch.LaunchUuid, launch.Project);
+                }
+            }
         }
         finally
         {
@@ -134,19 +152,6 @@ public sealed class ReportPortalLaunchManager : IDisposable
         }
     }
 
-    private void EnsureCompatibleSettings(ReportPortalSettings settings)
-    {
-        if (_settings is null || _settings.IsCompatibleWith(settings))
-            return;
-
-        throw new InvalidOperationException(
-            "Multiple executions in the same runner invocation attempted to publish to different ReportPortal launches. " +
-            "Use one consistent ReportPortal configuration per runner invocation.");
-    }
-
-    /// <summary>
-    /// Releases the underlying client resources owned by the launch manager.
-    /// </summary>
     public void Dispose()
     {
         if (_disposed)
@@ -154,9 +159,35 @@ public sealed class ReportPortalLaunchManager : IDisposable
 
         _disposed = true;
         _launchLock.Dispose();
-        _service?.Dispose();
-        _provisioningClient.Dispose();
+        foreach (var launch in _launches.Values)
+        {
+            if (launch.Service is IDisposable disposableService)
+                disposableService.Dispose();
+        }
+        _accessValidator.Dispose();
         GC.SuppressFinalize(this);
+    }
+
+    private sealed class ManagedLaunch(
+        string launchKey,
+        string project,
+        string system,
+        DateTime launchStartTimeUtc,
+        IClientService service,
+        string launchUuid)
+    {
+        public string LaunchKey { get; } = launchKey;
+        public string Project { get; } = project;
+        public string System { get; } = system;
+        public DateTime LaunchStartTimeUtc { get; } = launchStartTimeUtc;
+        public IClientService Service { get; } = service;
+        public string LaunchUuid { get; } = launchUuid;
+        public bool IsFinished { get; set; }
+
+        public ReportPortalLaunchContext ToContext()
+        {
+            return new ReportPortalLaunchContext(Service, LaunchUuid, LaunchStartTimeUtc);
+        }
     }
 }
 
@@ -165,4 +196,5 @@ public sealed class ReportPortalLaunchManager : IDisposable
 /// </summary>
 /// <param name="Service">The active ReportPortal client service.</param>
 /// <param name="LaunchUuid">The UUID of the live launch.</param>
-internal sealed record ReportPortalLaunchContext(IClientService Service, string LaunchUuid);
+/// <param name="LaunchStartTimeUtc">The UTC timestamp used when the launch was started in ReportPortal.</param>
+internal sealed record ReportPortalLaunchContext(IClientService Service, string LaunchUuid, DateTime LaunchStartTimeUtc);
