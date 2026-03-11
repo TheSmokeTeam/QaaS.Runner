@@ -284,11 +284,6 @@ public class TransactionBuilder
         return Configure(ReadConfiguration().MergeConfiguration(config)!);
     }
 
-    public TransactionBuilder UpsertConfiguration(ITransactorConfig config)
-    {
-        return Configure(config);
-    }
-
     public TransactionBuilder DeleteConfiguration()
     {
         return Reset();

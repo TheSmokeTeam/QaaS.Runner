@@ -66,11 +66,6 @@ public class LinkBuilder
         return Configure(ReadConfiguration().MergeConfiguration(config)!);
     }
 
-    public LinkBuilder UpsertConfiguration(ILinkConfig config)
-    {
-        return Configure(config);
-    }
-
     public LinkBuilder DeleteConfiguration()
     {
         Reset();

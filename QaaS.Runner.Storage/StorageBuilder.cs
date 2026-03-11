@@ -69,11 +69,6 @@ public class StorageBuilder
         return Configure(ReadConfiguration().MergeConfiguration(storageConfig)!);
     }
 
-    public StorageBuilder UpsertConfiguration(IStorageConfig storageConfig)
-    {
-        return Configure(storageConfig);
-    }
-
     public StorageBuilder DeleteConfiguration()
     {
         Reset();
