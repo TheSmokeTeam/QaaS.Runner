@@ -236,6 +236,11 @@ public partial class PublisherBuilder
         return Configure(ReadConfiguration().MergeConfiguration(config)!);
     }
 
+    public PublisherBuilder UpsertConfiguration(ISenderConfig config)
+    {
+        return Configure(config);
+    }
+
     public PublisherBuilder DeleteConfiguration()
     {
         return Reset();

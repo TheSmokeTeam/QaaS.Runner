@@ -85,6 +85,11 @@ public class CollectorBuilder
         return Configure(ReadConfiguration().MergeConfiguration(config)!);
     }
 
+    public CollectorBuilder UpsertConfiguration(IFetcherConfig config)
+    {
+        return Configure(config);
+    }
+
     public CollectorBuilder DeleteConfiguration()
     {
         Reset();

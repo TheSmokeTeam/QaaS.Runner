@@ -128,6 +128,11 @@ public partial class ConsumerBuilder
         return Configure(ReadConfiguration().MergeConfiguration(config)!);
     }
 
+    public ConsumerBuilder UpsertConfiguration(IReaderConfig config)
+    {
+        return Configure(config);
+    }
+
     public ConsumerBuilder DeleteConfiguration()
     {
         return Reset();
