@@ -11,7 +11,7 @@ using QaaS.Framework.SDK.Session.DataObjects;
 using QaaS.Framework.Serialization;
 using QaaS.Runner.Sessions.ConfigurationObjects;
 using StackExchange.Redis;
-using CommunicationInputOutputState = Qaas.Mocker.CommunicationObjects.ConfigurationObjects.InputOutputState;
+using CommunicationInputOutputState = QaaS.Framework.SDK.ConfigurationObjects.InputOutputState;
 
 namespace QaaS.Runner.Sessions.Actions.MockerCommands;
 

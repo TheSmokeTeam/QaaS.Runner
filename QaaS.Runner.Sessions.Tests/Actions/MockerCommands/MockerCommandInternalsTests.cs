@@ -23,7 +23,7 @@ using QaaS.Runner.Sessions.ConfigurationObjects;
 using QaaS.Framework.Serialization.Deserializers;
 using StackExchange.Redis;
 using SessionAction = QaaS.Runner.Sessions.Actions.Action;
-using CommunicationInputOutputState = Qaas.Mocker.CommunicationObjects.ConfigurationObjects.InputOutputState;
+using CommunicationInputOutputState = QaaS.Framework.SDK.ConfigurationObjects.InputOutputState;
 
 namespace QaaS.Runner.Sessions.Tests.Actions.MockerCommands;
 

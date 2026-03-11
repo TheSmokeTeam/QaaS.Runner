@@ -90,4 +90,30 @@ public class BuilderCrudTests
         Assert.That(builder.ReadConfiguration(), Is.Null);
         Assert.Throws<InvalidOperationException>(() => builder.Build());
     }
+
+    [Test]
+    public void LinkBuilder_UpsertConfiguration_MergesSameTypeAndPreservesExistingFields()
+    {
+        var builder = new LinkBuilder()
+            .Create(new KibanaLinkConfig
+            {
+                Url = "https://kibana",
+                DataViewId = "view",
+                TimestampField = "custom-timestamp"
+            });
+
+        builder.UpsertConfiguration(new KibanaLinkConfig
+        {
+            KqlQuery = "service.name : api"
+        });
+
+        var mergedConfiguration = (KibanaLinkConfig)builder.ReadConfiguration()!;
+        Assert.Multiple(() =>
+        {
+            Assert.That(mergedConfiguration.Url, Is.EqualTo("https://kibana"));
+            Assert.That(mergedConfiguration.DataViewId, Is.EqualTo("view"));
+            Assert.That(mergedConfiguration.TimestampField, Is.EqualTo("custom-timestamp"));
+            Assert.That(mergedConfiguration.KqlQuery, Is.EqualTo("service.name : api"));
+        });
+    }
 }

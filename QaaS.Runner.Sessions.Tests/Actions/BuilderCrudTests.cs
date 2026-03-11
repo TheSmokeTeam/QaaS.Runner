@@ -43,6 +43,32 @@ public class BuilderCrudTests
     }
 
     [Test]
+    public void ConsumerBuilder_UpsertConfiguration_MergesSameTypeAndPreservesExistingFields()
+    {
+        var builder = new ConsumerBuilder()
+            .CreateConfiguration(new RabbitMqReaderConfig
+            {
+                Host = "rabbitmq.local",
+                ExchangeName = "events",
+                RoutingKey = "created"
+            });
+
+        builder.UpsertConfiguration(new RabbitMqReaderConfig
+        {
+            RequestedConnectionTimeoutSeconds = 12
+        });
+
+        var mergedConfiguration = (RabbitMqReaderConfig)builder.ReadConfiguration()!;
+        Assert.Multiple(() =>
+        {
+            Assert.That(mergedConfiguration.Host, Is.EqualTo("rabbitmq.local"));
+            Assert.That(mergedConfiguration.ExchangeName, Is.EqualTo("events"));
+            Assert.That(mergedConfiguration.RoutingKey, Is.EqualTo("created"));
+            Assert.That(mergedConfiguration.RequestedConnectionTimeoutSeconds, Is.EqualTo(12));
+        });
+    }
+
+    [Test]
     public void PublisherBuilder_ShouldSupportDataSourcePolicyAndConfigurationCrud()
     {
         var builder = new PublisherBuilder()
@@ -66,6 +92,32 @@ public class BuilderCrudTests
 
         builder.DeleteConfiguration();
         Assert.That(builder.ReadConfiguration(), Is.Null);
+    }
+
+    [Test]
+    public void PublisherBuilder_UpsertConfiguration_MergesSameTypeAndPreservesExistingFields()
+    {
+        var builder = new PublisherBuilder()
+            .CreateConfiguration(new RabbitMqSenderConfig
+            {
+                Host = "rabbitmq.local",
+                ExchangeName = "events",
+                RoutingKey = "published"
+            });
+
+        builder.UpsertConfiguration(new RabbitMqSenderConfig
+        {
+            Expiration = "30000"
+        });
+
+        var mergedConfiguration = (RabbitMqSenderConfig)builder.ReadConfiguration()!;
+        Assert.Multiple(() =>
+        {
+            Assert.That(mergedConfiguration.Host, Is.EqualTo("rabbitmq.local"));
+            Assert.That(mergedConfiguration.ExchangeName, Is.EqualTo("events"));
+            Assert.That(mergedConfiguration.RoutingKey, Is.EqualTo("published"));
+            Assert.That(mergedConfiguration.Expiration, Is.EqualTo("30000"));
+        });
     }
 
     [Test]
@@ -97,6 +149,34 @@ public class BuilderCrudTests
         Assert.That(builder.ReadDataSourcePatterns(), Is.Empty);
         Assert.That(builder.ReadPolicies(), Is.Empty);
         Assert.That(builder.ReadConfiguration(), Is.Null);
+    }
+
+    [Test]
+    public void TransactionBuilder_UpsertConfiguration_MergesSameTypeAndPreservesExistingFields()
+    {
+        var builder = new TransactionBuilder()
+            .CreateConfiguration(new HttpTransactorConfig
+            {
+                Method = HttpMethods.Put,
+                BaseAddress = "https://service.local",
+                Route = "/resource",
+                Retries = 3
+            });
+
+        builder.UpsertConfiguration(new HttpTransactorConfig
+        {
+            MessageSendRetriesIntervalMs = 0
+        });
+
+        var mergedConfiguration = (HttpTransactorConfig)builder.ReadConfiguration()!;
+        Assert.Multiple(() =>
+        {
+            Assert.That(mergedConfiguration.Method, Is.EqualTo(HttpMethods.Put));
+            Assert.That(mergedConfiguration.BaseAddress, Is.EqualTo("https://service.local"));
+            Assert.That(mergedConfiguration.Route, Is.EqualTo("/resource"));
+            Assert.That(mergedConfiguration.Retries, Is.EqualTo(3));
+            Assert.That(mergedConfiguration.MessageSendRetriesIntervalMs, Is.Zero);
+        });
     }
 
     [Test]
@@ -152,6 +232,31 @@ public class BuilderCrudTests
 
         builder.DeleteConfiguration();
         Assert.That(builder.ReadConfiguration(), Is.Null);
+    }
+
+    [Test]
+    public void CollectorBuilder_UpsertConfiguration_MergesSameTypeAndPreservesExistingFields()
+    {
+        var builder = new CollectorBuilder().Create(new PrometheusFetcherConfig
+        {
+            Url = "https://prometheus",
+            Expression = "up",
+            SampleIntervalMs = 5000
+        });
+
+        builder.UpsertConfiguration(new PrometheusFetcherConfig
+        {
+            ApiKey = "api-key"
+        });
+
+        var mergedConfiguration = (PrometheusFetcherConfig)builder.ReadConfiguration()!;
+        Assert.Multiple(() =>
+        {
+            Assert.That(mergedConfiguration.Url, Is.EqualTo("https://prometheus"));
+            Assert.That(mergedConfiguration.Expression, Is.EqualTo("up"));
+            Assert.That(mergedConfiguration.SampleIntervalMs, Is.EqualTo(5000));
+            Assert.That(mergedConfiguration.ApiKey, Is.EqualTo("api-key"));
+        });
     }
 
     [Test]

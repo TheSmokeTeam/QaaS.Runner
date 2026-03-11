@@ -1,6 +1,7 @@
 ﻿using System.Diagnostics;
 using System.Text.Json;
 using Microsoft.Extensions.Logging;
+using QaaS.Framework.SDK.ConfigurationObjects;
 using QaaS.Framework.SDK.Extensions;
 using Qaas.Mocker.CommunicationObjects;
 using QaaS.Framework.SDK.Session;
@@ -9,7 +10,7 @@ using QaaS.Framework.Serialization;
 using QaaS.Framework.Serialization.Deserializers;
 using Qaas.Mocker.CommunicationObjects.ConfigurationObjects.Command;
 using QaaS.Runner.Sessions.ConfigurationObjects;
-using CommunicationInputOutputState = Qaas.Mocker.CommunicationObjects.ConfigurationObjects.InputOutputState;
+using CommunicationInputOutputState = QaaS.Framework.SDK.ConfigurationObjects.InputOutputState;
 
 namespace QaaS.Runner.Sessions.Actions.MockerCommands;
 
