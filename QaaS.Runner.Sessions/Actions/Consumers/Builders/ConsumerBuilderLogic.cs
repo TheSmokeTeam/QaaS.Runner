@@ -1,3 +1,4 @@
+using QaaS.Framework.Configurations.ConfigurationBindingUtils;
 using QaaS.Framework.Policies;
 using QaaS.Framework.Protocols.ConfigurationObjects;
 using QaaS.Framework.Protocols.ConfigurationObjects.Elastic;
@@ -109,16 +110,22 @@ public partial class ConsumerBuilder
         return S3Bucket;
     }
 
+    /// <summary>
+    /// Applies a partial update to the current consumer configuration while preserving omitted fields.
+    /// </summary>
     public ConsumerBuilder UpdateConfiguration(Func<IReaderConfig, IReaderConfig> update)
     {
         var currentConfig = ReadConfiguration() ??
                             throw new InvalidOperationException("Consumer configuration is not set");
-        return Configure(update(currentConfig));
+        return Configure(currentConfig.MergeConfiguration(update(currentConfig))!);
     }
 
+    /// <summary>
+    /// Upserts the consumer configuration, merging same-type configs and replacing different config types.
+    /// </summary>
     public ConsumerBuilder UpsertConfiguration(IReaderConfig config)
     {
-        return Configure(config);
+        return Configure(ReadConfiguration().MergeConfiguration(config)!);
     }
 
     public ConsumerBuilder DeleteConfiguration()

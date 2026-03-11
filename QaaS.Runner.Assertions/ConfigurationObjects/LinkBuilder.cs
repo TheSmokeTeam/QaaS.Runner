@@ -1,5 +1,6 @@
 ﻿using System.ComponentModel;
 using System.Runtime.CompilerServices;
+using QaaS.Framework.Configurations.ConfigurationBindingUtils;
 using QaaS.Runner.Assertions.ConfigurationObjects.LinkConfigs;
 using QaaS.Runner.Assertions.LinkBuilders;
 
@@ -47,16 +48,22 @@ public class LinkBuilder
         return Grafana;
     }
 
+    /// <summary>
+    /// Applies a partial update to the currently configured link config while preserving omitted fields.
+    /// </summary>
     public LinkBuilder UpdateConfiguration(Func<ILinkConfig, ILinkConfig> update)
     {
         var currentConfig = ReadConfiguration() ??
                             throw new InvalidOperationException("Link configuration is not set");
-        return Configure(update(currentConfig));
+        return Configure(currentConfig.MergeConfiguration(update(currentConfig))!);
     }
 
+    /// <summary>
+    /// Upserts the configured link config, merging same-type configs and replacing different config types.
+    /// </summary>
     public LinkBuilder UpsertConfiguration(ILinkConfig config)
     {
-        return Configure(config);
+        return Configure(ReadConfiguration().MergeConfiguration(config)!);
     }
 
     public LinkBuilder DeleteConfiguration()

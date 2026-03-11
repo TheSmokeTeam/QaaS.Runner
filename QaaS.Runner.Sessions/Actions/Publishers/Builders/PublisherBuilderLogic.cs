@@ -1,3 +1,4 @@
+using QaaS.Framework.Configurations.ConfigurationBindingUtils;
 using QaaS.Framework.Policies;
 using QaaS.Framework.Protocols.ConfigurationObjects;
 using QaaS.Framework.Protocols.ConfigurationObjects.Elastic;
@@ -217,16 +218,22 @@ public partial class PublisherBuilder
         return MongoDbCollection;
     }
 
+    /// <summary>
+    /// Applies a partial update to the current publisher configuration while preserving omitted fields.
+    /// </summary>
     public PublisherBuilder UpdateConfiguration(Func<ISenderConfig, ISenderConfig> update)
     {
         var currentConfig = ReadConfiguration() ??
                             throw new InvalidOperationException("Publisher configuration is not set");
-        return Configure(update(currentConfig));
+        return Configure(currentConfig.MergeConfiguration(update(currentConfig))!);
     }
 
+    /// <summary>
+    /// Upserts the publisher configuration, merging same-type configs and replacing different config types.
+    /// </summary>
     public PublisherBuilder UpsertConfiguration(ISenderConfig config)
     {
-        return Configure(config);
+        return Configure(ReadConfiguration().MergeConfiguration(config)!);
     }
 
     public PublisherBuilder DeleteConfiguration()

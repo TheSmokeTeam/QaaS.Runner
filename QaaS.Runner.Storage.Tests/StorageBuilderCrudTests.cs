@@ -26,6 +26,39 @@ public class StorageBuilderCrudTests
     }
 
     [Test]
+    public void StorageBuilder_UpsertConfiguration_MergesSameTypeAndPreservesExistingFields()
+    {
+        var builder = new StorageBuilder()
+            .Create(new S3Config
+            {
+                StorageBucket = "bucket-a",
+                ServiceURL = "https://s3.local",
+                AccessKey = "access-key",
+                SecretKey = "secret-key",
+                Prefix = "existing-prefix",
+                Delimiter = "/",
+                SkipEmptyObjects = true
+            });
+
+        builder.UpsertConfiguration(new S3Config
+        {
+            MaximumRetryCount = 5,
+            SkipEmptyObjects = false
+        });
+
+        var mergedConfiguration = (S3Config)builder.ReadConfiguration()!;
+        Assert.Multiple(() =>
+        {
+            Assert.That(mergedConfiguration.StorageBucket, Is.EqualTo("bucket-a"));
+            Assert.That(mergedConfiguration.ServiceURL, Is.EqualTo("https://s3.local"));
+            Assert.That(mergedConfiguration.Prefix, Is.EqualTo("existing-prefix"));
+            Assert.That(mergedConfiguration.Delimiter, Is.EqualTo("/"));
+            Assert.That(mergedConfiguration.MaximumRetryCount, Is.EqualTo(5));
+            Assert.That(mergedConfiguration.SkipEmptyObjects, Is.False);
+        });
+    }
+
+    [Test]
     public void Build_WhenMultipleStorageConfigurationsAreSet_ShouldThrowInvalidOperationException()
     {
         var builder = new StorageBuilder();
