@@ -20,7 +20,6 @@ using QaaS.Framework.SDK.Session.SessionDataObjects.RunningSessionsObjects;
 using QaaS.Runner.Sessions.Actions;
 using QaaS.Runner.Sessions.Actions.MockerCommands;
 using QaaS.Runner.Sessions.ConfigurationObjects;
-using QaaS.Framework.Serialization.Deserializers;
 using StackExchange.Redis;
 using SessionAction = QaaS.Runner.Sessions.Actions.Action;
 using CommunicationInputOutputState = QaaS.Framework.SDK.ConfigurationObjects.InputOutputState;
@@ -44,17 +43,17 @@ public class MockerCommandInternalsTests
                 Id = "cmd-id",
                 ServerName = "server-a",
                 ServerInstanceId = "instance-1",
-                ServerInputOutputState = CommunicationInputOutputState.OnlyInput
+                ServerInputOutputState = InputOutputState.OnlyInput
             }));
 
         var instances = (IList<string>)GetField(typeof(MockerCommand), command, "_serverInstanceNames");
-        var ioState = (CommunicationInputOutputState?)typeof(MockerCommand)
+        var ioState = (InputOutputState?)typeof(MockerCommand)
             .GetProperty("ServerInputOutputState", BindingFlags.Instance | BindingFlags.NonPublic)!
             .GetValue(command);
 
         Assert.That(instances, Has.Count.EqualTo(1));
         Assert.That(instances[0], Is.EqualTo("instance-1"));
-        Assert.That(ioState, Is.EqualTo(CommunicationInputOutputState.OnlyInput));
+        Assert.That(ioState, Is.EqualTo(InputOutputState.OnlyInput));
     }
 
     [Test]
@@ -66,7 +65,7 @@ public class MockerCommandInternalsTests
             Id = "cmd-id",
             ServerName = "server-a",
             ServerInstanceId = "instance-1",
-            ServerInputOutputState = CommunicationInputOutputState.OnlyInput
+            ServerInputOutputState = InputOutputState.OnlyInput
         });
 
         InvokeNonPublicMethod(typeof(MockerCommand), command, "PingResponseHandler",
@@ -91,11 +90,11 @@ public class MockerCommandInternalsTests
                 Id = "other-id",
                 ServerName = "server-a",
                 ServerInstanceId = "instance-1",
-                ServerInputOutputState = CommunicationInputOutputState.OnlyInput
+                ServerInputOutputState = InputOutputState.OnlyInput
             }));
 
         var instances = (IList<string>)GetField(typeof(MockerCommand), command, "_serverInstanceNames");
-        var ioState = (CommunicationInputOutputState?)typeof(MockerCommand)
+        var ioState = (InputOutputState?)typeof(MockerCommand)
             .GetProperty("ServerInputOutputState", BindingFlags.Instance | BindingFlags.NonPublic)!
             .GetValue(command);
 
@@ -115,11 +114,11 @@ public class MockerCommandInternalsTests
                 Id = "cmd-id",
                 ServerName = "other-server",
                 ServerInstanceId = "instance-1",
-                ServerInputOutputState = CommunicationInputOutputState.OnlyInput
+                ServerInputOutputState = InputOutputState.OnlyInput
             }));
 
         var instances = (IList<string>)GetField(typeof(MockerCommand), command, "_serverInstanceNames");
-        var ioState = (CommunicationInputOutputState?)typeof(MockerCommand)
+        var ioState = (InputOutputState?)typeof(MockerCommand)
             .GetProperty("ServerInputOutputState", BindingFlags.Instance | BindingFlags.NonPublic)!
             .GetValue(command);
 
@@ -139,7 +138,7 @@ public class MockerCommandInternalsTests
                 Id = "cmd-id",
                 ServerName = "server-a",
                 ServerInstanceId = "instance-1",
-                ServerInputOutputState = CommunicationInputOutputState.OnlyInput
+                ServerInputOutputState = InputOutputState.OnlyInput
             }));
 
         var exception = Assert.Throws<TargetInvocationException>(() =>
@@ -150,7 +149,7 @@ public class MockerCommandInternalsTests
                     Id = "cmd-id",
                     ServerName = "server-a",
                     ServerInstanceId = "instance-2",
-                    ServerInputOutputState = CommunicationInputOutputState.OnlyOutput
+                    ServerInputOutputState = InputOutputState.OnlyOutput
                 })));
 
         Assert.That(exception!.InnerException, Is.TypeOf<InvalidOperationException>());
@@ -486,7 +485,7 @@ public class MockerCommandInternalsTests
     {
         var consumeCommand = CreateUninitializedConsumeCommand();
         typeof(MockerCommand).GetProperty("ServerInputOutputState", BindingFlags.Instance | BindingFlags.NonPublic)!
-            .SetValue(consumeCommand, CommunicationInputOutputState.OnlyInput);
+            .SetValue(consumeCommand, InputOutputState.OnlyInput);
 
         var inputQueue = CommunicationMethods.CreateConsumerEndpointInput("server-a");
         var dbMock = CreateRedisDbWithQueueData(new Dictionary<string, Queue<RedisValue>>
@@ -514,7 +513,7 @@ public class MockerCommandInternalsTests
     {
         var consumeCommand = CreateUninitializedConsumeCommand();
         typeof(MockerCommand).GetProperty("ServerInputOutputState", BindingFlags.Instance | BindingFlags.NonPublic)!
-            .SetValue(consumeCommand, CommunicationInputOutputState.OnlyOutput);
+            .SetValue(consumeCommand, InputOutputState.OnlyOutput);
 
         var outputQueue = CommunicationMethods.CreateConsumerEndpointOutput("server-a");
         var dbMock = CreateRedisDbWithQueueData(new Dictionary<string, Queue<RedisValue>>
@@ -568,7 +567,7 @@ public class MockerCommandInternalsTests
     {
         var consumeCommand = CreateUninitializedConsumeCommand();
         typeof(MockerCommand).GetProperty("ServerInputOutputState", BindingFlags.Instance | BindingFlags.NonPublic)!
-            .SetValue(consumeCommand, CommunicationInputOutputState.NoInputOutput);
+            .SetValue(consumeCommand, InputOutputState.NoInputOutput);
 
         var result =
             (ValueTuple<IEnumerable<DetailedData<object>>?, IEnumerable<DetailedData<object>>?>)
@@ -680,7 +679,7 @@ public class MockerCommandInternalsTests
         SetField(typeof(MockerCommand), consumeCommand, "_successfulCommandResponseToServerInstanceNames",
             new List<string> { "instance-1" });
         typeof(MockerCommand).GetProperty("ServerInputOutputState", BindingFlags.Instance | BindingFlags.NonPublic)!
-            .SetValue(consumeCommand, CommunicationInputOutputState.BothInputOutput);
+            .SetValue(consumeCommand, InputOutputState.BothInputOutput);
 
         SetField(typeof(ConsumeMockerCommand), consumeCommand, "_consumeConfig", new ConsumeConfig
         {
@@ -737,7 +736,7 @@ public class MockerCommandInternalsTests
     {
         var consumeCommand = CreateUninitializedConsumeCommand();
         typeof(MockerCommand).GetProperty("ServerInputOutputState", BindingFlags.Instance | BindingFlags.NonPublic)!
-            .SetValue(consumeCommand, CommunicationInputOutputState.OnlyOutput);
+            .SetValue(consumeCommand, InputOutputState.OnlyOutput);
 
         SetField(typeof(ConsumeMockerCommand), consumeCommand, "_consumeConfig", new ConsumeConfig
         {

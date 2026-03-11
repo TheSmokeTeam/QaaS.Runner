@@ -55,7 +55,7 @@ public class ConsumeMockerCommand : MockerCommand
     protected override (IEnumerable<DetailedData<object>>?, IEnumerable<DetailedData<object>>?)
         AdditionalDataExchangeWithTheMocker()
     {
-        if (ServerInputOutputState == CommunicationInputOutputState.NoInputOutput)
+        if (ServerInputOutputState == InputOutputState.NoInputOutput)
         {
             Logger.LogWarning("Server {ServerName} exposes no input or output queues. Skipping consume step.",
                 ServerName);
@@ -65,13 +65,13 @@ public class ConsumeMockerCommand : MockerCommand
         var inputTypeToDeserializeTo = _consumeConfig.InputDeserialize?.SpecificType?.GetConfiguredType();
         var outputTypeToDeserializeTo = _consumeConfig.OutputDeserialize?.SpecificType?.GetConfiguredType();
 
-        var consumedInputData = ServerInputOutputState is CommunicationInputOutputState.OnlyInput or CommunicationInputOutputState.BothInputOutput
+        var consumedInputData = ServerInputOutputState is InputOutputState.OnlyInput or InputOutputState.BothInputOutput
             ? Consume(CommunicationMethods.CreateConsumerEndpointInput(ServerName),
                 _consumeConfig.TimeoutMs).Select(d => d.FilterData(_inputDataFilter))
             : null;
 
         var consumedOutputData =
-            ServerInputOutputState is CommunicationInputOutputState.OnlyOutput or CommunicationInputOutputState.BothInputOutput
+            ServerInputOutputState is InputOutputState.OnlyOutput or InputOutputState.BothInputOutput
                 ? Consume(CommunicationMethods.CreateConsumerEndpointOutput(ServerName),
                     _consumeConfig.TimeoutMs).Select(d => d.FilterData(_outputDataFilter))
                 : null;

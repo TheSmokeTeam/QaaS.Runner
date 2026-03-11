@@ -1,17 +1,17 @@
-﻿using System.Text.Json;
-using Microsoft.Extensions.Logging;
+﻿using Microsoft.Extensions.Logging;
 using MoreLinq.Extensions;
 using QaaS.Framework.SDK.ConfigurationObjects;
 using QaaS.Framework.SDK.ContextObjects;
-using Qaas.Mocker.CommunicationObjects;
-using Qaas.Mocker.CommunicationObjects.ConfigurationObjects.Command;
-using Qaas.Mocker.CommunicationObjects.ConfigurationObjects.Ping;
 using QaaS.Framework.SDK.Session.CommunicationDataObjects;
 using QaaS.Framework.SDK.Session.DataObjects;
 using QaaS.Framework.Serialization;
+using Qaas.Mocker.CommunicationObjects;
+using Qaas.Mocker.CommunicationObjects.ConfigurationObjects.Command;
+using Qaas.Mocker.CommunicationObjects.ConfigurationObjects.Ping;
 using QaaS.Runner.Sessions.ConfigurationObjects;
 using QaaS.Runner.Sessions.Extensions;
 using StackExchange.Redis;
+using System.Text.Json;
 using CommunicationInputOutputState = QaaS.Framework.SDK.ConfigurationObjects.InputOutputState;
 
 namespace QaaS.Runner.Sessions.Actions.MockerCommands;
@@ -32,7 +32,6 @@ public abstract class MockerCommand : StagedAction
     private readonly int _requestDurationMs;
     private readonly int _requestRetries;
     private readonly IList<string> _failedCommandResponses;
-    private object? _responseStateLock = new();
     private readonly IList<string> _successfulCommandResponseToServerInstanceNames;
     protected readonly object CommandConfig;
     protected readonly IDatabase RedisDatabase;
@@ -74,7 +73,7 @@ public abstract class MockerCommand : StagedAction
     /// <summary>
     ///     Whether the mocker's response containing input/outputs
     /// </summary>
-    protected CommunicationInputOutputState? ServerInputOutputState { get; set; }
+    protected InputOutputState? ServerInputOutputState { get; set; }
 
     /// <summary>
     ///     The type of the mocker action.
@@ -177,7 +176,10 @@ public abstract class MockerCommand : StagedAction
     /// </summary>
     private string PingRequestConstructor()
     {
-        return JsonSerializer.Serialize(new PingRequest { Id = _commandId });
+        return JsonSerializer.Serialize(new PingRequest
+        {
+            Id = _commandId
+        });
     }
 
     /// <summary>
@@ -207,7 +209,7 @@ public abstract class MockerCommand : StagedAction
             else if (ServerInputOutputState != pingResponse.ServerInputOutputState)
             {
                 throw new InvalidOperationException(
-                    $"Mocker Server instances does not have matching {nameof(CommunicationInputOutputState)} across all ping responses");
+                    $"Mocker Server instances does not have matching {nameof(InputOutputState)} across all ping responses");
             }
         }
 
@@ -274,8 +276,7 @@ public abstract class MockerCommand : StagedAction
     {
         var commandRequest = new CommandRequest
         {
-            Id = _commandId,
-            Command = CommandType
+            Id = _commandId, Command = CommandType
         };
         commandRequest.AppendObjectToRelevantCommandConfig(CommandConfig);
         return JsonSerializer.Serialize(commandRequest);
@@ -361,21 +362,17 @@ public abstract class MockerCommand : StagedAction
     }
 
     protected internal override void LogData(InternalCommunicationData<object> actData,
-        DetailedData<object> itemBeforeSerialization, InputOutputState? saveData = null)
-    {
-    }
+        DetailedData<object> itemBeforeSerialization, InputOutputState? saveData = null) { }
 
     internal override void ExportRunningCommunicationData(InternalContext context, string sessionName)
     {
         _sentRunningCommunicationData = new RunningCommunicationData<object>
         {
-            Name = Name,
-            SerializationType = GetInputCommunicationSerializationType()
+            Name = Name, SerializationType = GetInputCommunicationSerializationType()
         };
         _receivedRunningCommunicationData = new RunningCommunicationData<object>
         {
-            Name = Name,
-            SerializationType = GetOutputCommunicationSerializationType()
+            Name = Name, SerializationType = GetOutputCommunicationSerializationType()
         };
 
         var runningSession = context.GetRunningSession(sessionName);
@@ -413,6 +410,8 @@ public abstract class MockerCommand : StagedAction
         }
     }
 
-    private object ResponseStateLock => _responseStateLock ??= new object();
+    private object ResponseStateLock
+    {
+        get => field ??= new object();
+    } = new();
 }
-
