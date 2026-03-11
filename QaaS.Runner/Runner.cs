@@ -19,6 +19,16 @@ public class Runner : IRunner, IDisposable
     private bool ServeResults { get; set; }
 
     /// <summary>
+    /// Controls whether <see cref="Run" /> terminates the current process after the runner finishes successfully.
+    /// </summary>
+    public bool ExitProcessOnCompletion { get; set; } = true;
+
+    /// <summary>
+    /// The exit code produced by the most recent successful runner execution.
+    /// </summary>
+    public int? LastExitCode { get; private set; }
+
+    /// <summary>
     /// Initializes a new instance of the <see cref="Runner" /> class
     /// </summary>
     public List<ExecutionBuilder> ExecutionBuilders { get; set; }
@@ -50,18 +60,28 @@ public class Runner : IRunner, IDisposable
     /// </summary>
     public void Run()
     {
+        var exitCode = RunAndGetExitCode();
+        HandleCompletion(exitCode);
+    }
+
+    /// <summary>
+    /// Runs the runner lifecycle and returns the resulting exit code without terminating the current process.
+    /// </summary>
+    /// <returns>The aggregated exit code from the runner's executions.</returns>
+    public int RunAndGetExitCode()
+    {
         List<Execution>? executions = null;
         var exitCode = 0;
-        var shouldExit = false;
+        LastExitCode = null;
         Logger.LogInformation(
-            "Starting runner with {ExecutionCount} execution builders. EmptyResults={EmptyResults}, ServeResults={ServeResults}",
-            ExecutionBuilders.Count, EmptyResults, ServeResults);
+            "Starting runner with {ExecutionCount} execution builders. EmptyResults={EmptyResults}, ServeResults={ServeResults}, ExitProcessOnCompletion={ExitProcessOnCompletion}",
+            ExecutionBuilders.Count, EmptyResults, ServeResults, ExitProcessOnCompletion);
         try
         {
             Setup();
             executions = BuildExecutions();
             exitCode = StartExecutions(executions);
-            shouldExit = true;
+            LastExitCode = exitCode;
         }
         finally
         {
@@ -83,8 +103,18 @@ public class Runner : IRunner, IDisposable
         }
 
         Logger.LogInformation("Runner completed. ExitCode={ExitCode}", exitCode);
-        if (shouldExit)
+        return exitCode;
+    }
+
+    private void HandleCompletion(int exitCode)
+    {
+        if (ExitProcessOnCompletion)
+        {
             ExitProcess(exitCode);
+            return;
+        }
+
+        SetProcessExitCode(exitCode);
     }
 
     /// <summary>
@@ -154,6 +184,14 @@ public class Runner : IRunner, IDisposable
     protected virtual void ExitProcess(int exitCode)
     {
         Environment.Exit(exitCode);
+    }
+
+    /// <summary>
+    /// Sets the current process exit code without terminating the process.
+    /// </summary>
+    protected virtual void SetProcessExitCode(int exitCode)
+    {
+        Environment.ExitCode = exitCode;
     }
 
     /// <summary>

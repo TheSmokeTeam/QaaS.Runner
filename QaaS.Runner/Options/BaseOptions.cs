@@ -112,6 +112,12 @@ Or
         HelpText = "When this flag is used environment variables will not override loaded configurations.")]
     public bool DontResolveWithEnvironmentVariables { get; init; } = false;
 
+    [Option("no-process-exit", Default = false,
+        HelpText =
+            "When this flag is used the runner will not terminate the current process after it completes. " +
+            "Useful when embedding QaaS.Runner and orchestrating multiple runners in a single host process.")]
+    public bool NoProcessExit { get; init; } = false;
+
     /// <summary>
     ///     Gets the execution type of the command
     /// </summary>
