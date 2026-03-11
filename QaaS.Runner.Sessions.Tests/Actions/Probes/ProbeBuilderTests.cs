@@ -86,24 +86,6 @@ public class ProbeBuilderTests
     {
         var probes = new List<KeyValuePair<string, IProbe>>
         {
-            new ("TestProbe", _mockProbe.Object)
-        };
-
-        var actionFailures = new List<ActionFailure>();
-        var builder = new ProbeBuilder()
-            .Named("TestProbe")
-            .HookNamed("TestHook");
-
-        var probe = builder.Build(_context, probes, actionFailures, "Session1");
-
-        Assert.That(probe, Is.Not.Null);
-    }
-
-    [Test]
-    public void Build_WithSessionScopedProbeKey_Should_Return_Probe()
-    {
-        var probes = new List<KeyValuePair<string, IProbe>>
-        {
             new(ProbeBuilder.BuildScopedHookName("Session1", "TestProbe"), _mockProbe.Object)
         };
 
@@ -125,6 +107,24 @@ public class ProbeBuilderTests
 
         var builder = new ProbeBuilder()
             .Named("NonExistentProbe")
+            .HookNamed("SomeHook");
+
+        var probe = builder.Build(_context, probes, actionFailures, "Session1");
+
+        Assert.That(probe, Is.Null);
+        Assert.That(actionFailures.Count, Is.EqualTo(1));
+    }
+
+    [Test]
+    public void Build_WhenOnlyUnscopedProbeExists_Should_Add_Failure_And_Return_Null()
+    {
+        var probes = new List<KeyValuePair<string, IProbe>>
+        {
+            new("TestProbe", _mockProbe.Object)
+        };
+        var actionFailures = new List<ActionFailure>();
+        var builder = new ProbeBuilder()
+            .Named("TestProbe")
             .HookNamed("SomeHook");
 
         var probe = builder.Build(_context, probes, actionFailures, "Session1");

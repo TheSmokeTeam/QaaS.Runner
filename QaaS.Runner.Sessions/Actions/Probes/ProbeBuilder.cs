@@ -174,7 +174,6 @@ public class ProbeBuilder : IYamlConvertible
 
             var scopedHookName = BuildScopedHookName(sessionName, Name);
             var probeHook = probes.FirstOrDefault(pair => pair.Key == scopedHookName).Value
-                            ?? probes.FirstOrDefault(pair => pair.Key == Name).Value
                             ?? throw new ArgumentException($"Probe {Name} of type" +
                                                            $" {Probe} in session {sessionName} was not found" +
                                                            " in provided probes.");
