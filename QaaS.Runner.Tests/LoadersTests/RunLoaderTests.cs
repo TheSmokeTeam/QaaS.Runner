@@ -319,6 +319,80 @@ namespace QaaS.Runner.Tests.LoadersTests
         }
 
         [Test]
+        public void GetLoadedContexts_WithIgnoredCaseNames_ExcludesIgnoredCases()
+        {
+            var relativeCasesDir = $"TestData\\RunLoaderIgnoreExact-{Guid.NewGuid():N}";
+            var absoluteCasesDir = Path.Combine(Environment.CurrentDirectory, relativeCasesDir);
+            Directory.CreateDirectory(absoluteCasesDir);
+
+            var keepCase = Path.Combine(absoluteCasesDir, "keep.yaml");
+            var ignoreCase = Path.Combine(absoluteCasesDir, "ignore.yaml");
+            File.WriteAllText(keepCase, "keep");
+            File.WriteAllText(ignoreCase, "ignore");
+
+            try
+            {
+                var options = new RunOptions
+                {
+                    ConfigurationFile = "test.yaml",
+                    SendLogs = false,
+                    CasesRootDirectory = relativeCasesDir,
+                    CasesNamesToIgnore = [Path.GetRelativePath(Environment.CurrentDirectory, ignoreCase)]
+                };
+
+                var loader = new TestRunLoader(options, "exec-ignore-exact");
+                var contexts =
+                    ((IEnumerable<InternalContext>)GetLoadedContextsMethodInfo.Invoke(loader, null)!).ToList();
+
+                Assert.That(contexts.Select(context => context.CaseName).ToArray(), Is.EqualTo(new[]
+                {
+                    Path.GetRelativePath(Environment.CurrentDirectory, keepCase)
+                }));
+            }
+            finally
+            {
+                Directory.Delete(absoluteCasesDir, true);
+            }
+        }
+
+        [Test]
+        public void GetLoadedContexts_WithIgnoredCasePatterns_ExcludesPatternMatches()
+        {
+            var relativeCasesDir = $"TestData\\RunLoaderIgnorePattern-{Guid.NewGuid():N}";
+            var absoluteCasesDir = Path.Combine(Environment.CurrentDirectory, relativeCasesDir);
+            Directory.CreateDirectory(Path.Combine(absoluteCasesDir, "nested"));
+
+            var keepCase = Path.Combine(absoluteCasesDir, "alpha.yaml");
+            var ignoreCase = Path.Combine(absoluteCasesDir, "nested", "skip-beta.yaml");
+            File.WriteAllText(keepCase, "keep");
+            File.WriteAllText(ignoreCase, "ignore");
+
+            try
+            {
+                var options = new RunOptions
+                {
+                    ConfigurationFile = "test.yaml",
+                    SendLogs = false,
+                    CasesRootDirectory = relativeCasesDir,
+                    CasesNamePatternsToIgnore = [@"skip-.*\.yaml$"]
+                };
+
+                var loader = new TestRunLoader(options, "exec-ignore-pattern");
+                var contexts =
+                    ((IEnumerable<InternalContext>)GetLoadedContextsMethodInfo.Invoke(loader, null)!).ToList();
+
+                Assert.That(contexts.Select(context => context.CaseName).ToArray(), Is.EqualTo(new[]
+                {
+                    Path.GetRelativePath(Environment.CurrentDirectory, keepCase)
+                }));
+            }
+            finally
+            {
+                Directory.Delete(absoluteCasesDir, true);
+            }
+        }
+
+        [Test]
         public void GetLoadedContexts_WithHttpCasesRootDirectory_UsesJfrogHelperResults()
         {
             var options = new RunOptions
