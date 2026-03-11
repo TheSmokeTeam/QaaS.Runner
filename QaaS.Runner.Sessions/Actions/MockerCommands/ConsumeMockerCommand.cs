@@ -1,6 +1,7 @@
 ﻿using System.Diagnostics;
 using System.Text.Json;
 using Microsoft.Extensions.Logging;
+using QaaS.Framework.SDK.ConfigurationObjects;
 using QaaS.Framework.SDK.Extensions;
 using Qaas.Mocker.CommunicationObjects;
 using QaaS.Framework.SDK.Session;
@@ -9,7 +10,6 @@ using QaaS.Framework.Serialization;
 using QaaS.Framework.Serialization.Deserializers;
 using Qaas.Mocker.CommunicationObjects.ConfigurationObjects.Command;
 using QaaS.Runner.Sessions.ConfigurationObjects;
-using CommunicationInputOutputState = Qaas.Mocker.CommunicationObjects.ConfigurationObjects.InputOutputState;
 
 namespace QaaS.Runner.Sessions.Actions.MockerCommands;
 
@@ -54,7 +54,7 @@ public class ConsumeMockerCommand : MockerCommand
     protected override (IEnumerable<DetailedData<object>>?, IEnumerable<DetailedData<object>>?)
         AdditionalDataExchangeWithTheMocker()
     {
-        if (ServerInputOutputState == CommunicationInputOutputState.NoInputOutput)
+        if (ServerInputOutputState == InputOutputState.NoInputOutput)
         {
             Logger.LogWarning("Server {ServerName} exposes no input or output queues. Skipping consume step.",
                 ServerName);
@@ -64,13 +64,13 @@ public class ConsumeMockerCommand : MockerCommand
         var inputTypeToDeserializeTo = _consumeConfig.InputDeserialize?.SpecificType?.GetConfiguredType();
         var outputTypeToDeserializeTo = _consumeConfig.OutputDeserialize?.SpecificType?.GetConfiguredType();
 
-        var consumedInputData = ServerInputOutputState is CommunicationInputOutputState.OnlyInput or CommunicationInputOutputState.BothInputOutput
+        var consumedInputData = ServerInputOutputState is InputOutputState.OnlyInput or InputOutputState.BothInputOutput
             ? Consume(CommunicationMethods.CreateConsumerEndpointInput(ServerName),
                 _consumeConfig.TimeoutMs).Select(d => d.FilterData(_inputDataFilter))
             : null;
 
         var consumedOutputData =
-            ServerInputOutputState is CommunicationInputOutputState.OnlyOutput or CommunicationInputOutputState.BothInputOutput
+            ServerInputOutputState is InputOutputState.OnlyOutput or InputOutputState.BothInputOutput
                 ? Consume(CommunicationMethods.CreateConsumerEndpointOutput(ServerName),
                     _consumeConfig.TimeoutMs).Select(d => d.FilterData(_outputDataFilter))
                 : null;
