@@ -86,6 +86,14 @@ Or
         HelpText = "Names of the test-cases to run.")]
     public IList<string> CasesNamesToRun { get; init; } = Array.Empty<string>();
 
+    [Option("cases-names-ignore", Default = null,
+        HelpText = "Names of the test-cases to ignore.")]
+    public IList<string> CasesNamesToIgnore { get; init; } = Array.Empty<string>();
+
+    [Option("cases-name-patterns-ignore", Default = null,
+        HelpText = "Regex patterns of test-case names to ignore.")]
+    public IList<string> CasesNamePatternsToIgnore { get; init; } = Array.Empty<string>();
+
     [Option('i', "session-names", Default = null,
         HelpText = "Names of the sessions to run.")]
     public IList<string> SessionNamesToRun { get; init; } = Array.Empty<string>();
