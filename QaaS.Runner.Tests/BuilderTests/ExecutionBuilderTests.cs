@@ -1,9 +1,13 @@
 using System.Reflection;
+using Microsoft.Extensions.Configuration;
 using NUnit.Framework;
 using QaaS.Framework.Configurations.CustomExceptions;
 using QaaS.Framework.SDK;
+using QaaS.Framework.SDK.ContextObjects;
 using QaaS.Framework.SDK.DataSourceObjects;
 using QaaS.Framework.SDK.ExecutionObjects;
+using QaaS.Framework.SDK.Session.SessionDataObjects;
+using QaaS.Framework.SDK.Session.SessionDataObjects.RunningSessionsObjects;
 using QaaS.Runner.Assertions.ConfigurationObjects;
 using QaaS.Runner.Assertions.ConfigurationObjects.LinkConfigs;
 using QaaS.Runner.Sessions.Actions.Probes;
@@ -207,6 +211,41 @@ public class ExecutionBuilderTests
         Assert.Throws<InvalidConfigurationsException>(() => builder.Build());
     }
 
+    [Test]
+    public void Build_WithLoadedContextWithoutMetadata_DoesNotThrow()
+    {
+        var context = CreateLoadedContext(new Dictionary<string, string?>
+        {
+            ["Sessions:0:Name"] = "context-session"
+        });
+        var builder = new ExecutionBuilder(context, ExecutionType.Run, null, null, null, null);
+
+        Assert.DoesNotThrow(() => builder.Build());
+    }
+
+    [Test]
+    public void Build_WithLoadedContextWithPartialMetadata_RecordsEachValidationErrorOnce()
+    {
+        var context = CreateLoadedContext(new Dictionary<string, string?>
+        {
+            ["MetaData:System"] = "QaaS",
+            ["Sessions:0:Name"] = "context-session"
+        });
+        var builder = new ExecutionBuilder(context, ExecutionType.Run, null, null, null, null);
+
+        Assert.Throws<InvalidConfigurationsException>(() => builder.Build());
+
+        var validationResults = (IReadOnlyList<System.ComponentModel.DataAnnotations.ValidationResult>)typeof(ExecutionBuilder)
+            .GetField("_validationResults", BindingFlags.Instance | BindingFlags.NonPublic)!
+            .GetValue(builder)!;
+        var errorMessages = validationResults
+            .Select(result => result.ErrorMessage)
+            .Where(message => !string.IsNullOrWhiteSpace(message))
+            .ToList();
+
+        Assert.That(errorMessages.Count(message => message == "MetaData - The Team field is required."), Is.EqualTo(1));
+    }
+
     private ExecutionBuilder CreateValidExecutionBuilder()
     {
         var builder = new ExecutionBuilder();
@@ -283,5 +322,24 @@ public class ExecutionBuilderTests
         return builder.ExecutionType(ExecutionType.Run).SetExecutionId("test").SetCase("invalid")
             .WithLogger(Globals.Logger).WithGlobalDict(new Dictionary<string, object?>())
             .WithMetadata(new MetaDataConfig { System = "QaaS", Team = "Smoke" });
+    }
+
+    private static InternalContext CreateLoadedContext(IConfiguration configuration)
+    {
+        return new InternalContext
+        {
+            Logger = Globals.Logger,
+            RootConfiguration = configuration,
+            InternalRunningSessions = new RunningSessions(new Dictionary<string, RunningSessionData<object, object>>()),
+            InternalGlobalDict = new Dictionary<string, object?>()
+        };
+    }
+
+    private static InternalContext CreateLoadedContext(Dictionary<string, string?> values)
+    {
+        var configuration = new ConfigurationBuilder()
+            .AddInMemoryCollection(values)
+            .Build();
+        return CreateLoadedContext(configuration);
     }
 }
