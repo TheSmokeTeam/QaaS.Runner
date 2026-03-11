@@ -447,7 +447,13 @@ public class AssertionBuilder : IYamlConvertible
 
     public AssertionBuilder UpdateConfiguration(object configuration)
     {
-        return Configure(configuration);
+        AssertionConfiguration = AssertionConfiguration.BindConfigurationObjectToIConfiguration(configuration);
+        return this;
+    }
+
+    public AssertionBuilder UpsertConfiguration(object configuration)
+    {
+        return UpdateConfiguration(configuration);
     }
 
     public AssertionBuilder DeleteConfiguration()

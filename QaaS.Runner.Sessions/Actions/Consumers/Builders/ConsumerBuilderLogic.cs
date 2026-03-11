@@ -116,6 +116,11 @@ public partial class ConsumerBuilder
         return Configure(update(currentConfig));
     }
 
+    public ConsumerBuilder UpsertConfiguration(IReaderConfig config)
+    {
+        return Configure(config);
+    }
+
     public ConsumerBuilder DeleteConfiguration()
     {
         return Reset();

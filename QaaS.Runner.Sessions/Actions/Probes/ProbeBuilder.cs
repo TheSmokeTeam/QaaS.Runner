@@ -155,6 +155,28 @@ public class ProbeBuilder : IYamlConvertible
         return this;
     }
 
+    public IConfiguration ReadConfiguration()
+    {
+        return ProbeConfiguration;
+    }
+
+    public ProbeBuilder UpdateConfiguration(object configuration)
+    {
+        ProbeConfiguration = ProbeConfiguration.BindConfigurationObjectToIConfiguration(configuration);
+        return this;
+    }
+
+    public ProbeBuilder UpsertConfiguration(object configuration)
+    {
+        return UpdateConfiguration(configuration);
+    }
+
+    public ProbeBuilder DeleteConfiguration()
+    {
+        ProbeConfiguration = new ConfigurationBuilder().Build();
+        return this;
+    }
+
     /// <summary>
     /// Resolves the configured probe hook and constructs a runtime <see cref="Probe"/> action.
     /// Failures are captured into <paramref name="actionFailures"/> so session build can continue.
