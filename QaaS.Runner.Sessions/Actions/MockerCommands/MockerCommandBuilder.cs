@@ -120,6 +120,12 @@ public class MockerCommandBuilder
         return this;
     }
 
+    public MockerCommandBuilder UpsertCommand(CommandConfig command)
+    {
+        Command = command;
+        return this;
+    }
+
     public MockerCommandBuilder DeleteCommand()
     {
         Command = null;

@@ -73,6 +73,11 @@ public class CollectorBuilder
         return Configure(update(currentConfig));
     }
 
+    public CollectorBuilder UpsertConfiguration(IFetcherConfig config)
+    {
+        return Configure(config);
+    }
+
     public CollectorBuilder DeleteConfiguration()
     {
         Reset();

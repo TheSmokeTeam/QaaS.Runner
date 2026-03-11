@@ -224,6 +224,11 @@ public partial class PublisherBuilder
         return Configure(update(currentConfig));
     }
 
+    public PublisherBuilder UpsertConfiguration(ISenderConfig config)
+    {
+        return Configure(config);
+    }
+
     public PublisherBuilder DeleteConfiguration()
     {
         return Reset();
