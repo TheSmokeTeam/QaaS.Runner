@@ -1,5 +1,6 @@
 using System.ComponentModel;
 using System.ComponentModel.DataAnnotations;
+using QaaS.Framework.Configurations.ConfigurationBindingUtils;
 using QaaS.Framework.Protocols.ConfigurationObjects;
 using QaaS.Framework.Protocols.ConfigurationObjects.Prometheus;
 using QaaS.Framework.Protocols.Protocols.Factories;
@@ -66,16 +67,22 @@ public class CollectorBuilder
         return Prometheus;
     }
 
+    /// <summary>
+    /// Applies a partial update to the current collector configuration while preserving omitted fields.
+    /// </summary>
     public CollectorBuilder UpdateConfiguration(Func<IFetcherConfig, IFetcherConfig> update)
     {
         var currentConfig = ReadConfiguration() ??
                             throw new InvalidOperationException("Collector configuration is not set");
-        return Configure(update(currentConfig));
+        return Configure(currentConfig.MergeConfiguration(update(currentConfig))!);
     }
 
+    /// <summary>
+    /// Upserts the collector configuration, merging same-type configs and replacing different config types.
+    /// </summary>
     public CollectorBuilder UpsertConfiguration(IFetcherConfig config)
     {
-        return Configure(config);
+        return Configure(ReadConfiguration().MergeConfiguration(config)!);
     }
 
     public CollectorBuilder DeleteConfiguration()

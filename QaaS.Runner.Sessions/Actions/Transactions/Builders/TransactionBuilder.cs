@@ -1,5 +1,6 @@
 using System.ComponentModel;
 using System.ComponentModel.DataAnnotations;
+using QaaS.Framework.Configurations.ConfigurationBindingUtils;
 using QaaS.Framework.Configurations.CustomValidationAttributes;
 using QaaS.Framework.Policies;
 using QaaS.Framework.Protocols.ConfigurationObjects;
@@ -265,16 +266,22 @@ public class TransactionBuilder
         return (ITransactorConfig?)Http ?? Grpc;
     }
 
+    /// <summary>
+    /// Applies a partial update to the current transaction configuration while preserving omitted fields.
+    /// </summary>
     public TransactionBuilder UpdateConfiguration(Func<ITransactorConfig, ITransactorConfig> update)
     {
         var currentConfig = ReadConfiguration() ??
                             throw new InvalidOperationException("Transaction configuration is not set");
-        return Configure(update(currentConfig));
+        return Configure(currentConfig.MergeConfiguration(update(currentConfig))!);
     }
 
+    /// <summary>
+    /// Upserts the transaction configuration, merging same-type configs and replacing different config types.
+    /// </summary>
     public TransactionBuilder UpsertConfiguration(ITransactorConfig config)
     {
-        return Configure(config);
+        return Configure(ReadConfiguration().MergeConfiguration(config)!);
     }
 
     public TransactionBuilder DeleteConfiguration()

@@ -1,6 +1,7 @@
 ﻿using System.ComponentModel;
 using System.IO.Abstractions;
 using System.Runtime.CompilerServices;
+using QaaS.Framework.Configurations.ConfigurationBindingUtils;
 using QaaS.Framework.Configurations.CommonConfigurationObjects;
 using QaaS.Framework.SDK.ContextObjects;
 using QaaS.Runner.Storage.ConfigurationObjects;
@@ -50,16 +51,22 @@ public class StorageBuilder
         return (IStorageConfig?)S3 ?? FileSystem;
     }
 
+    /// <summary>
+    /// Applies a partial update to the current storage configuration while preserving omitted fields.
+    /// </summary>
     public StorageBuilder UpdateConfiguration(Func<IStorageConfig, IStorageConfig> update)
     {
         var currentConfig = ReadConfiguration() ??
                             throw new InvalidOperationException("Storage configuration is not set");
-        return Configure(update(currentConfig));
+        return Configure(currentConfig.MergeConfiguration(update(currentConfig))!);
     }
 
+    /// <summary>
+    /// Upserts the storage configuration, merging same-type configs and replacing different config types.
+    /// </summary>
     public StorageBuilder UpsertConfiguration(IStorageConfig storageConfig)
     {
-        return Configure(storageConfig);
+        return Configure(ReadConfiguration().MergeConfiguration(storageConfig)!);
     }
 
     public StorageBuilder DeleteConfiguration()
