@@ -1,6 +1,44 @@
+anchors:
+  rabbitmq: &rabbitmq ${variables:rabbitmq}
+
 MetaData:
   Team: Smoke
   System: QaaS
 
-Session:
-  - Name: "Test Session"
+Storages:
+  - FileSystem:
+      Path: SessionDataStorage
+
+DataSources:
+  - Name: RabbitPayload
+    Generator: TestGenerator
+    GeneratorConfiguration:
+      Count: 1
+
+Sessions:
+  - Name: RabbitRoundTrip
+    SaveData: true
+    Publishers:
+      - Name: PublishToRabbit
+        DataSourceNames: [ RabbitPayload ]
+        RabbitMq:
+          <<: *rabbitmq
+          QueueName: qaas.runner.e2e
+        Serialize:
+          Serializer: Json
+    Consumers:
+      - Name: ConsumeFromRabbit
+        TimeoutMs: 3000
+        RabbitMq:
+          <<: *rabbitmq
+          QueueName: qaas.runner.e2e
+        Deserialize:
+          Deserializer: Json
+          SpecificType:
+            AssemblyName: QaaS.Runner.E2ETests
+            TypeFullName: QaaS.Runner.E2ETests.MockJson
+
+Assertions:
+  - Name: RabbitRoundTripAssertion
+    Assertion: RabbitRoundTripAssertion
+    SessionNames: [ RabbitRoundTrip ]
