@@ -5,20 +5,20 @@ on:
     branches: ["**"]
     tags: ["*"]
   pull_request:
+    branches: ["**"]
 
 concurrency:
-  group: ci-${{ github.workflow }}-${{ github.head_ref || github.ref }}
+  group: ci-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
 
 permissions:
-  contents: read
+  contents: write
 
 env:
   DOTNET_NOLOGO: true
   DOTNET_CLI_TELEMETRY_OPTOUT: true
   CONFIGURATION: Release
-  SOLUTION_PATH: QaaS.Runner.sln
-  PROJECT_TO_PACK: QaaS.Runner/QaaS.Runner.csproj
+  PROJECT_PATH: QaaS.Runner.sln
   PACKAGE_OUTPUT_DIRECTORY: ${{ github.workspace }}\BuildOutput
 
 jobs:
@@ -35,15 +35,13 @@ jobs:
           dotnet-version: 10.0.x
 
       - name: Restore packages
-        run: dotnet restore ${{ env.SOLUTION_PATH }}
+        run: dotnet restore ${{ env.PROJECT_PATH }}
 
-      - name: Build solution
-        run: dotnet build ${{ env.SOLUTION_PATH }} --no-restore --configuration ${{ env.CONFIGURATION }}
+      - name: Build project
+        run: dotnet build ${{ env.PROJECT_PATH }} --no-restore --configuration ${{ env.CONFIGURATION }}
 
       - name: Test solution
-        run: dotnet test ${{ env.SOLUTION_PATH }} --configuration ${{ env.CONFIGURATION }} --no-restore --maxcpucount
-
-      # --- DEPLOYMENT STEPS (Run only on tags) ---
+        run: dotnet test ${{ env.PROJECT_PATH }} --configuration ${{ env.CONFIGURATION }} --no-restore --no-build --maxcpucount
 
       - name: Get Version
         if: startsWith(github.ref, 'refs/tags/')
@@ -56,30 +54,21 @@ jobs:
         run: |
           VERSION="${{ steps.version.outputs.version-without-v }}"
           if [[ ! "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+(-(alpha|beta)\.[0-9]+)?$ ]]; then
-            echo "Error: '$VERSION' is not a valid version."
+            echo "Error: '$VERSION' is not a valid version format."
             exit 1
           fi
 
-      - name: Pack QaaS.Runner
+      - name: Pack project
         if: startsWith(github.ref, 'refs/tags/')
         run: |
-          dotnet pack ${{ env.PROJECT_TO_PACK }} `
-            --no-restore `
+          dotnet pack ${{ env.PROJECT_PATH }} `
+            --no-restore --no-build `
             --configuration ${{ env.CONFIGURATION }} `
             --include-symbols `
-            -p:SymbolPackageFormat=snupkg `
             -p:PackageVersion=${{ steps.version.outputs.version-without-v }} `
             --output ${{ env.PACKAGE_OUTPUT_DIRECTORY }}
 
-      - name: Push QaaS.Runner to NuGet
+      - name: Push package
         if: startsWith(github.ref, 'refs/tags/')
-        shell: powershell
-        run: |
-          $packages = Get-ChildItem "${{ env.PACKAGE_OUTPUT_DIRECTORY }}\QaaS.Runner.*.nupkg"
-          foreach ($package in $packages) {
-            # Only push the main QaaS.Runner package, not QaaS.Runner.* (e.g., QaaS.Runner.Assertions)
-            if ($package.Name -match "^QaaS\.Runner\.[0-9]") {
-              dotnet nuget push $package.FullName -k ${{ secrets.NUGET_AUTH_TOKEN }} -s https://api.nuget.org/v3/index.json
-            }
-          }
+        run: dotnet nuget push ${{ env.PACKAGE_OUTPUT_DIRECTORY }}\*.nupkg -k ${{ secrets.NUGET_AUTH_TOKEN }} -s https://api.nuget.org/v3/index.json --skip-duplicate
 

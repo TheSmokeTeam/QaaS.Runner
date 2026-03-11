@@ -5,7 +5,15 @@
         <ImplicitUsings>enable</ImplicitUsings>
         <Nullable>enable</Nullable>
         <EnableUnsafeBinaryFormatterSerialization>true</EnableUnsafeBinaryFormatterSerialization>
-        <IsPackable>false</IsPackable>
+        <PackageId>QaaS.Runner.Sessions</PackageId>
+        <Authors>SmokeTeam</Authors>
+        <Description>Session runtime orchestration for QaaS runner workflows.</Description>
+        <RepositoryType>git</RepositoryType>
+        <IncludeSymbols>true</IncludeSymbols>
+        <SymbolPackageFormat>snupkg</SymbolPackageFormat>
+        <GenerateDocumentationFile>true</GenerateDocumentationFile>
+        <VersionPrefix>0.0.0</VersionPrefix>
+        <IsPackable>true</IsPackable>
         <PackageReadmeFile>README.md</PackageReadmeFile>
     </PropertyGroup>
 
