@@ -52,7 +52,7 @@ public class StageTests
                 .Build(_context!, [], _sessionName)!);
         _stage.AddCommunication(
             new ProbeBuilder().Named("testProbe").Build(_context!,
-                [new("testProbe", InitializeProbeHook())], [],
+                [new(ProbeBuilder.BuildScopedHookName(_sessionName, "testProbe"), InitializeProbeHook())], [],
                 _sessionName)!);
         _stage.ExportRunningCommunicationData();
 
