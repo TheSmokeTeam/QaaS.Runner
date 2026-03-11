@@ -63,6 +63,45 @@ public class RunnerBehaviorTests
         }
     }
 
+    private sealed class NonExitingRunLifecycleRunner(
+        ILifetimeScope scope,
+        List<ExecutionBuilder> executionBuilders,
+        Microsoft.Extensions.Logging.ILogger logger,
+        Serilog.ILogger serilogLogger) : Runner(scope, executionBuilders, logger, serilogLogger)
+    {
+        public List<string> Calls { get; } = [];
+        public int? ExitCode { get; private set; }
+        public int? ProcessExitCode { get; private set; }
+
+        protected override void Setup() => Calls.Add("setup");
+
+        protected override List<Execution> BuildExecutions()
+        {
+            Calls.Add("build");
+            return [];
+        }
+
+        protected override int StartExecutions(List<Execution> executions)
+        {
+            Calls.Add("start");
+            return 5;
+        }
+
+        protected override void Teardown() => Calls.Add("teardown");
+
+        protected override void ExitProcess(int exitCode)
+        {
+            Calls.Add("exit");
+            ExitCode = exitCode;
+        }
+
+        protected override void SetProcessExitCode(int exitCode)
+        {
+            Calls.Add("set-exit-code");
+            ProcessExitCode = exitCode;
+        }
+    }
+
     private sealed class ServeResultsRunner(
         ILifetimeScope scope,
         List<ExecutionBuilder> executionBuilders,
@@ -255,6 +294,38 @@ public class RunnerBehaviorTests
     }
 
     [Test]
+    public void Run_WhenProcessExitIsDisabled_SetsProcessExitCodeWithoutCallingExit()
+    {
+        using var scope = BuildScope();
+        var runner = new NonExitingRunLifecycleRunner(scope, [], Globals.Logger, new Mock<Serilog.ILogger>().Object)
+        {
+            ExitProcessOnCompletion = false
+        };
+
+        runner.Run();
+
+        Assert.That(runner.Calls, Is.EqualTo(new[] { "setup", "build", "start", "teardown", "set-exit-code" }));
+        Assert.That(runner.ProcessExitCode, Is.EqualTo(5));
+        Assert.That(runner.ExitCode, Is.Null);
+        Assert.That(runner.LastExitCode, Is.EqualTo(5));
+    }
+
+    [Test]
+    public void RunAndGetExitCode_ReturnsExitCodeWithoutCallingProcessExitHooks()
+    {
+        using var scope = BuildScope();
+        var runner = new NonExitingRunLifecycleRunner(scope, [], Globals.Logger, new Mock<Serilog.ILogger>().Object);
+
+        var exitCode = runner.RunAndGetExitCode();
+
+        Assert.That(exitCode, Is.EqualTo(5));
+        Assert.That(runner.Calls, Is.EqualTo(new[] { "setup", "build", "start", "teardown" }));
+        Assert.That(runner.ProcessExitCode, Is.Null);
+        Assert.That(runner.ExitCode, Is.Null);
+        Assert.That(runner.LastExitCode, Is.EqualTo(5));
+    }
+
+    [Test]
     public void Run_WhenBuildExecutionsThrows_StillRunsTeardownAndDispose()
     {
         using var scope = BuildScope();
@@ -264,6 +335,7 @@ public class RunnerBehaviorTests
 
         Assert.That(runner.Calls, Is.EqualTo(new[] { "setup", "build", "teardown", "dispose" }));
         Assert.That(runner.Disposed, Is.True);
+        Assert.That(runner.LastExitCode, Is.Null);
     }
 
     private static ILifetimeScope BuildScope()

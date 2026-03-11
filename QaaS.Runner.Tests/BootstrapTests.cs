@@ -21,6 +21,14 @@ public class BootstrapTests
         Assert.That(result, Is.InstanceOf<Runner>());
     }
 
+    [TestCaseSource(nameof(GetNoProcessExitRunnerTestCases))]
+    public void TestGetRunner_WithNoProcessExitFlag_DisablesProcessExit(string[] args)
+    {
+        var result = Bootstrap.New(args);
+
+        Assert.That(result.ExitProcessOnCompletion, Is.False);
+    }
+
     private static IEnumerable<TestCaseData> GetRunnerTestCases()
     {
         yield return new TestCaseData(
@@ -62,5 +70,14 @@ public class BootstrapTests
             new[] { "invalid-command" },
             "Runner"
         ).SetName("WithInvalidCommand");
+    }
+
+    private static IEnumerable<TestCaseData> GetNoProcessExitRunnerTestCases()
+    {
+        yield return new TestCaseData(new object[] { new[] { "run", "TestData/test.qaas.yaml", "--no-process-exit" } })
+            .SetName("WithRunNoProcessExitFlag");
+
+        yield return new TestCaseData(new object[] { new[] { "execute", "TestData/executable.yaml", "--no-process-exit" } })
+            .SetName("WithExecuteNoProcessExitFlag");
     }
 }

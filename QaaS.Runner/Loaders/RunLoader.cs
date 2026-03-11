@@ -172,10 +172,12 @@ public class RunLoader<TRunner, TOptions> : BaseLoader<TOptions, TRunner>
         var executionBuilders = GetLoadedExecutionBuilders().ToList();
 
         // Use Activator to create an instance of the configured implementation of TRunner
-        return (TRunner)Activator.CreateInstance(
+        var runner = (TRunner)Activator.CreateInstance(
             typeof(TRunner), _runScope, executionBuilders, Logger, SerilogLogger,
             Options is AssertableOptions assertableOptions && assertableOptions.EmptyAllureDirectory,
             Options is AssertableOptions assertableOptions2 && assertableOptions2.AutoServeTestResults
         )!;
+        runner.ExitProcessOnCompletion = !Options.NoProcessExit;
+        return runner;
     }
 }

@@ -106,4 +106,19 @@ public class ExecuteLoaderTests
             }
         }
     }
+
+    [Test]
+    public void GetLoadedRunner_WithNoProcessExitFlag_DisablesProcessExitOnCompletion()
+    {
+        var loader = new ExecuteLoader<Runner>(new ExecuteOptions
+        {
+            ConfigurationFile = "TestData/executable.yaml",
+            SendLogs = false,
+            NoProcessExit = true
+        });
+
+        var runner = loader.GetLoadedRunner();
+
+        Assert.That(runner.ExitProcessOnCompletion, Is.False);
+    }
 }
