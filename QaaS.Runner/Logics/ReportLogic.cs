@@ -14,20 +14,6 @@ namespace QaaS.Runner.Logics;
 public class ReportLogic(IList<IReporter> reporters, InternalContext context) : ILogic
 {
     /// <summary>
-    /// Determines whether reporting should run for the requested execution type.
-    /// </summary>
-    /// <param name="executionType">The active execution pipeline mode.</param>
-    /// <returns>
-    /// <see langword="true" /> for <see cref="ExecutionType.Run" /> and <see cref="ExecutionType.Assert" />;
-    /// otherwise <see langword="false" />.
-    /// </returns>
-    public bool ShouldRun(ExecutionType executionType)
-    {
-        return executionType is ExecutionType.Run or ExecutionType.Assert;
-    }
-
-
-    /// <summary>
     /// Reports matching <see cref="AssertionResult" /> entries to each configured <see cref="IReporter" />.
     /// </summary>
     /// <param name="executionData">The mutable execution context containing assertion results.</param>

@@ -9,21 +9,6 @@ namespace QaaS.Runner.Tests.LogicsTests;
 
 public class DataSourceLogicTests
 {
-    [TestCase(ExecutionType.Assert, true)]
-    [TestCase(ExecutionType.Run, true)]
-    [TestCase(ExecutionType.Template, false)]
-    [TestCase(ExecutionType.Act, true)]
-    public void TestShouldRun_WithExecutionType_ReturnsExpectedBoolean(ExecutionType executionType, bool expected)
-    {
-        // Arrange
-        var mockDataSources = new List<DataSource>();
-        var context = new InternalContext();
-        var dataSourceLogic = new DataSourceLogic(mockDataSources, context);
-
-        // Act & Assert
-        Assert.That(dataSourceLogic.ShouldRun(executionType), Is.EqualTo(expected));
-    }
-
     [Test]
     public void TestRun_WithDataSources_ReturnsExecutionDataWithAddedDataSources()
     {

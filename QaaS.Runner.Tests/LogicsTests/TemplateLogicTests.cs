@@ -9,22 +9,6 @@ namespace QaaS.Runner.Tests.LogicsTests;
 public class TemplateLogicTests
 {
     [Test]
-    [TestCase(ExecutionType.Template, true)]
-    [TestCase(ExecutionType.Run, false)]
-    public void TestShouldRun_WithExecutionType_ReturnsExpectedBoolean(ExecutionType executionType, bool expected)
-    {
-        // Arrange
-        var context = new Context();
-        var templateLogic = new TemplateLogic(context);
-
-        // Act
-        var result = templateLogic.ShouldRun(executionType);
-
-        // Assert
-        Assert.That(result, Is.EqualTo(expected));
-    }
-
-    [Test]
     public void TestRun_WithWriterOrNull_WritesTemplateCorrectly()
     {
         // Arrange
