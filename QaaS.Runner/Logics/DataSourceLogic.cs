@@ -12,18 +12,6 @@ namespace QaaS.Runner.Logics;
 public class DataSourceLogic(IList<DataSource> dataSources, InternalContext context) : ILogic
 {
     /// <summary>
-    /// Determines whether data sources should be loaded for the requested execution type.
-    /// </summary>
-    /// <param name="executionType">The active execution pipeline mode.</param>
-    /// <returns>
-    /// <see langword="true" /> for all execution types except <see cref="ExecutionType.Template" />.
-    /// </returns>
-    public bool ShouldRun(ExecutionType executionType)
-    {
-        return executionType != ExecutionType.Template;
-    }
-
-    /// <summary>
     /// Appends all configured data sources to <see cref="ExecutionData.DataSources" />.
     /// </summary>
     /// <param name="executionData">The mutable execution context to populate.</param>

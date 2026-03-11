@@ -16,22 +16,6 @@ namespace QaaS.Runner.Tests.LogicsTests;
 public class AssertionLogicTests
 {
     [Test]
-    [TestCase(ExecutionType.Assert, true)]
-    [TestCase(ExecutionType.Run, true)]
-    [TestCase(ExecutionType.Template, false)]
-    [TestCase(ExecutionType.Act, false)]
-    public void TestShouldRun_WithExecutionType_ReturnsExpectedBoolean(ExecutionType executionType, bool expected)
-    {
-        // Arrange
-        var mockAssertions = new List<Assertion>();
-        var context = new InternalContext();
-        var assertionLogic = new AssertionLogic(mockAssertions, context);
-
-        // Act & Assert
-        Assert.That(assertionLogic.ShouldRun(executionType), Is.EqualTo(expected));
-    }
-
-    [Test]
     public void TestRun_WithAssertions_ReturnsExecutionDataWithAssertionResults()
     {
         // Arrange

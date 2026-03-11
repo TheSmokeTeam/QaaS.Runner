@@ -11,21 +11,6 @@ namespace QaaS.Runner.Tests.LogicsTests;
 
 public class StorageLogicTests
 {
-    [TestCase(ExecutionType.Assert, true)]
-    [TestCase(ExecutionType.Run, false)]
-    [TestCase(ExecutionType.Template, false)]
-    [TestCase(ExecutionType.Act, true)]
-    public void TestShouldRun_WithExecutionType_ReturnsExpectedBoolean(ExecutionType executionType, bool expected)
-    {
-        // Arrange
-        var mockStorages = new List<IStorage>();
-        var context = new InternalContext();
-        var storageLogic = new StorageLogic(mockStorages, context, executionType);
-
-        // Act & Assert
-        Assert.That(storageLogic.ShouldRun(executionType), Is.EqualTo(expected));
-    }
-
     [Test]
     public void TestRun_WithAssertExecutionType_RetrievesFromStorages()
     {

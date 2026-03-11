@@ -12,6 +12,7 @@ using QaaS.Framework.SDK.Session.SessionDataObjects;
 using QaaS.Framework.SDK.Session.SessionDataObjects.RunningSessionsObjects;
 using QaaS.Runner.Assertions.AssertionObjects;
 using QaaS.Runner.Logics;
+using QaaS.Runner.Sessions.Session;
 using QaaS.Runner.Storage;
 
 namespace QaaS.Runner.Tests.ExecutionTests;
@@ -60,6 +61,31 @@ public class ExecutionTests
     }
 
     [Test]
+    public void Start_WithAssertType_DoesNotRunSessions()
+    {
+        var context = CreateContext();
+        var session = new Mock<ISession>();
+        session.Setup(s => s.Run(It.IsAny<ExecutionData>()))
+            .Returns(new SessionData { Name = "unexpected-session" });
+
+        var execution = new Execution(ExecutionType.Assert, context)
+        {
+            DataSourceLogic = new DataSourceLogic([], context),
+            SessionLogic = new SessionLogic([session.Object], context),
+            AssertionLogic = new AssertionLogic([], context),
+            ReportLogic = new ReportLogic([], context),
+            StorageLogic = new StorageLogic([], context, ExecutionType.Assert),
+            TemplateLogic = new TemplateLogic(context, TextWriter.Null)
+        };
+
+        var result = execution.Start();
+
+        Assert.That(result, Is.EqualTo(0));
+        Assert.That(context.ExecutionData.SessionDatas, Is.Empty);
+        session.Verify(s => s.Run(It.IsAny<ExecutionData>()), Times.Never);
+    }
+
+    [Test]
     public void Start_WithActType_ReturnsZeroAndStoresToStorage()
     {
         var context = CreateContext();
@@ -72,6 +98,20 @@ public class ExecutionTests
 
         Assert.That(result, Is.EqualTo(0));
         storage.Verify(s => s.Store(It.IsAny<ImmutableList<SessionData?>>(), context.CaseName), Times.Once);
+    }
+
+    [Test]
+    public void Start_WithRunType_DoesNotUseStorage()
+    {
+        var context = CreateContext();
+        var storage = new Mock<IStorage>();
+        var execution = CreateExecution(ExecutionType.Run, context, storages: [storage.Object]);
+
+        var result = execution.Start();
+
+        Assert.That(result, Is.EqualTo(0));
+        storage.Verify(s => s.Retrieve(It.IsAny<string>()), Times.Never);
+        storage.Verify(s => s.Store(It.IsAny<ImmutableList<SessionData?>>(), It.IsAny<string>()), Times.Never);
     }
 
     [Test]
