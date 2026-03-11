@@ -57,6 +57,11 @@ public class StorageBuilder
         return Configure(update(currentConfig));
     }
 
+    public StorageBuilder UpsertConfiguration(IStorageConfig storageConfig)
+    {
+        return Configure(storageConfig);
+    }
+
     public StorageBuilder DeleteConfiguration()
     {
         Reset();
