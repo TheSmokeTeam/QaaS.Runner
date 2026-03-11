@@ -12,21 +12,6 @@ namespace QaaS.Runner.Tests.LogicsTests;
 
 public class ReportLogicTests
 {
-    [TestCase(ExecutionType.Assert, true)]
-    [TestCase(ExecutionType.Run, true)]
-    [TestCase(ExecutionType.Template, false)]
-    [TestCase(ExecutionType.Act, false)]
-    public void TestShouldRun_WithExecutionType_ReturnsExpectedBoolean(ExecutionType executionType, bool expected)
-    {
-        // Arrange
-        var mockReporters = new List<IReporter>();
-        var context = new InternalContext();
-        var reportLogic = new ReportLogic(mockReporters, context);
-
-        // Act & Assert
-        Assert.That(reportLogic.ShouldRun(executionType), Is.EqualTo(expected));
-    }
-
     [TestCase(1)]
     [TestCase(5)]
     public void TestRun_WithReportersAndAssertionResults_WritesResultsToReporters(int reportersCount)

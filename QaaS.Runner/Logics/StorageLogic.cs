@@ -15,16 +15,6 @@ public class StorageLogic(IList<IStorage> storages, InternalContext context, Exe
     : ILogic
 {
     /// <summary>
-    /// Determines whether storage operations should run for the requested execution type.
-    /// </summary>
-    /// <param name="executionType">The active execution pipeline mode.</param>
-    /// <returns>
-    /// <see langword="true" /> for <see cref="ExecutionType.Act" /> and <see cref="ExecutionType.Assert" />;
-    /// otherwise <see langword="false" />.
-    /// </returns>
-    public bool ShouldRun(ExecutionType executionType) => executionType is ExecutionType.Act or ExecutionType.Assert;
-
-    /// <summary>
     /// Stores or retrieves session data based on the execution mode provided to the logic instance.
     /// </summary>
     /// <param name="executionData">The mutable execution context containing session data.</param>

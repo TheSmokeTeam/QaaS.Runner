@@ -12,21 +12,6 @@ namespace QaaS.Runner.Tests.LogicsTests;
 
 public class SessionLogicTests
 {
-    [TestCase(ExecutionType.Assert, false)]
-    [TestCase(ExecutionType.Run, true)]
-    [TestCase(ExecutionType.Template, false)]
-    [TestCase(ExecutionType.Act, true)]
-    public void TestShouldRun_WithExecutionType_ReturnsExpectedBoolean(ExecutionType executionType, bool expected)
-    {
-        // Arrange
-        var mockSessions = new List<ISession>();
-        var context = new InternalContext() { Logger = Globals.Logger };
-        var sessionLogic = new SessionLogic(mockSessions, context);
-
-        // Act & Assert
-        Assert.That(sessionLogic.ShouldRun(executionType), Is.EqualTo(expected));
-    }
-
     [Test]
     public void TestRun_WithMultipleSessions_ReturnsExecutionDataWithSessionDatas()
     {
