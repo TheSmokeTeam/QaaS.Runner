@@ -3,7 +3,7 @@ name: CI
 on:
   push:
     branches: ["**"]
-    tags: ["*"]
+    tags: ["+([0-9]).+([0-9]).+([0-9])"]
   pull_request:
     branches: ["**"]
   workflow_dispatch:
@@ -36,15 +36,15 @@ jobs:
         with:
           dotnet-version: 10.0.x
 
-      - name: Detect mirror tag
-        id: mirror_tag
+      - name: Detect stable tag
+        id: stable_tag
         shell: bash
         run: |
-          if [[ "${GITHUB_REF}" =~ ^refs/tags/([0-9]+\.[0-9]+\.[0-9]+(-alpha\.[0-9]+)?)$ ]]; then
-            echo "is_mirror_tag=true" >> "$GITHUB_OUTPUT"
+          if [[ "${GITHUB_REF}" =~ ^refs/tags/([0-9]+\.[0-9]+\.[0-9]+)$ ]]; then
+            echo "is_stable_tag=true" >> "$GITHUB_OUTPUT"
             echo "tag=${BASH_REMATCH[1]}" >> "$GITHUB_OUTPUT"
           else
-            echo "is_mirror_tag=false" >> "$GITHUB_OUTPUT"
+            echo "is_stable_tag=false" >> "$GITHUB_OUTPUT"
           fi
 
       - name: Restore packages
@@ -56,42 +56,27 @@ jobs:
       - name: Test solution
         run: dotnet test ${{ env.PROJECT_PATH }} --configuration ${{ env.CONFIGURATION }} --no-restore --no-build --maxcpucount
 
-      - name: Get Version
-        if: startsWith(github.ref, 'refs/tags/')
-        id: version
-        uses: battila7/get-version-action@v2
-
-      - name: Validate SemVer tag
-        if: startsWith(github.ref, 'refs/tags/')
-        shell: bash
-        run: |
-          VERSION="${{ steps.version.outputs.version-without-v }}"
-          if [[ ! "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+(-(alpha|beta)\.[0-9]+)?$ ]]; then
-            echo "Error: '$VERSION' is not a valid version format."
-            exit 1
-          fi
-
       - name: Pack project
-        if: startsWith(github.ref, 'refs/tags/')
+        if: steps.stable_tag.outputs.is_stable_tag == 'true'
         run: |
           dotnet pack ${{ env.PROJECT_PATH }} `
             --no-restore --no-build `
             --configuration ${{ env.CONFIGURATION }} `
             --include-symbols `
-            -p:PackageVersion=${{ steps.version.outputs.version-without-v }} `
+            -p:PackageVersion=${{ steps.stable_tag.outputs.tag }} `
             --output ${{ env.PACKAGE_OUTPUT_DIRECTORY }}
 
       - name: Push package
-        if: startsWith(github.ref, 'refs/tags/')
+        if: steps.stable_tag.outputs.is_stable_tag == 'true'
         run: dotnet nuget push ${{ env.PACKAGE_OUTPUT_DIRECTORY }}\*.nupkg -k ${{ secrets.NUGET_AUTH_TOKEN }} -s https://api.nuget.org/v3/index.json --skip-duplicate
 
       - name: Write restored packages metadata
-        if: steps.mirror_tag.outputs.is_mirror_tag == 'true'
+        if: steps.stable_tag.outputs.is_stable_tag == 'true'
         shell: pwsh
         run: |
           $metadata = @{
             repository = "${{ github.repository }}"
-            tag = "${{ steps.mirror_tag.outputs.tag }}"
+            tag = "${{ steps.stable_tag.outputs.tag }}"
             runId = "${{ github.run_id }}"
             createdAtUtc = (Get-Date).ToUniversalTime().ToString("o")
           } | ConvertTo-Json
@@ -100,7 +85,7 @@ jobs:
           $metadata | Set-Content -Path $metadataPath
 
       - name: Upload restored packages artifact
-        if: steps.mirror_tag.outputs.is_mirror_tag == 'true'
+        if: steps.stable_tag.outputs.is_stable_tag == 'true'
         uses: actions/upload-artifact@v4
         with:
           name: restored-packages
