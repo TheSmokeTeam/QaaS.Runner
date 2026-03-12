@@ -3,6 +3,7 @@ using Microsoft.Extensions.Logging;
 using QaaS.Framework.SDK.ContextObjects;
 using QaaS.Framework.SDK.DataSourceObjects;
 using QaaS.Framework.SDK.Session.SessionDataObjects;
+using QaaS.Runner.Infrastructure;
 using QaaS.Runner.Sessions.Actions;
 using QaaS.Runner.Sessions.Actions.Probes;
 using QaaS.Runner.Sessions.Actions.Publishers;
@@ -80,6 +81,8 @@ public class Stage
         _context.Logger.LogInformation(
             "Starting session {SessionName} stage {StageNumber} with {ActionCount} action(s)",
             _sessionName, _stage, Actions.Count);
+        _context.AppendSessionLog(_sessionName,
+            $"Starting session {_sessionName} stage {_stage} with {Actions.Count} action(s)");
         _context.Logger.LogDebug("Session {SessionName} stage {StageNumber} actions: {ActionNames}",
             _sessionName, _stage, string.Join(", ", Actions.Select(action => $"{action.GetType().Name}:{action.Name}")));
 
@@ -88,8 +91,11 @@ public class Stage
                 SessionExtensions.CreateTaskFromAction(_context, action, _sessionName, _actionFailures)).ToList();
         stageTasks.ForEach(task => task.Start());
         _ = Task.WhenAll(stageTasks).ContinueWith(_ =>
+            {
                 _context.Logger.LogInformation("Finished session {SessionName} stage {StageNumber}",
-                    _sessionName, _stage),
+                    _sessionName, _stage);
+                _context.AppendSessionLog(_sessionName, $"Finished session {_sessionName} stage {_stage}");
+            },
             TaskScheduler.Default);
 
         if (SleepAfterMilliseconds is > 0)

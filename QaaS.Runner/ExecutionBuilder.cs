@@ -28,6 +28,7 @@ using QaaS.Runner.Assertions;
 using QaaS.Runner.Assertions.AssertionObjects;
 using QaaS.Runner.Assertions.ConfigurationObjects;
 using QaaS.Runner.Extensions;
+using QaaS.Runner.Infrastructure;
 using QaaS.Runner.Sessions.Actions.Probes;
 using QaaS.Runner.Logics;
 using QaaS.Runner.Sessions.Session;
@@ -119,6 +120,7 @@ public class ExecutionBuilder() : BaseExecutionBuilder<InternalContext, Executio
     private string? _configuredCaseName;
     private string? _configuredExecutionId;
     private Dictionary<string, object?> _globalDict = new();
+    private readonly IConfiguration? _templateSourceConfiguration;
 
     internal ExecutionBuilder(InternalContext context, ExecutionType executionType, IList<string>? sessionNamesToRun,
         IList<string>? sessionCategoriesToRun, IList<string>? assertionNamesToRun,
@@ -128,6 +130,7 @@ public class ExecutionBuilder() : BaseExecutionBuilder<InternalContext, Executio
         Type = executionType;
 
         Context = context;
+        _templateSourceConfiguration = context.RootConfiguration;
         var blankRunBuilderFromContext = Bind.BindFromContext<ExecutionBuilder>(Context, _validationResults,
             new BinderOptions() { BindNonPublicProperties = true });
 
@@ -564,6 +567,37 @@ public class ExecutionBuilder() : BaseExecutionBuilder<InternalContext, Executio
         _validationResults.AddRange(distinctValidationResults);
     }
 
+    private void StoreRenderedConfigurationTemplate()
+    {
+        var includedSessionNames = (Sessions ?? [])
+            .Where(session => !string.IsNullOrWhiteSpace(session.Name))
+            .Select(session => session.Name!)
+            .ToHashSet(StringComparer.Ordinal);
+        var assertionStatusesToReport = (Assertions ?? [])
+            .Where(assertion => !string.IsNullOrWhiteSpace(assertion.Name))
+            .ToDictionary(
+                assertion => assertion.Name!,
+                assertion => (IReadOnlyList<string>)assertion.StatusesToReport
+                    .Select(status => status.ToString())
+                    .ToList(),
+                StringComparer.Ordinal);
+        var renderedTemplate = ConfigurationTemplateRenderer.Render(
+            _templateSourceConfiguration ?? Context.RootConfiguration,
+            [
+                new KeyValuePair<string, object?>("Storages", Storages),
+                new KeyValuePair<string, object?>("DataSources", DataSources),
+                new KeyValuePair<string, object?>("Sessions", Sessions),
+                new KeyValuePair<string, object?>("Assertions", Assertions),
+                new KeyValuePair<string, object?>("Links", Links),
+                new KeyValuePair<string, object?>("MetaData", MetaData)
+            ],
+            Infrastructure.Constants.ConfigurationSectionNames,
+            includedSessionNames,
+            assertionStatusesToReport);
+
+        Context.SetRenderedConfigurationTemplate(renderedTemplate);
+    }
+
     /// <inheritdoc />
     public override Execution Build()
     {
@@ -582,6 +616,7 @@ public class ExecutionBuilder() : BaseExecutionBuilder<InternalContext, Executio
         {
             // filter session assertion list based on names & categories
             FilterConfigurationsBasedOnFlags();
+            StoreRenderedConfigurationTemplate();
 
             // validate configuration
             _ = ValidationUtils.TryValidateObjectRecursive(this, _validationResults);
