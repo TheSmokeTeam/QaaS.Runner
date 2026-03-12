@@ -3,7 +3,7 @@ name: CI
 on:
   push:
     branches: ["**"]
-    tags: ["+([0-9]).+([0-9]).+([0-9])"]
+    tags: ["*"]
   pull_request:
     branches: ["**"]
   workflow_dispatch:
@@ -36,13 +36,13 @@ jobs:
         with:
           dotnet-version: 10.0.x
 
-      - name: Detect stable tag
+      - name: Detect tag
         id: stable_tag
         shell: bash
         run: |
-          if [[ "${GITHUB_REF}" =~ ^refs/tags/([0-9]+\.[0-9]+\.[0-9]+)$ ]]; then
+          if [[ "${GITHUB_REF}" == refs/tags/* ]]; then
             echo "is_stable_tag=true" >> "$GITHUB_OUTPUT"
-            echo "tag=${BASH_REMATCH[1]}" >> "$GITHUB_OUTPUT"
+            echo "tag=${GITHUB_REF#refs/tags/}" >> "$GITHUB_OUTPUT"
           else
             echo "is_stable_tag=false" >> "$GITHUB_OUTPUT"
           fi
