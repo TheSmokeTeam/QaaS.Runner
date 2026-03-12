@@ -12,6 +12,7 @@ using QaaS.Framework.SDK.Hooks.Assertion;
 using QaaS.Framework.SDK.Session;
 using QaaS.Framework.SDK.Session.SessionDataObjects;
 using QaaS.Framework.Serialization;
+using QaaS.Runner.Infrastructure;
 using RunnerFileSystemExtensions = QaaS.Runner.Infrastructure.FileSystemExtensions;
 using AssertionResult = QaaS.Runner.Assertions.AssertionObjects.AssertionResult;
 using AssertionSeverity = QaaS.Runner.Assertions.AssertionObjects.AssertionSeverity;
@@ -130,13 +131,34 @@ public class AllureReporter : BaseReporter
         const string templateAttachmentsDirectory = "Templates";
         var templateAttachmentsDirectoryFullPath = GetAttachmentDirectory(templateAttachmentsDirectory);
         Context.Logger.LogDebug("Saving the execution configuration template as an Allure attachment");
+        var renderedTemplate = Context.GetRenderedConfigurationTemplate() ??
+                               configuration.BuildConfigurationAsYaml(Infrastructure.Constants.ConfigurationSectionNames);
         return SaveDataToAllure(
-            data: Encoding.UTF8.GetBytes(
-                configuration.BuildConfigurationAsYaml(Infrastructure.Constants.ConfigurationSectionNames)),
+            data: Encoding.UTF8.GetBytes(renderedTemplate),
             fileName: attachmentFile,
             attachmentDirectory: templateAttachmentsDirectoryFullPath,
             name: attachmentFile,
             type: YamlAttachmentType);
+    }
+
+    private Attachment? SaveSessionLogToAllure(SessionData sessionData)
+    {
+        const string sessionLogsAttachmentsDirectory = "SessionLogs";
+        const string textAttachmentType = "text/plain";
+        var sessionLog = Context.GetSessionLog(sessionData.Name);
+        if (string.IsNullOrWhiteSpace(sessionLog))
+        {
+            return null;
+        }
+
+        var sessionLogAttachmentDirectory = GetAttachmentDirectory(sessionLogsAttachmentsDirectory);
+        Context.Logger.LogDebug("Saving session log for {SessionName} as an Allure attachment", sessionData.Name);
+        return SaveDataToAllure(
+            data: Encoding.UTF8.GetBytes(sessionLog),
+            fileName: $"{sessionData.Name}.log",
+            attachmentDirectory: sessionLogAttachmentDirectory,
+            name: "SessionLog",
+            type: textAttachmentType);
     }
 
     private List<Attachment> SaveAssertionAttachmentsToAllure(AssertionResult assertionResult)
@@ -380,6 +402,18 @@ public class AllureReporter : BaseReporter
 
     private StepResult CreateSessionStep(SessionData sessionData)
     {
+        var attachments = new List<Attachment>();
+        if (SaveSessionData)
+        {
+            attachments.Add(SaveSessionsDataToAllure(sessionData));
+        }
+
+        var sessionLogAttachment = SaveSessionLogToAllure(sessionData);
+        if (sessionLogAttachment != null)
+        {
+            attachments.Add(sessionLogAttachment);
+        }
+
         return new StepResult
         {
             name = sessionData.Name,
@@ -403,7 +437,7 @@ public class AllureReporter : BaseReporter
             status = sessionData.SessionFailures.Any() ? Status.failed : Status.passed,
             start = new DateTimeOffset(sessionData.UtcStartTime, new TimeSpan(0)).ToUnixTimeMilliseconds(),
             stop = new DateTimeOffset(sessionData.UtcEndTime, new TimeSpan(0)).ToUnixTimeMilliseconds(),
-            attachments = SaveSessionData ? [SaveSessionsDataToAllure(sessionData)] : null,
+            attachments = attachments.Count == 0 ? null : attachments,
             steps = sessionData.SessionFailures.Any()
                 ? new List<StepResult>
                 {

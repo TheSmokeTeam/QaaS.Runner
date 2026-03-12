@@ -74,6 +74,7 @@ public class Session : ISession
         Thread.Sleep(TimeSpan.FromMilliseconds(TimeoutBeforeSessionMs));
 
         _context.Logger.LogInformation("Starting session {SessionName}", Name);
+        _context.AppendSessionLog(Name, $"Starting session {Name}");
         var sessionStartTimeUtc = GetCurrentUtcTime();
         var actionsTasks = new List<Task<Tuple<Action, InternalCommunicationData<object>>?>>();
 
@@ -196,13 +197,18 @@ public class Session : ISession
     private void LogSessionSummary(SessionData sessionData)
     {
         _context.Logger.LogInformation("Session summary for {SessionName}", sessionData.Name);
+        _context.AppendSessionLog(sessionData.Name, $"Session summary for {sessionData.Name}");
         _context.Logger.LogInformationWithMetaData(
             "{SessionName} Duration In Milliseconds: {SessionDurationMilliseconds}",
             _context.GetMetaDataOrDefault(),
             new object?[] { sessionData.Name, (sessionData.UtcEndTime - sessionData.UtcStartTime).TotalMilliseconds });
+        _context.AppendSessionLog(sessionData.Name,
+            $"{sessionData.Name} Duration In Milliseconds: {(sessionData.UtcEndTime - sessionData.UtcStartTime).TotalMilliseconds}");
         _context.Logger.LogInformation("Session Utc Start Time: {SessionUtcStartTime}",
             sessionData.UtcStartTime);
+        _context.AppendSessionLog(sessionData.Name, $"Session Utc Start Time: {sessionData.UtcStartTime}");
         _context.Logger.LogInformation("Session Utc End Time: {SessionUtcEndTime}", sessionData.UtcEndTime);
+        _context.AppendSessionLog(sessionData.Name, $"Session Utc End Time: {sessionData.UtcEndTime}");
 
         // Inputs summary
         foreach (var input in sessionData.Inputs ?? Enumerable.Empty<CommunicationData<object>>())
@@ -211,6 +217,8 @@ public class Session : ISession
             _context.Logger.LogInformation(
                 "Input Source {InputName} Contains {NumberOfInputsSentToSource} Inputs",
                 input.Name, numberOfInputs);
+            _context.AppendSessionLog(sessionData.Name,
+                $"Input Source {input.Name} Contains {numberOfInputs} Inputs");
         }
 
         // Outputs summary
@@ -220,14 +228,23 @@ public class Session : ISession
             _context.Logger.LogInformation(
                 "Output Source {OutputName} Contains {NumberOfOutputsSentToSource} Outputs",
                 output.Name, numberOfOutputs);
+            _context.AppendSessionLog(sessionData.Name,
+                $"Output Source {output.Name} Contains {numberOfOutputs} Outputs");
         }
 
         _context.Logger.LogInformation("Session {SessionName} completed.", sessionData.Name);
+        _context.AppendSessionLog(sessionData.Name, $"Session {sessionData.Name} completed.");
         _context.Logger.LogInformation("Session {SessionName} Inputs={InputCount}", sessionData.Name,
             sessionData.Inputs?.Count ?? 0);
+        _context.AppendSessionLog(sessionData.Name,
+            $"Session {sessionData.Name} Inputs={sessionData.Inputs?.Count ?? 0}");
         _context.Logger.LogInformation("Session {SessionName} Outputs={OutputCount}", sessionData.Name,
             sessionData.Outputs?.Count ?? 0);
+        _context.AppendSessionLog(sessionData.Name,
+            $"Session {sessionData.Name} Outputs={sessionData.Outputs?.Count ?? 0}");
         _context.Logger.LogInformation("Session {SessionName} Failures={FailureCount}", sessionData.Name,
             sessionData.SessionFailures?.Count ?? 0);
+        _context.AppendSessionLog(sessionData.Name,
+            $"Session {sessionData.Name} Failures={sessionData.SessionFailures?.Count ?? 0}");
     }
 }

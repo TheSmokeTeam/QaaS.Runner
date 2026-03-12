@@ -41,8 +41,8 @@ public abstract class BaseConsumer : StagedAction
     protected abstract SerializationType? GetCommunicationSerializationType();
 
     /// <summary>
-    /// Acts any publishing class repeatedly according to instance's properties.
-    /// Uses overridable <see cref="Publish"/> that represents the publishing mechanism of any derived class.
+    /// Executes the consumer according to the instance configuration.
+    /// Uses overridable <see cref="Consume"/> that represents the consumption mechanism of any derived class.
     /// </summary>
     internal override InternalCommunicationData<object> Act()
     {
