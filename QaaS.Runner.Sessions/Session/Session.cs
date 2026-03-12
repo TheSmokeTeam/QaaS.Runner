@@ -83,6 +83,7 @@ public class Session : ISession
         foreach (var (_, stage) in _stages.OrderBy(stage => stage.Key))
             actionsTasks.AddRange(stage.Run());
 
+        Task.WhenAll(actionsTasks).GetAwaiter().GetResult();
         var sessionEndTimeUtc = GetCurrentUtcTime();
 
         // Perform end session operations
@@ -221,9 +222,12 @@ public class Session : ISession
                 output.Name, numberOfOutputs);
         }
 
-        _context.Logger.LogInformation(
-            "Session {SessionName} completed. Inputs={InputCount}, Outputs={OutputCount}, Failures={FailureCount}",
-            sessionData.Name, sessionData.Inputs?.Count ?? 0, sessionData.Outputs?.Count ?? 0,
+        _context.Logger.LogInformation("Session {SessionName} completed.", sessionData.Name);
+        _context.Logger.LogInformation("Session {SessionName} Inputs={InputCount}", sessionData.Name,
+            sessionData.Inputs?.Count ?? 0);
+        _context.Logger.LogInformation("Session {SessionName} Outputs={OutputCount}", sessionData.Name,
+            sessionData.Outputs?.Count ?? 0);
+        _context.Logger.LogInformation("Session {SessionName} Failures={FailureCount}", sessionData.Name,
             sessionData.SessionFailures?.Count ?? 0);
     }
 }
