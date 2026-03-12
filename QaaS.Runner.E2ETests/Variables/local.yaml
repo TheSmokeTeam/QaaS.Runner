@@ -1,7 +1,7 @@
 variables:
   rabbitmq:
     Host: localhost
-    Port: 5627
-    Username: admin
-    Password: admin
+    Port: 5672
+    Username: guest
+    Password: guest
     RoutingKey: /
