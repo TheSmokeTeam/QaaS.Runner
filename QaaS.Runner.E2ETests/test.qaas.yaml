@@ -23,15 +23,15 @@ Sessions:
         DataSourceNames: [ RabbitPayload ]
         RabbitMq:
           <<: *rabbitmq
-          QueueName: qaas.runner.e2e
+          ExchangeName: test
         Serialize:
           Serializer: Json
     Consumers:
       - Name: ConsumeFromRabbit
-        TimeoutMs: 3000
+        TimeoutMs: 20000
         RabbitMq:
           <<: *rabbitmq
-          QueueName: qaas.runner.e2e
+          ExchangeName: test
         Deserialize:
           Deserializer: Json
           SpecificType:
