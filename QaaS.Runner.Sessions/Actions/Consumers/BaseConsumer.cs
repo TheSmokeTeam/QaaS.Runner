@@ -8,6 +8,7 @@ using QaaS.Framework.SDK.Session.CommunicationDataObjects;
 using QaaS.Framework.SDK.Session.DataObjects;
 using QaaS.Framework.Serialization;
 using QaaS.Framework.Serialization.Deserializers;
+using QaaS.Runner.Sessions.Extensions;
 
 namespace QaaS.Runner.Sessions.Actions.Consumers;
 
@@ -53,10 +54,14 @@ public abstract class BaseConsumer : StagedAction
         };
 
         Policies?.SetupChain();
-        Logger.LogDebug("Acting consuming action {ActionName}", Name);
+        Logger.LogDebug(
+            "Starting consumer {ActionName}. TimeoutMs={TimeoutMs}, SerializationType={SerializationType}",
+            Name, TimeoutMs.TotalMilliseconds, SerializationType);
         Consume(data);
 
         RunningCommunicationData.Data.CompleteAdding();
+        Logger.LogDebug("Finished consumer {ActionName}. CollectedOutputCount={OutputCount}",
+            Name, data.Output?.Count ?? 0);
         return data;
     }
 
@@ -87,5 +92,5 @@ public abstract class BaseConsumer : StagedAction
 
 
     internal override void ExportRunningCommunicationData(InternalContext context, string sessionName)
-        => context.InternalRunningSessions.RunningSessionsDict[sessionName].Outputs!.Add(RunningCommunicationData);
+        => context.GetRunningSession(sessionName).Outputs!.Add(RunningCommunicationData);
 }

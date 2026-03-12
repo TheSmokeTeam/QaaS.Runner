@@ -9,6 +9,7 @@ using QaaS.Framework.SDK.ContextObjects;
 using QaaS.Framework.SDK.Extensions;
 using QaaS.Framework.SDK.Hooks.Probe;
 using QaaS.Framework.SDK.Session.SessionDataObjects;
+using QaaS.Runner.Infrastructure;
 using QaaS.Runner.Sessions.ConfigurationObjects;
 using QaaS.Runner.Sessions.Extensions;
 using YamlDotNet.Core;
@@ -201,7 +202,7 @@ public class ProbeBuilder : IYamlConvertible
                                                            " in provided probes.");
             var probeTypeName = probeHook.GetType().Name;
             context.Logger.LogDebugWithMetaData("Started building Probe of type {type}",
-                context.GetMetaDataFromContext(), new object?[] { probeTypeName });
+                context.GetMetaDataOrDefault(), new object?[] { probeTypeName });
 
             return new Probe(Name!, Stage, probeHook, DataSourceNames, DataSourcePatterns, context.Logger);
         }

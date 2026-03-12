@@ -113,8 +113,10 @@ public class ExecuteLoader<TRunner> : BaseLoader<ExecuteOptions, TRunner> where 
             .ToList();
 
         // Use Activator to create an instance of the configured implementation of TRunner
-        return (TRunner)Activator.CreateInstance(
+        var runner = (TRunner)Activator.CreateInstance(
             typeof(TRunner),
             _runScope, allExecutions, Logger, SerilogLogger, Options.EmptyAllureDirectory, Options.AutoServeTestResults)!;
+        runner.ExitProcessOnCompletion = !Options.NoProcessExit;
+        return runner;
     }
 }

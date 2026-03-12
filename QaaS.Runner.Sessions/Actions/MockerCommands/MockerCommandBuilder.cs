@@ -4,6 +4,7 @@ using QaaS.Framework.SDK.ContextObjects;
 using QaaS.Framework.SDK.Extensions;
 using Qaas.Mocker.CommunicationObjects.ConfigurationObjects.Command;
 using QaaS.Framework.SDK.Session.SessionDataObjects;
+using QaaS.Runner.Infrastructure;
 using QaaS.Runner.Sessions.ConfigurationObjects;
 using QaaS.Runner.Sessions.Extensions;
 
@@ -160,7 +161,7 @@ public class MockerCommandBuilder
             }
             var commandTypeName = type.GetType().Name;
             context.Logger.LogDebugWithMetaData("Started building MockerCommand of type {type}",
-                context.GetMetaDataFromContext(), new object?[] { commandTypeName });
+                context.GetMetaDataOrDefault(), new object?[] { commandTypeName });
 
             return type switch
             {
@@ -179,7 +180,7 @@ public class MockerCommandBuilder
         catch (Exception e)
         {
             actionFailures.AppendActionFailure(e, sessionName, context.Logger, nameof(MockerCommand), Name!,
-                type?.GetType().ToString());
+                type?.GetType().Name);
         }
 
         return null;

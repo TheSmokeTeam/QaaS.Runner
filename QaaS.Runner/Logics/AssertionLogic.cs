@@ -25,7 +25,7 @@ public class AssertionLogic(IList<Assertion> assertions, InternalContext context
     public ExecutionData Run(ExecutionData executionData)
     {
         context.Logger.LogInformation("Running {LogicType} Logic", "Assertions");
-        var metaData = context.GetMetaDataFromContext();
+        var metaData = context.GetMetaDataOrDefault();
 
         var assertionResults = new ConcurrentBag<AssertionResult>();
 

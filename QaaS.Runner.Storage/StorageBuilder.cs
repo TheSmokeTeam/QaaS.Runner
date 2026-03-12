@@ -4,6 +4,7 @@ using System.Runtime.CompilerServices;
 using QaaS.Framework.Configurations.ConfigurationBindingUtils;
 using QaaS.Framework.Configurations.CommonConfigurationObjects;
 using QaaS.Framework.SDK.ContextObjects;
+using QaaS.Framework.SDK.Extensions;
 using QaaS.Runner.Storage.ConfigurationObjects;
 using QaaS.Runner.Storage.ConfigurationObjects.StorageConfigs;
 

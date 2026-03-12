@@ -49,6 +49,12 @@ namespace QaaS.Runner.Tests.LoadersTests
 
         private sealed class TestJfrogArtifactoryHelper(IEnumerable<string> files) : IJfrogArtifactoryHelper
         {
+            public Task<IReadOnlyList<string>> GetUrlsToAllFilesInArtifactoryFolderAsync(string artifactoryFolderUrl,
+                HttpClient httpClient, CancellationToken cancellationToken = default)
+            {
+                return Task.FromResult<IReadOnlyList<string>>(files.ToList());
+            }
+
             public IEnumerable<string> GetUrlsToAllFilesInArtifactoryFolder(string artifactoryFolderUrl,
                 HttpClient httpClient)
             {
@@ -444,6 +450,23 @@ namespace QaaS.Runner.Tests.LoadersTests
 
             Assert.That((bool)emptyResultsProperty.GetValue(runner)!, Is.True);
             Assert.That((bool)serveResultsProperty.GetValue(runner)!, Is.True);
+        }
+
+        [Test]
+        public void GetLoadedRunner_WithNoProcessExitFlag_DisablesProcessExitOnCompletion()
+        {
+            var options = new RunOptions
+            {
+                ConfigurationFile = "test.yaml",
+                SendLogs = false,
+                NoProcessExit = true
+            };
+
+            var loader = new TestRunLoader(options, "exec-6");
+
+            var runner = loader.GetLoadedRunner();
+
+            Assert.That(runner.ExitProcessOnCompletion, Is.False);
         }
     }
 }

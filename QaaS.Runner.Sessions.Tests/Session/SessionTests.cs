@@ -1,13 +1,17 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Threading;
 using Moq;
 using NUnit.Framework;
 using NUnit.Framework.Legacy;
 using QaaS.Framework.Protocols.Protocols;
+using QaaS.Framework.SDK.ConfigurationObjects;
 using QaaS.Framework.SDK.ContextObjects;
 using QaaS.Framework.SDK.DataSourceObjects;
 using QaaS.Framework.SDK.Session.DataObjects;
+using QaaS.Framework.SDK.Session.SessionDataObjects;
+using QaaS.Runner.Sessions.Actions;
 using QaaS.Runner.Sessions.Session;
 using QaaS.Runner.Sessions.Tests.Actions;
 using QaaS.Runner.Sessions.Tests.Actions.Utils;
@@ -252,5 +256,61 @@ public class SessionTests
 
         Assert.That(sessionData, Is.Null);
         Assert.That(context.InternalRunningSessions.RunningSessionsDict.ContainsKey(sessionName), Is.False);
+    }
+
+    [Test]
+    public void Run_WithMultipleStages_CompletesEarlierStageBeforeStartingNextStage()
+    {
+        const string sessionName = "ordered-session";
+        var context = CreationalFunctions.CreateContext(sessionName, []);
+        var stage1Completed = 0;
+        var stage2StartedBeforeStage1Completed = false;
+
+        var stage1 = new Stage(context, [], sessionName, 0, 0, 0);
+        stage1.AddCommunication(new RecordingAction("stage-1", 0, Globals.Logger, () =>
+        {
+            Thread.Sleep(75);
+            Interlocked.Exchange(ref stage1Completed, 1);
+        }));
+
+        var stage2 = new Stage(context, [], sessionName, 1, 0, 0);
+        stage2.AddCommunication(new RecordingAction("stage-2", 1, Globals.Logger, () =>
+        {
+            stage2StartedBeforeStage1Completed = Interlocked.CompareExchange(ref stage1Completed, 0, 0) == 0;
+        }));
+
+        var session = new Sessions.Session.Session(
+            sessionName,
+            0,
+            true,
+            0,
+            0,
+            new Dictionary<int, Stage> { { 0, stage1 }, { 1, stage2 } },
+            [],
+            context,
+            []);
+
+        session.Run(context.ExecutionData);
+
+        Assert.That(stage2StartedBeforeStage1Completed, Is.False);
+    }
+
+    private sealed class RecordingAction(string name, int stage, Microsoft.Extensions.Logging.ILogger logger, System.Action callback)
+        : StagedAction(name, stage, null, logger)
+    {
+        internal override void ExportRunningCommunicationData(InternalContext context, string sessionName)
+        {
+        }
+
+        internal override InternalCommunicationData<object> Act()
+        {
+            callback();
+            return new InternalCommunicationData<object>();
+        }
+
+        protected internal override void LogData(InternalCommunicationData<object> actData,
+            DetailedData<object> itemBeforeSerialization, InputOutputState? saveAt = null)
+        {
+        }
     }
 }

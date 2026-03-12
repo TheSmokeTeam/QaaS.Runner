@@ -1,6 +1,7 @@
 ﻿using System.ComponentModel;
 using System.Runtime.CompilerServices;
 using QaaS.Framework.Configurations.ConfigurationBindingUtils;
+using QaaS.Framework.SDK.Extensions;
 using QaaS.Runner.Assertions.ConfigurationObjects.LinkConfigs;
 using QaaS.Runner.Assertions.LinkBuilders;
 

@@ -113,4 +113,23 @@ public class FileSystemRetrieverTests
         // Assert
         Assert.That(output, Is.EqualTo(expectedOutput));
     }
+
+    [Test]
+    public void RetrieveSerialized_WhenDirectoryDoesNotExist_ReturnsEmptyCollection()
+    {
+        var missingDirectory = Path.Combine(TestDirectory, "missing");
+        var fileSystemSource = new FileSystemStorage(
+            new FilesInFileSystemConfig { Path = missingDirectory }, TestFileSystem, Formatting.None)
+        {
+            _context = Globals.Context
+        };
+
+        var retrieveSerializedMethod = fileSystemSource.GetType()
+            .GetMethod("RetrieveSerialized", BindingFlags.NonPublic | BindingFlags.Instance)!;
+
+        var invokedOutput = retrieveSerializedMethod.Invoke(fileSystemSource, [null]);
+        var output = ((IEnumerable<byte[]>)invokedOutput!).ToList();
+
+        Assert.That(output, Is.Empty);
+    }
 }

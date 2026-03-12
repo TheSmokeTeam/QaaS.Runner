@@ -2,6 +2,7 @@ using System.Collections.Concurrent;
 using Microsoft.Extensions.Logging;
 using QaaS.Framework.SDK.ContextObjects;
 using QaaS.Framework.SDK.Session.SessionDataObjects;
+using QaaS.Framework.SDK.Session.SessionDataObjects.RunningSessionsObjects;
 using QaaS.Runner.Sessions.Actions;
 using Action = QaaS.Runner.Sessions.Actions.Action;
 
@@ -20,8 +21,7 @@ public static class SessionExtensions
         foreach (var item in array)
             item.Dispose();
 
-        logger.LogDebug("Disposed of {EnumerableLength} {EnumerableName}",
-            array.Length, enumerableName);
+        logger.LogDebug("Disposed {EnumerableLength} item(s) from {EnumerableName}", array.Length, enumerableName);
     }
 
     /// <summary>
@@ -37,10 +37,13 @@ public static class SessionExtensions
     public static void AppendActionFailure(this IList<ActionFailure> actionFailures, Exception exception,
         string sessionName, ILogger logger, string actionType, string actionRuntimeName, string? actionProtocol = null)
     {
-        var failedActionDescription = (actionProtocol != null ? $" {actionProtocol}" : "") + actionRuntimeName;
+        var failedActionDescription = string.IsNullOrWhiteSpace(actionProtocol)
+            ? actionRuntimeName
+            : $"{actionProtocol} {actionRuntimeName}";
         logger.LogError(
-            "{ActionType} {FailedAction} in {SessionName} failed due to the following exception \n{Exception}",
-            actionType, failedActionDescription, sessionName, exception);
+            exception,
+            "Action failure in session {SessionName}. ActionType={ActionType}, Action={ActionName}",
+            sessionName, actionType, failedActionDescription);
 
         actionFailures.Add(new ActionFailure
         {
@@ -58,10 +61,13 @@ public static class SessionExtensions
         string sessionName, ILogger logger, string actionType, string actionRuntimeName, string? actionProtocol = null,
         string? exceptionMessage = null)
     {
-        var failedActionDescription = actionProtocol + actionRuntimeName;
+        var failedActionDescription = string.IsNullOrWhiteSpace(actionProtocol)
+            ? actionRuntimeName
+            : $"{actionProtocol} {actionRuntimeName}";
         logger.LogError(
-            "{ActionType} {FailedAction} in {SessionName} failed due to the following exception \n{Exception}",
-            actionType, failedActionDescription, sessionName, exception);
+            exception,
+            "Action failure in session {SessionName}. ActionType={ActionType}, Action={ActionName}",
+            sessionName, actionType, failedActionDescription);
 
         actionFailures.Add(new ActionFailure
         {
@@ -75,6 +81,41 @@ public static class SessionExtensions
         });
     }
 
+    public static void SetRunningSession(this InternalContext context, string sessionName,
+        RunningSessionData<object, object> runningSessionData)
+    {
+        // Running session data is shared across async actions, so updates must stay serialized to
+        // avoid partial state being observed by publishers, consumers, and transactions.
+        lock (context.InternalRunningSessions.RunningSessionsDict)
+        {
+            context.InternalRunningSessions.RunningSessionsDict[sessionName] = runningSessionData;
+        }
+
+        context.Logger.LogDebug("Registered running session state for {SessionName}", sessionName);
+    }
+
+    public static RunningSessionData<object, object> GetRunningSession(this InternalContext context, string sessionName)
+    {
+        // Reads use the same lock as writes so action cancellation and live session lookups stay coherent.
+        lock (context.InternalRunningSessions.RunningSessionsDict)
+        {
+            return context.InternalRunningSessions.RunningSessionsDict[sessionName];
+        }
+    }
+
+    public static bool RemoveRunningSession(this InternalContext context, string sessionName)
+    {
+        var removed = false;
+        // Removing under the same lock prevents teardown from racing with actions that still resolve session state.
+        lock (context.InternalRunningSessions.RunningSessionsDict)
+        {
+            removed = context.InternalRunningSessions.RunningSessionsDict.Remove(sessionName);
+        }
+
+        context.Logger.LogDebug("Removed running session state for {SessionName}: {Removed}", sessionName, removed);
+        return removed;
+    }
+
     public static Task<Tuple<Action, InternalCommunicationData<object>>?> CreateTaskFromAction(InternalContext context,
         Action action, string sessionName, ConcurrentBag<ActionFailure> actionFailures)
     {
@@ -82,21 +123,29 @@ public static class SessionExtensions
             {
                 try
                 {
+                    context.Logger.LogDebug("Starting action task {ActionType} {ActionName} in session {SessionName}",
+                        action.GetType().Name, action.Name, sessionName);
                     return new Tuple<Action, InternalCommunicationData<object>>(action, action.Act());
                 }
                 catch (Exception e)
                 {
                     // When action fails all actions that getting its results live will fail as well
-                    context.InternalRunningSessions.RunningSessionsDict[sessionName].Inputs
+                    var runningSession = context.GetRunningSession(sessionName);
+                    runningSession.Inputs
                         ?.FirstOrDefault(input => input.Name == action.Name)?.DataCancellationTokenSource.Cancel();
-                    context.InternalRunningSessions.RunningSessionsDict[sessionName].Outputs
+                    runningSession.Outputs
                         ?.FirstOrDefault(output => output.Name == action.Name)?.DataCancellationTokenSource.Cancel();
 
                     var exceptionMessage =
                         e is OperationCanceledException ? $"Action {action.Name} was canceled" : e.Message;
-                    actionFailures.AppendActionFailure(e, sessionName, context.Logger, action.GetType().ToString(),
+                    actionFailures.AppendActionFailure(e, sessionName, context.Logger, action.GetType().Name,
                         action.Name, "", exceptionMessage);
                     return default;
+                }
+                finally
+                {
+                    context.Logger.LogDebug("Finished action task {ActionType} {ActionName} in session {SessionName}",
+                        action.GetType().Name, action.Name, sessionName);
                 }
             }
         );

@@ -71,25 +71,34 @@ public class Stage
 
     public IList<Task<Tuple<Action, InternalCommunicationData<object>>?>> Run()
     {
-        _context.Logger.LogInformation("Sleeping {WaitTimeMs} milliseconds before stage starts",
-            SleepBeforeMilliseconds);
-        if (SleepBeforeMilliseconds != null)
+        if (SleepBeforeMilliseconds is > 0)
+        {
+            _context.Logger.LogDebug("Sleeping {WaitTimeMs} ms before session {SessionName} stage {StageNumber}",
+                SleepBeforeMilliseconds, _sessionName, _stage);
             Thread.Sleep((int)SleepBeforeMilliseconds);
+        }
         _context.Logger.LogInformation(
-            "Starting Session {SessionName}'s stage number {StageNumber} - containing {NumberOfActions} actions",
+            "Starting session {SessionName} stage {StageNumber} with {ActionCount} action(s)",
             _sessionName, _stage, Actions.Count);
+        _context.Logger.LogDebug("Session {SessionName} stage {StageNumber} actions: {ActionNames}",
+            _sessionName, _stage, string.Join(", ", Actions.Select(action => $"{action.GetType().Name}:{action.Name}")));
 
         var stageTasks =
             Actions.Select(action =>
                 SessionExtensions.CreateTaskFromAction(_context, action, _sessionName, _actionFailures)).ToList();
         stageTasks.ForEach(task => task.Start());
+        // The stage is an ordering boundary: all actions in this stage may run concurrently, but the
+        // session must not advance to the next stage until every task here has completed.
+        Task.WhenAll(stageTasks).GetAwaiter().GetResult();
 
-        _context.Logger.LogInformation(
-            "Finished Session {SessionName}'s stage number {StageNumber}. Sleeping {WaitTimeMs} milliseconds",
-            _sessionName, _stage, SleepAfterMilliseconds);
+        _context.Logger.LogInformation("Finished session {SessionName} stage {StageNumber}", _sessionName, _stage);
 
-        if (SleepAfterMilliseconds != null)
+        if (SleepAfterMilliseconds is > 0)
+        {
+            _context.Logger.LogDebug("Sleeping {WaitTimeMs} ms after session {SessionName} stage {StageNumber}",
+                SleepAfterMilliseconds, _sessionName, _stage);
             Thread.Sleep((int)SleepAfterMilliseconds);
+        }
 
         return stageTasks;
     }

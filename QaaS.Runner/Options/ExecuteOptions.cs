@@ -34,4 +34,10 @@ Uses a locally installed allure CLI tool, if allure CLI is not installed and add
         HelpText =
             "Ids of the commands to run. Only the commands given would run. If none is given runs all commands.")]
     public IList<string> CommandIdsToRun { get; init; } = Array.Empty<string>();
+
+    [Option("no-process-exit", Default = false,
+        HelpText =
+            "When this flag is used the runner will not terminate the current process after it completes. " +
+            "Useful when embedding QaaS.Runner and orchestrating multiple runners in a single host process.")]
+    public bool NoProcessExit { get; init; } = false;
 }

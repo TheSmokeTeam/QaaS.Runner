@@ -133,4 +133,23 @@ public class TransactionTests
         CollectionAssert.AreEqual(expectedReceivedData, receivedData);
         CollectionAssert.AreEqual(expectedSentData, sentData);
     }
+
+    [Test]
+    public void TestExportRunningCommunicationData_PreservesTransactionMetadataOnExportedOutputs()
+    {
+        const string sessionName = "test session";
+        var context = CreationalFunctions.CreateContext(sessionName, []);
+        var transaction = InitTransactorWithIterations([], [], 1, "test data");
+
+        transaction.ExportRunningCommunicationData(context, sessionName);
+
+        var inputRcd = context.InternalRunningSessions.RunningSessionsDict[sessionName].Inputs![0];
+        var outputRcd = context.InternalRunningSessions.RunningSessionsDict[sessionName].Outputs![0];
+
+        Assert.That(inputRcd.Name, Is.EqualTo("TestPub"));
+        Assert.That(outputRcd.Name, Is.EqualTo("TestPub"));
+        Assert.That(outputRcd.SerializationType, Is.EqualTo(transaction.GetType()
+            .GetMethod("GetOutputCommunicationSerializationType", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance)!
+            .Invoke(transaction, null)));
+    }
 }
