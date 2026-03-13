@@ -18,6 +18,11 @@ DataSources:
 Sessions:
   - Name: RabbitRoundTrip
     SaveData: true
+    Probes:
+      - Name: SharedProbe
+        Probe: ScopedProbe
+        ProbeConfiguration:
+          Marker: rabbit-roundtrip-probe
     Publishers:
       - Name: PublishToRabbit
         DataSourceNames: [ RabbitPayload ]
@@ -37,6 +42,12 @@ Sessions:
           SpecificType:
             AssemblyName: QaaS.Runner.E2ETests
             TypeFullName: QaaS.Runner.E2ETests.MockJson
+  - Name: ProbeScopeCheck
+    Probes:
+      - Name: SharedProbe
+        Probe: ScopedProbe
+        ProbeConfiguration:
+          Marker: probe-scope-check
 
 Assertions:
   - Name: RabbitRoundTripAssertion
