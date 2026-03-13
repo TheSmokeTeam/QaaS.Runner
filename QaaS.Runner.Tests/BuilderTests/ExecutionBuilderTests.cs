@@ -188,6 +188,51 @@ public class ExecutionBuilderTests
     }
 
     [Test]
+    public void Start_WithProbeNamesThatWouldCollideWithoutScopedKeys_UsesDistinctProbeConfigurations()
+    {
+        var builder = new ExecutionBuilder()
+            .AddSession(new SessionBuilder
+            {
+                Name = "ab",
+                Stage = 0,
+                Probes =
+                [
+                    new ProbeBuilder()
+                        .Named("c")
+                        .HookNamed(nameof(FirstTestProbe))
+                        .Configure(new ProbeMarkerConfig { Marker = "first-collision-config" })
+                ]
+            })
+            .AddSession(new SessionBuilder
+            {
+                Name = "a",
+                Stage = 1,
+                Probes =
+                [
+                    new ProbeBuilder()
+                        .Named("bc")
+                        .HookNamed(nameof(SecondTestProbe))
+                        .Configure(new ProbeMarkerConfig { Marker = "second-collision-config" })
+                ]
+            })
+            .ExecutionType(ExecutionType.Run)
+            .SetExecutionId("probe-collision")
+            .SetCase("probe-collision-case")
+            .WithLogger(Globals.Logger)
+            .WithGlobalDict(new Dictionary<string, object?>())
+            .WithMetadata(new MetaDataConfig { Team = "Smoke", System = "QaaS" });
+
+        var execution = builder.Build();
+        var exitCode = execution.Start();
+        var runs = ProbeRunRecorder.GetRuns();
+
+        Assert.That(exitCode, Is.EqualTo(0));
+        Assert.That(runs, Has.Count.EqualTo(2));
+        Assert.That(runs, Contains.Item((nameof(FirstTestProbe), "first-collision-config")));
+        Assert.That(runs, Contains.Item((nameof(SecondTestProbe), "second-collision-config")));
+    }
+
+    [Test]
     public void Build_WithProbeMissingName_ThrowsInvalidConfigurationsException()
     {
         var builder = new ExecutionBuilder()
