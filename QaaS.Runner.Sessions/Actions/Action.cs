@@ -2,7 +2,7 @@ using Microsoft.Extensions.Logging;
 
 namespace QaaS.Runner.Sessions.Actions;
 
-public abstract class Action
+public abstract class Action : IDisposable
 {
     protected readonly ILogger Logger;
 
@@ -15,4 +15,11 @@ public abstract class Action
 
     public string Name { get; init; }
     internal abstract InternalCommunicationData<object> Act();
+
+    /// <summary>
+    /// Releases action-owned resources after the session has finished using the action result.
+    /// </summary>
+    public virtual void Dispose()
+    {
+    }
 }

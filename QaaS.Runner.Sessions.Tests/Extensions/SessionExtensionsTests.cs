@@ -93,7 +93,7 @@ public class SessionExtensionsTests
         var action = new SuccessfulAction("SuccessfulAction");
 
         var task = SessionExtensions.CreateTaskFromAction(context, action, SessionName, failures);
-        task.RunSynchronously();
+        task.GetAwaiter().GetResult();
 
         Assert.That(task.Result, Is.Not.Null);
         Assert.That(task.Result!.Item1, Is.SameAs(action));
@@ -109,7 +109,7 @@ public class SessionExtensionsTests
         var action = new ExceptionalAction("ExceptionalAction", new InvalidOperationException("boom"));
 
         var task = SessionExtensions.CreateTaskFromAction(context, action, SessionName, failures);
-        task.RunSynchronously();
+        task.GetAwaiter().GetResult();
 
         Assert.That(task.Result, Is.Null);
         Assert.That(failures, Has.Count.EqualTo(1));
@@ -124,7 +124,7 @@ public class SessionExtensionsTests
         var action = new ExceptionalAction("CanceledAction", new OperationCanceledException());
 
         var task = SessionExtensions.CreateTaskFromAction(context, action, SessionName, failures);
-        task.RunSynchronously();
+        task.GetAwaiter().GetResult();
 
         Assert.That(task.Result, Is.Null);
         Assert.That(failures, Has.Count.EqualTo(1));
@@ -143,7 +143,7 @@ public class SessionExtensionsTests
         context.InternalRunningSessions.RunningSessionsDict[SessionName].Outputs!.Add(outputRcd);
 
         var task = SessionExtensions.CreateTaskFromAction(context, action, SessionName, failures);
-        task.RunSynchronously();
+        task.GetAwaiter().GetResult();
 
         Assert.That(inputRcd.DataCancellationTokenSource.IsCancellationRequested, Is.True);
         Assert.That(outputRcd.DataCancellationTokenSource.IsCancellationRequested, Is.True);

@@ -1,5 +1,6 @@
 using System.Collections.Concurrent;
 using System.Threading;
+using System.Threading.Tasks;
 using Moq;
 using NUnit.Framework;
 using QaaS.Framework.SDK.ContextObjects;
@@ -24,8 +25,8 @@ public class SessionLogicTests
         mockSession1.SetupGet(session => session.RunUntilStage).Returns((int?)null);
         mockSession2.SetupGet(session => session.RunUntilStage).Returns((int?)null);
 
-        mockSession1.Setup(s => s.Run(It.IsAny<ExecutionData>())).Returns(sessionData1);
-        mockSession2.Setup(s => s.Run(It.IsAny<ExecutionData>())).Returns(sessionData2);
+        mockSession1.Setup(s => s.RunAsync(It.IsAny<ExecutionData>())).ReturnsAsync(sessionData1);
+        mockSession2.Setup(s => s.RunAsync(It.IsAny<ExecutionData>())).ReturnsAsync(sessionData2);
 
         var mockSessions = new List<ISession> { mockSession1.Object, mockSession2.Object };
         var context = new InternalContext { Logger = Globals.Logger };
@@ -57,8 +58,8 @@ public class SessionLogicTests
         mockSession1.SetupGet(session => session.RunUntilStage).Returns(2);
         mockSession2.SetupGet(session => session.RunUntilStage).Returns((int?)null);
 
-        mockSession1.Setup(s => s.Run(It.IsAny<ExecutionData>())).Returns(sessionData1);
-        mockSession2.Setup(s => s.Run(It.IsAny<ExecutionData>())).Returns(sessionData2);
+        mockSession1.Setup(s => s.RunAsync(It.IsAny<ExecutionData>())).ReturnsAsync(sessionData1);
+        mockSession2.Setup(s => s.RunAsync(It.IsAny<ExecutionData>())).ReturnsAsync(sessionData2);
 
         var mockSessions = new List<ISession> { mockSession1.Object, mockSession2.Object };
         var context = new InternalContext { Logger = Globals.Logger };
@@ -105,16 +106,22 @@ public class SessionLogicTests
         var stage2Session = new Mock<ISession>();
         stage2Session.SetupGet(s => s.SessionStage).Returns(2);
         stage2Session.SetupGet(s => s.RunUntilStage).Returns((int?)null);
-        stage2Session.Setup(s => s.Run(It.IsAny<ExecutionData>()))
-            .Callback(() => runOrder.Enqueue("stage-2"))
-            .Returns(stage2SessionData);
+        stage2Session.Setup(s => s.RunAsync(It.IsAny<ExecutionData>()))
+            .Returns(() =>
+            {
+                runOrder.Enqueue("stage-2");
+                return Task.FromResult<SessionData?>(stage2SessionData);
+            });
 
         var stage1Session = new Mock<ISession>();
         stage1Session.SetupGet(s => s.SessionStage).Returns(1);
         stage1Session.SetupGet(s => s.RunUntilStage).Returns((int?)null);
-        stage1Session.Setup(s => s.Run(It.IsAny<ExecutionData>()))
-            .Callback(() => runOrder.Enqueue("stage-1"))
-            .Returns(stage1SessionData);
+        stage1Session.Setup(s => s.RunAsync(It.IsAny<ExecutionData>()))
+            .Returns(() =>
+            {
+                runOrder.Enqueue("stage-1");
+                return Task.FromResult<SessionData?>(stage1SessionData);
+            });
 
         var sessionLogic = new SessionLogic([stage2Session.Object, stage1Session.Object], new InternalContext
         {
@@ -141,19 +148,22 @@ public class SessionLogicTests
 
         blockingSession.SetupGet(s => s.SessionStage).Returns(1);
         blockingSession.SetupGet(s => s.RunUntilStage).Returns(2);
-        blockingSession.Setup(s => s.Run(It.IsAny<ExecutionData>()))
-            .Callback(() =>
+        blockingSession.Setup(s => s.RunAsync(It.IsAny<ExecutionData>()))
+            .Returns(() =>
             {
                 Thread.Sleep(60);
                 Interlocked.Exchange(ref blockerCompleted, 1);
-            })
-            .Returns(new SessionData { Name = "BlockingSession" });
+                return Task.FromResult<SessionData?>(new SessionData { Name = "BlockingSession" });
+            });
 
         blockedStageSession.SetupGet(s => s.SessionStage).Returns(2);
         blockedStageSession.SetupGet(s => s.RunUntilStage).Returns((int?)null);
-        blockedStageSession.Setup(s => s.Run(It.IsAny<ExecutionData>()))
-            .Callback(() => Assert.That(Interlocked.CompareExchange(ref blockerCompleted, 0, 0), Is.EqualTo(1)))
-            .Returns(new SessionData { Name = "BlockedStageSession" });
+        blockedStageSession.Setup(s => s.RunAsync(It.IsAny<ExecutionData>()))
+            .Returns(() =>
+            {
+                Assert.That(Interlocked.CompareExchange(ref blockerCompleted, 0, 0), Is.EqualTo(1));
+                return Task.FromResult<SessionData?>(new SessionData { Name = "BlockedStageSession" });
+            });
 
         var sessionLogic = new SessionLogic([blockingSession.Object, blockedStageSession.Object], new InternalContext
         {
@@ -166,8 +176,8 @@ public class SessionLogicTests
 
         // Assert
         Assert.That(executionData.SessionDatas, Has.Count.EqualTo(2));
-        blockingSession.Verify(s => s.Run(It.IsAny<ExecutionData>()), Times.Once);
-        blockedStageSession.Verify(s => s.Run(It.IsAny<ExecutionData>()), Times.Once);
+        blockingSession.Verify(s => s.RunAsync(It.IsAny<ExecutionData>()), Times.Once);
+        blockedStageSession.Verify(s => s.RunAsync(It.IsAny<ExecutionData>()), Times.Once);
     }
 
     [Test]
@@ -180,12 +190,12 @@ public class SessionLogicTests
         var blockingSession = new Mock<ISession>();
         blockingSession.SetupGet(s => s.SessionStage).Returns(1);
         blockingSession.SetupGet(s => s.RunUntilStage).Returns(99);
-        blockingSession.Setup(s => s.Run(It.IsAny<ExecutionData>())).Returns(blockingSessionData);
+        blockingSession.Setup(s => s.RunAsync(It.IsAny<ExecutionData>())).ReturnsAsync(blockingSessionData);
 
         var regularSession = new Mock<ISession>();
         regularSession.SetupGet(s => s.SessionStage).Returns(1);
         regularSession.SetupGet(s => s.RunUntilStage).Returns((int?)null);
-        regularSession.Setup(s => s.Run(It.IsAny<ExecutionData>())).Returns(regularSessionData);
+        regularSession.Setup(s => s.RunAsync(It.IsAny<ExecutionData>())).ReturnsAsync(regularSessionData);
 
         var sessionLogic = new SessionLogic([blockingSession.Object, regularSession.Object], new InternalContext
         {

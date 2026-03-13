@@ -280,13 +280,15 @@ public class MockerCommandInternalsTests
         var instances = (IList<string>)GetField(typeof(MockerCommand), command, "_serverInstanceNames");
 
         Assert.That(instances, Has.Count.EqualTo(1));
-        subscriberMock.Verify(subscriber => subscriber.SubscribeAsync(
+        subscriberMock.Verify(subscriber => subscriber.Subscribe(
             It.IsAny<RedisChannel>(), It.IsAny<Action<RedisChannel, RedisValue>>(), It.IsAny<CommandFlags>()),
             Times.Once);
         subscriberMock.Verify(subscriber => subscriber.Publish(It.IsAny<RedisChannel>(), It.IsAny<RedisValue>(),
                 It.IsAny<CommandFlags>()),
             Times.Once);
-        subscriberMock.Verify(subscriber => subscriber.UnsubscribeAllAsync(It.IsAny<CommandFlags>()), Times.Once);
+        subscriberMock.Verify(subscriber => subscriber.Unsubscribe(
+            It.IsAny<RedisChannel>(), It.IsAny<Action<RedisChannel, RedisValue>>(), It.IsAny<CommandFlags>()),
+            Times.Once);
     }
 
     [Test]
@@ -296,18 +298,19 @@ public class MockerCommandInternalsTests
         var subscriberMock = new Mock<ISubscriber>();
         SetField(typeof(MockerCommand), command, "_redisSubscriber", subscriberMock.Object);
         SetField(typeof(MockerCommand), command, "_serverInstanceNames", new List<string> { "instance-1", "instance-2" });
-        SetField(typeof(MockerCommand), command, "_successfulCommandResponseToServerInstanceNames",
-            new List<string> { "instance-1", "instance-2" });
+        SetField(typeof(MockerCommand), command, "_successfulCommandResponseToServerInstanceNames", new List<string>());
 
         InvokeNonPublicMethod(typeof(MockerCommand), command, "CommandTheMockerInstances");
 
-        subscriberMock.Verify(subscriber => subscriber.SubscribeAsync(
+        subscriberMock.Verify(subscriber => subscriber.Subscribe(
                 It.IsAny<RedisChannel>(), It.IsAny<Action<RedisChannel, RedisValue>>(), It.IsAny<CommandFlags>()),
             Times.Exactly(2));
         subscriberMock.Verify(subscriber => subscriber.Publish(It.IsAny<RedisChannel>(), It.IsAny<RedisValue>(),
                 It.IsAny<CommandFlags>()),
             Times.Exactly(2));
-        subscriberMock.Verify(subscriber => subscriber.UnsubscribeAllAsync(It.IsAny<CommandFlags>()), Times.Once);
+        subscriberMock.Verify(subscriber => subscriber.Unsubscribe(
+                It.IsAny<RedisChannel>(), It.IsAny<Action<RedisChannel, RedisValue>>(), It.IsAny<CommandFlags>()),
+            Times.Exactly(2));
     }
 
     [Test]
@@ -632,7 +635,7 @@ public class MockerCommandInternalsTests
     }
 
     [Test]
-    public void CommandTheMockerInstances_WhenAllResponsesAreSuccessful_BreaksRetryLoopAfterFirstAttempt()
+    public void CommandTheMockerInstances_WhenAllResponsesAreAlreadySuccessful_DoesNotRepublish()
     {
         var command = CreateUninitializedTriggerCommand();
         var subscriberMock = new Mock<ISubscriber>();
@@ -646,7 +649,7 @@ public class MockerCommandInternalsTests
         InvokeNonPublicMethod(typeof(MockerCommand), command, "CommandTheMockerInstances");
 
         subscriberMock.Verify(subscriber => subscriber.Publish(It.IsAny<RedisChannel>(), It.IsAny<RedisValue>(),
-            It.IsAny<CommandFlags>()), Times.Exactly(2));
+            It.IsAny<CommandFlags>()), Times.Never);
     }
 
     [Test]
@@ -664,6 +667,36 @@ public class MockerCommandInternalsTests
 
         subscriberMock.Verify(subscriber => subscriber.Publish(It.IsAny<RedisChannel>(), It.IsAny<RedisValue>(),
             It.IsAny<CommandFlags>()), Times.Exactly(4));
+    }
+
+    [Test]
+    public void CommandTheMockerInstances_WhenSomeResponsesAlreadySucceeded_RetriesOnlyPendingInstances()
+    {
+        var command = CreateUninitializedTriggerCommand();
+        var subscriberMock = new Mock<ISubscriber>();
+        var publishCount = 0;
+        subscriberMock.Setup(subscriber => subscriber.Publish(It.IsAny<RedisChannel>(), It.IsAny<RedisValue>(),
+                It.IsAny<CommandFlags>()))
+            .Callback(() =>
+            {
+                publishCount++;
+                if (publishCount == 2)
+                {
+                    SetField(typeof(MockerCommand), command, "_successfulCommandResponseToServerInstanceNames",
+                        new List<string> { "instance-1" });
+                }
+            });
+
+        SetField(typeof(MockerCommand), command, "_requestRetries", 2);
+        SetField(typeof(MockerCommand), command, "_requestDurationMs", 0);
+        SetField(typeof(MockerCommand), command, "_redisSubscriber", subscriberMock.Object);
+        SetField(typeof(MockerCommand), command, "_serverInstanceNames", new List<string> { "instance-1", "instance-2" });
+        SetField(typeof(MockerCommand), command, "_successfulCommandResponseToServerInstanceNames", new List<string>());
+
+        InvokeNonPublicMethod(typeof(MockerCommand), command, "CommandTheMockerInstances");
+
+        subscriberMock.Verify(subscriber => subscriber.Publish(It.IsAny<RedisChannel>(), It.IsAny<RedisValue>(),
+            It.IsAny<CommandFlags>()), Times.Exactly(3));
     }
 
     #pragma warning disable CS8602

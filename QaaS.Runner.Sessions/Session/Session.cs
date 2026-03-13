@@ -14,6 +14,9 @@ using Action = QaaS.Runner.Sessions.Actions.Action;
 
 namespace QaaS.Runner.Sessions.Session;
 
+/// <summary>
+/// Executes the configured stages and collectors for a single runtime session.
+/// </summary>
 public class Session : ISession
 {
     private readonly ConcurrentBag<ActionFailure> _actionFailures;
@@ -69,9 +72,15 @@ public class Session : ISession
     /// <returns> If SaveData is set to true then it will return the session data </returns>
     public SessionData? Run(ExecutionData executionData)
     {
+        return RunAsync(executionData).GetAwaiter().GetResult();
+    }
+
+    /// <inheritdoc />
+    public async Task<SessionData?> RunAsync(ExecutionData executionData)
+    {
         _context.Logger.LogDebug("Waiting {TimeoutBeforeSessionMs} ms before starting session {SessionName}",
             TimeoutBeforeSessionMs, Name);
-        Thread.Sleep(TimeSpan.FromMilliseconds(TimeoutBeforeSessionMs));
+        await Task.Delay(TimeSpan.FromMilliseconds(TimeoutBeforeSessionMs));
 
         _context.Logger.LogInformation("Starting session {SessionName}", Name);
         _context.AppendSessionLog(Name, $"Starting session {Name}");
@@ -82,18 +91,20 @@ public class Session : ISession
         _context.Logger.LogDebug("Session {SessionName} contains {StageCount} stage(s) and {CollectorCount} collector(s)",
             Name, _stages.Count, _collectors?.Length ?? 0);
         foreach (var (_, stage) in _stages.OrderBy(stage => stage.Key))
-            actionsTasks.AddRange(stage.Run());
+            actionsTasks.AddRange(await stage.RunAsync());
 
-        Task.WhenAll(actionsTasks).GetAwaiter().GetResult();
+        await Task.WhenAll(actionsTasks);
         var sessionEndTimeUtc = GetCurrentUtcTime();
 
         // Perform end session operations
-        var postSessionsTasks =
-            RunPostSessionTasksAsync(sessionStartTimeUtc, sessionEndTimeUtc).GetAwaiter().GetResult();
+        var postSessionsTasks = await RunPostSessionTasksAsync(sessionStartTimeUtc, sessionEndTimeUtc);
         actionsTasks.AddRange(postSessionsTasks);
 
         var sessionData = CreateSessionData(actionsTasks, sessionStartTimeUtc, sessionEndTimeUtc);
         actionsTasks.DisposeOfEnumerable("session tasks", _context.Logger);
+        _stages.Values.SelectMany(stage => stage.GetActions())
+            .Concat<Action>(_collectors ?? [])
+            .DisposeOfEnumerable("session actions", _context.Logger);
 
         // Removing current session from running sessions
         _context.RemoveRunningSession(Name);
@@ -106,7 +117,7 @@ public class Session : ISession
 
         _context.Logger.LogDebug("Waiting {TimeoutAfterSessionMs} ms after finishing session {SessionName}",
             TimeoutAfterSessionMs, Name);
-        Thread.Sleep(TimeSpan.FromMilliseconds(TimeoutAfterSessionMs));
+        await Task.Delay(TimeSpan.FromMilliseconds(TimeoutAfterSessionMs));
 
         return SaveData ? sessionData : null;
     }
@@ -135,9 +146,6 @@ public class Session : ISession
             SessionExtensions.CreateTaskFromAction(_context, collector, Name, _actionFailures)).ToList() ?? [];
         _context.Logger.LogDebug("Running {CollectorCount} collector task(s) after session {SessionName}",
             collectorTasks.Count, Name);
-        foreach (var task in collectorTasks)
-            task.Start();
-
         await Task.WhenAll(collectorTasks);
         return collectorTasks;
     }

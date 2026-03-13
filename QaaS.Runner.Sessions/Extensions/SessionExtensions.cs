@@ -119,36 +119,34 @@ public static class SessionExtensions
     public static Task<Tuple<Action, InternalCommunicationData<object>>?> CreateTaskFromAction(InternalContext context,
         Action action, string sessionName, ConcurrentBag<ActionFailure> actionFailures)
     {
-        var task = new Task<Tuple<Action, InternalCommunicationData<object>>?>(() =>
+        return Task.Run(() =>
+        {
+            try
             {
-                try
-                {
-                    context.Logger.LogDebug("Starting action task {ActionType} {ActionName} in session {SessionName}",
-                        action.GetType().Name, action.Name, sessionName);
-                    return new Tuple<Action, InternalCommunicationData<object>>(action, action.Act());
-                }
-                catch (Exception e)
-                {
-                    // When action fails all actions that getting its results live will fail as well
-                    var runningSession = context.GetRunningSession(sessionName);
-                    runningSession.Inputs
-                        ?.FirstOrDefault(input => input.Name == action.Name)?.DataCancellationTokenSource.Cancel();
-                    runningSession.Outputs
-                        ?.FirstOrDefault(output => output.Name == action.Name)?.DataCancellationTokenSource.Cancel();
-
-                    var exceptionMessage =
-                        e is OperationCanceledException ? $"Action {action.Name} was canceled" : e.Message;
-                    actionFailures.AppendActionFailure(e, sessionName, context.Logger, action.GetType().Name,
-                        action.Name, "", exceptionMessage);
-                    return default;
-                }
-                finally
-                {
-                    context.Logger.LogDebug("Finished action task {ActionType} {ActionName} in session {SessionName}",
-                        action.GetType().Name, action.Name, sessionName);
-                }
+                context.Logger.LogDebug("Starting action task {ActionType} {ActionName} in session {SessionName}",
+                    action.GetType().Name, action.Name, sessionName);
+                return new Tuple<Action, InternalCommunicationData<object>>(action, action.Act());
             }
-        );
-        return task;
+            catch (Exception e)
+            {
+                // When action fails all actions that getting its results live will fail as well
+                var runningSession = context.GetRunningSession(sessionName);
+                runningSession.Inputs
+                    ?.FirstOrDefault(input => input.Name == action.Name)?.DataCancellationTokenSource.Cancel();
+                runningSession.Outputs
+                    ?.FirstOrDefault(output => output.Name == action.Name)?.DataCancellationTokenSource.Cancel();
+
+                var exceptionMessage =
+                    e is OperationCanceledException ? $"Action {action.Name} was canceled" : e.Message;
+                actionFailures.AppendActionFailure(e, sessionName, context.Logger, action.GetType().Name,
+                    action.Name, "", exceptionMessage);
+                return default;
+            }
+            finally
+            {
+                context.Logger.LogDebug("Finished action task {ActionType} {ActionName} in session {SessionName}",
+                    action.GetType().Name, action.Name, sessionName);
+            }
+        });
     }
 }
