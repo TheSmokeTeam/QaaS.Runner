@@ -88,6 +88,35 @@ public class JfrogArtifactoryHelperTests
             Contains.Item("https://test-artifactory.com/artifactory/folder1/folder2/subfolder/nestedfile.txt"));
     }
 
+    [Test]
+    public async Task TestGetUrlsToAllFilesInArtifactoryFolderAsync_WithNestedStructure_ReturnsAllFilePaths()
+    {
+        // Arrange
+        var helper = new JfrogArtifactoryHelper();
+        var baseUrl = "https://test-artifactory.com/artifactory/folder1/folder2";
+        var storageApiUrl = JfrogArtifactoryHelper.ParseArtifactoryFolderUrlToStorageApiUrl(baseUrl);
+        var fileStorageApiUrl = Path.Join(storageApiUrl, "file1.txt").Replace('\\', '/');
+        var responses = new Dictionary<string, HttpResponseMessage>
+        {
+            [storageApiUrl] = BuildOkJsonResponse("""{"children":[{"uri":"file1.txt"}]}"""),
+            [fileStorageApiUrl] = BuildOkJsonResponse("""{"children":null}""")
+        };
+
+        using var httpClient = BuildHttpClient(uri =>
+        {
+            if (responses.TryGetValue(uri.ToString(), out var response))
+                return response;
+
+            throw new InvalidOperationException($"Missing mocked response for uri {uri}");
+        });
+
+        // Act
+        var result = await helper.GetUrlsToAllFilesInArtifactoryFolderAsync(baseUrl, httpClient);
+
+        // Assert
+        Assert.That(result, Is.EqualTo(new[] { "https://test-artifactory.com/artifactory/folder1/folder2/file1.txt" }));
+    }
+
     [Test,
      TestCase("https://test-artifactory.com/artifactory/singlefile.txt", 1),
      TestCase("https://test-artifactory.com/artifactory/folder", 1)]

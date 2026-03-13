@@ -9,6 +9,7 @@ using QaaS.Framework.SDK.ContextObjects;
 using QaaS.Framework.SDK.Extensions;
 using QaaS.Framework.SDK.Hooks.Probe;
 using QaaS.Framework.SDK.Session.SessionDataObjects;
+using QaaS.Runner.Infrastructure;
 using QaaS.Runner.Sessions.ConfigurationObjects;
 using QaaS.Runner.Sessions.Extensions;
 using YamlDotNet.Core;
@@ -155,6 +156,28 @@ public class ProbeBuilder : IYamlConvertible
         return this;
     }
 
+    public IConfiguration ReadConfiguration()
+    {
+        return ProbeConfiguration;
+    }
+
+    public ProbeBuilder UpdateConfiguration(object configuration)
+    {
+        ProbeConfiguration = ProbeConfiguration.BindConfigurationObjectToIConfiguration(configuration);
+        return this;
+    }
+
+    public ProbeBuilder UpsertConfiguration(object configuration)
+    {
+        return UpdateConfiguration(configuration);
+    }
+
+    public ProbeBuilder DeleteConfiguration()
+    {
+        ProbeConfiguration = new ConfigurationBuilder().Build();
+        return this;
+    }
+
     /// <summary>
     /// Resolves the configured probe hook and constructs a runtime <see cref="Probe"/> action.
     /// Failures are captured into <paramref name="actionFailures"/> so session build can continue.
@@ -174,13 +197,12 @@ public class ProbeBuilder : IYamlConvertible
 
             var scopedHookName = BuildScopedHookName(sessionName, Name);
             var probeHook = probes.FirstOrDefault(pair => pair.Key == scopedHookName).Value
-                            ?? probes.FirstOrDefault(pair => pair.Key == Name).Value
                             ?? throw new ArgumentException($"Probe {Name} of type" +
                                                            $" {Probe} in session {sessionName} was not found" +
                                                            " in provided probes.");
             var probeTypeName = probeHook.GetType().Name;
             context.Logger.LogDebugWithMetaData("Started building Probe of type {type}",
-                context.GetMetaDataFromContext(), new object?[] { probeTypeName });
+                context.GetMetaDataOrDefault(), new object?[] { probeTypeName });
 
             return new Probe(Name!, Stage, probeHook, DataSourceNames, DataSourcePatterns, context.Logger);
         }

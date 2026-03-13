@@ -1,9 +1,12 @@
 using System.Collections.Generic;
 using System.Collections.Immutable;
+using System;
 using System.IO;
 using System.IO.Abstractions;
+using System.Linq;
 using System.Reflection;
 using Allure.Commons;
+using Microsoft.Extensions.Configuration;
 using NUnit.Framework;
 using QaaS.Framework.SDK.ContextObjects;
 using QaaS.Framework.SDK.Hooks.Assertion;
@@ -314,8 +317,9 @@ public class AllureReporterTests
             [baseAttachmentDirectoryInsideAllureDirectory, extraSubDirectoryName])!;
         var expectedAttachmentDirectory = Path.Join(baseAttachmentDirectoryInsideAllureDirectory,
             epochTestSuiteStartTimeField.GetValue(Reporter)!.ToString(),
-            executionId, FileSystemExtensions.MakeValidDirectoryName(caseName),
-            extraSubDirectoryName);
+            FileSystemExtensions.MakeValidDirectoryName(executionId),
+            FileSystemExtensions.MakeValidDirectoryName(caseName),
+            FileSystemExtensions.MakeValidDirectoryName(extraSubDirectoryName));
         // Assert
         Assert.AreEqual(expectedAttachmentDirectory, attachmentDirectory);
     }
@@ -377,5 +381,89 @@ public class AllureReporterTests
             Assert.That(result[i].source, Is.Not.Null.And.Not.Empty);
             Assert.That(result[i].type, Is.Not.Null.And.Not.Empty);
         }
+    }
+
+    [Test]
+    public void SaveAssertionAttachmentsToAllure_WithTraversalPath_ThrowsInvalidOperationException()
+    {
+        var assertionResult = new AssertionResult
+        {
+            Assertion = new Assertion
+            {
+                AssertionHook = new AssertionHookMock
+                {
+                    AssertionAttachments =
+                    [
+                        new AssertionAttachment
+                        {
+                            Path = "../outside.txt",
+                            SerializationType = SerializationType.Json,
+                            Data = new byte[] { 0x01 }
+                        }
+                    ]
+                },
+                Name = "unsafe-assertion",
+                AssertionName = "AssertionOne",
+                StatussesToReport = null
+            },
+            AssertionStatus = AssertionStatus.Passed,
+            TestDurationMs = 0,
+            Flaky = null
+        };
+
+        var saveAssertionAttachmentsToAllureMethod = Reporter?.GetType()
+            .GetMethod("SaveAssertionAttachmentsToAllure", BindingFlags.NonPublic | BindingFlags.Instance)!;
+
+        var exception = Assert.Throws<TargetInvocationException>(() =>
+            saveAssertionAttachmentsToAllureMethod.Invoke(Reporter, [assertionResult]));
+
+        Assert.That(exception!.InnerException, Is.TypeOf<InvalidOperationException>());
+    }
+
+    [Test]
+    public void SaveConfigurationTemplateToAllure_WithRenderedTemplate_UsesStoredTemplateContent()
+    {
+        const string renderedTemplate = "Sessions:\n  - Name: RabbitRoundTrip\n";
+        Reporter!.Context.InsertValueIntoGlobalDictionary(["__RunnerArtifacts", "RenderedTemplate"], renderedTemplate);
+        var configuration = new ConfigurationBuilder()
+            .AddInMemoryCollection(new Dictionary<string, string?>
+            {
+                ["Sessions:0:Name"] = "incomplete"
+            })
+            .Build();
+
+        var method = Reporter.GetType()
+            .GetMethod("SaveConfigurationTemplateToAllure", BindingFlags.NonPublic | BindingFlags.Instance)!;
+        var attachment = (Attachment)method.Invoke(Reporter, [configuration])!;
+        var attachmentPath = Path.Combine(AllureResultsFolder, attachment.source);
+
+        Assert.That(File.Exists(attachmentPath), Is.True);
+        Assert.That(File.ReadAllText(attachmentPath), Is.EqualTo(renderedTemplate));
+    }
+
+    [Test]
+    public void CreateSessionStep_WithStoredSessionLogs_AddsSessionLogAttachment()
+    {
+        Reporter!.SaveSessionData = true;
+        Reporter.Context.AppendSessionLog("test-session", "Starting session test-session");
+        Reporter.Context.AppendSessionLog("test-session", "Session test-session completed.");
+        var sessionData = new SessionData
+        {
+            Name = "test-session",
+            UtcStartTime = DateTime.UtcNow.AddSeconds(-1),
+            UtcEndTime = DateTime.UtcNow,
+            SessionFailures = []
+        };
+
+        var method = Reporter.GetType()
+            .GetMethod("CreateSessionStep", BindingFlags.NonPublic | BindingFlags.Instance)!;
+        var step = (StepResult)method.Invoke(Reporter, [sessionData])!;
+        var logAttachment = step.attachments!.Single(attachment => attachment.name == "SessionLog");
+        var logAttachmentPath = Path.Combine(AllureResultsFolder, logAttachment.source);
+
+        Assert.That(step.attachments, Has.Count.EqualTo(2));
+        Assert.That(File.Exists(logAttachmentPath), Is.True);
+        Assert.That(File.ReadAllText(logAttachmentPath), Does.Contain("Starting session test-session"));
+        Assert.That(File.ReadAllText(logAttachmentPath), Does.Contain("Session test-session completed."));
     }
 }

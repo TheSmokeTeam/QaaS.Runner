@@ -1,4 +1,3 @@
-﻿using Allure.Commons;
 using Microsoft.Extensions.Logging;
 using QaaS.Framework.Executions.Logics;
 using QaaS.Framework.SDK.ContextObjects;
@@ -14,20 +13,6 @@ namespace QaaS.Runner.Logics;
 public class ReportLogic(IList<IReporter> reporters, InternalContext context) : ILogic
 {
     /// <summary>
-    /// Determines whether reporting should run for the requested execution type.
-    /// </summary>
-    /// <param name="executionType">The active execution pipeline mode.</param>
-    /// <returns>
-    /// <see langword="true" /> for <see cref="ExecutionType.Run" /> and <see cref="ExecutionType.Assert" />;
-    /// otherwise <see langword="false" />.
-    /// </returns>
-    public bool ShouldRun(ExecutionType executionType)
-    {
-        return executionType is ExecutionType.Run or ExecutionType.Assert;
-    }
-
-
-    /// <summary>
     /// Reports matching <see cref="AssertionResult" /> entries to each configured <see cref="IReporter" />.
     /// </summary>
     /// <param name="executionData">The mutable execution context containing assertion results.</param>
@@ -38,26 +23,40 @@ public class ReportLogic(IList<IReporter> reporters, InternalContext context) : 
     public ExecutionData Run(ExecutionData executionData)
     {
         context.Logger.LogInformation("Running {Reports} Logic", "Reports");
-        context.Logger.LogInformation("Started writing assertion results to {ResultsDirectory}",
-            AllureLifecycle.Instance.ResultsDirectory);
+        context.Logger.LogInformation("Started writing assertion results using {ReporterCount} reporters",
+            reporters.Count);
+
+        var assertionResultsByName = executionData.AssertionResults
+            .OfType<AssertionResult>()
+            .ToDictionary(result => result.Assertion.Name, StringComparer.Ordinal);
 
         foreach (var reporter in reporters)
         {
-            var matchingResult = executionData.AssertionResults.FirstOrDefault(result =>
-                ((AssertionResult)result).Assertion.Name.Equals(reporter.Name));
-            
-            if (matchingResult is AssertionResult assertionResult)
+            if (assertionResultsByName.TryGetValue(reporter.AssertionName, out var assertionResult))
             {
-                // Report only if assertion result status matches one of the statuses to report
+                context.Logger.LogDebug(
+                    "Routing assertion {AssertionName} with status {AssertionStatus} to reporter {ReporterName}",
+                    assertionResult.Assertion.Name, assertionResult.AssertionStatus, reporter.Name);
                 if (assertionResult.Assertion.StatussesToReport.Contains(assertionResult.AssertionStatus))
+                {
                     reporter.WriteTestResults(assertionResult);
+                }
+                else
+                {
+                    context.Logger.LogDebug(
+                        "Skipping reporter {ReporterName} for assertion {AssertionName} because status {AssertionStatus} is not configured for reporting",
+                        reporter.Name, assertionResult.Assertion.Name, assertionResult.AssertionStatus);
+                }
             }
             else
-                throw new ArgumentException("Could not find any matching assertion result to reporter");
+            {
+                throw new ArgumentException(
+                    $"Could not find an assertion result for reporter '{reporter.Name}' targeting assertion '{reporter.AssertionName}'.");
+            }
         }
 
-        context.Logger.LogInformation("Finished writing assertion results to {ResultsDirectory}",
-            AllureLifecycle.Instance.ResultsDirectory);
+        context.Logger.LogInformation("Finished writing assertion results using {ReporterCount} reporters",
+            reporters.Count);
 
         return executionData;
     }

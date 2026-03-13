@@ -25,15 +25,6 @@
         <None Update="executable.yaml">
             <CopyToOutputDirectory>Always</CopyToOutputDirectory>
         </None>
-        <None Update="logger.yaml">
-            <CopyToOutputDirectory>Always</CopyToOutputDirectory>
-        </None>
-    </ItemGroup>
-
-    <ItemGroup>
-        <None Update="Cases\**\*.*">
-            <CopyToOutputDirectory>Always</CopyToOutputDirectory>
-        </None>
     </ItemGroup>
 
     <ItemGroup>

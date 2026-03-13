@@ -1,4 +1,5 @@
 using System.IO.Abstractions;
+using System.Text.RegularExpressions;
 using Autofac;
 using Microsoft.Extensions.Configuration;
 using QaaS.Framework.Configurations;
@@ -66,7 +67,9 @@ public class RunLoader<TRunner, TOptions> : BaseLoader<TOptions, TRunner>
     {
         using var httpClient = new HttpClient();
         httpClient.Timeout = TimeSpan.FromSeconds(HttpClientTimeoutSeconds);
-        return _jfrogArtifactoryHelper.GetUrlsToAllFilesInArtifactoryFolder(casesDirectoryPath, httpClient)
+        return _jfrogArtifactoryHelper.GetUrlsToAllFilesInArtifactoryFolderAsync(casesDirectoryPath, httpClient)
+            .GetAwaiter()
+            .GetResult()
             .OrderBy(f => f)
             .Select(casePath => BuildContext(executionId, casePath))
             .ToList();
@@ -95,6 +98,7 @@ public class RunLoader<TRunner, TOptions> : BaseLoader<TOptions, TRunner>
             contexts = PathUtils.IsPathHttpUrl(Options.CasesRootDirectory)
                 ? GetContextsWithJfrogArtifactoryCases(ExecutionId, Options.CasesRootDirectory)
                 : GetContextsWithFileSystemCases(ExecutionId, Options.CasesRootDirectory);
+            contexts = FilterIgnoredCases(contexts).ToList();
 
             // If casesNamesToRun is 0 all cases would run.
             if (Options.CasesNamesToRun.Count <= 0) return contexts;
@@ -111,6 +115,29 @@ public class RunLoader<TRunner, TOptions> : BaseLoader<TOptions, TRunner>
         }
 
         return contexts;
+    }
+
+    private IEnumerable<InternalContext> FilterIgnoredCases(IEnumerable<InternalContext> contexts)
+    {
+        var ignoredCaseNames = new HashSet<string>(Options.CasesNamesToIgnore ?? [], StringComparer.Ordinal);
+        var ignoredCasePatterns = (Options.CasesNamePatternsToIgnore ?? [])
+            .Select(pattern => new Regex(pattern, RegexOptions.Compiled))
+            .ToArray();
+
+        return contexts.Where(context =>
+        {
+            if (context.CaseName == null)
+            {
+                return true;
+            }
+
+            if (ignoredCaseNames.Contains(context.CaseName))
+            {
+                return false;
+            }
+
+            return ignoredCasePatterns.All(pattern => !pattern.IsMatch(context.CaseName));
+        });
     }
 
     private ILifetimeScope InitializeScope()
@@ -145,10 +172,12 @@ public class RunLoader<TRunner, TOptions> : BaseLoader<TOptions, TRunner>
         var executionBuilders = GetLoadedExecutionBuilders().ToList();
 
         // Use Activator to create an instance of the configured implementation of TRunner
-        return (TRunner)Activator.CreateInstance(
+        var runner = (TRunner)Activator.CreateInstance(
             typeof(TRunner), _runScope, executionBuilders, Logger, SerilogLogger,
             Options is AssertableOptions assertableOptions && assertableOptions.EmptyAllureDirectory,
             Options is AssertableOptions assertableOptions2 && assertableOptions2.AutoServeTestResults
         )!;
+        runner.ExitProcessOnCompletion = !Options.NoProcessExit;
+        return runner;
     }
 }

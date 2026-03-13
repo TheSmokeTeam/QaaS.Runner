@@ -6,6 +6,7 @@ using NUnit.Framework;
 using QaaS.Framework.SDK.Session.CommunicationDataObjects;
 using QaaS.Framework.SDK.Session.DataObjects;
 using QaaS.Framework.SDK.Session.SessionDataObjects;
+using QaaS.Framework.SDK.Session.SessionDataObjects.RunningSessionsObjects;
 using QaaS.Runner.Sessions.Extensions;
 using QaaS.Runner.Sessions.Tests.Actions.Utils;
 using SessionAction = QaaS.Runner.Sessions.Actions.Action;
@@ -92,7 +93,7 @@ public class SessionExtensionsTests
         var action = new SuccessfulAction("SuccessfulAction");
 
         var task = SessionExtensions.CreateTaskFromAction(context, action, SessionName, failures);
-        task.RunSynchronously();
+        task.GetAwaiter().GetResult();
 
         Assert.That(task.Result, Is.Not.Null);
         Assert.That(task.Result!.Item1, Is.SameAs(action));
@@ -108,7 +109,7 @@ public class SessionExtensionsTests
         var action = new ExceptionalAction("ExceptionalAction", new InvalidOperationException("boom"));
 
         var task = SessionExtensions.CreateTaskFromAction(context, action, SessionName, failures);
-        task.RunSynchronously();
+        task.GetAwaiter().GetResult();
 
         Assert.That(task.Result, Is.Null);
         Assert.That(failures, Has.Count.EqualTo(1));
@@ -123,7 +124,7 @@ public class SessionExtensionsTests
         var action = new ExceptionalAction("CanceledAction", new OperationCanceledException());
 
         var task = SessionExtensions.CreateTaskFromAction(context, action, SessionName, failures);
-        task.RunSynchronously();
+        task.GetAwaiter().GetResult();
 
         Assert.That(task.Result, Is.Null);
         Assert.That(failures, Has.Count.EqualTo(1));
@@ -142,10 +143,26 @@ public class SessionExtensionsTests
         context.InternalRunningSessions.RunningSessionsDict[SessionName].Outputs!.Add(outputRcd);
 
         var task = SessionExtensions.CreateTaskFromAction(context, action, SessionName, failures);
-        task.RunSynchronously();
+        task.GetAwaiter().GetResult();
 
         Assert.That(inputRcd.DataCancellationTokenSource.IsCancellationRequested, Is.True);
         Assert.That(outputRcd.DataCancellationTokenSource.IsCancellationRequested, Is.True);
+    }
+
+    [Test]
+    public void RunningSessionHelpers_SetGetAndRemoveSessionData()
+    {
+        var context = CreationalFunctions.CreateContext(SessionName, []);
+        var runningSession = new RunningSessionData<object, object>
+        {
+            Inputs = [],
+            Outputs = []
+        };
+
+        context.SetRunningSession("other-session", runningSession);
+
+        Assert.That(context.GetRunningSession("other-session"), Is.SameAs(runningSession));
+        Assert.That(context.RemoveRunningSession("other-session"), Is.True);
     }
 
     private sealed class DisposableTracker : IDisposable

@@ -3,6 +3,7 @@ using Microsoft.Extensions.Logging;
 using QaaS.Framework.SDK.ContextObjects;
 using QaaS.Framework.SDK.DataSourceObjects;
 using QaaS.Framework.SDK.Session.SessionDataObjects;
+using QaaS.Runner.Infrastructure;
 using QaaS.Runner.Sessions.Actions;
 using QaaS.Runner.Sessions.Actions.Probes;
 using QaaS.Runner.Sessions.Actions.Publishers;
@@ -13,6 +14,9 @@ using Action = QaaS.Runner.Sessions.Actions.Action;
 
 namespace QaaS.Runner.Sessions.Session;
 
+/// <summary>
+/// Represents an ordered execution stage within a session.
+/// </summary>
 public class Stage
 {
     private readonly ConcurrentBag<ActionFailure> _actionFailures;
@@ -69,27 +73,47 @@ public class Stage
         }
     }
 
-    public IList<Task<Tuple<Action, InternalCommunicationData<object>>?>> Run()
+    /// <summary>
+    /// Returns the staged actions that belong to this stage for lifecycle management.
+    /// </summary>
+    public IReadOnlyCollection<StagedAction> GetActions() => Actions;
+
+    /// <summary>
+    /// Starts all actions in the stage and returns the running action tasks.
+    /// </summary>
+    public async Task<IList<Task<Tuple<Action, InternalCommunicationData<object>>?>>> RunAsync()
     {
-        _context.Logger.LogInformation("Sleeping {WaitTimeMs} milliseconds before stage starts",
-            SleepBeforeMilliseconds);
-        if (SleepBeforeMilliseconds != null)
-            Thread.Sleep((int)SleepBeforeMilliseconds);
+        if (SleepBeforeMilliseconds is > 0)
+        {
+            _context.Logger.LogDebug("Sleeping {WaitTimeMs} ms before session {SessionName} stage {StageNumber}",
+                SleepBeforeMilliseconds, _sessionName, _stage);
+            await Task.Delay((int)SleepBeforeMilliseconds);
+        }
         _context.Logger.LogInformation(
-            "Starting Session {SessionName}'s stage number {StageNumber} - containing {NumberOfActions} actions",
+            "Starting session {SessionName} stage {StageNumber} with {ActionCount} action(s)",
             _sessionName, _stage, Actions.Count);
+        _context.AppendSessionLog(_sessionName,
+            $"Starting session {_sessionName} stage {_stage} with {Actions.Count} action(s)");
+        _context.Logger.LogDebug("Session {SessionName} stage {StageNumber} actions: {ActionNames}",
+            _sessionName, _stage, string.Join(", ", Actions.Select(action => $"{action.GetType().Name}:{action.Name}")));
 
         var stageTasks =
             Actions.Select(action =>
                 SessionExtensions.CreateTaskFromAction(_context, action, _sessionName, _actionFailures)).ToList();
-        stageTasks.ForEach(task => task.Start());
+        _ = Task.WhenAll(stageTasks).ContinueWith(_ =>
+            {
+                _context.Logger.LogInformation("Finished session {SessionName} stage {StageNumber}",
+                    _sessionName, _stage);
+                _context.AppendSessionLog(_sessionName, $"Finished session {_sessionName} stage {_stage}");
+            },
+            TaskScheduler.Default);
 
-        _context.Logger.LogInformation(
-            "Finished Session {SessionName}'s stage number {StageNumber}. Sleeping {WaitTimeMs} milliseconds",
-            _sessionName, _stage, SleepAfterMilliseconds);
-
-        if (SleepAfterMilliseconds != null)
-            Thread.Sleep((int)SleepAfterMilliseconds);
+        if (SleepAfterMilliseconds is > 0)
+        {
+            _context.Logger.LogDebug("Sleeping {WaitTimeMs} ms after session {SessionName} stage {StageNumber}",
+                SleepAfterMilliseconds, _sessionName, _stage);
+            await Task.Delay((int)SleepAfterMilliseconds);
+        }
 
         return stageTasks;
     }

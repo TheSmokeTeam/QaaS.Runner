@@ -447,7 +447,13 @@ public class AssertionBuilder : IYamlConvertible
 
     public AssertionBuilder UpdateConfiguration(object configuration)
     {
-        return Configure(configuration);
+        AssertionConfiguration = AssertionConfiguration.BindConfigurationObjectToIConfiguration(configuration);
+        return this;
+    }
+
+    public AssertionBuilder UpsertConfiguration(object configuration)
+    {
+        return UpdateConfiguration(configuration);
     }
 
     public AssertionBuilder DeleteConfiguration()
@@ -499,7 +505,8 @@ public class AssertionBuilder : IYamlConvertible
     {
         Reporter = new AllureReporter
         {
-            Name = Name!
+            Name = Name!,
+            AssertionName = Name!
         };
 
         Reporter.DisplayTrace = DisplayTrace;
@@ -513,5 +520,11 @@ public class AssertionBuilder : IYamlConvertible
 
         Reporter.FileSystem = fileSystem ?? new FileSystem();
         return Reporter;
+    }
+
+    internal IEnumerable<IReporter> BuildReporters(Context context, DateTime testSuiteStartTimeUtc,
+        IFileSystem? fileSystem = null)
+    {
+        yield return Build(context, testSuiteStartTimeUtc, fileSystem);
     }
 }

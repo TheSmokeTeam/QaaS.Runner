@@ -1,4 +1,4 @@
-﻿using System.Collections.Immutable;
+using System.Collections.Immutable;
 using QaaS.Framework.SDK.DataSourceObjects;
 using QaaS.Framework.SDK.Hooks.Generator;
 using QaaS.Framework.SDK.Session.DataObjects;
@@ -12,43 +12,22 @@ public class TestGenerator : BaseGenerator<TestGeneratorConfig>
     public override IEnumerable<Data<object>> Generate(IImmutableList<SessionData> sessionDataList,
         IImmutableList<DataSource> dataSourceList)
     {
-        if (Configuration.Count.HasValue)
+        for (var i = 0; i < Configuration.Count; i++)
         {
-            for (var i = 0; i < Configuration.Count; i++)
+            yield return new Data<object>
             {
-                yield return new Data<object>
+                Body = new MockJson
                 {
-                    Body = new MockJson
-                    {
-                        Property = "SomeValue"
-                    },
-                    MetaData = new MetaData
-                    {
-                        RabbitMq = new RabbitMq
-                        {
-                            RoutingKey = "SomeRoutingKey"
-                        }
-                    }
-                };
-            }
-        }
-        else
-        {
-            while (true)
-                yield return new Data<object>
+                    Property = "SomeValue"
+                },
+                MetaData = new MetaData
                 {
-                    Body = new MockJson
+                    RabbitMq = new RabbitMq
                     {
-                        Property = "SomeValue"
-                    },
-                    MetaData = new MetaData
-                    {
-                        RabbitMq = new RabbitMq
-                        {
-                            RoutingKey = "SomeRoutingKey"
-                        }
+                        RoutingKey = "SomeRoutingKey"
                     }
-                };
+                }
+            };
         }
     }
 }

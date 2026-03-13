@@ -86,6 +86,14 @@ Or
         HelpText = "Names of the test-cases to run.")]
     public IList<string> CasesNamesToRun { get; init; } = Array.Empty<string>();
 
+    [Option("cases-names-ignore", Default = null,
+        HelpText = "Names of the test-cases to ignore.")]
+    public IList<string> CasesNamesToIgnore { get; init; } = Array.Empty<string>();
+
+    [Option("cases-name-patterns-ignore", Default = null,
+        HelpText = "Regex patterns of test-case names to ignore.")]
+    public IList<string> CasesNamePatternsToIgnore { get; init; } = Array.Empty<string>();
+
     [Option('i', "session-names", Default = null,
         HelpText = "Names of the sessions to run.")]
     public IList<string> SessionNamesToRun { get; init; } = Array.Empty<string>();
@@ -111,6 +119,12 @@ Or
     [Option("no-env", Default = false,
         HelpText = "When this flag is used environment variables will not override loaded configurations.")]
     public bool DontResolveWithEnvironmentVariables { get; init; } = false;
+
+    [Option("no-process-exit", Default = false,
+        HelpText =
+            "When this flag is used the runner will not terminate the current process after it completes. " +
+            "Useful when embedding QaaS.Runner and orchestrating multiple runners in a single host process.")]
+    public bool NoProcessExit { get; init; } = false;
 
     /// <summary>
     ///     Gets the execution type of the command

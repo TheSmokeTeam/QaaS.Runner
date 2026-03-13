@@ -18,10 +18,44 @@ public class StorageBuilderCrudTests
         Assert.That(builder.ReadConfiguration(), Is.TypeOf<FilesInFileSystemConfig>());
 
         builder.UpdateConfiguration(_ => new S3Config { Prefix = "prefix" });
-        Assert.That(builder.ReadConfiguration(), Is.TypeOf<S3Config>());
+        builder.UpsertConfiguration(new FilesInFileSystemConfig { Path = "two/path" });
+        Assert.That(builder.ReadConfiguration(), Is.TypeOf<FilesInFileSystemConfig>());
 
         builder.DeleteConfiguration();
         Assert.That(builder.ReadConfiguration(), Is.Null);
+    }
+
+    [Test]
+    public void StorageBuilder_UpsertConfiguration_MergesSameTypeAndPreservesExistingFields()
+    {
+        var builder = new StorageBuilder()
+            .Create(new S3Config
+            {
+                StorageBucket = "bucket-a",
+                ServiceURL = "https://s3.local",
+                AccessKey = "access-key",
+                SecretKey = "secret-key",
+                Prefix = "existing-prefix",
+                Delimiter = "/",
+                SkipEmptyObjects = true
+            });
+
+        builder.UpsertConfiguration(new S3Config
+        {
+            MaximumRetryCount = 5,
+            SkipEmptyObjects = false
+        });
+
+        var mergedConfiguration = (S3Config)builder.ReadConfiguration()!;
+        Assert.Multiple(() =>
+        {
+            Assert.That(mergedConfiguration.StorageBucket, Is.EqualTo("bucket-a"));
+            Assert.That(mergedConfiguration.ServiceURL, Is.EqualTo("https://s3.local"));
+            Assert.That(mergedConfiguration.Prefix, Is.EqualTo("existing-prefix"));
+            Assert.That(mergedConfiguration.Delimiter, Is.EqualTo("/"));
+            Assert.That(mergedConfiguration.MaximumRetryCount, Is.EqualTo(5));
+            Assert.That(mergedConfiguration.SkipEmptyObjects, Is.False);
+        });
     }
 
     [Test]

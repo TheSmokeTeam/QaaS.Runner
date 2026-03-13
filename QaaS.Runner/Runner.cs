@@ -9,13 +9,24 @@ namespace QaaS.Runner;
 /// <summary>
 /// Runner object representing a single QaaS.Runner run
 /// </summary>
-public class Runner : IRunner
+public class Runner : IRunner, IDisposable
 {
+    private bool _disposed;
     private ILifetimeScope Scope { get; set; }
     internal ILogger Logger { get; set; }
     private Serilog.ILogger SerilogLogger { get; set; }
     private bool EmptyResults { get; set; }
     private bool ServeResults { get; set; }
+
+    /// <summary>
+    /// Controls whether <see cref="Run" /> terminates the current process after the runner finishes successfully.
+    /// </summary>
+    public bool ExitProcessOnCompletion { get; set; } = true;
+
+    /// <summary>
+    /// The exit code produced by the most recent successful runner execution.
+    /// </summary>
+    public int? LastExitCode { get; private set; }
 
     /// <summary>
     /// Initializes a new instance of the <see cref="Runner" /> class
@@ -49,11 +60,61 @@ public class Runner : IRunner
     /// </summary>
     public void Run()
     {
-        Setup();
-        var executions = BuildExecutions();
-        var exitCode = StartExecutions(executions);
-        Teardown();
-        ExitProcess(exitCode);
+        var exitCode = RunAndGetExitCode();
+        HandleCompletion(exitCode);
+    }
+
+    /// <summary>
+    /// Runs the runner lifecycle and returns the resulting exit code without terminating the current process.
+    /// </summary>
+    /// <returns>The aggregated exit code from the runner's executions.</returns>
+    public int RunAndGetExitCode()
+    {
+        List<Execution>? executions = null;
+        var exitCode = 0;
+        LastExitCode = null;
+        Logger.LogInformation(
+            "Starting runner with {ExecutionCount} execution builders. EmptyResults={EmptyResults}, ServeResults={ServeResults}, ExitProcessOnCompletion={ExitProcessOnCompletion}",
+            ExecutionBuilders.Count, EmptyResults, ServeResults, ExitProcessOnCompletion);
+        try
+        {
+            Setup();
+            executions = BuildExecutions();
+            exitCode = StartExecutions(executions);
+            LastExitCode = exitCode;
+        }
+        finally
+        {
+            try
+            {
+                DisposeExecutions(executions);
+            }
+            finally
+            {
+                try
+                {
+                    Teardown();
+                }
+                finally
+                {
+                    Dispose();
+                }
+            }
+        }
+
+        Logger.LogInformation("Runner completed. ExitCode={ExitCode}", exitCode);
+        return exitCode;
+    }
+
+    private void HandleCompletion(int exitCode)
+    {
+        if (ExitProcessOnCompletion)
+        {
+            ExitProcess(exitCode);
+            return;
+        }
+
+        SetProcessExitCode(exitCode);
     }
 
     /// <summary>
@@ -61,8 +122,18 @@ public class Runner : IRunner
     /// </summary>
     protected virtual void Setup()
     {
+        Logger.LogDebug("Runner setup started");
         if (EmptyResults)
+        {
+            Logger.LogInformation("Cleaning results directory before execution");
             CleanResultsDirectory();
+        }
+        else
+        {
+            Logger.LogDebug("Results directory cleanup is disabled for this run");
+        }
+
+        Logger.LogDebug("Runner setup completed");
     }
 
     /// <summary>
@@ -70,12 +141,25 @@ public class Runner : IRunner
     /// </summary>
     protected virtual void Teardown()
     {
+        Logger.LogDebug("Runner teardown started");
         // Disposing logger to enable sending logs to elastic
         if (SerilogLogger is IDisposable disposableLogger)
+        {
+            Logger.LogDebug("Disposing Serilog logger instance");
             disposableLogger.Dispose();
-        
+        }
+
         if (ServeResults)
+        {
+            Logger.LogInformation("Serving test results after execution");
             ServeResultsInAllure();
+        }
+        else
+        {
+            Logger.LogDebug("Result serving is disabled for this run");
+        }
+
+        Logger.LogDebug("Runner teardown completed");
     }
 
     /// <summary>
@@ -103,6 +187,14 @@ public class Runner : IRunner
     }
 
     /// <summary>
+    /// Sets the current process exit code without terminating the process.
+    /// </summary>
+    protected virtual void SetProcessExitCode(int exitCode)
+    {
+        Environment.ExitCode = exitCode;
+    }
+
+    /// <summary>
     /// Builds the list of <see cref="Execution" />s from <see cref="ExecutionBuilders" />
     /// </summary>
     /// <returns>List of built <see cref="Execution" />s</returns>
@@ -110,11 +202,15 @@ public class Runner : IRunner
     {
         Logger.LogInformation("Building {ExecutionCount} executions", ExecutionBuilders.Count);
         var globalDict = new Dictionary<string, object?>();
+        // Builders share a single global dictionary so metadata and runtime values written by one
+        // execution are visible to later executions in the same runner invocation.
         ExecutionBuilders.ForEach(builder => builder.WithGlobalDict(globalDict));
-        
+
         // passing the same logger reference to every builder
         ExecutionBuilders.ForEach(builder => builder.WithLogger(Logger));
-        return ExecutionBuilders.Select(builder => builder.Build()).ToList();
+        var executions = ExecutionBuilders.Select(builder => builder.Build()).ToList();
+        Logger.LogInformation("Built {ExecutionCount} executions successfully", executions.Count);
+        return executions;
     }
 
     /// <summary>
@@ -126,6 +222,27 @@ public class Runner : IRunner
     protected virtual int StartExecutions(List<Execution> executions)
     {
         Logger.LogInformation("Running {ExecutionCount} executions", executions.Count);
-        return executions.Select(execution => execution.Start()).Sum();
+        var exitCode = executions.Select(execution => execution.Start()).Sum();
+        Logger.LogInformation("Finished running executions. Aggregated exit code: {ExitCode}", exitCode);
+        return exitCode;
+    }
+
+    protected virtual void DisposeExecutions(IEnumerable<Execution>? executions)
+    {
+        var executionList = (executions ?? Enumerable.Empty<Execution>()).ToList();
+        Logger.LogDebug("Disposing {ExecutionCount} execution instances", executionList.Count);
+        foreach (var execution in executionList)
+            execution.Dispose();
+    }
+
+    public virtual void Dispose()
+    {
+        if (_disposed)
+            return;
+
+        _disposed = true;
+        Logger.LogDebug("Disposing runner scope");
+        Scope.Dispose();
+        GC.SuppressFinalize(this);
     }
 }

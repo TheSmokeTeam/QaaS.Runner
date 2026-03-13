@@ -13,7 +13,7 @@ public static class Constants
     /// </summary>
     public static readonly List<string> ConfigurationSectionNames =
     [
-        "Storage",
+        "Storages",
         "DataSources",
         "Sessions",
         "Assertions",

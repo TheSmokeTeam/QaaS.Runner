@@ -1,6 +1,7 @@
 ﻿using System.Diagnostics;
 using System.Text.Json;
 using Microsoft.Extensions.Logging;
+using QaaS.Framework.SDK.ConfigurationObjects;
 using QaaS.Framework.SDK.Extensions;
 using Qaas.Mocker.CommunicationObjects;
 using QaaS.Framework.SDK.Session;
@@ -9,8 +10,6 @@ using QaaS.Framework.Serialization;
 using QaaS.Framework.Serialization.Deserializers;
 using Qaas.Mocker.CommunicationObjects.ConfigurationObjects.Command;
 using QaaS.Runner.Sessions.ConfigurationObjects;
-using CommunicationInputOutputState = Qaas.Mocker.CommunicationObjects.ConfigurationObjects.InputOutputState;
-
 namespace QaaS.Runner.Sessions.Actions.MockerCommands;
 
 /// <summary>
@@ -54,22 +53,23 @@ public class ConsumeMockerCommand : MockerCommand
     protected override (IEnumerable<DetailedData<object>>?, IEnumerable<DetailedData<object>>?)
         AdditionalDataExchangeWithTheMocker()
     {
-        if (ServerInputOutputState == CommunicationInputOutputState.NoInputOutput)
+        if (ServerInputOutputState == InputOutputState.NoInputOutput)
         {
-            Logger.LogWarning("Server '{ServerName}' has not Inputs or outputs, nothing to consume from", ServerName);
+            Logger.LogWarning("Server {ServerName} exposes no input or output queues. Skipping consume step.",
+                ServerName);
             return (null, null);
         }
 
         var inputTypeToDeserializeTo = _consumeConfig.InputDeserialize?.SpecificType?.GetConfiguredType();
         var outputTypeToDeserializeTo = _consumeConfig.OutputDeserialize?.SpecificType?.GetConfiguredType();
 
-        var consumedInputData = ServerInputOutputState is CommunicationInputOutputState.OnlyInput or CommunicationInputOutputState.BothInputOutput
+        var consumedInputData = ServerInputOutputState is InputOutputState.OnlyInput or InputOutputState.BothInputOutput
             ? Consume(CommunicationMethods.CreateConsumerEndpointInput(ServerName),
                 _consumeConfig.TimeoutMs).Select(d => d.FilterData(_inputDataFilter))
             : null;
 
         var consumedOutputData =
-            ServerInputOutputState is CommunicationInputOutputState.OnlyOutput or CommunicationInputOutputState.BothInputOutput
+            ServerInputOutputState is InputOutputState.OnlyOutput or InputOutputState.BothInputOutput
                 ? Consume(CommunicationMethods.CreateConsumerEndpointOutput(ServerName),
                     _consumeConfig.TimeoutMs).Select(d => d.FilterData(_outputDataFilter))
                 : null;
@@ -106,7 +106,8 @@ public class ConsumeMockerCommand : MockerCommand
     /// </summary>
     private IEnumerable<DetailedData<byte[]>> Consume(string queueName, int timeoutMs)
     {
-        Logger.LogDebug("Started consuming from Server - '{QueueName}'", queueName);
+        Logger.LogDebug("Starting Redis queue consume from {QueueName} with idle timeout {TimeoutMs} ms",
+            queueName, timeoutMs);
         var stopwatch = new Stopwatch();
         stopwatch.Restart();
         while (stopwatch.ElapsedMilliseconds < timeoutMs)
@@ -118,7 +119,8 @@ public class ConsumeMockerCommand : MockerCommand
             stopwatch.Restart();
         }
 
-        Logger.LogInformation("Stopped consuming from Server - '{QueueName}'", queueName);
+        Logger.LogInformation("Stopped Redis queue consume from {QueueName} after {TimeoutMs} ms of inactivity",
+            queueName, timeoutMs);
     }
 }
 

@@ -1,5 +1,6 @@
 using System.ComponentModel;
 using System.ComponentModel.DataAnnotations;
+using QaaS.Framework.Configurations.ConfigurationBindingUtils;
 using QaaS.Framework.Protocols.ConfigurationObjects;
 using QaaS.Framework.Protocols.ConfigurationObjects.Prometheus;
 using QaaS.Framework.Protocols.Protocols.Factories;
@@ -7,6 +8,7 @@ using QaaS.Framework.SDK.ContextObjects;
 using QaaS.Framework.SDK.Extensions;
 using QaaS.Framework.SDK.Session;
 using QaaS.Framework.SDK.Session.SessionDataObjects;
+using QaaS.Runner.Infrastructure;
 using QaaS.Runner.Sessions.ConfigurationObjects;
 using QaaS.Runner.Sessions.Extensions;
 
@@ -66,11 +68,22 @@ public class CollectorBuilder
         return Prometheus;
     }
 
+    /// <summary>
+    /// Applies a partial update to the current collector configuration while preserving omitted fields.
+    /// </summary>
     public CollectorBuilder UpdateConfiguration(Func<IFetcherConfig, IFetcherConfig> update)
     {
         var currentConfig = ReadConfiguration() ??
                             throw new InvalidOperationException("Collector configuration is not set");
-        return Configure(update(currentConfig));
+        return Configure(currentConfig.MergeConfiguration(update(currentConfig))!);
+    }
+
+    /// <summary>
+    /// Upserts the collector configuration, merging same-type configs and replacing different config types.
+    /// </summary>
+    public CollectorBuilder UpsertConfiguration(IFetcherConfig config)
+    {
+        return Configure(ReadConfiguration().MergeConfiguration(config)!);
     }
 
     public CollectorBuilder DeleteConfiguration()
@@ -126,7 +139,7 @@ public class CollectorBuilder
                    throw new InvalidOperationException($"Missing supported type in collector {Name}");
             var collectorTypeName = type.GetType().Name;
             context.Logger.LogDebugWithMetaData("Started building Collector of type {type}",
-                context.GetMetaDataFromContext(), new object?[] { collectorTypeName });
+                context.GetMetaDataOrDefault(), new object?[] { collectorTypeName });
 
             var fetcher = FetcherFactory.CreateFetcher(type, context.Logger);
             
@@ -136,7 +149,7 @@ public class CollectorBuilder
         catch (Exception e)
         {
             actionFailures.AppendActionFailure(e, sessionName, context.Logger, nameof(Collector), Name!,
-                type?.GetType().ToString());
+                type?.GetType().Name);
         }
 
         return null;

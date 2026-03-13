@@ -1,3 +1,4 @@
+using QaaS.Framework.Configurations.ConfigurationBindingUtils;
 using QaaS.Framework.Policies;
 using QaaS.Framework.Protocols.ConfigurationObjects;
 using QaaS.Framework.Protocols.ConfigurationObjects.Elastic;
@@ -13,6 +14,7 @@ using QaaS.Framework.SDK.Extensions;
 using QaaS.Framework.SDK.Session;
 using QaaS.Framework.SDK.Session.SessionDataObjects;
 using QaaS.Framework.Serialization;
+using QaaS.Runner.Infrastructure;
 using QaaS.Runner.Sessions.Extensions;
 using InvalidOperationException = System.InvalidOperationException;
 
@@ -109,11 +111,22 @@ public partial class ConsumerBuilder
         return S3Bucket;
     }
 
+    /// <summary>
+    /// Applies a partial update to the current consumer configuration while preserving omitted fields.
+    /// </summary>
     public ConsumerBuilder UpdateConfiguration(Func<IReaderConfig, IReaderConfig> update)
     {
         var currentConfig = ReadConfiguration() ??
                             throw new InvalidOperationException("Consumer configuration is not set");
-        return Configure(update(currentConfig));
+        return Configure(currentConfig.MergeConfiguration(update(currentConfig))!);
+    }
+
+    /// <summary>
+    /// Upserts the consumer configuration, merging same-type configs and replacing different config types.
+    /// </summary>
+    public ConsumerBuilder UpsertConfiguration(IReaderConfig config)
+    {
+        return Configure(ReadConfiguration().MergeConfiguration(config)!);
     }
 
     public ConsumerBuilder DeleteConfiguration()
@@ -211,7 +224,7 @@ public partial class ConsumerBuilder
             var consumerTypeName = reader?.GetType().Name ?? chunkReader?.GetType().Name ?? "Unknown";
             
             context.Logger.LogDebugWithMetaData("Started building Consumer of type {type}",
-                context.GetMetaDataFromContext(), new object?[] { consumerTypeName });
+                context.GetMetaDataOrDefault(), new object?[] { consumerTypeName });
 
             return reader != null
                 ? new Consumer(Name!, reader, timeout, Stage, policies, DataFilter, serializationType,

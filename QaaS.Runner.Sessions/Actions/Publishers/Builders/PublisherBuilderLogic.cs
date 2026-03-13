@@ -1,3 +1,4 @@
+using QaaS.Framework.Configurations.ConfigurationBindingUtils;
 using QaaS.Framework.Policies;
 using QaaS.Framework.Protocols.ConfigurationObjects;
 using QaaS.Framework.Protocols.ConfigurationObjects.Elastic;
@@ -15,6 +16,7 @@ using QaaS.Framework.SDK.Extensions;
 using QaaS.Framework.SDK.Session;
 using QaaS.Framework.SDK.Session.SessionDataObjects;
 using QaaS.Framework.Serialization;
+using QaaS.Runner.Infrastructure;
 using QaaS.Runner.Sessions.ConfigurationObjects;
 using QaaS.Runner.Sessions.Extensions;
 using Parallel = QaaS.Runner.Sessions.ConfigurationObjects.Parallel;
@@ -217,11 +219,22 @@ public partial class PublisherBuilder
         return MongoDbCollection;
     }
 
+    /// <summary>
+    /// Applies a partial update to the current publisher configuration while preserving omitted fields.
+    /// </summary>
     public PublisherBuilder UpdateConfiguration(Func<ISenderConfig, ISenderConfig> update)
     {
         var currentConfig = ReadConfiguration() ??
                             throw new InvalidOperationException("Publisher configuration is not set");
-        return Configure(update(currentConfig));
+        return Configure(currentConfig.MergeConfiguration(update(currentConfig))!);
+    }
+
+    /// <summary>
+    /// Upserts the publisher configuration, merging same-type configs and replacing different config types.
+    /// </summary>
+    public PublisherBuilder UpsertConfiguration(ISenderConfig config)
+    {
+        return Configure(ReadConfiguration().MergeConfiguration(config)!);
     }
 
     public PublisherBuilder DeleteConfiguration()
@@ -320,7 +333,7 @@ public partial class PublisherBuilder
             var publisherTypeName = sender?.GetType().Name ?? chunkSender?.GetType().Name ?? "Unknown";
             
             context.Logger.LogDebugWithMetaData("Started building Publisher of type {type}",
-                context.GetMetaDataFromContext(), new object?[] { publisherTypeName });
+                context.GetMetaDataOrDefault(), new object?[] { publisherTypeName });
 
             return sender != null
                 ? new Publisher(Name!, sender, Stage, DataFilter, PolicyBuilder.BuildPolicies(Policies), Loop,
@@ -335,7 +348,7 @@ public partial class PublisherBuilder
         catch (Exception e)
         {
             actionFailures.AppendActionFailure(e, sessionName, context.Logger, nameof(Publisher), Name!,
-                type?.GetType().ToString()!);
+                type?.GetType().Name);
         }
 
         return null;
