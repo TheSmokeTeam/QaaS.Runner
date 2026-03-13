@@ -44,7 +44,7 @@ public class SessionLogic(List<ISession> sessions, InternalContext context) : IL
                 context.Logger.LogDebug(
                     "Waiting for {BlockingSessionCount} deferred session(s) before starting stage {Stage}",
                     blockers.Count, stage);
-                Task.WhenAll(blockers).Wait();
+                Task.WhenAll(blockers).GetAwaiter().GetResult();
             }
 
             context.Logger.LogInformation(
@@ -54,16 +54,17 @@ public class SessionLogic(List<ISession> sessions, InternalContext context) : IL
             {
                 if (session.RunUntilStage == null)
                 {
-                    sessionsInThisStage.Add(Task.Run(() => session.Run(executionData)));
+                    sessionsInThisStage.Add(StartSessionAsync(session, executionData));
                     continue;
                 }
 
                 if (!blockingSessions.ContainsKey(session.RunUntilStage!.Value))
                     blockingSessions[session.RunUntilStage.Value] = [];
-                blockingSessions[session.RunUntilStage.Value].Add(Task.Run(() => session.Run(executionData)));
+                blockingSessions[session.RunUntilStage.Value].Add(StartSessionAsync(session, executionData));
             }
 
-            executionData.SessionDatas.AddRange(sessionsInThisStage.Select(s => s.Result));
+            executionData.SessionDatas.AddRange(sessionsInThisStage.Select(sessionTask =>
+                sessionTask.GetAwaiter().GetResult()));
             context.Logger.LogInformation(
                 "Finished session stage {Stage}. Immediate session results captured: {CapturedSessionCount}",
                 stage, sessionsInThisStage.Count);
@@ -71,11 +72,16 @@ public class SessionLogic(List<ISession> sessions, InternalContext context) : IL
 
         blockingSessions.Select(stageToSessions => stageToSessions.Value)
             .ForEach(sessionsTasks => sessionsTasks
-                .ForEach(sessionTask => executionData.SessionDatas.Add(sessionTask.Result)));
+                .ForEach(sessionTask => executionData.SessionDatas.Add(sessionTask.GetAwaiter().GetResult())));
 
         context.Logger.LogInformation("Session logic completed. Total collected session results: {SessionDataCount}",
             executionData.SessionDatas.Count);
 
         return executionData;
+    }
+
+    private static Task<SessionData?> StartSessionAsync(ISession session, ExecutionData executionData)
+    {
+        return session.RunAsync(executionData) ?? Task.Run(() => session.Run(executionData));
     }
 }

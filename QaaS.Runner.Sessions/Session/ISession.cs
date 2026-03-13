@@ -1,4 +1,5 @@
 ﻿using System.Collections.Concurrent;
+using System.Threading.Tasks;
 using QaaS.Framework.SDK.ContextObjects;
 using QaaS.Framework.SDK.ExecutionObjects;
 using QaaS.Framework.SDK.Session.SessionDataObjects;
@@ -34,4 +35,15 @@ public interface ISession
     /// <param name="executionData">Runtime execution state containing session and datasource inputs.</param>
     /// <returns>The produced session data, or <see langword="null" /> when no data is produced.</returns>
     public SessionData? Run(ExecutionData executionData);
+
+    /// <summary>
+    /// Executes the session asynchronously using the provided execution context.
+    /// Implementations can override this to avoid blocking worker threads during session delays and waits.
+    /// </summary>
+    /// <param name="executionData">Runtime execution state containing session and datasource inputs.</param>
+    /// <returns>The produced session data, or <see langword="null" /> when no data is produced.</returns>
+    public Task<SessionData?> RunAsync(ExecutionData executionData)
+    {
+        return Task.Run(() => Run(executionData));
+    }
 }

@@ -14,6 +14,9 @@ using Action = QaaS.Runner.Sessions.Actions.Action;
 
 namespace QaaS.Runner.Sessions.Session;
 
+/// <summary>
+/// Represents an ordered execution stage within a session.
+/// </summary>
 public class Stage
 {
     private readonly ConcurrentBag<ActionFailure> _actionFailures;
@@ -70,13 +73,21 @@ public class Stage
         }
     }
 
-    public IList<Task<Tuple<Action, InternalCommunicationData<object>>?>> Run()
+    /// <summary>
+    /// Returns the staged actions that belong to this stage for lifecycle management.
+    /// </summary>
+    public IReadOnlyCollection<StagedAction> GetActions() => Actions;
+
+    /// <summary>
+    /// Starts all actions in the stage and returns the running action tasks.
+    /// </summary>
+    public async Task<IList<Task<Tuple<Action, InternalCommunicationData<object>>?>>> RunAsync()
     {
         if (SleepBeforeMilliseconds is > 0)
         {
             _context.Logger.LogDebug("Sleeping {WaitTimeMs} ms before session {SessionName} stage {StageNumber}",
                 SleepBeforeMilliseconds, _sessionName, _stage);
-            Thread.Sleep((int)SleepBeforeMilliseconds);
+            await Task.Delay((int)SleepBeforeMilliseconds);
         }
         _context.Logger.LogInformation(
             "Starting session {SessionName} stage {StageNumber} with {ActionCount} action(s)",
@@ -89,7 +100,6 @@ public class Stage
         var stageTasks =
             Actions.Select(action =>
                 SessionExtensions.CreateTaskFromAction(_context, action, _sessionName, _actionFailures)).ToList();
-        stageTasks.ForEach(task => task.Start());
         _ = Task.WhenAll(stageTasks).ContinueWith(_ =>
             {
                 _context.Logger.LogInformation("Finished session {SessionName} stage {StageNumber}",
@@ -102,7 +112,7 @@ public class Stage
         {
             _context.Logger.LogDebug("Sleeping {WaitTimeMs} ms after session {SessionName} stage {StageNumber}",
                 SleepAfterMilliseconds, _sessionName, _stage);
-            Thread.Sleep((int)SleepAfterMilliseconds);
+            await Task.Delay((int)SleepAfterMilliseconds);
         }
 
         return stageTasks;

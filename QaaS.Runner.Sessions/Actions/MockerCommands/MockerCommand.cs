@@ -11,6 +11,7 @@ using Qaas.Mocker.CommunicationObjects.ConfigurationObjects.Ping;
 using QaaS.Runner.Sessions.ConfigurationObjects;
 using QaaS.Runner.Sessions.Extensions;
 using StackExchange.Redis;
+using System.Diagnostics;
 using System.Text.Json;
 
 namespace QaaS.Runner.Sessions.Actions.MockerCommands;
@@ -22,6 +23,7 @@ public abstract class MockerCommand : StagedAction
 {
     private const string PingContentType = "ping";
     private const string CommandContentType = "command";
+    private const int ResponsePollingIntervalMs = 10;
 
     private readonly string _commandId;
 
@@ -143,30 +145,35 @@ public abstract class MockerCommand : StagedAction
     {
         var pingRequestChannel = CommunicationMethods.CreateChannelRunnerToMocker(PingContentType, ServerName);
         var pingResponseChannel = CommunicationMethods.CreateChannelMockerToRunner(PingContentType, ServerName);
+        var responseChannel = RedisChannel.Literal(pingResponseChannel);
 
-        _redisSubscriber.SubscribeAsync(RedisChannel.Literal(pingResponseChannel), PingResponseHandler);
+        _redisSubscriber.Subscribe(responseChannel, PingResponseHandler);
         Logger.LogInformation("Subscribed to ping response channel '{PingResponseChannel}'", pingResponseChannel);
 
-        for (var retryIndex = 1; retryIndex <= _requestRetries; retryIndex++)
+        try
         {
-            Logger.LogDebug("Publishing ping request attempt {Attempt}/{MaxAttempts} for server {ServerName}",
-                retryIndex, _requestRetries, ServerName);
-            _redisSubscriber.Publish(RedisChannel.Literal(pingRequestChannel), PingRequestConstructor());
-            if (GetServerInstanceNamesSnapshot().Count != 0)
-                break;
-            if (retryIndex < _requestRetries)
-                Thread.Sleep(_requestDurationMs);
+            for (var retryIndex = 1; retryIndex <= _requestRetries; retryIndex++)
+            {
+                Logger.LogDebug("Publishing ping request attempt {Attempt}/{MaxAttempts} for server {ServerName}",
+                    retryIndex, _requestRetries, ServerName);
+                _redisSubscriber.Publish(RedisChannel.Literal(pingRequestChannel), PingRequestConstructor());
+                WaitForResponsesUntilTimeout(() => GetServerInstanceNamesSnapshot().Count > 0);
+                if (GetServerInstanceNamesSnapshot().Count != 0)
+                    break;
+            }
         }
-
-        _redisSubscriber.UnsubscribeAllAsync();
-        Logger.LogDebug("Unsubscribed from ping response channels for server {ServerName}", ServerName);
-
-        lock (ResponseStateLock)
+        finally
         {
-            _serverInstanceNames = _serverInstanceNames
-                .Where(serverInstance => !string.IsNullOrWhiteSpace(serverInstance))
-                .Distinct(StringComparer.Ordinal)
-                .ToList();
+            _redisSubscriber.Unsubscribe(responseChannel, PingResponseHandler);
+            Logger.LogDebug("Unsubscribed from ping response channels for server {ServerName}", ServerName);
+
+            lock (ResponseStateLock)
+            {
+                _serverInstanceNames = _serverInstanceNames
+                    .Where(serverInstance => !string.IsNullOrWhiteSpace(serverInstance))
+                    .Distinct(StringComparer.Ordinal)
+                    .ToList();
+            }
         }
     }
 
@@ -222,35 +229,50 @@ public abstract class MockerCommand : StagedAction
     private void CommandTheMockerInstances()
     {
         var serverInstances = GetServerInstanceNamesSnapshot();
-        foreach (var serverInstance in serverInstances)
+        var responseChannels = serverInstances.ToDictionary(
+            serverInstance => serverInstance,
+            serverInstance => RedisChannel.Literal(CommunicationMethods.CreateChannelMockerToRunner(CommandContentType,
+                ServerName, serverInstance)),
+            StringComparer.Ordinal);
+
+        foreach (var (serverInstance, responseChannel) in responseChannels)
         {
-            var responseChannel = CommunicationMethods.CreateChannelMockerToRunner(CommandContentType,
-                ServerName, serverInstance);
-            _redisSubscriber.SubscribeAsync(RedisChannel.Literal(responseChannel), CommandResponseHandler);
-            Logger.LogInformation("Subscribed to command response channel '{ResponseChannel}' for server instance '{ServerInstance}'",
+            _redisSubscriber.Subscribe(responseChannel, CommandResponseHandler);
+            Logger.LogInformation(
+                "Subscribed to command response channel '{ResponseChannel}' for server instance '{ServerInstance}'",
                 responseChannel, serverInstance);
         }
 
-        for (var retryIndex = 1; retryIndex <= _requestRetries; retryIndex++)
+        try
         {
-            Logger.LogDebug("Publishing command request attempt {Attempt}/{MaxAttempts} for server {ServerName}",
-                retryIndex, _requestRetries, ServerName);
-            foreach (var serverInstance in serverInstances)
+            for (var retryIndex = 1; retryIndex <= _requestRetries; retryIndex++)
             {
-                var requestChannel = CommunicationMethods.CreateChannelRunnerToMocker(CommandContentType,
-                    ServerName, serverInstance);
-                Logger.LogDebug("Publishing command request to channel '{RequestChannel}'", requestChannel);
-                _redisSubscriber.Publish(RedisChannel.Literal(requestChannel), CommandRequestConstructor());
+                Logger.LogDebug("Publishing command request attempt {Attempt}/{MaxAttempts} for server {ServerName}",
+                    retryIndex, _requestRetries, ServerName);
+                var pendingInstances = GetPendingCommandResponseNamesSnapshot(serverInstances);
+                foreach (var serverInstance in pendingInstances)
+                {
+                    var requestChannel = CommunicationMethods.CreateChannelRunnerToMocker(CommandContentType,
+                        ServerName, serverInstance);
+                    Logger.LogDebug("Publishing command request to channel '{RequestChannel}'", requestChannel);
+                    _redisSubscriber.Publish(RedisChannel.Literal(requestChannel), CommandRequestConstructor());
+                }
+
+                if (pendingInstances.Count == 0)
+                    break;
+
+                WaitForResponsesUntilTimeout(AllCommandsRequestsAreSuccessful);
+                if (AllCommandsRequestsAreSuccessful())
+                    break;
             }
-
-            if (AllCommandsRequestsAreSuccessful())
-                break;
-            if (retryIndex < _requestRetries)
-                Thread.Sleep(_requestDurationMs);
         }
+        finally
+        {
+            foreach (var responseChannel in responseChannels.Values)
+                _redisSubscriber.Unsubscribe(responseChannel, CommandResponseHandler);
 
-        _redisSubscriber.UnsubscribeAllAsync();
-        Logger.LogDebug("Unsubscribed from command response channels for server {ServerName}", ServerName);
+            Logger.LogDebug("Unsubscribed from command response channels for server {ServerName}", ServerName);
+        }
     }
 
     private bool AllCommandsRequestsAreSuccessful()
@@ -355,7 +377,7 @@ public abstract class MockerCommand : StagedAction
         };
     }
 
-    public void Dispose()
+    public override void Dispose()
     {
         _redisConnection?.Dispose();
     }
@@ -407,6 +429,31 @@ public abstract class MockerCommand : StagedAction
         {
             return _failedCommandResponses.ToList();
         }
+    }
+
+    private List<string> GetPendingCommandResponseNamesSnapshot(IEnumerable<string> expectedServerInstances)
+    {
+        lock (ResponseStateLock)
+        {
+            var successfulInstances = new HashSet<string>(_successfulCommandResponseToServerInstanceNames
+                .Where(id => !string.IsNullOrWhiteSpace(id))
+                .Distinct(StringComparer.Ordinal), StringComparer.Ordinal);
+            return expectedServerInstances
+                .Where(id => !string.IsNullOrWhiteSpace(id))
+                .Distinct(StringComparer.Ordinal)
+                .Where(id => !successfulInstances.Contains(id))
+                .ToList();
+        }
+    }
+
+    private void WaitForResponsesUntilTimeout(Func<bool> completedPredicate)
+    {
+        if (_requestDurationMs <= 0)
+            return;
+
+        var timeoutStopwatch = Stopwatch.StartNew();
+        while (!completedPredicate() && timeoutStopwatch.ElapsedMilliseconds < _requestDurationMs)
+            Thread.Sleep(ResponsePollingIntervalMs);
     }
 
     private object ResponseStateLock

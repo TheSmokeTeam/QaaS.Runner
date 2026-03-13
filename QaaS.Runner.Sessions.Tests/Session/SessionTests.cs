@@ -351,6 +351,32 @@ public class SessionTests
             message.Contains("completed. Inputs=", StringComparison.Ordinal)), Is.False);
     }
 
+    [Test]
+    public void Run_WhenSessionCompletes_DisposesStageActions()
+    {
+        const string sessionName = "disposable-session";
+        var context = CreationalFunctions.CreateContext(sessionName, []);
+        var disposed = false;
+
+        var stage = new Stage(context, [], sessionName, 0, 0, 0);
+        stage.AddCommunication(new DisposableAction("disposable-action", 0, Globals.Logger, () => disposed = true));
+
+        var session = new Sessions.Session.Session(
+            sessionName,
+            0,
+            true,
+            0,
+            0,
+            new Dictionary<int, Stage> { { 0, stage } },
+            [],
+            context,
+            []);
+
+        session.Run(context.ExecutionData);
+
+        Assert.That(disposed, Is.True);
+    }
+
     private sealed class RecordingAction(string name, int stage, Microsoft.Extensions.Logging.ILogger logger, System.Action callback)
         : StagedAction(name, stage, null, logger)
     {
@@ -367,6 +393,29 @@ public class SessionTests
         protected internal override void LogData(InternalCommunicationData<object> actData,
             DetailedData<object> itemBeforeSerialization, InputOutputState? saveAt = null)
         {
+        }
+    }
+
+    private sealed class DisposableAction(string name, int stage, Microsoft.Extensions.Logging.ILogger logger, System.Action onDispose)
+        : StagedAction(name, stage, null, logger)
+    {
+        internal override void ExportRunningCommunicationData(InternalContext context, string sessionName)
+        {
+        }
+
+        internal override InternalCommunicationData<object> Act()
+        {
+            return new InternalCommunicationData<object>();
+        }
+
+        protected internal override void LogData(InternalCommunicationData<object> actData,
+            DetailedData<object> itemBeforeSerialization, InputOutputState? saveAt = null)
+        {
+        }
+
+        public override void Dispose()
+        {
+            onDispose();
         }
     }
 
