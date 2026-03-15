@@ -25,6 +25,7 @@ env:
   COVERAGE_RESULTS_DIRECTORY: ${{ github.workspace }}\CoverageResults
   COVERAGE_RESULTS_PATH: ${{ github.workspace }}\CoverageResults\coverage.xml
   COVERAGE_REPORT_DIRECTORY: ${{ github.workspace }}\CoverageReport
+  FILTERED_COVERAGE_RESULTS_PATH: ${{ github.workspace }}\CoverageReport\Cobertura.xml
 
 jobs:
   build-test-deploy:
@@ -87,7 +88,7 @@ jobs:
         shell: pwsh
         run: |
           New-Item -ItemType Directory -Path "${{ env.COVERAGE_REPORT_DIRECTORY }}" -Force | Out-Null
-          reportgenerator "-reports:${{ env.COVERAGE_RESULTS_PATH }}" "-targetdir:${{ env.COVERAGE_REPORT_DIRECTORY }}" "-reporttypes:Html;MarkdownSummaryGithub"
+          reportgenerator "-reports:${{ env.COVERAGE_RESULTS_PATH }}" "-targetdir:${{ env.COVERAGE_REPORT_DIRECTORY }}" "-reporttypes:Html;MarkdownSummaryGithub;Cobertura" "-assemblyfilters:+*;-*.Tests"
 
       - name: Publish coverage job summary
         shell: pwsh
@@ -118,20 +119,36 @@ jobs:
             exit 0
           }
 
-          [xml]$coverage = Get-Content "${{ env.COVERAGE_RESULTS_PATH }}"
+          function Get-BadgeColor([double]$value) {
+            if ($value -ge 90) { return "brightgreen" }
+            if ($value -ge 75) { return "green" }
+            if ($value -ge 60) { return "yellow" }
+            if ($value -ge 40) { return "orange" }
+            return "red"
+          }
+
+          [xml]$coverage = Get-Content "${{ env.FILTERED_COVERAGE_RESULTS_PATH }}"
           $linePercent = [math]::Round([double]$coverage.coverage.'line-rate' * 100, 1)
           $branchPercent = [math]::Round([double]$coverage.coverage.'branch-rate' * 100, 1)
-          $score = [math]::Min($linePercent, $branchPercent)
-          $color = if ($score -ge 90) { "brightgreen" } elseif ($score -ge 75) { "green" } elseif ($score -ge 60) { "yellow" } elseif ($score -ge 40) { "orange" } else { "red" }
+          $lineColor = Get-BadgeColor $linePercent
+          $branchColor = Get-BadgeColor $branchPercent
 
           $gistBody = @{
             files = @{
-              "coverage-badge.json" = @{
+              "line-coverage-badge.json" = @{
                 content = (@{
                   schemaVersion = 1
-                  label = "coverage"
-                  message = "L $linePercent% | B $branchPercent%"
-                  color = $color
+                  label = "Line"
+                  message = "$linePercent%"
+                  color = $lineColor
+                } | ConvertTo-Json -Compress)
+              }
+              "branch-coverage-badge.json" = @{
+                content = (@{
+                  schemaVersion = 1
+                  label = "Branch"
+                  message = "$branchPercent%"
+                  color = $branchColor
                 } | ConvertTo-Json -Compress)
               }
             }

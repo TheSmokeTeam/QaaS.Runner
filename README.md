@@ -3,7 +3,8 @@
 Execution orchestration package for running QaaS test workflows from YAML configuration.
 
 [![CI](https://github.com/TheSmokeTeam/QaaS.Runner/actions/workflows/ci.yml/badge.svg)](https://github.com/TheSmokeTeam/QaaS.Runner/actions/workflows/ci.yml)
-[![Coverage](https://img.shields.io/endpoint?url=https://gist.githubusercontent.com/eldarush/9a06894c5b6da0ff9f2f706b0a71bbb8/raw/coverage-badge.json)](https://github.com/TheSmokeTeam/QaaS.Runner/actions/workflows/ci.yml)
+[![Line Coverage](https://img.shields.io/endpoint?url=https://gist.githubusercontent.com/eldarush/9a06894c5b6da0ff9f2f706b0a71bbb8/raw/line-coverage-badge.json)](https://github.com/TheSmokeTeam/QaaS.Runner/actions/workflows/ci.yml)
+[![Branch Coverage](https://img.shields.io/endpoint?url=https://gist.githubusercontent.com/eldarush/9a06894c5b6da0ff9f2f706b0a71bbb8/raw/branch-coverage-badge.json)](https://github.com/TheSmokeTeam/QaaS.Runner/actions/workflows/ci.yml)
 [![Docs](https://img.shields.io/badge/docs-qaas--docs-blue)](https://thesmoketeam.github.io/qaas-docs/)
 [![.NET](https://img.shields.io/badge/.NET-10.0-512BD4)](https://dotnet.microsoft.com/)
 
