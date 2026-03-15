@@ -20,6 +20,7 @@ env:
   DOTNET_CLI_TELEMETRY_OPTOUT: true
   CONFIGURATION: Release
   PROJECT_PATH: QaaS.Runner.sln
+  COVERAGE_SOLUTION_PATH: QaaS.Runner.sln
   PACKAGE_OUTPUT_DIRECTORY: ${{ github.workspace }}\BuildOutput
   RESTORED_PACKAGES_PATH: ${{ github.workspace }}\RestoredPackages
   COVERAGE_RESULTS_DIRECTORY: ${{ github.workspace }}\CoverageResults
@@ -78,6 +79,71 @@ jobs:
       - name: Build project
         run: dotnet build ${{ env.PROJECT_PATH }} --no-restore --configuration ${{ env.CONFIGURATION }}
 
+      - name: Resolve coverage scope
+        shell: pwsh
+        run: |
+          function Get-AssemblyName([string]$projectPath) {
+            [xml]$project = Get-Content $projectPath
+            $assemblyName = @($project.Project.PropertyGroup.AssemblyName | Where-Object { -not [string]::IsNullOrWhiteSpace($_) }) | Select-Object -First 1
+            if ([string]::IsNullOrWhiteSpace($assemblyName)) {
+              $assemblyName = [System.IO.Path]::GetFileNameWithoutExtension($projectPath)
+            }
+
+            return [string]$assemblyName
+          }
+
+          function Test-IsTestProject([string]$projectPath) {
+            $projectName = [System.IO.Path]::GetFileNameWithoutExtension($projectPath)
+            if ($projectName -like '*.Tests' -or $projectName -like '*.E2ETests') {
+              return $true
+            }
+
+            [xml]$project = Get-Content $projectPath
+            $isTestProject = @($project.Project.PropertyGroup.IsTestProject | Where-Object {
+              $_ -and $_.Trim().Equals('true', [System.StringComparison]::OrdinalIgnoreCase)
+            }).Count -gt 0
+            if ($isTestProject) {
+              return $true
+            }
+
+            return @($project.Project.ItemGroup.PackageReference | Where-Object {
+              $_.Include -eq 'Microsoft.NET.Test.Sdk'
+            }).Count -gt 0
+          }
+
+          $solutionEntries = dotnet sln "${{ env.COVERAGE_SOLUTION_PATH }}" list
+          if ($LASTEXITCODE -ne 0) {
+            throw "Unable to list projects for coverage scope."
+          }
+
+          $projectPaths = $solutionEntries | Select-Object -Skip 2 | Where-Object {
+            -not [string]::IsNullOrWhiteSpace($_)
+          } | ForEach-Object {
+            Join-Path $env:GITHUB_WORKSPACE $_.Trim()
+          }
+
+          $assemblyNames = foreach ($projectPath in $projectPaths) {
+            if (-not (Test-Path $projectPath)) {
+              throw "Coverage scope project '$projectPath' was not found."
+            }
+
+            if (Test-IsTestProject $projectPath) {
+              continue
+            }
+
+            Get-AssemblyName $projectPath
+          }
+
+          $assemblyNames = $assemblyNames | Sort-Object -Unique
+          if (@($assemblyNames).Count -eq 0) {
+            throw "No non-test solution assemblies were resolved for coverage."
+          }
+
+          $assemblyFilters = ($assemblyNames | ForEach-Object { "+$_" }) -join ';'
+          Add-Content -Path $env:GITHUB_ENV -Value "COVERAGE_ASSEMBLY_FILTERS=$assemblyFilters"
+          Add-Content -Path $env:GITHUB_ENV -Value "COVERAGE_INCLUDED_ASSEMBLIES=$($assemblyNames -join ', ')"
+          Write-Host "Coverage assemblies: $($assemblyNames -join ', ')"
+
       - name: Collect coverage
         shell: pwsh
         run: |
@@ -88,7 +154,17 @@ jobs:
         shell: pwsh
         run: |
           New-Item -ItemType Directory -Path "${{ env.COVERAGE_REPORT_DIRECTORY }}" -Force | Out-Null
-          reportgenerator "-reports:${{ env.COVERAGE_RESULTS_PATH }}" "-targetdir:${{ env.COVERAGE_REPORT_DIRECTORY }}" "-reporttypes:Html;MarkdownSummaryGithub;Cobertura" "-assemblyfilters:+*;-*.Tests"
+          reportgenerator "-reports:${{ env.COVERAGE_RESULTS_PATH }}" "-targetdir:${{ env.COVERAGE_REPORT_DIRECTORY }}" "-reporttypes:Html;MarkdownSummaryGithub;Cobertura" "-assemblyfilters:$env:COVERAGE_ASSEMBLY_FILTERS" "-verbosity:Error"
+
+      - name: Log coverage totals
+        shell: pwsh
+        run: |
+          [xml]$coverage = Get-Content "${{ env.FILTERED_COVERAGE_RESULTS_PATH }}"
+          $linePercent = [math]::Round([double]$coverage.coverage.'line-rate' * 100, 1)
+          $branchPercent = [math]::Round([double]$coverage.coverage.'branch-rate' * 100, 1)
+          Write-Host "Solution line coverage (excluding test projects): $linePercent%"
+          Write-Host "Solution branch coverage (excluding test projects): $branchPercent%"
+          Write-Host "Included assemblies: $env:COVERAGE_INCLUDED_ASSEMBLIES"
 
       - name: Publish coverage job summary
         shell: pwsh
