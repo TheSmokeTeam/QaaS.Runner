@@ -160,6 +160,8 @@ jobs:
             --no-restore --no-build `
             --configuration ${{ env.CONFIGURATION }} `
             --include-symbols `
+            -p:DebugType=portable `
+            -p:SymbolPackageFormat=snupkg `
             -p:PackageVersion=${{ steps.stable_tag.outputs.tag }} `
             --output ${{ env.PACKAGE_OUTPUT_DIRECTORY }}
 
@@ -190,6 +192,15 @@ jobs:
       - name: Push package
         if: steps.stable_tag.outputs.is_stable_tag == 'true'
         run: dotnet nuget push ${{ env.PACKAGE_OUTPUT_DIRECTORY }}\*.nupkg -k ${{ secrets.NUGET_AUTH_TOKEN }} -s https://api.nuget.org/v3/index.json --skip-duplicate
+
+      - name: Push symbol package
+        if: steps.stable_tag.outputs.is_stable_tag == 'true'
+        shell: pwsh
+        run: |
+          $symbolPackages = Get-ChildItem "${{ env.PACKAGE_OUTPUT_DIRECTORY }}" -Filter "*.snupkg" -File
+          foreach ($package in $symbolPackages) {
+            dotnet nuget push $package.FullName -k ${{ secrets.NUGET_AUTH_TOKEN }} -s https://api.nuget.org/v3/index.json --skip-duplicate
+          }
 
       - name: Write restored packages metadata
         if: steps.stable_tag.outputs.is_stable_tag == 'true'
