@@ -81,7 +81,7 @@ jobs:
         shell: pwsh
         run: |
           New-Item -ItemType Directory -Path "${{ env.COVERAGE_RESULTS_DIRECTORY }}" -Force | Out-Null
-          dotnet-coverage collect --mode xml -f cobertura -o "${{ env.COVERAGE_RESULTS_PATH }}" dotnet test ${{ env.PROJECT_PATH }} --configuration ${{ env.CONFIGURATION }} --no-restore --no-build --maxcpucount
+          dotnet-coverage collect dotnet test ${{ env.PROJECT_PATH }} --configuration ${{ env.CONFIGURATION }} --no-restore --no-build --maxcpucount --mode xml -f cobertura -o "${{ env.COVERAGE_RESULTS_PATH }}"
 
       - name: Generate coverage reports
         shell: pwsh
