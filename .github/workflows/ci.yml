@@ -108,8 +108,10 @@ jobs:
           GIST_ID: ${{ secrets.GIST_ID }}
           GIST_TOKEN: ${{ secrets.GIST_TOKEN }}
         run: |
-          $gistId = $env:GIST_ID.Trim()
-          $gistToken = $env:GIST_TOKEN.Trim()
+          $rawGistId = if ($null -eq $env:GIST_ID) { '' } else { $env:GIST_ID }
+          $rawGistToken = if ($null -eq $env:GIST_TOKEN) { '' } else { $env:GIST_TOKEN }
+          $gistId = -join ($rawGistId.ToCharArray() | Where-Object { [int][char]$_ -ge 33 -and [int][char]$_ -le 126 })
+          $gistToken = -join ($rawGistToken.ToCharArray() | Where-Object { [int][char]$_ -ge 33 -and [int][char]$_ -le 126 })
 
           if ([string]::IsNullOrWhiteSpace($gistId) -or [string]::IsNullOrWhiteSpace($gistToken)) {
             Write-Host "Gist secrets are not configured. Skipping badge update."
