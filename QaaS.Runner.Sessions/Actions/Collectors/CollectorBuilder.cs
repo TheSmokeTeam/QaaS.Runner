@@ -11,6 +11,7 @@ using QaaS.Framework.SDK.Session.SessionDataObjects;
 using QaaS.Runner.Infrastructure;
 using QaaS.Runner.Sessions.ConfigurationObjects;
 using QaaS.Runner.Sessions.Extensions;
+using QaaS.Runner.Sessions.Testing;
 
 namespace QaaS.Runner.Sessions.Actions.Collectors;
 
@@ -141,7 +142,9 @@ public class CollectorBuilder
             context.Logger.LogDebugWithMetaData("Started building Collector of type {type}",
                 context.GetMetaDataOrDefault(), new object?[] { collectorTypeName });
 
-            var fetcher = FetcherFactory.CreateFetcher(type, context.Logger);
+            var factoryRequest = new CollectorFactoryRequest(Name!, type, context.Logger);
+            var fetcher = context.GetSessionActionFactoryOverrides()?.CollectorFactory?.Invoke(factoryRequest)
+                          ?? FetcherFactory.CreateFetcher(type, context.Logger);
             
             return new Collector(Name!, fetcher, DataFilter, CollectionRange.StartTimeMs, CollectionRange.EndTimeMs,
                 EndTimeReachedCheckIntervalMs, context.Logger);

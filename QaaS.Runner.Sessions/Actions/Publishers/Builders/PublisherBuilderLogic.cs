@@ -19,6 +19,7 @@ using QaaS.Framework.Serialization;
 using QaaS.Runner.Infrastructure;
 using QaaS.Runner.Sessions.ConfigurationObjects;
 using QaaS.Runner.Sessions.Extensions;
+using QaaS.Runner.Sessions.Testing;
 using Parallel = QaaS.Runner.Sessions.ConfigurationObjects.Parallel;
 
 namespace QaaS.Runner.Sessions.Actions.Publishers.Builders;
@@ -329,7 +330,10 @@ public partial class PublisherBuilder
             type = allTypes.FirstOrDefault(configuredType => configuredType != null) ??
                    throw new InvalidOperationException($"Missing supported type in publisher {Name}");
             
-            var (sender, chunkSender) = SenderFactory.CreateSender(Chunk != null, type, context.Logger, DataFilter);
+            var factoryRequest = new PublisherFactoryRequest(Name!, type, Chunk != null, context.Logger, DataFilter);
+            var (sender, chunkSender) = context.GetSessionActionFactoryOverrides()?.PublisherFactory
+                                           ?.Invoke(factoryRequest)
+                                       ?? SenderFactory.CreateSender(Chunk != null, type, context.Logger, DataFilter);
             var publisherTypeName = sender?.GetType().Name ?? chunkSender?.GetType().Name ?? "Unknown";
             
             context.Logger.LogDebugWithMetaData("Started building Publisher of type {type}",

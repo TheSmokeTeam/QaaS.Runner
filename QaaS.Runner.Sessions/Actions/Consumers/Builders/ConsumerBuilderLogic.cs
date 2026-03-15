@@ -16,6 +16,7 @@ using QaaS.Framework.SDK.Session.SessionDataObjects;
 using QaaS.Framework.Serialization;
 using QaaS.Runner.Infrastructure;
 using QaaS.Runner.Sessions.Extensions;
+using QaaS.Runner.Sessions.Testing;
 using InvalidOperationException = System.InvalidOperationException;
 
 namespace QaaS.Runner.Sessions.Actions.Consumers.Builders;
@@ -220,7 +221,9 @@ public partial class ConsumerBuilder
             type = allTypes.FirstOrDefault(configuredType => configuredType != null) ??
                    throw new InvalidOperationException($"Missing supported type in consumer {Name}");
 
-            var (reader, chunkReader) = ReaderFactory.CreateReader(type, context.Logger, DataFilter);
+            var factoryRequest = new ConsumerFactoryRequest(Name!, type, context.Logger, DataFilter);
+            var (reader, chunkReader) = context.GetSessionActionFactoryOverrides()?.ConsumerFactory?.Invoke(factoryRequest)
+                                        ?? ReaderFactory.CreateReader(type, context.Logger, DataFilter);
             var consumerTypeName = reader?.GetType().Name ?? chunkReader?.GetType().Name ?? "Unknown";
             
             context.Logger.LogDebugWithMetaData("Started building Consumer of type {type}",

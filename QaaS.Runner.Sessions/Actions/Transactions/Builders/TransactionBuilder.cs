@@ -13,6 +13,7 @@ using QaaS.Framework.SDK.Session.SessionDataObjects;
 using QaaS.Framework.Serialization;
 using QaaS.Runner.Sessions.ConfigurationObjects;
 using QaaS.Runner.Sessions.Extensions;
+using QaaS.Runner.Sessions.Testing;
 
 namespace QaaS.Runner.Sessions.Actions.Transactions.Builders;
 
@@ -341,7 +342,9 @@ public class TransactionBuilder
             var timeout = TimeSpan.FromMilliseconds(TimeoutMs!.Value);
             var deserializerSpecificType = OutputDeserialize?.SpecificType?.GetConfiguredType();
 
-            var transactor = TransactorFactory.CreateTransactor(type, context.Logger, timeout);
+            var factoryRequest = new TransactionFactoryRequest(Name!, type, context.Logger, timeout);
+            var transactor = context.GetSessionActionFactoryOverrides()?.TransactionFactory?.Invoke(factoryRequest)
+                             ?? TransactorFactory.CreateTransactor(type, context.Logger, timeout);
 
             return new Transaction(Name!, transactor, Stage, InputDataFilter, OutputDataFilter,
                 PolicyBuilder.BuildPolicies(Policies), Loop, Iterations, SleepTimeMs,

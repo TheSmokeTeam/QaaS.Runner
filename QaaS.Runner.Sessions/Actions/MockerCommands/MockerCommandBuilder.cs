@@ -5,8 +5,10 @@ using QaaS.Framework.SDK.Extensions;
 using Qaas.Mocker.CommunicationObjects.ConfigurationObjects.Command;
 using QaaS.Framework.SDK.Session.SessionDataObjects;
 using QaaS.Runner.Infrastructure;
+using QaaS.Runner.Sessions.Actions;
 using QaaS.Runner.Sessions.ConfigurationObjects;
 using QaaS.Runner.Sessions.Extensions;
+using QaaS.Runner.Sessions.Testing;
 
 namespace QaaS.Runner.Sessions.Actions.MockerCommands;
 
@@ -137,7 +139,7 @@ public class MockerCommandBuilder
     /// <summary>
     /// Builds the configured mocker command type and writes recoverable build failures to <paramref name="actionFailures"/>.
     /// </summary>
-    internal MockerCommand? Build(InternalContext context, IList<ActionFailure> actionFailures, string sessionName)
+    internal StagedAction? Build(InternalContext context, IList<ActionFailure> actionFailures, string sessionName)
     {
         object? type = null;
         try
@@ -163,7 +165,11 @@ public class MockerCommandBuilder
             context.Logger.LogDebugWithMetaData("Started building MockerCommand of type {type}",
                 context.GetMetaDataOrDefault(), new object?[] { commandTypeName });
 
-            return type switch
+            var factoryRequest = new MockerCommandFactoryRequest(Name!, Stage, type, Command, Redis!, ServerName!,
+                RequestDurationMs, RequestRetries, context.Logger);
+
+            return context.GetSessionActionFactoryOverrides()?.MockerCommandFactory?.Invoke(factoryRequest) ?? type
+                switch
             {
                 ChangeActionStub => new ChangeActionStubMockerCommand(Name!, Stage,
                     Command.ChangeActionStub!, Redis!, ServerName!,
