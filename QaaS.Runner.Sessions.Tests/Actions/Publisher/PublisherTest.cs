@@ -23,6 +23,7 @@ namespace QaaS.Runner.Sessions.Tests.Actions.Publisher;
 [TestFixture]
 public class PublisherTest
 {
+    private const int DefaultTestMessagesPerSecond = 100_000;
     private static Mock<ISender>? _sender;
     private static Mock<IChunkSender>? _chunkSender;
     private static List<Data<object>> _infoSent = [];
@@ -31,7 +32,7 @@ public class PublisherTest
         string[]? dsPatterns,
         string[]? dsNames,
         int maxAmountOfMessages,
-        int msgPerSec = 100)
+        int msgPerSec = DefaultTestMessagesPerSecond)
     {
         _infoSent = CreationalFunctions.InitSender(ref _sender!);
 
@@ -153,7 +154,7 @@ public class PublisherTest
         CollectionAssert.AreEquivalent(expectedDataContent, receivedDataContent);
     }
 
-    private const int TimeoutMsForWork = 100;
+    private const int TimeoutMsForWork = 10;
 
     private readonly FieldInfo _iterableSerializableSaveIteratorField =
         typeof(Sessions.Actions.Publishers.Publisher).GetField("IterableSerializableSaveIterator",
@@ -304,7 +305,7 @@ public class PublisherTest
             {
                 var body = sentData.Body!.ToString()!;
                 var index = int.Parse(body.Split('-')[1]);
-                Thread.Sleep((dataToPublish.Length - index) * 10);
+                Thread.Sleep((dataToPublish.Length - index) * 2);
                 return new DetailedData<object>
                 {
                     Body = sentData.Body,

@@ -6,6 +6,7 @@ using System.Globalization;
 using System.Net.Sockets;
 using System.Reflection;
 using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Logging.Abstractions;
 using Moq;
 using NUnit.Framework;
 using QaaS.Framework.Protocols.ConfigurationObjects;
@@ -56,6 +57,8 @@ namespace QaaS.Runner.Tests.SessionTests;
 [FixtureLifeCycle(LifeCycle.InstancePerTestCase)]
 public class SessionExecutionCoverageTests
 {
+    private const int MinimalActionTimeoutMs = 1;
+    private const int MinimalMockerRequestDurationMs = 1;
     private static readonly MethodInfo BuildContextMethodInfo = typeof(RunLoader<Runner, RunOptions>).GetMethod(
         "BuildContext", BindingFlags.NonPublic | BindingFlags.Instance)!;
 
@@ -89,7 +92,7 @@ public class SessionExecutionCoverageTests
 
         var sessionBuilder = source == ScenarioSource.Code
             ? CreateCodeSessionBuilder(scenario)
-            : CreateYamlSessionBuilder(context, scenario.Name);
+            : CreateYamlSessionBuilder(context, scenario);
 
         var session = sessionBuilder.Build(context, []);
         var sessionData = session.Run(context.ExecutionData);
@@ -115,7 +118,7 @@ public class SessionExecutionCoverageTests
 
         var sessionBuilder = source == ScenarioSource.Code
             ? CreateCodeSessionBuilder(scenario)
-            : CreateYamlSessionBuilder(context, scenario.Name);
+            : CreateYamlSessionBuilder(context, scenario);
 
         var session = sessionBuilder.Build(context, []);
         var sessionData = session.Run(context.ExecutionData);
@@ -154,7 +157,7 @@ public class SessionExecutionCoverageTests
 
         var sessionBuilder = source == ScenarioSource.Code
             ? CreateCodeSessionBuilder(scenario)
-            : CreateYamlSessionBuilder(context, scenario.Name);
+            : CreateYamlSessionBuilder(context, scenario);
 
         var session = sessionBuilder.Build(context, []);
         var sessionData = session.Run(context.ExecutionData);
@@ -637,7 +640,7 @@ public class SessionExecutionCoverageTests
     {
         var context = new InternalContext
         {
-            Logger = Globals.Logger,
+            Logger = NullLogger.Instance,
             RootConfiguration = new ConfigurationBuilder().Build(),
             InternalRunningSessions = new RunningSessions(new Dictionary<string, RunningSessionData<object, object>>()),
             InternalGlobalDict = new Dictionary<string, object?>(),
@@ -675,7 +678,7 @@ public class SessionExecutionCoverageTests
                 [Guid.NewGuid().ToString("N"), null, null])!;
             return new InternalContext
             {
-                Logger = loadedContext.Logger,
+                Logger = NullLogger.Instance,
                 RootConfiguration = loadedContext.RootConfiguration,
                 ExecutionId = loadedContext.ExecutionId,
                 CaseName = loadedContext.CaseName,
@@ -759,7 +762,7 @@ public class SessionExecutionCoverageTests
         {
             var consumerBuilder = new ConsumerBuilder()
                 .Named(scenario.Consumer.ActionName)
-                .WithTimeout(1000)
+                .WithTimeout(MinimalActionTimeoutMs)
                 .Configure(scenario.Consumer.Configuration);
 
             if (scenario.Consumer.UseBinarySerialization)
@@ -774,7 +777,7 @@ public class SessionExecutionCoverageTests
         {
             var transactionBuilder = new TransactionBuilder()
                 .Named(scenario.Transaction.ActionName)
-                .WithTimeout(1000)
+                .WithTimeout(MinimalActionTimeoutMs)
                 .WithIterations(scenario.Transaction.Iterations)
                 .Configure(scenario.Transaction.Configuration);
 
@@ -816,18 +819,52 @@ public class SessionExecutionCoverageTests
                 .Named(scenario.Mocker.ActionName)
                 .WithServerName("test-server")
                 .WithRedis(new QaaS.Runner.Sessions.ConfigurationObjects.RedisConfig { Host = "localhost:6379" })
-                .WithRequestDurationMs(10)
+                .WithRequestDurationMs(MinimalMockerRequestDurationMs)
                 .WithRequestRetries(1)
                 .WithCommand(scenario.Mocker.Command));
         }
 
+        ApplyZeroTimeoutStageConfiguration(builder, scenario);
         return builder;
     }
 
-    private static SessionBuilder CreateYamlSessionBuilder(InternalContext context, string sessionName)
+    private static void ApplyZeroTimeoutStageConfiguration(SessionBuilder builder, SessionScenarioDefinition scenario)
+    {
+        foreach (var stageNumber in GetUsedActionStages(scenario))
+        {
+            builder.AddStage(new StageConfig(stageNumber, timeoutBefore: 0, timeoutAfter: 0));
+        }
+    }
+
+    private static IEnumerable<int> GetUsedActionStages(SessionScenarioDefinition scenario)
+    {
+        if (scenario.Consumer != null)
+        {
+            yield return 0;
+        }
+
+        if (scenario.Publisher != null)
+        {
+            yield return 1;
+        }
+
+        if (scenario.Transaction != null)
+        {
+            yield return 2;
+        }
+
+        if (scenario.Mocker != null)
+        {
+            yield return 4;
+        }
+    }
+
+    private static SessionBuilder CreateYamlSessionBuilder(InternalContext context, SessionScenarioDefinition scenario)
     {
         var executionBuilder = new ExecutionBuilder(context, ExecutionType.Act, null, null, null, null);
-        return executionBuilder.ReadSessions().Single(session => session.Name == sessionName);
+        var builder = executionBuilder.ReadSessions().Single(session => session.Name == scenario.Name);
+        ApplyZeroTimeoutStageConfiguration(builder, scenario);
+        return builder;
     }
 
     private static SessionActionFactoryOverrides CreateFactoryOverrides(MockRuntimeRegistry registry,
@@ -1211,7 +1248,7 @@ public class SessionExecutionCoverageTests
             {
                 lines.Add("    Consumers:");
                 lines.Add($"      - Name: \"{scenario.Consumer.ActionName}\"");
-                lines.Add("        TimeoutMs: 1000");
+                lines.Add($"        TimeoutMs: {MinimalActionTimeoutMs}");
                 if (scenario.Consumer.UseBinarySerialization)
                 {
                     lines.Add("        Deserialize:");
@@ -1225,7 +1262,7 @@ public class SessionExecutionCoverageTests
             {
                 lines.Add("    Transactions:");
                 lines.Add($"      - Name: \"{scenario.Transaction.ActionName}\"");
-                lines.Add("        TimeoutMs: 1000");
+                lines.Add($"        TimeoutMs: {MinimalActionTimeoutMs}");
                 lines.Add($"        Iterations: {scenario.Transaction.Iterations}");
                 if (scenario.Transaction.UseDataSourcePatterns)
                 {
@@ -1269,7 +1306,7 @@ public class SessionExecutionCoverageTests
                 lines.Add("        ServerName: \"test-server\"");
                 lines.Add("        Redis:");
                 lines.Add("          Host: \"localhost:6379\"");
-                lines.Add("        RequestDurationMs: 10");
+                lines.Add($"        RequestDurationMs: {MinimalMockerRequestDurationMs}");
                 lines.Add("        RequestRetries: 1");
                 lines.AddRange(ToYamlLines("Command", scenario.Mocker.Command, 8));
             }

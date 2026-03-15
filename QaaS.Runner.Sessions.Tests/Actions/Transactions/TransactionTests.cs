@@ -18,6 +18,7 @@ namespace QaaS.Runner.Sessions.Tests.Actions.Transactions;
 [TestFixture]
 public class TransactionTests
 {
+    private const int DefaultTestMessagesPerSecond = 100_000;
     private static Mock<ITransactor> _transactor = null!;
     private static List<Data<object>> _infoSent = null!;
 
@@ -56,7 +57,7 @@ public class TransactionTests
         string[]? dsNames,
         int numberOfIterations,
         string dataToGet,
-        int msgPerSec = 100)
+        int msgPerSec = DefaultTestMessagesPerSecond)
     {
         _infoSent = CreationalFunctions.InitTransactor(ref _transactor!, dataToGet);
 

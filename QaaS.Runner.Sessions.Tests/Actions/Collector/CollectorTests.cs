@@ -1,6 +1,7 @@
 using System;
 using System.Diagnostics;
 using System.Linq;
+using Microsoft.Extensions.Logging.Abstractions;
 using Moq;
 using NUnit.Framework;
 using NUnit.Framework.Legacy;
@@ -8,9 +9,6 @@ using QaaS.Framework.Protocols.Protocols;
 using QaaS.Framework.SDK.Session;
 using QaaS.Framework.SDK.Session.DataObjects;
 using QaaS.Framework.SDK.Session.MetaDataObjects;
-using Serilog;
-using Serilog.Events;
-using Serilog.Extensions.Logging;
 
 namespace QaaS.Runner.Sessions.Tests.Actions.Collector;
 
@@ -39,24 +37,21 @@ public class CollectorTests
             new DataFilter {Body = true, Timestamp = false, MetaData = false},
             0,
             endTimeOffset,
-            0,
-            new SerilogLoggerFactory(new LoggerConfiguration().MinimumLevel
-                .Is(LogEventLevel.Information).WriteTo
-                .Console().CreateLogger()).CreateLogger("DefaultLogger"));
+            1,
+            NullLogger.Instance);
         collector.SetCollectionTimes(sessionTime, sessionTime.AddSeconds(sessionLength));
         return collector;
     }
 
     [Test]
-    public void
-        TestAct_ReceivesDataFilterOfReturnOnlyBodyAnd1000MilliCollectionEndTimeOffset_WillReturnOnlyTheBodyWithADelayOfRoughly1000MilliSeconds()
+    public void TestAct_WaitsUntilCollectionEndTime_AndReturnsFilteredBodies()
     {
         // Arrange
         InitFetcher();
-        const int endTimeOffset = 5000;
+        const int endTimeOffset = 50;
         var sw = Stopwatch.StartNew();
         var sessionStartTime = DateTime.UtcNow;
-        const int sessionLength = 1;
+        const int sessionLength = 0;
         var collector = InitCollector(_fetcher!.Object, endTimeOffset, sessionStartTime , sessionLength);
 
         // Act
