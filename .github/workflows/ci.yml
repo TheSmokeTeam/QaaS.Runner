@@ -108,7 +108,10 @@ jobs:
           GIST_ID: ${{ secrets.GIST_ID }}
           GIST_TOKEN: ${{ secrets.GIST_TOKEN }}
         run: |
-          if ([string]::IsNullOrWhiteSpace($env:GIST_ID) -or [string]::IsNullOrWhiteSpace($env:GIST_TOKEN)) {
+          $gistId = $env:GIST_ID.Trim()
+          $gistToken = $env:GIST_TOKEN.Trim()
+
+          if ([string]::IsNullOrWhiteSpace($gistId) -or [string]::IsNullOrWhiteSpace($gistToken)) {
             Write-Host "Gist secrets are not configured. Skipping badge update."
             exit 0
           }
@@ -133,12 +136,12 @@ jobs:
           } | ConvertTo-Json -Depth 5
 
           $headers = @{
-            Authorization = "Bearer $env:GIST_TOKEN"
+            Authorization = "Bearer $gistToken"
             Accept = "application/vnd.github+json"
             "X-GitHub-Api-Version" = "2022-11-28"
           }
 
-          Invoke-RestMethod -Uri "https://api.github.com/gists/$($env:GIST_ID)" -Method Patch -Headers $headers -ContentType "application/json" -Body $gistBody | Out-Null
+          Invoke-RestMethod -Uri "https://api.github.com/gists/$gistId" -Method Patch -Headers $headers -ContentType "application/json" -Body $gistBody | Out-Null
 
       - name: Upload coverage report artifact
         uses: actions/upload-artifact@v4
