@@ -180,6 +180,7 @@ jobs:
           Get-Content $summaryFile.FullName | Add-Content -Path $env:GITHUB_STEP_SUMMARY
 
       - name: Update coverage gist badge
+        if: github.event_name == 'push' && github.ref == 'refs/heads/master'
         shell: pwsh
         env:
           GIST_ID: ${{ secrets.GIST_ID }}
