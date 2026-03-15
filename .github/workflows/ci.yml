@@ -20,8 +20,13 @@ env:
   DOTNET_CLI_TELEMETRY_OPTOUT: true
   CONFIGURATION: Release
   PROJECT_PATH: QaaS.Runner.sln
+  COVERAGE_SOLUTION_PATH: QaaS.Runner.sln
   PACKAGE_OUTPUT_DIRECTORY: ${{ github.workspace }}\BuildOutput
   RESTORED_PACKAGES_PATH: ${{ github.workspace }}\RestoredPackages
+  COVERAGE_RESULTS_DIRECTORY: ${{ github.workspace }}\CoverageResults
+  COVERAGE_RESULTS_PATH: ${{ github.workspace }}\CoverageResults\coverage.xml
+  COVERAGE_REPORT_DIRECTORY: ${{ github.workspace }}\CoverageReport
+  FILTERED_COVERAGE_RESULTS_PATH: ${{ github.workspace }}\CoverageReport\Cobertura.xml
 
 jobs:
   build-test-deploy:
@@ -47,14 +52,200 @@ jobs:
             echo "is_stable_tag=false" >> "$GITHUB_OUTPUT"
           fi
 
+      - name: Install coverage tools
+        shell: pwsh
+        run: |
+          dotnet tool update --global dotnet-coverage
+          if ($LASTEXITCODE -ne 0) {
+            dotnet tool install --global dotnet-coverage
+            if ($LASTEXITCODE -ne 0) {
+              throw "Unable to install dotnet-coverage."
+            }
+          }
+
+          dotnet tool update --global dotnet-reportgenerator-globaltool
+          if ($LASTEXITCODE -ne 0) {
+            dotnet tool install --global dotnet-reportgenerator-globaltool
+            if ($LASTEXITCODE -ne 0) {
+              throw "Unable to install dotnet-reportgenerator-globaltool."
+            }
+          }
+
+          Add-Content -Path $env:GITHUB_PATH -Value "$env:USERPROFILE\.dotnet\tools"
+
       - name: Restore packages
         run: dotnet restore ${{ env.PROJECT_PATH }} --packages ${{ env.RESTORED_PACKAGES_PATH }}
 
       - name: Build project
         run: dotnet build ${{ env.PROJECT_PATH }} --no-restore --configuration ${{ env.CONFIGURATION }}
 
-      - name: Test solution
-        run: dotnet test ${{ env.PROJECT_PATH }} --configuration ${{ env.CONFIGURATION }} --no-restore --no-build --maxcpucount
+      - name: Resolve coverage scope
+        shell: pwsh
+        run: |
+          function Get-AssemblyName([string]$projectPath) {
+            [xml]$project = Get-Content $projectPath
+            $assemblyName = @($project.Project.PropertyGroup.AssemblyName | Where-Object { -not [string]::IsNullOrWhiteSpace($_) }) | Select-Object -First 1
+            if ([string]::IsNullOrWhiteSpace($assemblyName)) {
+              $assemblyName = [System.IO.Path]::GetFileNameWithoutExtension($projectPath)
+            }
+
+            return [string]$assemblyName
+          }
+
+          function Test-IsTestProject([string]$projectPath) {
+            $projectName = [System.IO.Path]::GetFileNameWithoutExtension($projectPath)
+            if ($projectName -like '*.Tests' -or $projectName -like '*.E2ETests') {
+              return $true
+            }
+
+            [xml]$project = Get-Content $projectPath
+            $isTestProject = @($project.Project.PropertyGroup.IsTestProject | Where-Object {
+              $_ -and $_.Trim().Equals('true', [System.StringComparison]::OrdinalIgnoreCase)
+            }).Count -gt 0
+            if ($isTestProject) {
+              return $true
+            }
+
+            return @($project.Project.ItemGroup.PackageReference | Where-Object {
+              $_.Include -eq 'Microsoft.NET.Test.Sdk'
+            }).Count -gt 0
+          }
+
+          $solutionEntries = dotnet sln "${{ env.COVERAGE_SOLUTION_PATH }}" list
+          if ($LASTEXITCODE -ne 0) {
+            throw "Unable to list projects for coverage scope."
+          }
+
+          $projectPaths = $solutionEntries | Select-Object -Skip 2 | Where-Object {
+            -not [string]::IsNullOrWhiteSpace($_)
+          } | ForEach-Object {
+            Join-Path $env:GITHUB_WORKSPACE $_.Trim()
+          }
+
+          $assemblyNames = foreach ($projectPath in $projectPaths) {
+            if (-not (Test-Path $projectPath)) {
+              throw "Coverage scope project '$projectPath' was not found."
+            }
+
+            if (Test-IsTestProject $projectPath) {
+              continue
+            }
+
+            Get-AssemblyName $projectPath
+          }
+
+          $assemblyNames = $assemblyNames | Sort-Object -Unique
+          if (@($assemblyNames).Count -eq 0) {
+            throw "No non-test solution assemblies were resolved for coverage."
+          }
+
+          $assemblyFilters = ($assemblyNames | ForEach-Object { "+$_" }) -join ';'
+          Add-Content -Path $env:GITHUB_ENV -Value "COVERAGE_ASSEMBLY_FILTERS=$assemblyFilters"
+          Add-Content -Path $env:GITHUB_ENV -Value "COVERAGE_INCLUDED_ASSEMBLIES=$($assemblyNames -join ', ')"
+          Write-Host "Coverage assemblies: $($assemblyNames -join ', ')"
+
+      - name: Collect coverage
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Path "${{ env.COVERAGE_RESULTS_DIRECTORY }}" -Force | Out-Null
+          dotnet-coverage collect dotnet test ${{ env.PROJECT_PATH }} --configuration ${{ env.CONFIGURATION }} --no-restore --no-build --maxcpucount -f cobertura -o "${{ env.COVERAGE_RESULTS_PATH }}"
+
+      - name: Generate coverage reports
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Path "${{ env.COVERAGE_REPORT_DIRECTORY }}" -Force | Out-Null
+          reportgenerator "-reports:${{ env.COVERAGE_RESULTS_PATH }}" "-targetdir:${{ env.COVERAGE_REPORT_DIRECTORY }}" "-reporttypes:Html;MarkdownSummaryGithub;Cobertura" "-assemblyfilters:$env:COVERAGE_ASSEMBLY_FILTERS" "-verbosity:Error"
+
+      - name: Log coverage totals
+        shell: pwsh
+        run: |
+          [xml]$coverage = Get-Content "${{ env.FILTERED_COVERAGE_RESULTS_PATH }}"
+          $linePercent = [math]::Round([double]$coverage.coverage.'line-rate' * 100, 1)
+          $branchPercent = [math]::Round([double]$coverage.coverage.'branch-rate' * 100, 1)
+          Write-Host "Solution line coverage (excluding test projects): $linePercent%"
+          Write-Host "Solution branch coverage (excluding test projects): $branchPercent%"
+          Write-Host "Included assemblies: $env:COVERAGE_INCLUDED_ASSEMBLIES"
+
+      - name: Publish coverage job summary
+        shell: pwsh
+        run: |
+          $summaryFile = Get-ChildItem "${{ env.COVERAGE_REPORT_DIRECTORY }}" -File | Where-Object {
+            $_.Name -like "Summary*.md"
+          } | Select-Object -First 1
+
+          if ($null -eq $summaryFile) {
+            throw "Coverage summary markdown file was not generated."
+          }
+
+          Get-Content $summaryFile.FullName | Add-Content -Path $env:GITHUB_STEP_SUMMARY
+
+      - name: Update coverage gist badge
+        if: github.ref == 'refs/heads/master'
+        shell: pwsh
+        env:
+          GIST_ID: ${{ secrets.GIST_ID }}
+          GIST_TOKEN: ${{ secrets.GIST_TOKEN }}
+        run: |
+          $rawGistId = if ($null -eq $env:GIST_ID) { '' } else { $env:GIST_ID }
+          $rawGistToken = if ($null -eq $env:GIST_TOKEN) { '' } else { $env:GIST_TOKEN }
+          $gistId = -join ($rawGistId.ToCharArray() | Where-Object { [int][char]$_ -ge 33 -and [int][char]$_ -le 126 })
+          $gistToken = -join ($rawGistToken.ToCharArray() | Where-Object { [int][char]$_ -ge 33 -and [int][char]$_ -le 126 })
+
+          if ([string]::IsNullOrWhiteSpace($gistId) -or [string]::IsNullOrWhiteSpace($gistToken)) {
+            Write-Host "Gist secrets are not configured. Skipping badge update."
+            exit 0
+          }
+
+          function Get-BadgeColor([double]$value) {
+            if ($value -ge 90) { return "brightgreen" }
+            if ($value -ge 75) { return "green" }
+            if ($value -ge 60) { return "yellow" }
+            if ($value -ge 40) { return "orange" }
+            return "red"
+          }
+
+          [xml]$coverage = Get-Content "${{ env.FILTERED_COVERAGE_RESULTS_PATH }}"
+          $linePercent = [math]::Round([double]$coverage.coverage.'line-rate' * 100, 1)
+          $branchPercent = [math]::Round([double]$coverage.coverage.'branch-rate' * 100, 1)
+          $lineColor = Get-BadgeColor $linePercent
+          $branchColor = Get-BadgeColor $branchPercent
+
+          $gistBody = @{
+            files = @{
+              "line-coverage-badge.json" = @{
+                content = (@{
+                  schemaVersion = 1
+                  label = "Line"
+                  message = "$linePercent%"
+                  color = $lineColor
+                } | ConvertTo-Json -Compress)
+              }
+              "branch-coverage-badge.json" = @{
+                content = (@{
+                  schemaVersion = 1
+                  label = "Branch"
+                  message = "$branchPercent%"
+                  color = $branchColor
+                } | ConvertTo-Json -Compress)
+              }
+            }
+          } | ConvertTo-Json -Depth 5
+
+          $headers = @{
+            Authorization = "Bearer $gistToken"
+            Accept = "application/vnd.github+json"
+            "X-GitHub-Api-Version" = "2022-11-28"
+          }
+
+          Invoke-RestMethod -Uri "https://api.github.com/gists/$gistId" -Method Patch -Headers $headers -ContentType "application/json" -Body $gistBody | Out-Null
+
+      - name: Upload coverage report artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-report
+          path: ${{ env.COVERAGE_REPORT_DIRECTORY }}
+          if-no-files-found: error
+          retention-days: 7
 
       - name: Pack project
         if: steps.stable_tag.outputs.is_stable_tag == 'true'
@@ -63,12 +254,47 @@ jobs:
             --no-restore --no-build `
             --configuration ${{ env.CONFIGURATION }} `
             --include-symbols `
+            -p:DebugType=portable `
+            -p:SymbolPackageFormat=snupkg `
             -p:PackageVersion=${{ steps.stable_tag.outputs.tag }} `
             --output ${{ env.PACKAGE_OUTPUT_DIRECTORY }}
+
+      - name: Stage packed packages in restored packages artifact
+        if: steps.stable_tag.outputs.is_stable_tag == 'true'
+        shell: pwsh
+        run: |
+          $pattern = '^(?<id>.+?)\.(?<version>\d+(?:\.\d+){1,3}(?:-[0-9A-Za-z][0-9A-Za-z.-]*)?(?:\+[0-9A-Za-z][0-9A-Za-z.-]*)?)\.(?<extension>nupkg|snupkg)$'
+          $packageFiles = Get-ChildItem "${{ env.PACKAGE_OUTPUT_DIRECTORY }}" -File | Where-Object {
+            $_.Extension -in '.nupkg', '.snupkg'
+          }
+
+          foreach ($packageFile in $packageFiles) {
+            $match = [regex]::Match($packageFile.Name, $pattern, [System.Text.RegularExpressions.RegexOptions]::IgnoreCase)
+            if (-not $match.Success) {
+              throw "Unable to determine package id and version from '$($packageFile.Name)'."
+            }
+
+            $packageId = $match.Groups['id'].Value.ToLowerInvariant()
+            $packageVersion = $match.Groups['version'].Value
+            $versionDirectory = Join-Path "${{ env.RESTORED_PACKAGES_PATH }}" $packageId
+            $versionDirectory = Join-Path $versionDirectory $packageVersion
+
+            New-Item -ItemType Directory -Path $versionDirectory -Force | Out-Null
+            Copy-Item $packageFile.FullName $versionDirectory -Force
+          }
 
       - name: Push package
         if: steps.stable_tag.outputs.is_stable_tag == 'true'
         run: dotnet nuget push ${{ env.PACKAGE_OUTPUT_DIRECTORY }}\*.nupkg -k ${{ secrets.NUGET_AUTH_TOKEN }} -s https://api.nuget.org/v3/index.json --skip-duplicate
+
+      - name: Push symbol package
+        if: steps.stable_tag.outputs.is_stable_tag == 'true'
+        shell: pwsh
+        run: |
+          $symbolPackages = Get-ChildItem "${{ env.PACKAGE_OUTPUT_DIRECTORY }}" -Filter "*.snupkg" -File
+          foreach ($package in $symbolPackages) {
+            dotnet nuget push $package.FullName -k ${{ secrets.NUGET_AUTH_TOKEN }} -s https://api.nuget.org/v3/index.json --skip-duplicate
+          }
 
       - name: Write restored packages metadata
         if: steps.stable_tag.outputs.is_stable_tag == 'true'
