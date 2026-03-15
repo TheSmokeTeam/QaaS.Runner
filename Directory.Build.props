@@ -1,5 +1,11 @@
 <Project>
   <PropertyGroup>
+    <DebugType>full</DebugType>
+    <DebugSymbols>true</DebugSymbols>
+    <DeterministicSourcePaths>true</DeterministicSourcePaths>
+  </PropertyGroup>
+
+  <PropertyGroup>
     <NoWarn>$(NoWarn);CS1591</NoWarn>
   </PropertyGroup>
 

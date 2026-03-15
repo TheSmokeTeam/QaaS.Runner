@@ -22,6 +22,9 @@ env:
   PROJECT_PATH: QaaS.Runner.sln
   PACKAGE_OUTPUT_DIRECTORY: ${{ github.workspace }}\BuildOutput
   RESTORED_PACKAGES_PATH: ${{ github.workspace }}\RestoredPackages
+  COVERAGE_RESULTS_DIRECTORY: ${{ github.workspace }}\CoverageResults
+  COVERAGE_RESULTS_PATH: ${{ github.workspace }}\CoverageResults\coverage.xml
+  COVERAGE_REPORT_DIRECTORY: ${{ github.workspace }}\CoverageReport
 
 jobs:
   build-test-deploy:
@@ -47,14 +50,103 @@ jobs:
             echo "is_stable_tag=false" >> "$GITHUB_OUTPUT"
           fi
 
+      - name: Install coverage tools
+        shell: pwsh
+        run: |
+          dotnet tool update --global dotnet-coverage
+          if ($LASTEXITCODE -ne 0) {
+            dotnet tool install --global dotnet-coverage
+            if ($LASTEXITCODE -ne 0) {
+              throw "Unable to install dotnet-coverage."
+            }
+          }
+
+          dotnet tool update --global dotnet-reportgenerator-globaltool
+          if ($LASTEXITCODE -ne 0) {
+            dotnet tool install --global dotnet-reportgenerator-globaltool
+            if ($LASTEXITCODE -ne 0) {
+              throw "Unable to install dotnet-reportgenerator-globaltool."
+            }
+          }
+
+          Add-Content -Path $env:GITHUB_PATH -Value "$env:USERPROFILE\.dotnet\tools"
+
       - name: Restore packages
         run: dotnet restore ${{ env.PROJECT_PATH }} --packages ${{ env.RESTORED_PACKAGES_PATH }}
 
       - name: Build project
         run: dotnet build ${{ env.PROJECT_PATH }} --no-restore --configuration ${{ env.CONFIGURATION }}
 
-      - name: Test solution
-        run: dotnet test ${{ env.PROJECT_PATH }} --configuration ${{ env.CONFIGURATION }} --no-restore --no-build --maxcpucount
+      - name: Collect coverage
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Path "${{ env.COVERAGE_RESULTS_DIRECTORY }}" -Force | Out-Null
+          dotnet-coverage collect "dotnet test ${{ env.PROJECT_PATH }} --configuration ${{ env.CONFIGURATION }} --no-restore --no-build --maxcpucount" --mode xml -f cobertura -o "${{ env.COVERAGE_RESULTS_PATH }}"
+
+      - name: Generate coverage reports
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Path "${{ env.COVERAGE_REPORT_DIRECTORY }}" -Force | Out-Null
+          reportgenerator "-reports:${{ env.COVERAGE_RESULTS_PATH }}" "-targetdir:${{ env.COVERAGE_REPORT_DIRECTORY }}" "-reporttypes:Html;MarkdownSummaryGithub"
+
+      - name: Publish coverage job summary
+        shell: pwsh
+        run: |
+          $summaryFile = Get-ChildItem "${{ env.COVERAGE_REPORT_DIRECTORY }}" -File | Where-Object {
+            $_.Name -like "Summary*.md"
+          } | Select-Object -First 1
+
+          if ($null -eq $summaryFile) {
+            throw "Coverage summary markdown file was not generated."
+          }
+
+          Get-Content $summaryFile.FullName | Add-Content -Path $env:GITHUB_STEP_SUMMARY
+
+      - name: Update coverage gist badge
+        shell: pwsh
+        env:
+          GIST_ID: ${{ secrets.GIST_ID }}
+          GIST_TOKEN: ${{ secrets.GIST_TOKEN }}
+        run: |
+          if ([string]::IsNullOrWhiteSpace($env:GIST_ID) -or [string]::IsNullOrWhiteSpace($env:GIST_TOKEN)) {
+            Write-Host "Gist secrets are not configured. Skipping badge update."
+            exit 0
+          }
+
+          [xml]$coverage = Get-Content "${{ env.COVERAGE_RESULTS_PATH }}"
+          $linePercent = [math]::Round([double]$coverage.coverage.'line-rate' * 100, 1)
+          $branchPercent = [math]::Round([double]$coverage.coverage.'branch-rate' * 100, 1)
+          $score = [math]::Min($linePercent, $branchPercent)
+          $color = if ($score -ge 90) { "brightgreen" } elseif ($score -ge 75) { "green" } elseif ($score -ge 60) { "yellow" } elseif ($score -ge 40) { "orange" } else { "red" }
+
+          $gistBody = @{
+            files = @{
+              "coverage-badge.json" = @{
+                content = (@{
+                  schemaVersion = 1
+                  label = "coverage"
+                  message = "L $linePercent% | B $branchPercent%"
+                  color = $color
+                } | ConvertTo-Json -Compress)
+              }
+            }
+          } | ConvertTo-Json -Depth 5
+
+          $headers = @{
+            Authorization = "Bearer $env:GIST_TOKEN"
+            Accept = "application/vnd.github+json"
+            "X-GitHub-Api-Version" = "2022-11-28"
+          }
+
+          Invoke-RestMethod -Uri "https://api.github.com/gists/$($env:GIST_ID)" -Method Patch -Headers $headers -ContentType "application/json" -Body $gistBody | Out-Null
+
+      - name: Upload coverage report artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-report
+          path: ${{ env.COVERAGE_REPORT_DIRECTORY }}
+          if-no-files-found: error
+          retention-days: 7
 
       - name: Pack project
         if: steps.stable_tag.outputs.is_stable_tag == 'true'
@@ -70,7 +162,7 @@ jobs:
         if: steps.stable_tag.outputs.is_stable_tag == 'true'
         shell: pwsh
         run: |
-          $pattern = '^(?<id>.+)\.(?<version>\d+\.\d+\.\d+(?:[-+][0-9A-Za-z.-]+)?)\.(?<extension>nupkg|snupkg)$'
+          $pattern = '^(?<id>.+?)\.(?<version>\d+(?:\.\d+){1,3}(?:-[0-9A-Za-z][0-9A-Za-z.-]*)?(?:\+[0-9A-Za-z][0-9A-Za-z.-]*)?)\.(?<extension>nupkg|snupkg)$'
           $packageFiles = Get-ChildItem "${{ env.PACKAGE_OUTPUT_DIRECTORY }}" -File | Where-Object {
             $_.Extension -in '.nupkg', '.snupkg'
           }
