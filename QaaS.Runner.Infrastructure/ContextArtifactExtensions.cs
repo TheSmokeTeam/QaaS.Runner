@@ -6,7 +6,7 @@ using QaaS.Framework.SDK.ContextObjects;
 namespace QaaS.Runner.Infrastructure;
 
 /// <summary>
-/// Stores rendered templates and session log artifacts inside the shared execution context.
+/// Stores runner-generated execution artifacts in the shared context without extending framework context types.
 /// </summary>
 public static class ContextArtifactExtensions
 {
@@ -16,7 +16,7 @@ public static class ContextArtifactExtensions
     private const string SessionLogsKey = "SessionLogs";
 
     /// <summary>
-    /// Saves the rendered configuration template for the current execution.
+    /// Saves the rendered runner configuration template for the current execution scope.
     /// </summary>
     public static void SetRenderedConfigurationTemplate(this Context context, string template)
     {
@@ -24,7 +24,7 @@ public static class ContextArtifactExtensions
     }
 
     /// <summary>
-    /// Returns the rendered configuration template if it was captured during execution build.
+    /// Returns the rendered configuration template captured for the current execution scope, if one exists.
     /// </summary>
     public static string? GetRenderedConfigurationTemplate(this Context context)
     {
@@ -33,7 +33,7 @@ public static class ContextArtifactExtensions
     }
 
     /// <summary>
-    /// Appends a log line for a specific session.
+    /// Appends a session-scoped log line that can later be attached to reports.
     /// </summary>
     public static void AppendSessionLog(this Context context, string sessionName, string message)
     {
@@ -48,7 +48,7 @@ public static class ContextArtifactExtensions
     }
 
     /// <summary>
-    /// Returns the concatenated session log text, or null when no log lines were captured.
+    /// Returns the concatenated session log text for a session, or null when nothing was captured.
     /// </summary>
     public static string? GetSessionLog(this Context context, string sessionName)
     {

@@ -6,12 +6,12 @@ using QaaS.Framework.SDK.Extensions;
 namespace QaaS.Runner.Infrastructure;
 
 /// <summary>
-/// Metadata helpers that keep runner flows operational when the YAML omits the MetaData section.
+/// Runner-specific metadata helpers that normalize missing or malformed metadata entries on the shared context.
 /// </summary>
 public static class ContextMetadataExtensions
 {
     /// <summary>
-    /// Returns configured metadata when present; otherwise creates and stores an empty metadata object.
+    /// Returns the configured metadata object, or creates and stores an empty one when the context does not contain a valid entry.
     /// </summary>
     public static MetaDataConfig GetMetaDataOrDefault(this InternalContext context)
     {

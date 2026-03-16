@@ -1,7 +1,7 @@
 ﻿namespace QaaS.Runner.Infrastructure;
 
 /// <summary>
-///     Extensions related to DateTime
+/// Legacy date and time conversion helpers that apply the runner's historical Israel timezone rules.
 /// </summary>
 public static class DateTimeExtensions
 {
@@ -10,7 +10,7 @@ public static class DateTimeExtensions
         : "Israel Standard Time";
 
     /// <summary>
-    ///     converts the given time to utc based on the timezone offset in summer time given
+    /// Converts a local wall-clock value into UTC using a summer-time offset and optional DST override.
     /// </summary>
     /// <param name="timeToConvertToUtc"> the datetime to convert to utc </param>
     /// <param name="insertionTimeTimeZoneOffsetSummerTime">
@@ -21,7 +21,7 @@ public static class DateTimeExtensions
     ///     True if its day light saving time right now in israel time zone,
     ///     if no value is given gets the time zone info from the system
     /// </param>
-    /// <returns> The given datetime as utc </returns>
+    /// <returns>The converted UTC value with <see cref="DateTimeKind.Utc" />.</returns>
     public static DateTime ConvertDateTimeToUtcByTimeZoneOffset(
         this DateTime timeToConvertToUtc, int insertionTimeTimeZoneOffsetSummerTime, bool? isDayLightSavingTime = null)
     {
@@ -36,7 +36,7 @@ public static class DateTimeExtensions
     }
 
     /// <summary>
-    ///     adds a timezone offset to the given utc time based on the timezone offset in summer time given
+    /// Converts a UTC value into a local wall-clock value using a summer-time offset and optional DST override.
     /// </summary>
     /// <param name="utcTimeToConvert"> the utc datetime to convert </param>
     /// <param name="timeZoneOffsetSummerTime">
@@ -47,7 +47,7 @@ public static class DateTimeExtensions
     ///     True if its day light saving time right now in israel time zone,
     ///     if no value is given gets the time zone info from the system
     /// </param>
-    /// <returns> The given datetime with the added timezone offset </returns>
+    /// <returns>The converted local value with <see cref="DateTimeKind.Unspecified" />.</returns>
     public static DateTime ConvertDateTimeFromUtcToTimeZoneByTimeZoneOffset(
         this DateTime utcTimeToConvert, int timeZoneOffsetSummerTime, bool? isDayLightSavingTime = null)
     {
@@ -62,7 +62,7 @@ public static class DateTimeExtensions
     }
 
     /// <summary>
-    ///     Checks if its currently day light saving time in israel time zone
+    /// Determines whether the supplied date falls inside daylight-saving time in the Israel timezone.
     /// </summary>
     private static bool IsDayLightSavingTimeInGivenDateTime(this DateTime dateTime)
     {

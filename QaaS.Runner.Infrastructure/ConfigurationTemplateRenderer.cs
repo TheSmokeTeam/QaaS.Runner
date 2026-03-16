@@ -7,7 +7,7 @@ using YamlDotNet.Serialization;
 namespace QaaS.Runner.Infrastructure;
 
 /// <summary>
-/// Renders a stable YAML template from the resolved runner builders while preserving explicit configuration values.
+/// Renders a stable YAML view of the effective runner configuration, combining source configuration with runtime-resolved builder values.
 /// </summary>
 public static class ConfigurationTemplateRenderer
 {
@@ -15,8 +15,8 @@ public static class ConfigurationTemplateRenderer
         BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic;
 
     /// <summary>
-    /// Serializes the resolved configuration in a stable section order while keeping explicitly configured defaults
-    /// and augmenting assertion statuses that are resolved at runtime.
+    /// Serializes the effective runner configuration in a deterministic section order, preserving explicitly configured defaults
+    /// and injecting runtime-only assertion status settings when needed.
     /// </summary>
     public static string Render(
         IConfiguration rootConfiguration,

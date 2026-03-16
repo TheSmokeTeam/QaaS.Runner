@@ -1,12 +1,12 @@
 ﻿namespace QaaS.Runner.Infrastructure;
 
 /// <summary>
-///     Contains extension functions related to file system functionality
+/// Shared path-safety helpers used by runner components that persist files and attachments.
 /// </summary>
 public static class FileSystemExtensions
 {
     /// <summary>
-    ///     Makes a string into a valid directory name according to current OS
+    /// Sanitizes a value so it can safely be used as a single directory name segment on the current OS.
     /// </summary>
     public static string? MakeValidDirectoryName(string? name)
     {
@@ -14,7 +14,7 @@ public static class FileSystemExtensions
     }
 
     /// <summary>
-    ///     Makes a string into a valid file name according to current OS
+    /// Sanitizes a value so it can safely be used as a single file name segment on the current OS.
     /// </summary>
     public static string? MakeValidFileName(string? name)
     {
@@ -22,7 +22,7 @@ public static class FileSystemExtensions
     }
 
     /// <summary>
-    ///     Normalizes a relative path and blocks rooted or parent traversal segments.
+    /// Normalizes a relative path while rejecting rooted paths and traversal segments such as <c>..</c>.
     /// </summary>
     public static string NormalizeRelativePath(string? path)
     {
@@ -47,7 +47,7 @@ public static class FileSystemExtensions
     }
 
     /// <summary>
-    ///     Combines a set of path segments under a fixed root and prevents escaping that root.
+    /// Combines path segments under a fixed root and throws when the resolved path escapes that root.
     /// </summary>
     public static string CombineUnderRoot(string rootPath, params string?[] segments)
     {
