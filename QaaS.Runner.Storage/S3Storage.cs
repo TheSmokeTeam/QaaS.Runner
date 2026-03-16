@@ -14,7 +14,7 @@ public class S3Storage : BaseStorage
         _configuration = configuration;
     }
 
-    private IS3Client BuildS3Client(S3Config config)
+    protected virtual IS3Client BuildS3Client(S3Config config)
     {
         return new S3Client(new AmazonS3Client(config.AccessKey, config.SecretKey,
             new AmazonS3Config

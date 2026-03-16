@@ -47,7 +47,6 @@ public class ProbeBuilder : IYamlConvertible
                                         $" deserialization from Yaml for {nameof(ProbeBuilder)}");
     }
 
-    [ExcludeFromCodeCoverage]
     public void Write(IEmitter emitter, ObjectSerializer nestedObjectSerializer)
     {
         var probeConfiguration = ProbeConfiguration

@@ -1,4 +1,5 @@
 using System.Reflection;
+using Autofac;
 using Microsoft.Extensions.Configuration;
 using NUnit.Framework;
 using QaaS.Framework.Configurations;
@@ -12,6 +13,7 @@ using QaaS.Framework.SDK.Session.SessionDataObjects;
 using QaaS.Framework.SDK.Session.SessionDataObjects.RunningSessionsObjects;
 using QaaS.Runner.Assertions.ConfigurationObjects;
 using QaaS.Runner.Assertions.ConfigurationObjects.LinkConfigs;
+using QaaS.Runner.Infrastructure;
 using QaaS.Runner.Sessions.Actions.Probes;
 using QaaS.Runner.Sessions.Session.Builders;
 using QaaS.Runner.Storage;
@@ -141,6 +143,17 @@ public class ExecutionBuilderTests
         var storages = builder.ReadStorages();
 
         Assert.That(storages, Is.Empty);
+    }
+
+    [Test]
+    public void ReadSessions_WhenSessionsAreNull_ReturnsEmptyCollection()
+    {
+        var builder = new ExecutionBuilder
+        {
+            Sessions = null
+        };
+
+        Assert.That(builder.ReadSessions(), Is.Empty);
     }
 
     [Test]
@@ -393,6 +406,350 @@ public class ExecutionBuilderTests
             Is.True);
 
         Assert.Throws<InvalidConfigurationsException>(() => builder.Build());
+    }
+
+    [Test]
+    public void UpdateAndDeleteIndexedCollections_WithInvalidIndex_ThrowArgumentOutOfRangeException()
+    {
+        var builder = new ExecutionBuilder
+        {
+            Storages = [new StorageBuilder()],
+            Links = [new LinkBuilder()]
+        };
+
+        Assert.Multiple(() =>
+        {
+            Assert.Throws<ArgumentOutOfRangeException>(() => builder.UpdateStorageAt(-1, new StorageBuilder()));
+            Assert.Throws<ArgumentOutOfRangeException>(() => builder.DeleteStorageAt(5));
+            Assert.Throws<ArgumentOutOfRangeException>(() => builder.UpdateLinkAt(-1, new LinkBuilder()));
+            Assert.Throws<ArgumentOutOfRangeException>(() => builder.DeleteLinkAt(5));
+        });
+    }
+
+    [Test]
+    public void BuildProbeHookData_SkipsIncompleteDefinitions_AndScopesValidProbeNames()
+    {
+        var builder = new ExecutionBuilder
+        {
+            Sessions =
+            [
+                new SessionBuilder
+                {
+                    Name = "valid-session",
+                    Probes =
+                    [
+                        new ProbeBuilder()
+                            .Named("valid-probe")
+                            .HookNamed(nameof(FirstTestProbe))
+                            .Configure(new ProbeMarkerConfig { Marker = "configured" }),
+                        new ProbeBuilder().Named("missing-hook"),
+                        new ProbeBuilder().HookNamed(nameof(SecondTestProbe))
+                    ]
+                },
+                new SessionBuilder
+                {
+                    Name = null,
+                    Probes =
+                    [
+                        new ProbeBuilder()
+                            .Named("missing-session")
+                            .HookNamed(nameof(FirstTestProbe))
+                    ]
+                }
+            ]
+        };
+
+        var method = typeof(ExecutionBuilder)
+            .GetMethod("BuildProbeHookData", BindingFlags.Instance | BindingFlags.NonPublic)!;
+        var hookData = ((System.Collections.IEnumerable)method.Invoke(builder, [])!)
+            .Cast<object>()
+            .ToList();
+
+        Assert.That(hookData, Has.Count.EqualTo(1));
+        Assert.Multiple(() =>
+        {
+            Assert.That(hookData[0].GetType().GetProperty("Type")!.GetValue(hookData[0]),
+                Is.EqualTo(nameof(FirstTestProbe)));
+            Assert.That(hookData[0].GetType().GetProperty("Name")!.GetValue(hookData[0]),
+                Is.EqualTo(ProbeBuilder.BuildScopedHookName("valid-session", "valid-probe")));
+        });
+    }
+
+    [Test]
+    public void ValidateProbeDefinitions_WithMissingValues_AddsValidationResultsForEachFailure()
+    {
+        var builder = new ExecutionBuilder
+        {
+            Sessions =
+            [
+                new SessionBuilder
+                {
+                    Name = null,
+                    Probes =
+                    [
+                        new ProbeBuilder()
+                    ]
+                }
+            ]
+        };
+
+        typeof(ExecutionBuilder)
+            .GetMethod("ValidateProbeDefinitions", BindingFlags.Instance | BindingFlags.NonPublic)!
+            .Invoke(builder, []);
+        var validationResults = (IReadOnlyList<System.ComponentModel.DataAnnotations.ValidationResult>)typeof(ExecutionBuilder)
+            .GetField("_validationResults", BindingFlags.Instance | BindingFlags.NonPublic)!
+            .GetValue(builder)!;
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(validationResults.Select(result => result.ErrorMessage),
+                Has.One.EqualTo("Session name is required when configuring probes."));
+            Assert.That(validationResults.Select(result => result.ErrorMessage),
+                Has.One.EqualTo("Probe name is required for session ''."));
+            Assert.That(validationResults.Select(result => result.ErrorMessage),
+                Has.One.EqualTo("Probe type is required for probe '' in session ''."));
+        });
+    }
+
+    [Test]
+    public void DeduplicateValidationResults_RemovesDuplicateMessagesAndMemberNames()
+    {
+        var builder = new ExecutionBuilder();
+        var validationResultsField = typeof(ExecutionBuilder)
+            .GetField("_validationResults", BindingFlags.Instance | BindingFlags.NonPublic)!;
+        var validationResults = (List<System.ComponentModel.DataAnnotations.ValidationResult>)validationResultsField.GetValue(builder)!;
+        validationResults.Add(new System.ComponentModel.DataAnnotations.ValidationResult("duplicate", ["A"]));
+        validationResults.Add(new System.ComponentModel.DataAnnotations.ValidationResult("duplicate", ["A"]));
+        validationResults.Add(new System.ComponentModel.DataAnnotations.ValidationResult("distinct", ["B"]));
+
+        typeof(ExecutionBuilder)
+            .GetMethod("DeduplicateValidationResults", BindingFlags.Instance | BindingFlags.NonPublic)!
+            .Invoke(builder, []);
+
+        Assert.That(validationResults.Select(result => result.ErrorMessage),
+            Is.EqualTo(new[] { "duplicate", "distinct" }));
+    }
+
+    [Test]
+    public void DeduplicateValidationResults_WithSingleItem_DoesNothing()
+    {
+        var builder = new ExecutionBuilder();
+        var validationResultsField = typeof(ExecutionBuilder)
+            .GetField("_validationResults", BindingFlags.Instance | BindingFlags.NonPublic)!;
+        var validationResults = (List<System.ComponentModel.DataAnnotations.ValidationResult>)validationResultsField.GetValue(builder)!;
+        validationResults.Add(new System.ComponentModel.DataAnnotations.ValidationResult("single"));
+
+        typeof(ExecutionBuilder)
+            .GetMethod("DeduplicateValidationResults", BindingFlags.Instance | BindingFlags.NonPublic)!
+            .Invoke(builder, []);
+
+        Assert.That(validationResults.Select(result => result.ErrorMessage), Is.EqualTo(new[] { "single" }));
+    }
+
+    [Test]
+    public void DeduplicateValidationResults_WithAlreadyDistinctItems_LeavesCollectionUntouched()
+    {
+        var builder = new ExecutionBuilder();
+        var validationResultsField = typeof(ExecutionBuilder)
+            .GetField("_validationResults", BindingFlags.Instance | BindingFlags.NonPublic)!;
+        var validationResults = (List<System.ComponentModel.DataAnnotations.ValidationResult>)validationResultsField.GetValue(builder)!;
+        validationResults.Add(new System.ComponentModel.DataAnnotations.ValidationResult("first", ["A"]));
+        validationResults.Add(new System.ComponentModel.DataAnnotations.ValidationResult("second", ["B"]));
+
+        typeof(ExecutionBuilder)
+            .GetMethod("DeduplicateValidationResults", BindingFlags.Instance | BindingFlags.NonPublic)!
+            .Invoke(builder, []);
+
+        Assert.That(validationResults.Select(result => result.ErrorMessage), Is.EqualTo(new[] { "first", "second" }));
+    }
+
+    [Test]
+    public void BuildDataSources_WithoutParameters_UsesInitializedBuildScope()
+    {
+        var builder = CreateValidExecutionBuilder();
+        var execution = builder.Build();
+
+        try
+        {
+            var dataSources = ((System.Collections.IEnumerable)typeof(ExecutionBuilder)
+                    .GetMethod("BuildDataSources", BindingFlags.Instance | BindingFlags.NonPublic, null,
+                        Type.EmptyTypes, null)!
+                    .Invoke(builder, [])!)
+                .Cast<object>()
+                .ToList();
+
+            Assert.That(dataSources, Has.Count.EqualTo(1));
+        }
+        finally
+        {
+            execution.Dispose();
+        }
+    }
+
+    [Test]
+    public void InitializeContext_WithoutLoadedContext_UsesDefaultsAndCreatesMetadataEntry()
+    {
+        var builder = new ExecutionBuilder();
+
+        typeof(ExecutionBuilder)
+            .GetMethod("InitializeContext", BindingFlags.Instance | BindingFlags.NonPublic)!
+            .Invoke(builder, []);
+
+        var context = (InternalContext)typeof(ExecutionBuilder).BaseType!
+            .GetField("Context", BindingFlags.Instance | BindingFlags.NonPublic)!
+            .GetValue(builder)!;
+        Assert.Multiple(() =>
+        {
+            Assert.That(context, Is.Not.Null);
+            Assert.That(context.Logger, Is.Not.Null);
+            Assert.That(context.RootConfiguration, Is.Not.Null);
+            Assert.That(context.GetMetaDataOrDefault(), Is.Not.Null);
+        });
+    }
+
+    [Test]
+    public void FilterConfigurationsAndTemplateRendering_WithMissingCollections_HandleNullArrays()
+    {
+        var builder = new ExecutionBuilder
+        {
+            Sessions = null,
+            Assertions = null,
+            Links = null,
+            Storages = null
+        };
+        builder.WithMetadata(new MetaDataConfig
+        {
+            Team = "Smoke",
+            System = "QaaS"
+        });
+
+        typeof(ExecutionBuilder)
+            .GetMethod("InitializeContext", BindingFlags.Instance | BindingFlags.NonPublic)!
+            .Invoke(builder, []);
+        typeof(ExecutionBuilder)
+            .GetMethod("FilterConfigurationsBasedOnFlags", BindingFlags.Instance | BindingFlags.NonPublic)!
+            .Invoke(builder, []);
+        typeof(ExecutionBuilder)
+            .GetMethod("StoreRenderedConfigurationTemplate", BindingFlags.Instance | BindingFlags.NonPublic)!
+            .Invoke(builder, []);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(builder.Assertions, Is.Empty);
+            Assert.That(builder.Sessions, Is.Empty);
+            Assert.That(((InternalContext)typeof(ExecutionBuilder).BaseType!
+                    .GetField("Context", BindingFlags.Instance | BindingFlags.NonPublic)!
+                    .GetValue(builder)!)
+                .GetRenderedConfigurationTemplate(), Does.Contain("MetaData:"));
+        });
+    }
+
+    [Test]
+    public void ValidateCollection_WithNullCollectionAndNullItems_DoesNotAddValidationResults()
+    {
+        var builder = new ExecutionBuilder();
+        var validationResultsField = typeof(ExecutionBuilder)
+            .GetField("_validationResults", BindingFlags.Instance | BindingFlags.NonPublic)!;
+        var validationResults = (List<System.ComponentModel.DataAnnotations.ValidationResult>)validationResultsField.GetValue(builder)!;
+
+        typeof(ExecutionBuilder)
+            .GetMethod("ValidateCollection", BindingFlags.Instance | BindingFlags.NonPublic)!
+            .MakeGenericMethod(typeof(MetaDataConfig))
+            .Invoke(builder, [null, "MetaData"]);
+        typeof(ExecutionBuilder)
+            .GetMethod("ValidateCollection", BindingFlags.Instance | BindingFlags.NonPublic)!
+            .MakeGenericMethod(typeof(MetaDataConfig))
+            .Invoke(builder, [new MetaDataConfig?[] { null, new() { Team = "Smoke", System = "QaaS" } }, "MetaData"]);
+
+        Assert.That(validationResults, Is.Empty);
+    }
+
+    [Test]
+    public void Build_WithLoadedContextGlobalDictionary_MergesExistingAndConfiguredEntries()
+    {
+        var context = CreateLoadedContext(new Dictionary<string, string?>
+        {
+            ["MetaData:Team"] = "Smoke",
+            ["MetaData:System"] = "QaaS"
+        });
+        context.InternalGlobalDict = new Dictionary<string, object?>
+        {
+            ["existing"] = "old",
+            ["shared"] = "context-value"
+        };
+
+        var builder = new ExecutionBuilder(context, ExecutionType.Template, null, null, null, null)
+            .WithGlobalDict(new Dictionary<string, object?>
+            {
+                ["shared"] = "builder-value",
+                ["added"] = 123
+            });
+
+        var execution = builder.Build();
+        var executionContext = (InternalContext)typeof(Execution)
+            .GetProperty("Context", BindingFlags.Instance | BindingFlags.NonPublic)!
+            .GetValue(execution)!;
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(executionContext.InternalGlobalDict["existing"], Is.EqualTo("old"));
+            Assert.That(executionContext.InternalGlobalDict["shared"], Is.EqualTo("builder-value"));
+            Assert.That(executionContext.InternalGlobalDict["added"], Is.EqualTo(123));
+        });
+    }
+
+    [Test]
+    public void BuildHelperMethods_WithMissingConfigurationArrays_ReturnEmptyCollections()
+    {
+        var builder = new ExecutionBuilder
+        {
+            Sessions = null,
+            Assertions = null,
+            Storages = null,
+            DataSources = null
+        };
+        using var scope = new ContainerBuilder().Build().BeginLifetimeScope();
+
+        var builtDataSources = (System.Collections.IEnumerable)typeof(ExecutionBuilder)
+            .GetMethod("BuildDataSources", BindingFlags.Instance | BindingFlags.NonPublic, null,
+                [typeof(ILifetimeScope)], null)!
+            .Invoke(builder, [scope])!;
+        var builtSessions = (System.Collections.IEnumerable)typeof(ExecutionBuilder)
+            .GetMethod("BuildSessions", BindingFlags.Instance | BindingFlags.NonPublic)!
+            .Invoke(builder, [scope])!;
+        var builtAssertions = (System.Collections.IEnumerable)typeof(ExecutionBuilder)
+            .GetMethod("BuildAssertions", BindingFlags.Instance | BindingFlags.NonPublic)!
+            .Invoke(builder, [scope])!;
+        var builtReports = (System.Collections.IEnumerable)typeof(ExecutionBuilder)
+            .GetMethod("BuildReports", BindingFlags.Instance | BindingFlags.NonPublic)!
+            .Invoke(builder, [])!;
+        var builtStorages = (System.Collections.IEnumerable)typeof(ExecutionBuilder)
+            .GetMethod("BuildStorages", BindingFlags.Instance | BindingFlags.NonPublic)!
+            .Invoke(builder, [])!;
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(builtDataSources.Cast<object>(), Is.Empty);
+            Assert.That(builtSessions.Cast<object>(), Is.Empty);
+            Assert.That(builtAssertions.Cast<object>(), Is.Empty);
+            Assert.That(builtReports.Cast<object>(), Is.Empty);
+            Assert.That(builtStorages.Cast<object>(), Is.Empty);
+            Assert.That(builder.Sessions, Is.Empty);
+        });
+    }
+
+    [Test]
+    public void BuildDataSources_WithoutInitializedBuildScope_ThrowsInvalidOperationException()
+    {
+        var builder = new ExecutionBuilder();
+
+        var exception = Assert.Throws<TargetInvocationException>(() =>
+            typeof(ExecutionBuilder)
+                .GetMethod("BuildDataSources", BindingFlags.Instance | BindingFlags.NonPublic, null, Type.EmptyTypes,
+                    null)!
+                .Invoke(builder, []));
+
+        Assert.That(exception!.InnerException, Is.TypeOf<InvalidOperationException>());
     }
 
     private ExecutionBuilder CreateValidExecutionBuilder()

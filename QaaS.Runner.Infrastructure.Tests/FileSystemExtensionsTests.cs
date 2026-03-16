@@ -18,6 +18,7 @@ public class FileSystemExtensionsTests
 
     [Test]
     [TestCase("report?.json", ExpectedResult = "report_.json")]
+    [TestCase("...", ExpectedResult = "_")]
     [TestCase("", ExpectedResult = "")]
     [TestCase(null, ExpectedResult = null)]
     public string? TestMakeValidFileName_CallFunction_ShouldReturnExpectedResult(string? name)
@@ -40,6 +41,22 @@ public class FileSystemExtensionsTests
     }
 
     [Test]
+    public void NormalizeRelativePath_WithRootedPath_ThrowsInvalidOperationException()
+    {
+        var rootedPath = Path.GetFullPath(Path.Combine(Path.GetTempPath(), "rooted.json"));
+
+        Assert.Throws<InvalidOperationException>(() => FileSystemExtensions.NormalizeRelativePath(rootedPath));
+    }
+
+    [Test]
+    public void NormalizeRelativePath_WithInvalidSegment_SanitizesEachSegment()
+    {
+        var result = FileSystemExtensions.NormalizeRelativePath("folder/repor?.json");
+
+        Assert.That(result, Is.EqualTo(Path.Combine("folder", "repor_.json")));
+    }
+
+    [Test]
     public void CombineUnderRoot_WithChildSegments_ReturnsPathUnderRoot()
     {
         var root = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString("N"));
@@ -56,5 +73,21 @@ public class FileSystemExtensionsTests
 
         Assert.Throws<InvalidOperationException>(() =>
             FileSystemExtensions.CombineUnderRoot(root, "..", "outside.json"));
+    }
+
+    [Test]
+    public void CombineUnderRoot_WithBlankRoot_ThrowsArgumentException()
+    {
+        Assert.Throws<ArgumentException>(() => FileSystemExtensions.CombineUnderRoot(" ", "child"));
+    }
+
+    [Test]
+    public void CombineUnderRoot_WithNullSegments_IgnoresThem()
+    {
+        var root = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString("N"));
+
+        var result = FileSystemExtensions.CombineUnderRoot(root, null, "", "child");
+
+        Assert.That(result, Is.EqualTo(Path.Combine(Path.GetFullPath(root), "child")));
     }
 }

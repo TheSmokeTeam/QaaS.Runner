@@ -4,7 +4,6 @@ using QaaS.Framework.SDK.DataSourceObjects;
 
 namespace QaaS.Runner;
 
-[ExcludeFromCodeCoverage]
 public static class Constants
 {
     /// <summary>

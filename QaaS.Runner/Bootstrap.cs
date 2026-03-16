@@ -49,16 +49,27 @@ public static class Bootstrap
     internal static TRunner GetRunner<TRunner>(IEnumerable<string>? args, string? executionId = null)
         where TRunner : Runner
     {
-        if (args == null)
-            return CreateDefaultRunner<TRunner>();
+        var commandLineArgs = args?.ToArray();
+        if (commandLineArgs == null || commandLineArgs.Length == 0)
+        {
+            using var emptyArgsParser = ParserBuilder.BuildParser();
+            return WriteHelpAndCreateBootstrapHandledRunner<TRunner>(emptyArgsParser);
+        }
 
         // Build CLI parser and parse supported verbs
         using var cliParser = ParserBuilder.BuildParser();
         var cliParserResult = cliParser.ParseArguments<RunOptions,
-            ActOptions, AssertOptions, TemplateOptions, ExecuteOptions, int>(args);
+            ActOptions, AssertOptions, TemplateOptions, ExecuteOptions, int>(commandLineArgs);
 
         var runner = cliParserResult
-            .WithNotParsed(_ => Console.Out.WriteLine(HelpTextBuilder.BuildHelpText(cliParserResult)))
+            .WithNotParsed(errors =>
+            {
+                var parseErrors = errors.ToArray();
+                if (parseErrors.All(error => error.Tag is ErrorType.VersionRequestedError))
+                    return;
+
+                Console.Out.WriteLine(HelpTextBuilder.BuildHelpText(cliParserResult));
+            })
             .MapResult(
                 (TemplateOptions options) =>
                     new RunLoader<TRunner, TemplateOptions>(GetSafeLoggerOptions(options), executionId).GetLoadedRunner(),
@@ -88,15 +99,15 @@ public static class Bootstrap
             const string qaasFrameworkAssemblyName = "QaaS.Framework.Executions";
             logger.LogInformation($"\nQaaS Framework Versions:\n" +
                                                    $"{qaasFrameworkAssemblyName} {GetAssemblyVersionFromName(qaasFrameworkAssemblyName)}\n");
-            return CreateDefaultRunner<TRunner>(logger, serilogLogger, ownsSerilogLogger);
+            return CreateBootstrapHandledRunner<TRunner>(0, logger, serilogLogger, ownsSerilogLogger);
         }
 
-        // If all errors are help commands requested then the user asked for help and arguments are valid
+        // Help requests were already printed to stdout and should not continue into the runner lifecycle.
         if (errorsArray.All(err => err.Tag is ErrorType.HelpRequestedError or ErrorType.HelpVerbRequestedError))
-            return CreateDefaultRunner<TRunner>(logger, serilogLogger, ownsSerilogLogger);
+            return CreateBootstrapHandledRunner<TRunner>(0, logger, serilogLogger, ownsSerilogLogger);
 
         logger.LogCritical("Failed to parse/process the command line arguments");
-        return CreateDefaultRunner<TRunner>(logger, serilogLogger, ownsSerilogLogger);
+        return CreateBootstrapHandledRunner<TRunner>(1, logger, serilogLogger, ownsSerilogLogger);
     }
 
     // Create a custom runner using activator to dynamically get a new instance of any implementation of TRunner
@@ -203,5 +214,30 @@ public static class Bootstrap
             resolvedLoggers.logger,
             resolvedLoggers.serilogLogger,
             disposeSerilogLogger: resolvedLoggers.ownsSerilogLogger);
+    }
+
+    /// <summary>
+    /// Prints the top-level help text for empty command lines and returns a runner that only carries the exit code.
+    /// </summary>
+    private static TRunner WriteHelpAndCreateBootstrapHandledRunner<TRunner>(Parser cliParser) where TRunner : Runner
+    {
+        var emptyArgsResult = cliParser.ParseArguments<RunOptions, ActOptions, AssertOptions, TemplateOptions,
+            ExecuteOptions, int>([]);
+        Console.Out.WriteLine(HelpTextBuilder.BuildHelpText(emptyArgsResult));
+        return CreateBootstrapHandledRunner<TRunner>(0);
+    }
+
+    /// <summary>
+    /// Creates a runner that should stop after bootstrap because the command line was fully handled already.
+    /// </summary>
+    private static TRunner CreateBootstrapHandledRunner<TRunner>(
+        int exitCode,
+        ILogger? logger = null,
+        Serilog.ILogger? serilogLogger = null,
+        bool? ownsSerilogLogger = null)
+        where TRunner : Runner
+    {
+        return (TRunner)CreateDefaultRunner<TRunner>(logger, serilogLogger, ownsSerilogLogger)
+            .WithBootstrapHandledExitCode(exitCode);
     }
 }

@@ -100,4 +100,21 @@ public class BaseStorageTests
 
         Assert.Throws<InvalidOperationException>(() => storage.Store(sessions, "case-e"));
     }
+
+    [Test]
+    public void Retrieve_WhenContextWasNotAssigned_StillDeserializesSessions()
+    {
+        var options = new JsonSerializerOptions
+        {
+            DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull
+        };
+        var storage = new InspectableStorage(Formatting.None,
+        [
+            SessionDataSerialization.SerializeSessionData(new SessionData { Name = "session-no-context" }, options)
+        ]);
+
+        var result = storage.Retrieve("case-f");
+
+        Assert.That(result.Select(session => session.Name), Is.EqualTo(new[] { "session-no-context" }));
+    }
 }

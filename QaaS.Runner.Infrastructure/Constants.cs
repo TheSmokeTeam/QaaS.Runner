@@ -5,7 +5,6 @@ namespace QaaS.Runner.Infrastructure;
 /// <summary>
 /// Centralizes runner-wide constants shared by multiple runner packages.
 /// </summary>
-[ExcludeFromCodeCoverage]
 public static class Constants
 {
     /// <summary>

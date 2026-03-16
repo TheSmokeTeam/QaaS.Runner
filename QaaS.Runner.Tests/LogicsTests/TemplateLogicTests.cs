@@ -53,4 +53,28 @@ public class TemplateLogicTests
             value.Contains("MetaData:", StringComparison.Ordinal) &&
             value.Contains("System: QaaS", StringComparison.Ordinal))), Times.Once());
     }
+
+    [Test]
+    public void Run_WhenWriterWasNotProvided_WritesTemplateToConsoleOut()
+    {
+        var context = Globals.GetContextWithMetadata();
+        context.SetRenderedConfigurationTemplate("MetaData:\n  System: QaaS\n");
+        var originalWriter = Console.Out;
+        using var consoleCapture = new StringWriter();
+
+        try
+        {
+            Console.SetOut(consoleCapture);
+
+            var result = new TemplateLogic(context).Run(new ExecutionData());
+
+            Assert.That(result, Is.Not.Null);
+            Assert.That(consoleCapture.ToString(), Does.Contain("MetaData:"));
+            Assert.That(consoleCapture.ToString(), Does.Contain("System: QaaS"));
+        }
+        finally
+        {
+            Console.SetOut(originalWriter);
+        }
+    }
 }

@@ -21,6 +21,14 @@ namespace QaaS.Runner.Assertions.Tests.AssertionResultsWritersTests;
 [TestFixture]
 public class AllureReporterTests
 {
+    private sealed class ExposedAllureReporter : AllureReporter
+    {
+        public void SaveAttachment(byte[] attachmentContent, string attachmentDirectory, string attachmentFileName)
+        {
+            SaveAttachmentIfNotAlreadySaved(attachmentContent, attachmentDirectory, attachmentFileName);
+        }
+    }
+
     [SetUp]
     public void SetUp()
     {
@@ -325,6 +333,18 @@ public class AllureReporterTests
     }
 
     [Test]
+    public void GetAttachmentDirectory_WithNullBaseDirectory_ThrowsInvalidOperationException()
+    {
+        var method = Reporter!.GetType()
+            .GetMethod("GetAttachmentDirectory", BindingFlags.NonPublic | BindingFlags.Instance)!;
+
+        var exception = Assert.Throws<TargetInvocationException>(() =>
+            method.Invoke(Reporter, new object?[] { null, null }));
+
+        Assert.That(exception!.InnerException, Is.TypeOf<InvalidOperationException>());
+    }
+
+    [Test]
     [TestCase(0)]
     [TestCase(1)]
     [TestCase(5)]
@@ -465,5 +485,622 @@ public class AllureReporterTests
         Assert.That(File.Exists(logAttachmentPath), Is.True);
         Assert.That(File.ReadAllText(logAttachmentPath), Does.Contain("Starting session test-session"));
         Assert.That(File.ReadAllText(logAttachmentPath), Does.Contain("Session test-session completed."));
+    }
+
+    [Test]
+    public void SaveAttachmentIfNotAlreadySaved_WhenDuplicateAttachmentIsSaved_WritesFileOnlyOnce()
+    {
+        var reporter = new ExposedAllureReporter
+        {
+            Context = new Context { Logger = Globals.Logger },
+            FileSystem = new FileSystem()
+        };
+
+        reporter.SaveAttachment([0x01], "Attachments", "duplicate.txt");
+        reporter.SaveAttachment([0x02], "Attachments", "duplicate.txt");
+
+        var savedFile = Path.Combine(AllureResultsFolder, "Attachments", "duplicate.txt");
+        Assert.Multiple(() =>
+        {
+            Assert.That(File.Exists(savedFile), Is.True);
+            Assert.That(File.ReadAllBytes(savedFile), Is.EqualTo(new byte[] { 0x01 }));
+            Assert.That(Directory.GetFiles(Path.Combine(AllureResultsFolder, "Attachments")),
+                Has.Length.EqualTo(1));
+        });
+    }
+
+    [Test]
+    public void SaveAttachmentIfNotAlreadySaved_WithNullFileName_ThrowsInvalidOperationException()
+    {
+        var reporter = new ExposedAllureReporter
+        {
+            Context = new Context { Logger = Globals.Logger },
+            FileSystem = new FileSystem()
+        };
+
+        Assert.Throws<InvalidOperationException>(() => reporter.SaveAttachment([0x01], "Attachments", null!));
+    }
+
+    [Test]
+    public void SaveSessionLogToAllure_WhenNoLogWasStored_ReturnsNull()
+    {
+        var method = Reporter!.GetType()
+            .GetMethod("SaveSessionLogToAllure", BindingFlags.NonPublic | BindingFlags.Instance)!;
+
+        var attachment = method.Invoke(Reporter, [new SessionData { Name = "missing-log-session" }]);
+
+        Assert.That(attachment, Is.Null);
+    }
+
+    [Test]
+    public void SaveAssertionAttachmentsToAllure_WhenAssertionHookIsMissing_ReturnsEmptyList()
+    {
+        var assertionResult = new AssertionResult
+        {
+            Assertion = new Assertion
+            {
+                Name = "no-hook",
+                AssertionName = "NoHookAssertion",
+                AssertionHook = null,
+                StatussesToReport = null
+            },
+            AssertionStatus = AssertionStatus.Passed,
+            TestDurationMs = 0,
+            Flaky = null
+        };
+
+        var attachments = (List<Attachment>)Reporter!.GetType()
+            .GetMethod("SaveAssertionAttachmentsToAllure", BindingFlags.NonPublic | BindingFlags.Instance)!
+            .Invoke(Reporter, [assertionResult])!;
+
+        Assert.That(attachments, Is.Empty);
+    }
+
+    [Test]
+    public void SaveAssertionAttachmentsToAllure_WithDuplicateNormalizedPaths_ThrowsInvalidOperationException()
+    {
+        var assertionResult = new AssertionResult
+        {
+            Assertion = new Assertion
+            {
+                AssertionHook = new AssertionHookMock
+                {
+                    AssertionAttachments =
+                    [
+                        new AssertionAttachment
+                        {
+                            Path = "folder/file.txt",
+                            SerializationType = SerializationType.Json,
+                            Data = new byte[] { 0x01 }
+                        },
+                        new AssertionAttachment
+                        {
+                            Path = "folder\\file.txt",
+                            SerializationType = SerializationType.Json,
+                            Data = new byte[] { 0x02 }
+                        }
+                    ]
+                },
+                Name = "duplicate-attachments",
+                AssertionName = "DuplicateAttachmentAssertion",
+                StatussesToReport = null
+            },
+            AssertionStatus = AssertionStatus.Passed,
+            TestDurationMs = 0,
+            Flaky = null
+        };
+
+        var method = Reporter!.GetType()
+            .GetMethod("SaveAssertionAttachmentsToAllure", BindingFlags.NonPublic | BindingFlags.Instance)!;
+
+        var exception = Assert.Throws<TargetInvocationException>(() => method.Invoke(Reporter, [assertionResult]));
+        Assert.That(exception!.InnerException, Is.TypeOf<InvalidOperationException>());
+    }
+
+    [Test]
+    public void SaveAssertionAttachmentsToAllure_WithMissingFileName_ThrowsInvalidOperationException()
+    {
+        var assertionResult = new AssertionResult
+        {
+            Assertion = new Assertion
+            {
+                AssertionHook = new AssertionHookMock
+                {
+                    AssertionAttachments =
+                    [
+                        new AssertionAttachment
+                        {
+                            Path = string.Empty,
+                            SerializationType = SerializationType.Json,
+                            Data = new byte[] { 0x01 }
+                        }
+                    ]
+                },
+                Name = "missing-file-name",
+                AssertionName = "MissingFileNameAssertion",
+                StatussesToReport = null
+            },
+            AssertionStatus = AssertionStatus.Passed,
+            TestDurationMs = 0,
+            Flaky = null
+        };
+
+        var method = Reporter!.GetType()
+            .GetMethod("SaveAssertionAttachmentsToAllure", BindingFlags.NonPublic | BindingFlags.Instance)!;
+
+        var exception = Assert.Throws<TargetInvocationException>(() => method.Invoke(Reporter, [assertionResult]));
+        Assert.That(exception!.InnerException, Is.TypeOf<InvalidOperationException>());
+    }
+
+    [Test]
+    public void GetCoveragesAsAttachments_FiltersByExecutionCaseAndSessionName()
+    {
+        Reporter!.Context = new Context
+        {
+            Logger = Globals.Logger,
+            ExecutionId = "exec-1",
+            CaseName = "case-a"
+        };
+        var coverageDirectory = Path.Combine(AllureResultsFolder, "Coverages");
+        Directory.CreateDirectory(coverageDirectory);
+        File.WriteAllText(Path.Combine(coverageDirectory, "exec-1-case-a-session-a.xml"), "match");
+        File.WriteAllText(Path.Combine(coverageDirectory, "exec-1-case-b-session-a.xml"), "wrong-case");
+        File.WriteAllText(Path.Combine(coverageDirectory, "exec-2-case-a-session-a.xml"), "wrong-execution");
+        File.WriteAllText(Path.Combine(coverageDirectory, "exec-1-case-a-session-b.xml"), "wrong-session");
+
+        var assertionResult = new AssertionResult
+        {
+            Assertion = new Assertion
+            {
+                Name = "coverage-assertion",
+                AssertionName = "CoverageAssertion",
+                SessionDataList = new List<SessionData>
+                {
+                    new() { Name = "session-a", SessionFailures = [] }
+                }.ToImmutableList(),
+                StatussesToReport = null
+            },
+            AssertionStatus = AssertionStatus.Passed,
+            TestDurationMs = 0,
+            Flaky = new Flaky { IsFlaky = false, FlakinessReasons = [] }
+        };
+
+        var method = Reporter.GetType()
+            .GetMethod("GetCoveragesAsAttachments", BindingFlags.NonPublic | BindingFlags.Instance)!;
+        var attachments = (List<Attachment>)method.Invoke(Reporter, [assertionResult])!;
+
+        Assert.That(attachments.Select(attachment => attachment.name),
+            Is.EqualTo(new[] { "exec-1-case-a-session-a.xml" }));
+    }
+
+    [TestCase(AssertionStatus.Passed, "hook-message", "hook-trace")]
+    [TestCase(AssertionStatus.Failed, "hook-message", "hook-trace")]
+    [TestCase(AssertionStatus.Unknown, "hook-message", "hook-trace")]
+    [TestCase(AssertionStatus.Skipped, "hook-message", "hook-trace")]
+    public void GetStatusDetailsAccordingToStatus_ForNonBrokenStatuses_UsesAssertionHookDetails(
+        AssertionStatus status, string expectedMessage, string expectedTrace)
+    {
+        Reporter!.DisplayTrace = true;
+        var assertionResult = new AssertionResult
+        {
+            Assertion = new Assertion
+            {
+                AssertionHook = new AssertionHookMock
+                {
+                    AssertionMessage = expectedMessage,
+                    AssertionTrace = expectedTrace
+                },
+                Name = "status-assertion",
+                AssertionName = "StatusAssertion",
+                StatussesToReport = null
+            },
+            AssertionStatus = status,
+            Flaky = new Flaky { IsFlaky = true, FlakinessReasons = [] }
+        };
+
+        var method = Reporter.GetType()
+            .GetMethod("GetStatusDetailsAccordingToStatus", BindingFlags.NonPublic | BindingFlags.Instance)!;
+        var statusDetails = (StatusDetails)method.Invoke(Reporter, [assertionResult])!;
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(statusDetails.message, Is.EqualTo(expectedMessage));
+            Assert.That(statusDetails.trace, Is.EqualTo(expectedTrace));
+            Assert.That(statusDetails.flaky, Is.True);
+        });
+    }
+
+    [Test]
+    public void GetStatusDetailsAccordingToStatus_ForBrokenStatus_UsesExceptionDetailsAndHonorsDisplayTraceFlag()
+    {
+        Reporter!.DisplayTrace = false;
+        var exception = new InvalidOperationException("broken-message");
+        var assertionResult = new AssertionResult
+        {
+            Assertion = new Assertion
+            {
+                AssertionHook = new AssertionHookMock
+                {
+                    AssertionMessage = "hook-message",
+                    AssertionTrace = "hook-trace"
+                },
+                Name = "broken-assertion",
+                AssertionName = "BrokenAssertion",
+                StatussesToReport = null
+            },
+            AssertionStatus = AssertionStatus.Broken,
+            BrokenAssertionException = exception,
+            Flaky = new Flaky { IsFlaky = false, FlakinessReasons = [] }
+        };
+
+        var method = Reporter.GetType()
+            .GetMethod("GetStatusDetailsAccordingToStatus", BindingFlags.NonPublic | BindingFlags.Instance)!;
+        var statusDetails = (StatusDetails)method.Invoke(Reporter, [assertionResult])!;
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(statusDetails.message, Is.EqualTo("broken-message"));
+            Assert.That(statusDetails.trace, Is.EqualTo("Assertion configured to not display assertion trace"));
+            Assert.That(statusDetails.flaky, Is.False);
+        });
+    }
+
+    [Test]
+    public void CreateSessionStep_WithFailuresAndNoAttachments_CreatesFailureSubStep()
+    {
+        Reporter!.SaveSessionData = false;
+        var sessionData = new SessionData
+        {
+            Name = "failed-session",
+            UtcStartTime = DateTime.UtcNow.AddSeconds(-2),
+            UtcEndTime = DateTime.UtcNow,
+            SessionFailures =
+            [
+                new ActionFailure
+                {
+                    Name = "action-name",
+                    Action = "publish",
+                    ActionType = "Publisher",
+                    Reason = new Reason
+                    {
+                        Message = "message",
+                        Description = "description"
+                    }
+                }
+            ]
+        };
+
+        var method = Reporter.GetType()
+            .GetMethod("CreateSessionStep", BindingFlags.NonPublic | BindingFlags.Instance)!;
+        var step = (StepResult)method.Invoke(Reporter, [sessionData])!;
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(step.attachments, Is.Null);
+            Assert.That(step.steps, Has.Count.EqualTo(1));
+            Assert.That(step.steps![0].name, Is.EqualTo(nameof(sessionData.SessionFailures)));
+            Assert.That(step.steps[0].steps, Has.Count.EqualTo(1));
+            Assert.That(step.steps[0].steps![0].parameters!.Select(parameter => parameter.name),
+                Is.EquivalentTo(new[]
+                {
+                    nameof(ActionFailure.Name),
+                    nameof(ActionFailure.ActionType),
+                    nameof(ActionFailure.Reason.Description)
+                }));
+        });
+    }
+
+    [Test]
+    public void GetAttachmentsForAssertion_WithSaveFlagsDisabledAndNoCoverage_ReturnsEmptyList()
+    {
+        Reporter!.SaveAttachments = false;
+        Reporter.SaveTemplate = false;
+        var assertionResult = new AssertionResult
+        {
+            Assertion = new Assertion
+            {
+                Name = "no-attachments",
+                AssertionName = "NoAttachmentsAssertion",
+                SessionDataList = [],
+                StatussesToReport = null
+            },
+            AssertionStatus = AssertionStatus.Passed,
+            Flaky = new Flaky { IsFlaky = false, FlakinessReasons = [] }
+        };
+
+        var attachments = (List<Attachment>)Reporter.GetType()
+            .GetMethod("GetAttachmentsForAssertion", BindingFlags.NonPublic | BindingFlags.Instance)!
+            .Invoke(Reporter, [assertionResult])!;
+
+        Assert.That(attachments, Is.Empty);
+    }
+
+    [Test]
+    public void GetAttachmentsForAssertion_WithTemplateOnly_ReturnsTemplateAttachment()
+    {
+        Reporter!.SaveAttachments = false;
+        Reporter.SaveTemplate = true;
+        Reporter.Context = new Context
+        {
+            Logger = Globals.Logger,
+            RootConfiguration = new ConfigurationBuilder()
+                .AddInMemoryCollection(new Dictionary<string, string?>
+                {
+                    ["MetaData:System"] = "QaaS",
+                    ["MetaData:Team"] = "Smoke"
+                })
+                .Build()
+        };
+        var assertionResult = new AssertionResult
+        {
+            Assertion = new Assertion
+            {
+                Name = "template-only",
+                AssertionName = "TemplateOnlyAssertion",
+                SessionDataList = [],
+                StatussesToReport = null
+            },
+            AssertionStatus = AssertionStatus.Passed,
+            Flaky = new Flaky { IsFlaky = false, FlakinessReasons = [] }
+        };
+
+        var attachments = (List<Attachment>)Reporter.GetType()
+            .GetMethod("GetAttachmentsForAssertion", BindingFlags.NonPublic | BindingFlags.Instance)!
+            .Invoke(Reporter, [assertionResult])!;
+
+        Assert.That(attachments, Has.Count.EqualTo(1));
+        Assert.That(attachments[0].source, Does.EndWith("template.yaml"));
+        Assert.That(attachments[0].type, Is.EqualTo("application/yaml"));
+    }
+
+    [Test]
+    public void GetAttachmentsForAssertion_WithCustomAttachmentsOnly_ReturnsCustomAttachment()
+    {
+        Reporter!.SaveAttachments = true;
+        Reporter.SaveTemplate = false;
+        var assertionResult = new AssertionResult
+        {
+            Assertion = new Assertion
+            {
+                Name = "custom-attachments",
+                AssertionName = "CustomAttachmentAssertion",
+                AssertionHook = new AssertionHookMock
+                {
+                    AssertionAttachments =
+                    [
+                        new AssertionAttachment
+                        {
+                            Path = "payload.json",
+                            SerializationType = SerializationType.Json,
+                            Data = new { Value = 5 }
+                        }
+                    ]
+                },
+                SessionDataList = [],
+                StatussesToReport = null
+            },
+            AssertionStatus = AssertionStatus.Passed,
+            Flaky = new Flaky { IsFlaky = false, FlakinessReasons = [] }
+        };
+
+        var attachments = (List<Attachment>)Reporter.GetType()
+            .GetMethod("GetAttachmentsForAssertion", BindingFlags.NonPublic | BindingFlags.Instance)!
+            .Invoke(Reporter, [assertionResult])!;
+
+        Assert.That(attachments, Has.Count.EqualTo(1));
+        Assert.That(attachments[0].source, Does.EndWith("payload.json"));
+        Assert.That(File.Exists(Path.Combine(AllureResultsFolder, attachments[0].source)), Is.True);
+    }
+
+    [Test]
+    public void SaveDataToAllure_WithNullFileName_ThrowsInvalidOperationException()
+    {
+        var method = Reporter!.GetType()
+            .GetMethod("SaveDataToAllure", BindingFlags.NonPublic | BindingFlags.Instance)!;
+
+        var exception = Assert.Throws<TargetInvocationException>(() =>
+            method.Invoke(Reporter, [new byte[] { 0x01 }, null, "Attachments", "attachment", "text/plain"]));
+
+        Assert.That(exception!.InnerException, Is.TypeOf<InvalidOperationException>());
+    }
+
+    [Test]
+    public void SaveDataToAllure_WithEmptyAttachmentDirectory_UsesFileNameAsSource()
+    {
+        var method = Reporter!.GetType()
+            .GetMethod("SaveDataToAllure", BindingFlags.NonPublic | BindingFlags.Instance)!;
+
+        var attachment = (Attachment)method.Invoke(Reporter,
+            [new byte[] { 0x01 }, "root-file.txt", string.Empty, "root-file", "text/plain"])!;
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(attachment.source, Is.EqualTo("root-file.txt"));
+            Assert.That(File.Exists(Path.Combine(AllureResultsFolder, "root-file.txt")), Is.True);
+        });
+    }
+
+    [Test]
+    public void AddTestCaseLabelsIfIsPartOfTestCase_AddsSuiteLabelsOnlyWhenCaseExists()
+    {
+        var method = Reporter!.GetType()
+            .GetMethod("AddTestCaseLabelsIfIsPartOfTestCase", BindingFlags.NonPublic | BindingFlags.Instance)!;
+        var existingLabels = new List<Label> { Label.Tag("existing") };
+
+        Reporter.Context = new Context { Logger = Globals.Logger };
+        var unchanged = (List<Label>)method.Invoke(Reporter, [existingLabels])!;
+
+        Reporter.Context = new Context { Logger = Globals.Logger, CaseName = "case-a" };
+        var updated = (List<Label>)method.Invoke(Reporter, [existingLabels])!;
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(unchanged, Is.SameAs(existingLabels));
+            Assert.That(updated.Select(label => label.name).ToList(), Has.Count.EqualTo(3));
+            Assert.That(updated.Select(label => label.value).ToList(), Contains.Item("case-a"));
+        });
+    }
+
+    [Test]
+    public void AddExecutionIdLabelsIfIsUnderAnExecutionId_AddsParentSuiteLabelsOnlyWhenExecutionExists()
+    {
+        var method = Reporter!.GetType()
+            .GetMethod("AddExecutionIdLabelsIfIsUnderAnExecutionId", BindingFlags.NonPublic | BindingFlags.Instance)!;
+        var existingLabels = new List<Label> { Label.Tag("existing") };
+
+        Reporter.Context = new Context { Logger = Globals.Logger };
+        var unchanged = (List<Label>)method.Invoke(Reporter, [existingLabels])!;
+
+        Reporter.Context = new Context { Logger = Globals.Logger, ExecutionId = "exec-a" };
+        var updated = (List<Label>)method.Invoke(Reporter, [existingLabels])!;
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(unchanged, Is.SameAs(existingLabels));
+            Assert.That(updated.Select(label => label.name).ToList(), Has.Count.EqualTo(3));
+            Assert.That(updated.Select(label => label.value).ToList(), Contains.Item("exec-a"));
+        });
+    }
+
+    [Test]
+    public void GetStatusDetailsAccordingToStatus_WithUnknownEnumValue_ThrowsArgumentOutOfRangeException()
+    {
+        var assertionResult = new AssertionResult
+        {
+            Assertion = new Assertion
+            {
+                Name = "invalid-status",
+                AssertionName = "InvalidStatusAssertion",
+                AssertionHook = new AssertionHookMock(),
+                StatussesToReport = null
+            },
+            AssertionStatus = (AssertionStatus)999,
+            Flaky = new Flaky { IsFlaky = false, FlakinessReasons = [] }
+        };
+
+        var method = Reporter!.GetType()
+            .GetMethod("GetStatusDetailsAccordingToStatus", BindingFlags.NonPublic | BindingFlags.Instance)!;
+
+        var exception = Assert.Throws<TargetInvocationException>(() => method.Invoke(Reporter, [assertionResult]));
+        Assert.That(exception!.InnerException, Is.TypeOf<ArgumentOutOfRangeException>());
+    }
+
+    [Test]
+    public void GetStatusDetailsAccordingToStatus_ForBrokenStatusWithDisplayTraceEnabled_UsesExceptionTrace()
+    {
+        Reporter!.DisplayTrace = true;
+        var exception = new InvalidOperationException("broken-message");
+        var assertionResult = new AssertionResult
+        {
+            Assertion = new Assertion
+            {
+                Name = "broken-with-trace",
+                AssertionName = "BrokenWithTraceAssertion",
+                AssertionHook = new AssertionHookMock(),
+                StatussesToReport = null
+            },
+            AssertionStatus = AssertionStatus.Broken,
+            BrokenAssertionException = exception,
+            Flaky = new Flaky { IsFlaky = false, FlakinessReasons = [] }
+        };
+
+        var statusDetails = (StatusDetails)Reporter.GetType()
+            .GetMethod("GetStatusDetailsAccordingToStatus", BindingFlags.NonPublic | BindingFlags.Instance)!
+            .Invoke(Reporter, [assertionResult])!;
+
+        Assert.That(statusDetails.trace, Does.Contain("System.InvalidOperationException"));
+    }
+
+    [Test]
+    public void WriteTestResults_WithLinksAndFlakinessReasons_WritesThemIntoAllureResult()
+    {
+        Reporter!.SaveAttachments = false;
+        Reporter.SaveTemplate = false;
+        Reporter.SaveSessionData = false;
+        Directory.CreateDirectory(AllureResultsFolder);
+        Reporter.Context = new Context
+        {
+            Logger = Globals.Logger,
+            RootConfiguration = new ConfigurationBuilder().Build()
+        };
+        var assertionResult = new AssertionResult
+        {
+            Assertion = new Assertion
+            {
+                Name = "linked-assertion",
+                AssertionName = "LinkedAssertion",
+                AssertionConfiguration = new ConfigurationBuilder()
+                    .AddInMemoryCollection(new Dictionary<string, string?>
+                    {
+                        ["enabled"] = "true"
+                    })
+                    .Build(),
+                SessionDataList = [],
+                StatussesToReport = null
+            },
+            AssertionStatus = AssertionStatus.Passed,
+            TestDurationMs = 5,
+            Flaky = new Flaky
+            {
+                IsFlaky = true,
+                FlakinessReasons =
+                [
+                    new KeyValuePair<string, List<ActionFailure>>("session-a",
+                    [
+                        new ActionFailure
+                        {
+                            Action = "Publish",
+                            ActionType = "Publisher",
+                            Name = "publish-step",
+                            Reason = new Reason
+                            {
+                                Message = "failed intermittently",
+                                Description = "temporary issue"
+                            }
+                        }
+                    ])
+                ]
+            },
+            Links = new Dictionary<string, string>
+            {
+                ["Grafana"] = "https://grafana.local/d/123"
+            }
+        };
+
+        Reporter.WriteTestResults(assertionResult);
+
+        var resultFile = Directory.GetFiles(AllureResultsFolder, "*-result.json", SearchOption.TopDirectoryOnly).Single();
+        var contents = File.ReadAllText(resultFile);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(contents, Does.Contain("https://grafana.local/d/123"));
+            Assert.That(contents, Does.Contain("Flakiness Reasons"));
+            Assert.That(contents, Does.Contain("publish-step"));
+        });
+    }
+
+    [Test]
+    public void CreateSessionStep_WithNoFailuresOrArtifacts_ReturnsPassedStepWithoutNestedSteps()
+    {
+        Reporter!.SaveSessionData = false;
+        var sessionData = new SessionData
+        {
+            Name = "clean-session",
+            UtcStartTime = DateTime.UtcNow.AddSeconds(-1),
+            UtcEndTime = DateTime.UtcNow,
+            SessionFailures = []
+        };
+
+        var step = (StepResult)Reporter.GetType()
+            .GetMethod("CreateSessionStep", BindingFlags.NonPublic | BindingFlags.Instance)!
+            .Invoke(Reporter, [sessionData])!;
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(step.status, Is.EqualTo(Status.passed));
+            Assert.That(step.attachments, Is.Null);
+            Assert.That(step.steps, Is.Null);
+        });
     }
 }

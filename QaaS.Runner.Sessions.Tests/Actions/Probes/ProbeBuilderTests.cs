@@ -1,4 +1,5 @@
 using System;
+using System.Collections;
 using System.Collections.Generic;
 using System.Reflection;
 using Moq;
@@ -172,5 +173,36 @@ public class ProbeBuilderTests
         Assert.Throws<NotSupportedException>(() =>
             builder.Read(null!, typeof(ProbeBuilder), null!)
         );
+    }
+
+    [Test]
+    public void Write_SerializesProbeConfigurationIntoDictionaryLikePayload()
+    {
+        var builder = new ProbeBuilder()
+            .Named("SerializedProbe")
+            .HookNamed("ProbeHook")
+            .AtStage(3)
+            .Configure(new { Threshold = 42, Enabled = true });
+
+        object? serialized = null;
+
+        builder.Write(null!, (payload, _) => serialized = payload);
+
+        Assert.That(serialized, Is.Not.Null);
+        var serializedType = serialized!.GetType();
+        var probeConfiguration = serializedType.GetProperty("ProbeConfiguration")!.GetValue(serialized) as IDictionary;
+        Assert.Multiple(() =>
+        {
+            Assert.That(serializedType.GetProperty("Name")!.GetValue(serialized), Is.EqualTo("SerializedProbe"));
+            Assert.That(serializedType.GetProperty("Probe")!.GetValue(serialized), Is.EqualTo("ProbeHook"));
+            Assert.That(serializedType.GetProperty("Stage")!.GetValue(serialized), Is.EqualTo(3));
+        });
+
+        Assert.That(probeConfiguration, Is.Not.Null);
+        Assert.Multiple(() =>
+        {
+            Assert.That(probeConfiguration!["Threshold"], Is.EqualTo("42"));
+            Assert.That(probeConfiguration["Enabled"], Is.EqualTo("True"));
+        });
     }
 }

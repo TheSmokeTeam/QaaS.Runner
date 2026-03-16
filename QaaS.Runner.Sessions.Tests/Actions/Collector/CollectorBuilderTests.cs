@@ -162,4 +162,23 @@ public class CollectorBuilderTests
         Assert.That(result, Is.Not.Null);
         Assert.That(fetcherField.GetValue(result!), Is.SameAs(fetcher.Object));
     }
+
+    [Test]
+    public void Build_When_Runtime_Override_Throws_ReturnsNullAndRecordsFailure()
+    {
+        var context = Globals.GetContextWithMetadata();
+        context.SetSessionActionOverrides(new SessionActionOverrides
+        {
+            Collector = _ => throw new InvalidOperationException("override failed")
+        });
+        var builder = new CollectorBuilder()
+            .Named("TestCollector")
+            .Configure(new PrometheusFetcherConfig { Url = "https://promql:8080", Expression = "sum ()" });
+
+        var result = builder.Build(context, _actionFailures, _sessionName);
+
+        Assert.That(result, Is.Null);
+        Assert.That(_actionFailures, Has.Count.EqualTo(1));
+        Assert.That(_actionFailures[0].Reason.Message, Does.Contain("override failed"));
+    }
 }

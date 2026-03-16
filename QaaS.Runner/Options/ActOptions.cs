@@ -7,8 +7,7 @@ namespace QaaS.Runner.Options;
 /// <summary>
 /// Options object to be mapped for `act` runnable command 
 /// </summary>
-[Verb("act", HelpText = "Run a qaas test without the assertions and save all sessionData."),
- ExcludeFromCodeCoverage]
+[Verb("act", HelpText = "Run a qaas test without the assertions and save all sessionData.")]
 public record ActOptions : BaseOptions
 {
     /// <inheritdoc />

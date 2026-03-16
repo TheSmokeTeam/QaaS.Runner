@@ -1,6 +1,7 @@
 using Autofac;
 using Microsoft.Extensions.Logging;
 using NUnit.Framework;
+using System.IO;
 
 namespace QaaS.Runner.Tests.RunnerTests;
 
@@ -59,7 +60,7 @@ public class RunnerTests
     public void
         TestBootstrapNewWithCustomRunner_InvokeRunMethodWithCustomRunnerMethodImplementations_CustomRunnerMethodsAreCalled()
     {
-        var runner = Bootstrap.New<MockRunner>();
+        var runner = Bootstrap.New<MockRunner>(["run", "TestData/test.qaas.yaml", "--no-process-exit"]);
         var mockRunner = runner as MockRunner;
 
         runner.Run();
@@ -70,7 +71,49 @@ public class RunnerTests
         Assert.IsTrue(mockRunner.TeardownCalled);
         Assert.IsTrue(mockRunner.BuildExecutionsCalled);
         Assert.IsTrue(mockRunner.StartExecutionsCalled);
-        Assert.That(mockRunner.ExitCode, Is.EqualTo(0));
+        Assert.That(mockRunner.ExitCode, Is.Null);
+    }
+
+    [Test]
+    public void BootstrapNew_WithNullArguments_WritesHelpWithoutInvokingRunnerLifecycle()
+    {
+        var helpOutput = CaptureStandardOutput(() =>
+        {
+            var runner = Bootstrap.New<MockRunner>(null);
+            var mockRunner = runner as MockRunner;
+
+            var exitCode = runner.RunAndGetExitCode();
+
+            Assert.That(exitCode, Is.Zero);
+            Assert.That(mockRunner, Is.Not.Null);
+            Assert.That(mockRunner!.SetupCalled, Is.False);
+            Assert.That(mockRunner.TeardownCalled, Is.False);
+            Assert.That(mockRunner.BuildExecutionsCalled, Is.False);
+            Assert.That(mockRunner.StartExecutionsCalled, Is.False);
+        });
+
+        Assert.That(helpOutput, Does.Contain("Usage:"));
+    }
+
+    [Test]
+    public void BootstrapNew_WithHelpFlag_WritesHelpWithoutInvokingRunnerLifecycle()
+    {
+        var helpOutput = CaptureStandardOutput(() =>
+        {
+            var runner = Bootstrap.New<MockRunner>(["--help"]);
+            var mockRunner = runner as MockRunner;
+
+            var exitCode = runner.RunAndGetExitCode();
+
+            Assert.That(exitCode, Is.Zero);
+            Assert.That(mockRunner, Is.Not.Null);
+            Assert.That(mockRunner!.SetupCalled, Is.False);
+            Assert.That(mockRunner.TeardownCalled, Is.False);
+            Assert.That(mockRunner.BuildExecutionsCalled, Is.False);
+            Assert.That(mockRunner.StartExecutionsCalled, Is.False);
+        });
+
+        Assert.That(helpOutput, Does.Contain("Usage:"));
     }
 
     [Test]
@@ -84,5 +127,22 @@ public class RunnerTests
             Assert.That(firstRunner.RunAndGetExitCode(), Is.Zero);
             Assert.That(secondRunner.RunAndGetExitCode(), Is.Zero);
         });
+    }
+
+    private static string CaptureStandardOutput(Action action)
+    {
+        var originalOut = Console.Out;
+        using var writer = new StringWriter();
+
+        try
+        {
+            Console.SetOut(writer);
+            action();
+            return writer.ToString();
+        }
+        finally
+        {
+            Console.SetOut(originalOut);
+        }
     }
 }

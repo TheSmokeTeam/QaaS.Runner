@@ -25,6 +25,67 @@ public class ExecutionBuilderCrudTests
     }
 
     [Test]
+    public void AddOperations_WhenCollectionsAreNull_InitializeConfiguredArrays()
+    {
+        var builder = new ExecutionBuilder
+        {
+            Sessions = null,
+            Assertions = null,
+            Storages = null,
+            DataSources = null,
+            Links = null
+        };
+        var session = new SessionBuilder { Name = "session-a", Stage = 0, Probes = [] };
+        var assertion = new AssertionBuilder
+        {
+            Name = "assertion-a",
+            Assertion = "Equals",
+            AssertionInstance = null!,
+            Reporter = null!
+        }.HookNamed("AssertionHook");
+        var storage = new StorageBuilder().Configure(new S3Config());
+        var dataSource = new DataSourceBuilder().Named("source-a").HookNamed("GeneratorHook");
+        var link = new LinkBuilder().Configure(new KibanaLinkConfig
+        {
+            Url = "https://kibana",
+            DataViewId = "view"
+        });
+
+        builder.AddSession(session)
+            .AddAssertion(assertion)
+            .AddStorage(storage)
+            .AddDataSource(dataSource)
+            .AddLink(link);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(builder.ReadSessions(), Is.EqualTo(new[] { session }));
+            Assert.That(builder.ReadAssertions(), Is.EqualTo(new[] { assertion }));
+            Assert.That(builder.ReadStorages(), Is.EqualTo(new[] { storage }));
+            Assert.That(builder.ReadDataSources(), Is.EqualTo(new[] { dataSource }));
+            Assert.That(builder.ReadLinks(), Is.EqualTo(new[] { link }));
+        });
+    }
+
+    [Test]
+    public void ReadOperations_WhenCollectionsAreNull_ReturnEmptyCollections()
+    {
+        var builder = new ExecutionBuilder
+        {
+            Assertions = null,
+            DataSources = null,
+            Links = null
+        };
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(builder.ReadAssertions(), Is.Empty);
+            Assert.That(builder.ReadDataSources(), Is.Empty);
+            Assert.That(builder.ReadLinks(), Is.Empty);
+        });
+    }
+
+    [Test]
     public void UpdateSession_ShouldReplaceMatchingSessionByName()
     {
         var original = new SessionBuilder { Name = "session-a", Stage = 0, Probes = [] };

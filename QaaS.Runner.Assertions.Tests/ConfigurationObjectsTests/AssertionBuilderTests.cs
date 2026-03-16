@@ -1,4 +1,5 @@
 using System;
+using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
 using Microsoft.Extensions.Configuration;
@@ -135,6 +136,120 @@ public class AssertionBuilderTests
 
         Assert.Throws<NotSupportedException>(() =>
             builder.Read(null!, typeof(AssertionBuilder), null!));
+    }
+
+    [Test]
+    public void SessionCrudMethods_WhenCollectionsAreNull_InitializeAndReturnEmptyFallbacks()
+    {
+        var builder = CreateBuilder();
+        builder.SessionNames = null;
+        builder.SessionNamePatterns = null;
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(builder.ReadSessionNames(), Is.Empty);
+            Assert.That(builder.ReadSessionPatterns(), Is.Empty);
+        });
+
+        builder.AddSessionName("session-a")
+            .AddSessionPattern("^session-.*$");
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(builder.ReadSessionNames(), Is.EqualTo(new[] { "session-a" }));
+            Assert.That(builder.ReadSessionPatterns(), Is.EqualTo(new[] { "^session-.*$" }));
+        });
+    }
+
+    [Test]
+    public void SessionCrudMethods_WhenCollectionsAreNullOrKeysMissing_LeaveBuilderUnchanged()
+    {
+        var builder = CreateBuilder();
+        builder.SessionNames = null;
+        builder.SessionNamePatterns = null;
+
+        builder.UpdateSessionName("missing", "updated")
+            .UpdateSessionPattern("missing", "updated")
+            .DeleteSessionName("missing")
+            .DeleteSessionPattern("missing");
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(builder.ReadSessionNames(), Is.Empty);
+            Assert.That(builder.ReadSessionPatterns(), Is.Empty);
+        });
+
+        builder.AddSessionName("session-a")
+            .AddSessionPattern("^session-.*$")
+            .UpdateSessionName("other-session", "updated")
+            .UpdateSessionPattern("^other$", "^updated$")
+            .DeleteSessionName("other-session")
+            .DeleteSessionPattern("^other$");
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(builder.ReadSessionNames(), Is.EqualTo(new[] { "session-a" }));
+            Assert.That(builder.ReadSessionPatterns(), Is.EqualTo(new[] { "^session-.*$" }));
+        });
+    }
+
+    [Test]
+    public void Write_SerializesAssertionPayloadWithConfigurationDictionary()
+    {
+        var builder = CreateBuilder()
+            .Named("assertion-display")
+            .HookNamed("hook-type")
+            .WithCategory("smoke")
+            .Configure(new
+            {
+                Enabled = true,
+                Threshold = 7
+            });
+        object? serialized = null;
+
+        builder.Write(null!, (payload, _) => serialized = payload);
+
+        Assert.That(serialized, Is.Not.Null);
+        var serializedType = serialized!.GetType();
+        var assertionConfiguration = serializedType.GetProperty("AssertionConfiguration")!.GetValue(serialized) as IDictionary;
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(builder.Category, Is.EqualTo("smoke"));
+            Assert.That(serializedType.GetProperty("Assertion")!.GetValue(serialized), Is.EqualTo("hook-type"));
+            Assert.That(serializedType.GetProperty("Name")!.GetValue(serialized), Is.EqualTo("assertion-display"));
+        });
+        Assert.That(assertionConfiguration, Is.Not.Null);
+        Assert.Multiple(() =>
+        {
+            Assert.That(assertionConfiguration!["Enabled"], Is.EqualTo("True"));
+            Assert.That(assertionConfiguration["Threshold"], Is.EqualTo("7"));
+        });
+    }
+
+    [Test]
+    public void Build_WithNullGlobalLinks_UsesOnlyLocalLinks()
+    {
+        var builder = CreateBuilder()
+            .Named("assertion-display")
+            .HookNamed("hook-type")
+            .AddLink(new LinkBuilder().Named("local-link").Configure(new PrometheusLinkConfig
+            {
+                Url = "https://prometheus.local",
+                Expressions = ["up"]
+            }));
+        var assertionHook = new AssertionHookMock();
+
+        var builtAssertion = builder.Build(
+            new List<KeyValuePair<string, IAssertion>>
+            {
+                new("assertion-display", assertionHook)
+            },
+            null);
+
+        Assert.That(builtAssertion.AssertionHook, Is.SameAs(assertionHook));
+        Assert.That(builtAssertion.Links, Has.Count.EqualTo(1));
+        Assert.That(builtAssertion.Links[0], Is.TypeOf<global::QaaS.Runner.Assertions.LinkBuilders.PrometheusLink>());
     }
 
     private static AssertionBuilder CreateBuilder()

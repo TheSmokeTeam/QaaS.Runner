@@ -90,6 +90,7 @@ public static class ConfigurationMutationExtensions
                  underlyingType == typeof(TimeSpan) ||
                  underlyingType == typeof(Guid) ||
                  underlyingType == typeof(Uri) ||
+                 typeof(IEnumerable).IsAssignableFrom(underlyingType) ||
                  underlyingType == typeof(string));
     }
 

@@ -18,6 +18,7 @@ public class Runner : IRunner, IDisposable
     private bool EmptyResults { get; set; }
     private bool ServeResults { get; set; }
     private bool DisposeSerilogLogger { get; set; } = true;
+    private int? BootstrapHandledExitCode { get; set; }
 
     /// <summary>
     /// Controls whether <see cref="Run" /> terminates the current process after the runner finishes successfully.
@@ -71,6 +72,18 @@ public class Runner : IRunner, IDisposable
     /// <returns>The aggregated exit code from the runner's executions.</returns>
     public int RunAndGetExitCode()
     {
+        // Help/version/parse-only flows still return a Runner for API compatibility, but should stop here
+        // because bootstrap already wrote the CLI output and chose the correct exit code.
+        if (BootstrapHandledExitCode.HasValue)
+        {
+            LastExitCode = BootstrapHandledExitCode.Value;
+            Logger.LogDebug(
+                "Skipping runner lifecycle because bootstrap already handled the command-line request. ExitCode={ExitCode}",
+                BootstrapHandledExitCode.Value);
+            DisposeBootstrapOnlyResources();
+            return BootstrapHandledExitCode.Value;
+        }
+
         List<Execution>? executions = null;
         var exitCode = 0;
         LastExitCode = null;
@@ -247,9 +260,26 @@ public class Runner : IRunner, IDisposable
         GC.SuppressFinalize(this);
     }
 
+    /// <summary>
+    /// Marks the runner as a bootstrap-only result so <see cref="Run" /> can return the chosen exit code without
+    /// entering the execution lifecycle.
+    /// </summary>
+    internal Runner WithBootstrapHandledExitCode(int exitCode)
+    {
+        BootstrapHandledExitCode = exitCode;
+        return this;
+    }
+
     internal Runner WithSerilogLoggerDisposal(bool disposeSerilogLogger)
     {
         DisposeSerilogLogger = disposeSerilogLogger;
         return this;
+    }
+
+    private void DisposeBootstrapOnlyResources()
+    {
+        Dispose();
+        if (DisposeSerilogLogger && SerilogLogger is IDisposable disposableLogger)
+            disposableLogger.Dispose();
     }
 }

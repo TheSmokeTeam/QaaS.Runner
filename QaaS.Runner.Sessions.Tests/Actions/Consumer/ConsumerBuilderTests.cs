@@ -26,6 +26,20 @@ public class ConsumerBuilderTests
     private IList<ActionFailure> _actionFailures = null!;
     private string _sessionName = null!;
 
+    private static IEnumerable<TestCaseData> SupportedReaderConfigurations()
+    {
+        yield return new TestCaseData(new RabbitMqReaderConfig()).SetName("ReadConfiguration_WithRabbitMq_ReturnsRabbitMq");
+        yield return new TestCaseData(new KafkaTopicReaderConfig()).SetName("ReadConfiguration_WithKafkaTopic_ReturnsKafkaTopic");
+        yield return new TestCaseData(new SocketReaderConfig()).SetName("ReadConfiguration_WithSocket_ReturnsSocket");
+        yield return new TestCaseData(new IbmMqReaderConfig()).SetName("ReadConfiguration_WithIbmMq_ReturnsIbmMq");
+        yield return new TestCaseData(new PostgreSqlReaderConfig()).SetName("ReadConfiguration_WithPostgreSql_ReturnsPostgreSql");
+        yield return new TestCaseData(new OracleReaderConfig()).SetName("ReadConfiguration_WithOracle_ReturnsOracle");
+        yield return new TestCaseData(new MsSqlReaderConfig()).SetName("ReadConfiguration_WithMsSql_ReturnsMsSql");
+        yield return new TestCaseData(new TrinoReaderConfig()).SetName("ReadConfiguration_WithTrino_ReturnsTrino");
+        yield return new TestCaseData(new ElasticReaderConfig()).SetName("ReadConfiguration_WithElastic_ReturnsElastic");
+        yield return new TestCaseData(new S3BucketReaderConfig()).SetName("ReadConfiguration_WithS3_ReturnsS3");
+    }
+
     [SetUp]
     public void SetUp()
     {
@@ -364,6 +378,23 @@ public class ConsumerBuilderTests
     }
 
     [Test]
+    [TestCaseSource(nameof(SupportedReaderConfigurations))]
+    public void ReadConfiguration_WithConfiguredType_ReturnsConfiguredInstance(IReaderConfig config)
+    {
+        var builder = new ConsumerBuilder().Configure(config);
+
+        Assert.That(builder.ReadConfiguration(), Is.SameAs(config));
+    }
+
+    [Test]
+    public void ReadConfiguration_WithoutConfiguredType_ReturnsNull()
+    {
+        var builder = new ConsumerBuilder();
+
+        Assert.That(builder.ReadConfiguration(), Is.Null);
+    }
+
+    [Test]
     public void Build_With_Valid_RabbitMq_Config_Should_Create_Consumer()
     {
         // Arrange
@@ -686,6 +717,28 @@ public class ConsumerBuilderTests
         // Assert
         Assert.That(result, Is.Null);
         Assert.That(_actionFailures.Count, Is.GreaterThan(0));
+    }
+
+    [Test]
+    public void UpdateConfiguration_WithoutExistingConfiguration_ThrowsInvalidOperationException()
+    {
+        var builder = new ConsumerBuilder();
+
+        Assert.Throws<InvalidOperationException>(() => builder.UpdateConfiguration(config => config));
+    }
+
+    [Test]
+    public void UpdatePolicyAt_WithValidIndex_ReplacesPolicy()
+    {
+        var replacementPolicy = new PolicyBuilder();
+        var builder = new ConsumerBuilder()
+            .AddPolicy(new PolicyBuilder())
+            .AddPolicy(new PolicyBuilder());
+
+        builder.UpdatePolicyAt(0, replacementPolicy);
+
+        Assert.That(builder.Policies[0], Is.SameAs(replacementPolicy));
+        Assert.That(builder.Policies[1], Is.Not.SameAs(replacementPolicy));
     }
 
     [Test]

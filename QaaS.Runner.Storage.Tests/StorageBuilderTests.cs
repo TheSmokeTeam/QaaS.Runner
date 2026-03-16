@@ -65,6 +65,15 @@ public class StorageBuilderTests
         Assert.That(returnedBuilder, Is.SameAs(builder));
     }
 
+    [Test]
+    public void UpdateConfiguration_WithoutExistingConfiguration_ThrowsInvalidOperationException()
+    {
+        var builder = new StorageBuilder();
+
+        Assert.Throws<InvalidOperationException>(() =>
+            builder.UpdateConfiguration(config => config));
+    }
+
     private static IStorage InvokeBuild(StorageBuilder builder, Context context)
     {
         var buildMethod = typeof(StorageBuilder).GetMethod("Build", BindingFlags.Instance | BindingFlags.NonPublic);

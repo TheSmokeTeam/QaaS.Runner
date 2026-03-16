@@ -148,4 +148,33 @@ public class ReportLogicTests
         firstReporter.Verify(reporter => reporter.WriteTestResults(assertionResult), Times.Once);
         secondReporter.Verify(reporter => reporter.WriteTestResults(assertionResult), Times.Once);
     }
+
+    [Test]
+    public void TestRun_WhenAssertionStatusIsNotConfiguredForReporting_DoesNotWriteResults()
+    {
+        var reporter = new Mock<IReporter>();
+        reporter.SetupGet(r => r.Name).Returns("Reporter");
+        reporter.SetupGet(r => r.AssertionName).Returns("AssertionA");
+        var assertionResult = new AssertionResult
+        {
+            Assertion = new Assertion
+            {
+                Name = "AssertionA",
+                StatussesToReport = [AssertionStatus.Failed],
+                AssertionName = null,
+                AssertionHook = null
+            },
+            AssertionStatus = AssertionStatus.Passed,
+            TestDurationMs = 0,
+            Flaky = null
+        };
+        var executionData = new ExecutionData();
+        executionData.AssertionResults.Add(assertionResult);
+        var logic = new ReportLogic([reporter.Object], Globals.GetContextWithMetadata());
+
+        var result = logic.Run(executionData);
+
+        Assert.That(result, Is.SameAs(executionData));
+        reporter.Verify(currentReporter => currentReporter.WriteTestResults(It.IsAny<AssertionResult>()), Times.Never);
+    }
 }
