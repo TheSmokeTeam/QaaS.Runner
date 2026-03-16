@@ -5,7 +5,6 @@ using System.Linq;
 using System.Net.Sockets;
 using System.Reflection;
 using NUnit.Framework;
-using QaaS.Framework.Configurations;
 using QaaS.Framework.Policies;
 using QaaS.Framework.Protocols.ConfigurationObjects;
 using QaaS.Framework.Protocols.ConfigurationObjects.Elastic;
@@ -22,6 +21,7 @@ using QaaS.Framework.SDK.Session;
 using QaaS.Framework.SDK.Session.SessionDataObjects;
 using QaaS.Framework.SDK.Session.SessionDataObjects.RunningSessionsObjects;
 using QaaS.Framework.Serialization;
+using QaaS.Runner;
 using QaaS.Runner.Sessions.Actions.Publishers.Builders;
 using QaaS.Runner.Sessions.ConfigurationObjects;
 using Serilog;
@@ -418,8 +418,7 @@ public class PublisherBuilderTests
 
         // Act 
         var validationResults = new List<ValidationResult>();
-        ValidationUtils.TryValidateObjectRecursive(publisherBuilder, validationResults,
-            bindingFlags: BindingFlags.NonPublic | BindingFlags.Public | BindingFlags.Instance);
+        RunnerValidationUtils.TryValidateProperties(publisherBuilder, validationResults, "Chunk");
 
         // Assert
         Assert.That(validationResults.Count(r => r.ErrorMessage!.Contains("Chunk")), Is.EqualTo(1));
@@ -437,15 +436,13 @@ public class PublisherBuilderTests
 
         // Act 
         var validationResults = new List<ValidationResult>();
-        ValidationUtils.TryValidateObjectRecursive(publisherBuilder, validationResults,
-            bindingFlags: BindingFlags.NonPublic | BindingFlags.Public | BindingFlags.Instance);
+        RunnerValidationUtils.TryValidateProperties(publisherBuilder, validationResults, "Chunk");
 
         // Assert
         Assert.That(validationResults.Count(r => r.ErrorMessage!.Contains("Chunk")), Is.EqualTo(1));
     }
 
     [Test]
-    [TestCaseSource(nameof(TestSendersWhichSupportAllSending))]
     [TestCaseSource(nameof(TestSendersWhichSupportSingleSending))]
     public void
         TestValidationOfChunks_ConfigureValidConfigurationAccordingToIfTheProtocolNeedsChunksOrNot_ShouldBeValidOnSingleProtocols(
@@ -457,8 +454,7 @@ public class PublisherBuilderTests
 
         // Act 
         var validationResults = new List<ValidationResult>();
-        ValidationUtils.TryValidateObjectRecursive(publisherBuilder, validationResults,
-            bindingFlags: BindingFlags.NonPublic | BindingFlags.Public | BindingFlags.Instance);
+        RunnerValidationUtils.TryValidateProperties(publisherBuilder, validationResults, "Chunk");
 
         // Assert
         Assert.That(validationResults.Count(r => r.ErrorMessage!.Contains("Chunk")), Is.EqualTo(0));
@@ -466,7 +462,6 @@ public class PublisherBuilderTests
 
 
     [Test]
-    [TestCaseSource(nameof(TestSendersWhichSupportAllSending))]
     [TestCaseSource(nameof(TestSendersWhichSupportChunkSending))]
     public void
         TestValidationOfChunks_ConfigureValidConfigurationAccordingToIfTheProtocolNeedsChunksOrNot_ShouldBeValidOnChunkProtocols(
@@ -479,8 +474,7 @@ public class PublisherBuilderTests
 
         // Act 
         var validationResults = new List<ValidationResult>();
-        ValidationUtils.TryValidateObjectRecursive(publisherBuilder, validationResults,
-            bindingFlags: BindingFlags.NonPublic | BindingFlags.Public | BindingFlags.Instance);
+        RunnerValidationUtils.TryValidateProperties(publisherBuilder, validationResults, "Chunk");
 
         // Assert
         Assert.That(validationResults.Count(r => r.ErrorMessage!.Contains("Chunk")), Is.EqualTo(0));

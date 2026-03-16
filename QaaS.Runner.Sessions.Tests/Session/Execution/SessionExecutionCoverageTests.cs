@@ -50,7 +50,7 @@ using QaaS.Runner.Sessions.Session.Builders;
 using QaaS.Runner.Sessions.RuntimeOverrides;
 using Qaas.Mocker.CommunicationObjects.ConfigurationObjects.Command;
 
-namespace QaaS.Runner.Tests.SessionTests;
+namespace QaaS.Runner.Sessions.Tests.Session.Execution;
 
 [TestFixture]
 [Parallelizable(ParallelScope.All)]
@@ -88,7 +88,7 @@ public class SessionExecutionCoverageTests
 
         context.ExecutionData.DataSources = CreateDataSources();
         context.ExecutionData.SessionDatas.Clear();
-        context.SetSessionActionFactoryOverrides(CreateFactoryOverrides(registry, scenario));
+        context.SetSessionActionOverrides(CreateActionOverrides(registry, scenario));
 
         var sessionBuilder = source == ScenarioSource.Code
             ? CreateCodeSessionBuilder(scenario)
@@ -114,7 +114,7 @@ public class SessionExecutionCoverageTests
 
         context.ExecutionData.DataSources = CreateDataSources();
         context.ExecutionData.SessionDatas.Clear();
-        context.SetSessionActionFactoryOverrides(CreateFactoryOverrides(registry, scenario));
+        context.SetSessionActionOverrides(CreateActionOverrides(registry, scenario));
 
         var sessionBuilder = source == ScenarioSource.Code
             ? CreateCodeSessionBuilder(scenario)
@@ -139,7 +139,7 @@ public class SessionExecutionCoverageTests
             Publisher: new PublisherDefinition(
                 ActionName: "publisher-save-data-disabled",
                 ConfigKey: "RabbitMq",
-                Configuration: new RabbitMqSenderConfig { Host = "https://publisher.test" },
+                Configuration: CreateValidRabbitMqSenderConfig("https://publisher.test"),
                 UseChunkSending: false,
                 UseDataSourcePatterns: false,
                 UseBinarySerialization: true,
@@ -153,7 +153,7 @@ public class SessionExecutionCoverageTests
 
         context.ExecutionData.DataSources = CreateDataSources();
         context.ExecutionData.SessionDatas.Clear();
-        context.SetSessionActionFactoryOverrides(CreateFactoryOverrides(registry, scenario));
+        context.SetSessionActionOverrides(CreateActionOverrides(registry, scenario));
 
         var sessionBuilder = source == ScenarioSource.Code
             ? CreateCodeSessionBuilder(scenario)
@@ -176,16 +176,16 @@ public class SessionExecutionCoverageTests
             Name: targetSessionName,
             Category: "target",
             Consumer: CreateSingleReaderConsumer("consumer-filter-target", "RabbitMq",
-                new RabbitMqReaderConfig { Host = "https://consumer.test" }, useBinarySerialization: true));
+                CreateValidRabbitMqReaderConfig("https://consumer.test"), useBinarySerialization: true));
         var ignored = new SessionScenarioDefinition(
             Name: "ignored-session",
             Category: "ignored",
             Consumer: CreateSingleReaderConsumer("consumer-filter-ignored", "RabbitMq",
-                new RabbitMqReaderConfig { Host = "https://consumer.test" }, useBinarySerialization: true));
+                CreateValidRabbitMqReaderConfig("https://consumer.test"), useBinarySerialization: true));
 
         var registry = new MockRuntimeRegistry();
         var context = CreateContextFromYaml(BuildYamlConfiguration([target, ignored]));
-        context.SetSessionActionFactoryOverrides(CreateFactoryOverrides(registry, target, ignored));
+        context.SetSessionActionOverrides(CreateActionOverrides(registry, target, ignored));
 
         using var execution = new ExecutionBuilder(context, ExecutionType.Act, [targetSessionName], null, null, null)
             .Build();
@@ -204,16 +204,16 @@ public class SessionExecutionCoverageTests
             Name: "category-target-session",
             Category: "critical",
             Consumer: CreateSingleReaderConsumer("consumer-category-target", "RabbitMq",
-                new RabbitMqReaderConfig { Host = "https://consumer.test" }, useBinarySerialization: false));
+                CreateValidRabbitMqReaderConfig("https://consumer.test"), useBinarySerialization: false));
         var ignored = new SessionScenarioDefinition(
             Name: "category-ignored-session",
             Category: "background",
             Consumer: CreateSingleReaderConsumer("consumer-category-ignored", "RabbitMq",
-                new RabbitMqReaderConfig { Host = "https://consumer.test" }, useBinarySerialization: false));
+                CreateValidRabbitMqReaderConfig("https://consumer.test"), useBinarySerialization: false));
 
         var registry = new MockRuntimeRegistry();
         var context = CreateContextFromYaml(BuildYamlConfiguration([target, ignored]));
-        context.SetSessionActionFactoryOverrides(CreateFactoryOverrides(registry, target, ignored));
+        context.SetSessionActionOverrides(CreateActionOverrides(registry, target, ignored));
 
         using var execution = new ExecutionBuilder(context, ExecutionType.Act, null, ["critical"], null, null)
             .Build();
@@ -297,21 +297,21 @@ public class SessionExecutionCoverageTests
             Name: "protocol-mocker-change-action-stub",
             Mocker: new MockerDefinition(
                 ActionName: "mocker-change-action-stub",
-                Command: new CommandConfig { ChangeActionStub = new ChangeActionStub() },
+                Command: new MockerCommandConfig { ChangeActionStub = new ChangeActionStub() },
                 Flavor: CommandFlavor.ChangeActionStub));
 
         yield return new SessionScenarioDefinition(
             Name: "protocol-mocker-trigger-action",
             Mocker: new MockerDefinition(
                 ActionName: "mocker-trigger-action",
-                Command: new CommandConfig { TriggerAction = new TriggerAction() },
+                Command: new MockerCommandConfig { TriggerAction = new TriggerAction() },
                 Flavor: CommandFlavor.TriggerAction));
 
         yield return new SessionScenarioDefinition(
             Name: "protocol-mocker-consume",
             Mocker: new MockerDefinition(
                 ActionName: "mocker-consume",
-                Command: new CommandConfig { Consume = new ConsumeConfig() },
+                Command: new MockerCommandConfig { Consume = new ConsumeCommandConfig() },
                 Flavor: CommandFlavor.Consume));
     }
 
@@ -320,7 +320,7 @@ public class SessionExecutionCoverageTests
         yield return new SessionScenarioDefinition(
             Name: "protocol-consumer-rabbitmq",
             Consumer: CreateSingleReaderConsumer("consumer-rabbitmq", "RabbitMq",
-                new RabbitMqReaderConfig { Host = "https://rabbitmq.test" }, useBinarySerialization: true));
+                CreateValidRabbitMqReaderConfig("https://rabbitmq.test"), useBinarySerialization: true));
         yield return new SessionScenarioDefinition(
             Name: "protocol-consumer-kafka",
             Consumer: CreateSingleReaderConsumer("consumer-kafka", "KafkaTopic",
@@ -427,7 +427,7 @@ public class SessionExecutionCoverageTests
         yield return new SessionScenarioDefinition(
             Name: "protocol-publisher-rabbitmq",
             Publisher: CreateSinglePublisher("publisher-rabbitmq", "RabbitMq",
-                new RabbitMqSenderConfig { Host = "https://rabbitmq.test" }, useBinarySerialization: true));
+                CreateValidRabbitMqSenderConfig("https://rabbitmq.test"), useBinarySerialization: true));
         yield return new SessionScenarioDefinition(
             Name: "protocol-publisher-kafka",
             Publisher: CreateSinglePublisher("publisher-kafka", "KafkaTopic",
@@ -529,7 +529,7 @@ public class SessionExecutionCoverageTests
                             iterations: 2,
                             parallelism: 2)
                         : CreateSinglePublisher("publisher-combo", "RabbitMq",
-                            new RabbitMqSenderConfig { Host = "https://publisher.test" },
+                            CreateValidRabbitMqSenderConfig("https://publisher.test"),
                             useBinarySerialization,
                             usePatterns,
                             iterations: 2,
@@ -556,7 +556,7 @@ public class SessionExecutionCoverageTests
                             UseBinarySerialization: useBinarySerialization,
                             MessageCount: ConsumerOutputs.Length)
                         : CreateSingleReaderConsumer("consumer-combo", "RabbitMq",
-                            new RabbitMqReaderConfig { Host = "https://consumer.test" }, useBinarySerialization),
+                            CreateValidRabbitMqReaderConfig("https://consumer.test"), useBinarySerialization),
                 Transaction: (mask & (int)SessionActionFlags.Transaction) == 0
                     ? null
                     : new TransactionDefinition(
@@ -588,8 +588,8 @@ public class SessionExecutionCoverageTests
                     : new MockerDefinition(
                         ActionName: "mocker-combo",
                         Command: useConsumeCommand
-                            ? new CommandConfig { Consume = new ConsumeConfig() }
-                            : new CommandConfig { TriggerAction = new TriggerAction() },
+                            ? new MockerCommandConfig { Consume = new ConsumeCommandConfig() }
+                            : new MockerCommandConfig { TriggerAction = new TriggerAction() },
                         Flavor: useConsumeCommand ? CommandFlavor.Consume : CommandFlavor.TriggerAction));
         }
     }
@@ -606,6 +606,15 @@ public class SessionExecutionCoverageTests
             MessageCount: ConsumerOutputs.Length);
     }
 
+    private static RabbitMqReaderConfig CreateValidRabbitMqReaderConfig(string host)
+    {
+        return new RabbitMqReaderConfig
+        {
+            Host = host,
+            QueueName = "queue"
+        };
+    }
+
     private static PublisherDefinition CreateSinglePublisher(string actionName, string configKey,
         ISenderConfig configuration, bool useBinarySerialization, bool usePatterns = false, int iterations = 1,
         int? parallelism = null)
@@ -619,6 +628,16 @@ public class SessionExecutionCoverageTests
             UseBinarySerialization: useBinarySerialization,
             Iterations: iterations,
             Parallelism: parallelism);
+    }
+
+    private static RabbitMqSenderConfig CreateValidRabbitMqSenderConfig(string host)
+    {
+        return new RabbitMqSenderConfig
+        {
+            Host = host,
+            ExchangeName = "exchange",
+            RoutingKey = "routing-key"
+        };
     }
 
     private static PublisherDefinition CreateChunkPublisher(string actionName, string configKey,
@@ -867,12 +886,12 @@ public class SessionExecutionCoverageTests
         return builder;
     }
 
-    private static SessionActionFactoryOverrides CreateFactoryOverrides(MockRuntimeRegistry registry,
+    private static SessionActionOverrides CreateActionOverrides(MockRuntimeRegistry registry,
         params SessionScenarioDefinition[] scenarios)
     {
-        return new SessionActionFactoryOverrides
+        return new SessionActionOverrides
         {
-            ConsumerFactory = request =>
+            Consumer = request =>
             {
                 var scenario = scenarios.Single(session =>
                     session.Consumer?.ActionName == request.ActionName);
@@ -881,7 +900,7 @@ public class SessionExecutionCoverageTests
                     ? (null, CreateChunkReaderMock(request.ActionName, registry, consumer.UseBinarySerialization).Object)
                     : (CreateReaderMock(request.ActionName, registry, consumer.UseBinarySerialization).Object, null);
             },
-            PublisherFactory = request =>
+            Publisher = request =>
             {
                 var scenario = scenarios.Single(session =>
                     session.Publisher?.ActionName == request.ActionName);
@@ -891,21 +910,21 @@ public class SessionExecutionCoverageTests
                         CreateChunkSenderMock(request.ActionName, registry, publisher.UseBinarySerialization).Object)
                     : (CreateSenderMock(request.ActionName, registry, publisher.UseBinarySerialization).Object, null);
             },
-            TransactionFactory = request =>
+            Transaction = request =>
             {
                 var scenario = scenarios.Single(session =>
                     session.Transaction?.ActionName == request.ActionName);
                 return CreateTransactorMock(request.ActionName, registry, scenario.Transaction!.UseBinarySerialization)
                     .Object;
             },
-            CollectorFactory = request =>
+            Collector = request =>
             {
                 var scenario = scenarios.Single(session =>
                     session.Collector?.ActionName == request.ActionName);
                 return CreateFetcherMock(request.ActionName, registry, scenario.Collector!.UseBinarySerialization)
                     .Object;
             },
-            MockerCommandFactory = request =>
+            MockerCommand = request =>
             {
                 var scenario = scenarios.Single(session =>
                     session.Mocker?.ActionName == request.ActionName);
@@ -1660,7 +1679,7 @@ public class SessionExecutionCoverageTests
     private sealed record CollectorDefinition(string ActionName, string ConfigKey, IFetcherConfig Configuration,
         bool UseBinarySerialization);
 
-    private sealed record MockerDefinition(string ActionName, CommandConfig Command, CommandFlavor Flavor,
+    private sealed record MockerDefinition(string ActionName, MockerCommandConfig Command, CommandFlavor Flavor,
         bool UseBinarySerialization = false);
 
     private enum CommandFlavor

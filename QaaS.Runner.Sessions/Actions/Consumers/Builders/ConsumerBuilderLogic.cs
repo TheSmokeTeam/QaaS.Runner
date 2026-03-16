@@ -220,8 +220,8 @@ public partial class ConsumerBuilder
             type = allTypes.FirstOrDefault(configuredType => configuredType != null) ??
                    throw new InvalidOperationException($"Missing supported type in consumer {Name}");
 
-            var factoryRequest = new ConsumerFactoryRequest(Name!, type, context.Logger, DataFilter);
-            var (reader, chunkReader) = context.GetSessionActionFactoryOverrides()?.ConsumerFactory?.Invoke(factoryRequest)
+            var overrideRequest = new ConsumerOverrideRequest(Name!, type, context.Logger, DataFilter);
+            var (reader, chunkReader) = context.GetSessionActionOverrides()?.Consumer?.Invoke(overrideRequest)
                                         ?? ReaderFactory.CreateReader(type, context.Logger, DataFilter);
             var consumerTypeName = reader?.GetType().Name ?? chunkReader?.GetType().Name ?? "Unknown";
             

@@ -1,15 +1,18 @@
 using System;
 using System.Collections.Generic;
+using System.Reflection;
 using Moq;
 using NUnit.Framework;
 using QaaS.Framework.Protocols.ConfigurationObjects;
 using QaaS.Framework.Protocols.ConfigurationObjects.Prometheus;
+using QaaS.Framework.Protocols.Protocols;
 using QaaS.Framework.SDK.ContextObjects;
 using QaaS.Framework.SDK.Session;
 using QaaS.Framework.SDK.Session.SessionDataObjects;
 using QaaS.Framework.SDK.Session.SessionDataObjects.RunningSessionsObjects;
 using QaaS.Runner.Sessions.Actions.Collectors;
 using QaaS.Runner.Sessions.ConfigurationObjects;
+using QaaS.Runner.Sessions.RuntimeOverrides;
 using Serilog;
 using Serilog.Events;
 using Serilog.Extensions.Logging;
@@ -126,5 +129,37 @@ public class CollectorBuilderTests
                 .Named("TestCollector")
                 .Configure(unsupportedConfig);
         });
+    }
+
+    [Test]
+    public void UpdateConfiguration_Without_Existing_Configuration_Should_Throw()
+    {
+        var builder = new CollectorBuilder()
+            .Named("TestCollector");
+
+        Assert.Throws<InvalidOperationException>(() =>
+            builder.UpdateConfiguration(config => config));
+    }
+
+    [Test]
+    public void Build_With_Runtime_Override_Uses_Override_Action()
+    {
+        var fetcher = new Mock<IFetcher>();
+        var context = Globals.GetContextWithMetadata();
+        context.SetSessionActionOverrides(new SessionActionOverrides
+        {
+            Collector = _ => fetcher.Object
+        });
+
+        var builder = new CollectorBuilder()
+            .Named("TestCollector")
+            .Configure(new PrometheusFetcherConfig { Url = "https://promql:8080", Expression = "sum ()" });
+
+        var result = builder.Build(context, _actionFailures, _sessionName);
+        var fetcherField = typeof(global::QaaS.Runner.Sessions.Actions.Collectors.Collector)
+            .GetField("_fetcher", BindingFlags.Instance | BindingFlags.NonPublic)!;
+
+        Assert.That(result, Is.Not.Null);
+        Assert.That(fetcherField.GetValue(result!), Is.SameAs(fetcher.Object));
     }
 }

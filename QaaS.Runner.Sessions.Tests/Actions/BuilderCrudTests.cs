@@ -314,26 +314,26 @@ public class BuilderCrudTests
     }
 
     [Test]
-    public void MockerCommandBuilder_ShouldSupportCommandCrud()
+    public void MockerCommandBuilder_ShouldSupportConfigurationCrud()
     {
-        var builder = new MockerCommandBuilder().CreateCommand(new CommandConfig
+        var builder = new MockerCommandBuilder().CreateConfiguration(new MockerCommandConfig
         {
-            Consume = new ConsumeConfig()
+            Consume = new ConsumeCommandConfig()
         });
 
-        builder.UpdateCommand(_ => new CommandConfig
+        builder.UpdateConfiguration(_ => new MockerCommandConfig
         {
             TriggerAction = new TriggerAction()
         });
-        builder.UpsertCommand(new CommandConfig
+        builder.UpdateConfiguration(new MockerCommandConfig
         {
-            Consume = new ConsumeConfig()
+            Consume = new ConsumeCommandConfig()
         });
 
-        Assert.That(builder.ReadCommand(), Is.Not.Null);
-        Assert.That(builder.ReadCommand()!.Consume, Is.Not.Null);
+        Assert.That(builder.ReadConfiguration(), Is.Not.Null);
+        Assert.That(builder.ReadConfiguration()!.Consume, Is.Not.Null);
 
-        builder.DeleteCommand();
-        Assert.That(builder.ReadCommand(), Is.Null);
+        builder.DeleteConfiguration();
+        Assert.That(builder.ReadConfiguration(), Is.Null);
     }
 }

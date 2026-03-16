@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Reflection;
 using Moq;
 using NUnit.Framework;
 using QaaS.Framework.SDK.ContextObjects;
@@ -70,6 +71,22 @@ public class ProbeBuilderTests
     }
 
     [Test]
+    public void AddDataSourceFilters_When_Collections_Are_Null_Initializes_Them()
+    {
+        var builder = new ProbeBuilder();
+        typeof(ProbeBuilder).GetProperty("DataSourceNames", BindingFlags.Instance | BindingFlags.NonPublic)!
+            .SetValue(builder, null);
+        typeof(ProbeBuilder).GetProperty("DataSourcePatterns", BindingFlags.Instance | BindingFlags.NonPublic)!
+            .SetValue(builder, null);
+
+        builder.AddDataSourceName("DataSource1")
+            .AddDataSourcePattern(@"^\w+$");
+
+        Assert.That(builder.DataSourceNames, Contains.Item("DataSource1"));
+        Assert.That(builder.DataSourcePatterns, Contains.Item(@"^\w+$"));
+    }
+
+    [Test]
     public void Configure_Should_Set_Configuration()
     {
         var config = new { Key1 = "Value1", Key2 = 42 };
@@ -131,6 +148,21 @@ public class ProbeBuilderTests
 
         Assert.That(probe, Is.Null);
         Assert.That(actionFailures.Count, Is.EqualTo(1));
+    }
+
+    [Test]
+    public void Build_When_Name_Is_Missing_Should_Add_Failure_And_Return_Null()
+    {
+        var probes = new List<KeyValuePair<string, IProbe>>();
+        var actionFailures = new List<ActionFailure>();
+        var builder = new ProbeBuilder()
+            .HookNamed("SomeHook");
+
+        var probe = builder.Build(_context, probes, actionFailures, "Session1");
+
+        Assert.That(probe, Is.Null);
+        Assert.That(actionFailures, Has.Count.EqualTo(1));
+        Assert.That(actionFailures[0].Reason.Message, Does.Contain("Probe Name is required"));
     }
 
     [Test]

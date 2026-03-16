@@ -336,7 +336,7 @@ public class MockerCommandInternalsTests
     public void CommandRequestConstructor_IncludesRelevantCommandConfiguration()
     {
         var command = CreateUninitializedTriggerCommand();
-        SetField(typeof(MockerCommand), command, "CommandConfig",
+        SetField(typeof(MockerCommand), command, "SupportedCommandConfiguration",
             new TriggerAction { ActionName = "trigger-a", TimeoutMs = 321 });
 
         var commandPayload = (string)InvokeNonPublicMethod(typeof(MockerCommand), command, "CommandRequestConstructor")!;
@@ -464,7 +464,7 @@ public class MockerCommandInternalsTests
     public void ConsumeMockerCommand_MethodGettersReturnConfiguredValues()
     {
         var consumeCommand = CreateUninitializedConsumeCommand();
-        SetField(typeof(ConsumeMockerCommand), consumeCommand, "_consumeConfig", new ConsumeConfig
+        SetField(typeof(ConsumeMockerCommand), consumeCommand, "_consumeConfig", new ConsumeCommandConfig
         {
             InputDeserialize = new DeserializeConfig { Deserializer = SerializationType.Json },
             OutputDeserialize = new DeserializeConfig { Deserializer = SerializationType.Xml }
@@ -714,7 +714,7 @@ public class MockerCommandInternalsTests
         typeof(MockerCommand).GetProperty("ServerInputOutputState", BindingFlags.Instance | BindingFlags.NonPublic)!
             .SetValue(consumeCommand, InputOutputState.BothInputOutput);
 
-        SetField(typeof(ConsumeMockerCommand), consumeCommand, "_consumeConfig", new ConsumeConfig
+        SetField(typeof(ConsumeMockerCommand), consumeCommand, "_consumeConfig", new ConsumeCommandConfig
         {
             TimeoutMs = 5,
             InputDeserialize = new DeserializeConfig { Deserializer = SerializationType.Json }
@@ -771,7 +771,7 @@ public class MockerCommandInternalsTests
         typeof(MockerCommand).GetProperty("ServerInputOutputState", BindingFlags.Instance | BindingFlags.NonPublic)!
             .SetValue(consumeCommand, InputOutputState.OnlyOutput);
 
-        SetField(typeof(ConsumeMockerCommand), consumeCommand, "_consumeConfig", new ConsumeConfig
+        SetField(typeof(ConsumeMockerCommand), consumeCommand, "_consumeConfig", new ConsumeCommandConfig
         {
             TimeoutMs = 5,
             OutputDeserialize = new DeserializeConfig { Deserializer = SerializationType.Json }
@@ -832,7 +832,7 @@ public class MockerCommandInternalsTests
         SetField(typeof(StagedAction), command, "<Stage>k__BackingField", 0);
         SetField(typeof(MockerCommand), command, "_commandId", "cmd-id");
         SetField(typeof(MockerCommand), command, "ServerName", "server-a");
-        SetField(typeof(MockerCommand), command, "CommandConfig", new TriggerAction());
+        SetField(typeof(MockerCommand), command, "SupportedCommandConfiguration", new TriggerAction());
         SetField(typeof(MockerCommand), command, "_requestDurationMs", 0);
         SetField(typeof(MockerCommand), command, "_requestRetries", 1);
         SetField(typeof(MockerCommand), command, "_redisHost", "localhost");
@@ -856,7 +856,7 @@ public class MockerCommandInternalsTests
         SetField(typeof(StagedAction), command, "<Stage>k__BackingField", 0);
         SetField(typeof(MockerCommand), command, "_commandId", "cmd-id");
         SetField(typeof(MockerCommand), command, "ServerName", "server-a");
-        SetField(typeof(MockerCommand), command, "CommandConfig", new ChangeActionStub());
+        SetField(typeof(MockerCommand), command, "SupportedCommandConfiguration", new ChangeActionStub());
         SetField(typeof(MockerCommand), command, "_requestDurationMs", 0);
         SetField(typeof(MockerCommand), command, "_requestRetries", 1);
         SetField(typeof(MockerCommand), command, "_redisHost", "localhost");
@@ -879,7 +879,7 @@ public class MockerCommandInternalsTests
         SetField(typeof(StagedAction), command, "<Stage>k__BackingField", 0);
         SetField(typeof(MockerCommand), command, "_commandId", "cmd-id");
         SetField(typeof(MockerCommand), command, "ServerName", "server-a");
-        SetField(typeof(MockerCommand), command, "CommandConfig", new ConsumeConfig());
+        SetField(typeof(MockerCommand), command, "SupportedCommandConfiguration", new ConsumeCommandConfig());
         SetField(typeof(MockerCommand), command, "_requestDurationMs", 0);
         SetField(typeof(MockerCommand), command, "_requestRetries", 1);
         SetField(typeof(MockerCommand), command, "_redisHost", "localhost");
@@ -890,7 +890,7 @@ public class MockerCommandInternalsTests
         SetField(typeof(MockerCommand), command, "_sentRunningCommunicationData", new RunningCommunicationData<object>());
         SetField(typeof(MockerCommand), command, "RedisDatabase", new Mock<IDatabase>().Object);
 
-        SetField(typeof(ConsumeMockerCommand), command, "_consumeConfig", new ConsumeConfig { TimeoutMs = 5 });
+        SetField(typeof(ConsumeMockerCommand), command, "_consumeConfig", new ConsumeCommandConfig { TimeoutMs = 5 });
         SetField(typeof(ConsumeMockerCommand), command, "_inputDataFilter", new DataFilter());
         SetField(typeof(ConsumeMockerCommand), command, "_outputDataFilter", new DataFilter());
 

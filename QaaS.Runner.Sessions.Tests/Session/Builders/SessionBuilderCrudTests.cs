@@ -15,6 +15,56 @@ namespace QaaS.Runner.Sessions.Tests.Session.Builders;
 public class SessionBuilderCrudTests
 {
     [Test]
+    public void CrudOperations_WhenCollectionsAreNull_TreatCollectionsAsEmptyUntilItemsAreAdded()
+    {
+        var builder = new SessionBuilder();
+        SetActionCollections(builder, null);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(builder.ReadConsumers(), Is.Empty);
+            Assert.That(builder.ReadPublishers(), Is.Empty);
+            Assert.That(builder.ReadTransactions(), Is.Empty);
+            Assert.That(builder.ReadProbes(), Is.Empty);
+            Assert.That(builder.ReadCollectors(), Is.Empty);
+            Assert.That(builder.ReadMockerCommands(), Is.Empty);
+            Assert.That(builder.ReadConsumer("missing"), Is.Null);
+            Assert.That(builder.ReadPublisher("missing"), Is.Null);
+            Assert.That(builder.ReadTransaction("missing"), Is.Null);
+            Assert.That(builder.ReadProbe("missing"), Is.Null);
+            Assert.That(builder.ReadCollector("missing"), Is.Null);
+            Assert.That(builder.ReadMockerCommand("missing"), Is.Null);
+        });
+
+        Assert.DoesNotThrow(() =>
+        {
+            builder.DeleteConsumer("missing")
+                .DeletePublisher("missing")
+                .DeleteTransaction("missing")
+                .DeleteProbe("missing")
+                .DeleteCollector("missing")
+                .DeleteMockerCommand("missing");
+        });
+
+        builder.AddConsumer(new ConsumerBuilder().Named("consumer-a"))
+            .AddPublisher(new PublisherBuilder().Named("publisher-a"))
+            .AddTransaction(new TransactionBuilder().Named("transaction-a"))
+            .AddProbe(new ProbeBuilder().Named("probe-a"))
+            .AddCollector(new CollectorBuilder().Named("collector-a"))
+            .AddMockerCommand(new MockerCommandBuilder().Named("command-a"));
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(builder.ReadConsumers(), Has.Count.EqualTo(1));
+            Assert.That(builder.ReadPublishers(), Has.Count.EqualTo(1));
+            Assert.That(builder.ReadTransactions(), Has.Count.EqualTo(1));
+            Assert.That(builder.ReadProbes(), Has.Count.EqualTo(1));
+            Assert.That(builder.ReadCollectors(), Has.Count.EqualTo(1));
+            Assert.That(builder.ReadMockerCommands(), Has.Count.EqualTo(1));
+        });
+    }
+
+    [Test]
     public void Consumers_ShouldSupportCrudByName()
     {
         var builder = new SessionBuilder()
@@ -157,5 +207,22 @@ public class SessionBuilderCrudTests
 
         Assert.That(builder.ReadPublishers(), Has.Count.EqualTo(1));
         Assert.That(builder.ReadPublishers()[0].Name, Is.EqualTo("publisher-a"));
+    }
+
+    private static void SetActionCollections(SessionBuilder builder, object? value)
+    {
+        foreach (var propertyName in new[]
+                 {
+                     "Consumers",
+                     "Publishers",
+                     "Transactions",
+                     "Probes",
+                     "Collectors",
+                     "MockerCommands"
+                 })
+        {
+            typeof(SessionBuilder).GetProperty(propertyName, BindingFlags.Instance | BindingFlags.NonPublic)!
+                .SetValue(builder, value);
+        }
     }
 }

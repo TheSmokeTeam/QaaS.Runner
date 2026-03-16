@@ -81,7 +81,7 @@ public class ProbeBuilder : IYamlConvertible
 
     public ProbeBuilder AddDataSourceName(string dataSourceName)
     {
-        var dataSourceNamesList = DataSourceNames.ToList() ?? [];
+        var dataSourceNamesList = DataSourceNames?.ToList() ?? [];
         dataSourceNamesList.Add(dataSourceName);
         DataSourceNames = dataSourceNamesList.ToArray();
         return this;

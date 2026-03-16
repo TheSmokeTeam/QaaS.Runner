@@ -1,6 +1,8 @@
 using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
+using System.Reflection;
 using System.Threading;
 using Microsoft.Extensions.Logging;
 using Moq;
@@ -377,6 +379,78 @@ public class SessionTests
         Assert.That(disposed, Is.True);
     }
 
+    [Test]
+    public void Run_When_Action_Fails_Skips_Null_Task_Results_And_Returns_Remaining_Data()
+    {
+        const string sessionName = "partial-failure-session";
+        var context = CreationalFunctions.CreateContext(sessionName, []);
+        var actionFailures = new ConcurrentBag<ActionFailure>();
+        var stage = new Stage(context, actionFailures, sessionName, 0, 0, 0);
+        stage.AddCommunication(new SuccessfulStageAction("success"));
+        stage.AddCommunication(new ExceptionalStageAction("failure", new InvalidOperationException("boom")));
+
+        var session = new Sessions.Session.Session(
+            sessionName,
+            0,
+            true,
+            0,
+            0,
+            new Dictionary<int, Stage> { { 0, stage } },
+            [],
+            context,
+            actionFailures);
+
+        var sessionData = session.Run(context.ExecutionData);
+
+        Assert.That(sessionData, Is.Not.Null);
+        Assert.That(sessionData!.Outputs, Has.Count.EqualTo(1));
+        Assert.That(sessionData.SessionFailures, Has.Count.EqualTo(1));
+        Assert.That(sessionData.SessionFailures[0].Reason.Message, Is.EqualTo("boom"));
+    }
+
+    [Test]
+    public void LogSessionSummary_When_Collections_Are_Null_Logs_Zero_Counts()
+    {
+        const string sessionName = "summary-null-session";
+        var logger = new CapturingLogger();
+        var context = new InternalContext
+        {
+            Logger = logger,
+            InternalGlobalDict = new Dictionary<string, object?>(),
+            InternalRunningSessions = new RunningSessions(new Dictionary<string, RunningSessionData<object, object>>())
+        };
+        context.InsertValueIntoGlobalDictionary(context.GetMetaDataPath(), new MetaDataConfig());
+
+        var session = new Sessions.Session.Session(
+            sessionName,
+            0,
+            true,
+            0,
+            0,
+            [],
+            [],
+            context,
+            []);
+
+        var sessionData = new SessionData
+        {
+            Name = sessionName,
+            Inputs = null,
+            Outputs = null,
+            SessionFailures = null,
+            UtcStartTime = DateTime.UtcNow,
+            UtcEndTime = DateTime.UtcNow.AddSeconds(1)
+        };
+
+        typeof(global::QaaS.Runner.Sessions.Session.Session)
+            .GetMethod("LogSessionSummary", BindingFlags.Instance | BindingFlags.NonPublic)!
+            .Invoke(session, [sessionData]);
+
+        Assert.That(logger.Messages, Has.Some.EqualTo($"Session {sessionName} Inputs=0"));
+        Assert.That(logger.Messages, Has.Some.EqualTo($"Session {sessionName} Outputs=0"));
+        Assert.That(logger.Messages, Has.Some.EqualTo($"Session {sessionName} Failures=0"));
+    }
+
     private sealed class RecordingAction(string name, int stage, Microsoft.Extensions.Logging.ILogger logger, System.Action callback)
         : StagedAction(name, stage, null, logger)
     {
@@ -416,6 +490,44 @@ public class SessionTests
         public override void Dispose()
         {
             onDispose();
+        }
+    }
+
+    private sealed class SuccessfulStageAction(string name) : StagedAction(name, 0, null, Globals.Logger)
+    {
+        internal override void ExportRunningCommunicationData(InternalContext context, string sessionName)
+        {
+        }
+
+        internal override InternalCommunicationData<object> Act()
+        {
+            return new InternalCommunicationData<object>
+            {
+                Output = [new DetailedData<object> { Body = "ok" }]
+            };
+        }
+
+        protected internal override void LogData(InternalCommunicationData<object> actData,
+            DetailedData<object> itemBeforeSerialization, InputOutputState? saveAt = null)
+        {
+        }
+    }
+
+    private sealed class ExceptionalStageAction(string name, Exception exceptionToThrow)
+        : StagedAction(name, 0, null, Globals.Logger)
+    {
+        internal override void ExportRunningCommunicationData(InternalContext context, string sessionName)
+        {
+        }
+
+        internal override InternalCommunicationData<object> Act()
+        {
+            throw exceptionToThrow;
+        }
+
+        protected internal override void LogData(InternalCommunicationData<object> actData,
+            DetailedData<object> itemBeforeSerialization, InputOutputState? saveAt = null)
+        {
         }
     }
 

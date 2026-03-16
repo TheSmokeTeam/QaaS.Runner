@@ -34,7 +34,7 @@ public class MockerCommandBuilder
 
     [Required]
     [Description("The command action to commit")]
-    internal CommandConfig? Command { get; set; }
+    internal MockerCommandConfig? Command { get; set; }
 
     [Description("The duration the runner will try to request the mocker server instances")]
     [DefaultValue(3000)]
@@ -101,35 +101,40 @@ public class MockerCommandBuilder
     /// <summary>
     /// Sets command-specific configuration. Exactly one supported command type must be configured.
     /// </summary>
-    public MockerCommandBuilder WithCommand(CommandConfig command)
+    public MockerCommandBuilder Configure(MockerCommandConfig command)
     {
         Command = command;
         return this;
     }
 
-    public MockerCommandBuilder CreateCommand(CommandConfig command)
+    public MockerCommandBuilder WithCommand(MockerCommandConfig command)
     {
-        return WithCommand(command);
+        return Configure(command);
     }
 
-    public CommandConfig? ReadCommand()
+    public MockerCommandBuilder CreateConfiguration(MockerCommandConfig command)
+    {
+        return Configure(command);
+    }
+
+    public MockerCommandConfig? ReadConfiguration()
     {
         return Command;
     }
 
-    public MockerCommandBuilder UpdateCommand(Func<CommandConfig, CommandConfig> update)
+    public MockerCommandBuilder UpdateConfiguration(Func<MockerCommandConfig, MockerCommandConfig> update)
     {
-        Command = update(Command ?? throw new InvalidOperationException("Command configuration is not set"));
+        Command = update(ReadConfiguration() ?? throw new InvalidOperationException("Command configuration is not set"));
         return this;
     }
 
-    public MockerCommandBuilder UpsertCommand(CommandConfig command)
+    public MockerCommandBuilder UpdateConfiguration(MockerCommandConfig command)
     {
-        Command = command;
+        Command = ReadConfiguration().UpdateConfiguration(command);
         return this;
     }
 
-    public MockerCommandBuilder DeleteCommand()
+    public MockerCommandBuilder DeleteConfiguration()
     {
         Command = null;
         return this;
@@ -165,11 +170,10 @@ public class MockerCommandBuilder
             context.Logger.LogDebugWithMetaData("Started building MockerCommand of type {type}",
                 context.GetMetaDataOrDefault(), new object?[] { commandTypeName });
 
-            var factoryRequest = new MockerCommandFactoryRequest(Name!, Stage, type, Command, Redis!, ServerName!,
+            var overrideRequest = new MockerCommandOverrideRequest(Name!, Stage, type, Command, Redis!, ServerName!,
                 RequestDurationMs, RequestRetries, context.Logger);
 
-            return context.GetSessionActionFactoryOverrides()?.MockerCommandFactory?.Invoke(factoryRequest) ?? type
-                switch
+            return context.GetSessionActionOverrides()?.MockerCommand?.Invoke(overrideRequest) ?? type switch
             {
                 ChangeActionStub => new ChangeActionStubMockerCommand(Name!, Stage,
                     Command.ChangeActionStub!, Redis!, ServerName!,

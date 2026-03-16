@@ -35,7 +35,7 @@ public abstract class MockerCommand : StagedAction
     private readonly int _requestRetries;
     private readonly IList<string> _failedCommandResponses;
     private readonly IList<string> _successfulCommandResponseToServerInstanceNames;
-    protected readonly object CommandConfig;
+    protected readonly object SupportedCommandConfiguration;
     protected readonly IDatabase RedisDatabase;
 
     protected readonly string ServerName;
@@ -60,7 +60,7 @@ public abstract class MockerCommand : StagedAction
         _successfulCommandResponseToServerInstanceNames = new List<string>();
         _failedCommandResponses = new List<string>();
 
-        CommandConfig = commandConfig;
+        SupportedCommandConfiguration = commandConfig;
 
         _receivedRunningCommunicationData = new RunningCommunicationData<object>();
 
@@ -300,7 +300,7 @@ public abstract class MockerCommand : StagedAction
         {
             Id = _commandId, Command = CommandType
         };
-        commandRequest.AppendObjectToRelevantCommandConfig(CommandConfig);
+        commandRequest.AppendObjectToRelevantCommandConfig(SupportedCommandConfiguration);
         return JsonSerializer.Serialize(commandRequest);
     }
 

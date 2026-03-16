@@ -19,7 +19,7 @@ namespace QaaS.Runner.Sessions.Actions.MockerCommands;
 /// </summary>
 public class ConsumeMockerCommand : MockerCommand
 {
-    private readonly ConsumeConfig _consumeConfig;
+    private readonly ConsumeCommandConfig _consumeConfig;
 
     private readonly DataFilter _inputDataFilter;
 
@@ -29,7 +29,7 @@ public class ConsumeMockerCommand : MockerCommand
 
     private readonly IDeserializer? _outputDeserializer;
 
-    public ConsumeMockerCommand(string name, int stage, ConsumeConfig commandConfig, RedisConfig redisConfig,
+    public ConsumeMockerCommand(string name, int stage, ConsumeCommandConfig commandConfig, RedisConfig redisConfig,
         string serverName,
         int requestDurationMs, int requestRetries, ILogger logger) : base(
         name, stage, commandConfig, redisConfig, serverName,
@@ -40,7 +40,7 @@ public class ConsumeMockerCommand : MockerCommand
 
         _inputDataFilter = commandConfig.InputDataFilter;
         _outputDataFilter = commandConfig.OutputDataFilter;
-        _consumeConfig = (ConsumeConfig)CommandConfig;
+        _consumeConfig = (ConsumeCommandConfig)SupportedCommandConfiguration;
     }
 
     /// <inheritdoc />

@@ -329,9 +329,8 @@ public partial class PublisherBuilder
             type = allTypes.FirstOrDefault(configuredType => configuredType != null) ??
                    throw new InvalidOperationException($"Missing supported type in publisher {Name}");
             
-            var factoryRequest = new PublisherFactoryRequest(Name!, type, Chunk != null, context.Logger, DataFilter);
-            var (sender, chunkSender) = context.GetSessionActionFactoryOverrides()?.PublisherFactory
-                                           ?.Invoke(factoryRequest)
+            var overrideRequest = new PublisherOverrideRequest(Name!, type, Chunk != null, context.Logger, DataFilter);
+            var (sender, chunkSender) = context.GetSessionActionOverrides()?.Publisher?.Invoke(overrideRequest)
                                        ?? SenderFactory.CreateSender(Chunk != null, type, context.Logger, DataFilter);
             var publisherTypeName = sender?.GetType().Name ?? chunkSender?.GetType().Name ?? "Unknown";
             

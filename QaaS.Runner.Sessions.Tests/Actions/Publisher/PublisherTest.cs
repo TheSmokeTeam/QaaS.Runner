@@ -332,4 +332,66 @@ public class PublisherTest
         Assert.That(testActData.Input!.All(item =>
             item.Timestamp == expectedTimestamps[item.Body!.ToString()!]), Is.True);
     }
+
+    [Test]
+    public void Act_WithNullSenderAndNoDataSources_ReturnsEmptyInputWithConfiguredSerialization()
+    {
+        var publisher = new Sessions.Actions.Publishers.Publisher(
+            "test",
+            null,
+            0,
+            new DataFilter(),
+            null,
+            false,
+            null,
+            1,
+            0,
+            SerializationType.Json,
+            null,
+            null,
+            Globals.Logger);
+
+        publisher.InitializeIterableSerializableSaveIterator([], []);
+        var result = publisher.Act();
+
+        Assert.That(result.Input, Is.Empty);
+        Assert.That(result.InputSerializationType, Is.EqualTo(SerializationType.Json));
+    }
+
+    [Test]
+    public void ChunkAct_WithNullSenderAndNoDataSources_ReturnsEmptyInputWithConfiguredSerialization()
+    {
+        var publisher = new Sessions.Actions.Publishers.ChunkPublisher(
+            "test",
+            null,
+            0,
+            new DataFilter(),
+            null,
+            null,
+            2,
+            false,
+            1,
+            0,
+            SerializationType.Json,
+            null,
+            null,
+            Globals.Logger);
+
+        publisher.InitializeIterableSerializableSaveIterator([], []);
+        var result = publisher.Act();
+
+        Assert.That(result.Input, Is.Empty);
+        Assert.That(result.InputSerializationType, Is.EqualTo(SerializationType.Json));
+    }
+
+    [Test]
+    public void IterateWithOriginal_WhenIterableIsNull_ReturnsEmptySequence()
+    {
+        var iterator = new IterableSerializableDataIterator(null, null);
+
+        var items = iterator.IterateWithOriginal().ToArray();
+
+        Assert.That(items, Is.Empty);
+        Assert.That(iterator.IteratedData, Is.Empty);
+    }
 }

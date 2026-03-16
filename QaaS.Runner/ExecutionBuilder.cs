@@ -38,6 +38,7 @@ using QaaS.Runner.Storage.ConfigurationObjects;
 using ILogger = Microsoft.Extensions.Logging.ILogger;
 
 [assembly: InternalsVisibleTo("QaaS.Runner.Tests")]
+[assembly: InternalsVisibleTo("QaaS.Runner.Sessions.Tests")]
 
 namespace QaaS.Runner;
 
@@ -642,7 +643,7 @@ public class ExecutionBuilder() : BaseExecutionBuilder<InternalContext, Executio
             StoreRenderedConfigurationTemplate();
 
             // validate configuration
-            _ = ValidationUtils.TryValidateObjectRecursive(this, _validationResults);
+            ValidateConfiguredSections();
             DeduplicateValidationResults();
 
             if (_validationResults.Any())
@@ -754,5 +755,41 @@ public class ExecutionBuilder() : BaseExecutionBuilder<InternalContext, Executio
         }
 
         return items.Where((_, itemIndex) => itemIndex != index).ToArray();
+    }
+
+    private void ValidateConfiguredSections()
+    {
+        _ = RunnerValidationUtils.TryValidateProperties(this, _validationResults,
+            nameof(DataSources), nameof(Storages), nameof(Assertions), nameof(Links), nameof(MetaData), nameof(Sessions));
+
+        ValidateCollection(DataSources, nameof(DataSources));
+        ValidateCollection(Storages, nameof(Storages));
+        ValidateCollection(Assertions, nameof(Assertions));
+        ValidateCollection(Links, nameof(Links));
+        ValidateCollection(Sessions, nameof(Sessions));
+
+        if (MetaData != null)
+        {
+            _ = RunnerValidationUtils.TryValidateObjectRecursive(MetaData, _validationResults, nameof(MetaData));
+        }
+    }
+
+    private void ValidateCollection<T>(IEnumerable<T>? items, string parentPath)
+    {
+        if (items == null)
+        {
+            return;
+        }
+
+        var index = 0;
+        foreach (var item in items)
+        {
+            if (item != null)
+            {
+                _ = RunnerValidationUtils.TryValidateObjectRecursive(item, _validationResults, $"{parentPath}:{index}");
+            }
+
+            index++;
+        }
     }
 }

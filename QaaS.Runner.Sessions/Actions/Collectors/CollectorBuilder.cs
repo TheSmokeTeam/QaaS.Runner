@@ -141,8 +141,8 @@ public class CollectorBuilder
             context.Logger.LogDebugWithMetaData("Started building Collector of type {type}",
                 context.GetMetaDataOrDefault(), new object?[] { collectorTypeName });
 
-            var factoryRequest = new CollectorFactoryRequest(Name!, type, context.Logger);
-            var fetcher = context.GetSessionActionFactoryOverrides()?.CollectorFactory?.Invoke(factoryRequest)
+            var overrideRequest = new CollectorOverrideRequest(Name!, type, context.Logger);
+            var fetcher = context.GetSessionActionOverrides()?.Collector?.Invoke(overrideRequest)
                           ?? FetcherFactory.CreateFetcher(type, context.Logger);
             
             return new Collector(Name!, fetcher, DataFilter, CollectionRange.StartTimeMs, CollectionRange.EndTimeMs,

@@ -1,7 +1,9 @@
 using System.Reflection;
 using Microsoft.Extensions.Configuration;
 using NUnit.Framework;
+using QaaS.Framework.Configurations;
 using QaaS.Framework.Configurations.CustomExceptions;
+using QaaS.Framework.Protocols.ConfigurationObjects.RabbitMq;
 using QaaS.Framework.SDK;
 using QaaS.Framework.SDK.ContextObjects;
 using QaaS.Framework.SDK.DataSourceObjects;
@@ -291,6 +293,108 @@ public class ExecutionBuilderTests
         Assert.That(errorMessages.Count(message => message == "MetaData - The Team field is required."), Is.EqualTo(1));
     }
 
+    [Test]
+    public void Constructor_WithInvalidRabbitMqTargets_BindsBothTargetsIntoNestedBuilders()
+    {
+        var context = CreateLoadedContext(new Dictionary<string, string?>
+        {
+            ["MetaData:Team"] = "Smoke",
+            ["MetaData:System"] = "QaaS",
+            ["Sessions:0:Name"] = "rabbit-session",
+            ["Sessions:0:Publishers:0:Name"] = "publisher",
+            ["Sessions:0:Publishers:0:DataSourceNames:0"] = "source",
+            ["Sessions:0:Publishers:0:RabbitMq:Host"] = "localhost",
+            ["Sessions:0:Publishers:0:RabbitMq:ExchangeName"] = "exchange",
+            ["Sessions:0:Publishers:0:RabbitMq:QueueName"] = "queue",
+            ["Sessions:0:Consumers:0:Name"] = "consumer",
+            ["Sessions:0:Consumers:0:TimeoutMs"] = "1000",
+            ["Sessions:0:Consumers:0:RabbitMq:Host"] = "localhost",
+            ["Sessions:0:Consumers:0:RabbitMq:ExchangeName"] = "exchange",
+            ["Sessions:0:Consumers:0:RabbitMq:QueueName"] = "queue"
+        });
+
+        var builder = new ExecutionBuilder(context, ExecutionType.Run, null, null, null, null);
+        var session = builder.ReadSessions().Single();
+        var publisher = session.ReadPublishers().Single();
+        var consumer = session.ReadConsumers().Single();
+        var publisherRabbitMq = (RabbitMqSenderConfig?)typeof(QaaS.Runner.Sessions.Actions.Publishers.Builders.PublisherBuilder)
+            .GetProperty("RabbitMq", BindingFlags.Instance | BindingFlags.NonPublic)!
+            .GetValue(publisher);
+        var consumerRabbitMq = (RabbitMqReaderConfig?)typeof(QaaS.Runner.Sessions.Actions.Consumers.Builders.ConsumerBuilder)
+            .GetProperty("RabbitMq", BindingFlags.Instance | BindingFlags.NonPublic)!
+            .GetValue(consumer);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(publisherRabbitMq, Is.Not.Null);
+            Assert.That(publisherRabbitMq!.ExchangeName, Is.EqualTo("exchange"));
+            Assert.That(publisherRabbitMq.QueueName, Is.EqualTo("queue"));
+            Assert.That(consumerRabbitMq, Is.Not.Null);
+            Assert.That(consumerRabbitMq!.ExchangeName, Is.EqualTo("exchange"));
+            Assert.That(consumerRabbitMq.QueueName, Is.EqualTo("queue"));
+        });
+    }
+
+    [Test]
+    public void Build_WithInvalidNestedRabbitMqTargets_ThrowsInvalidConfigurationsException()
+    {
+        var directRabbitMqValidationResults = new List<System.ComponentModel.DataAnnotations.ValidationResult>();
+        var directRabbitMqIsValid = ValidationUtils.TryValidateObjectRecursive(new RabbitMqSenderConfig
+        {
+            Host = "localhost",
+            ExchangeName = "exchange",
+            QueueName = "queue"
+        }, directRabbitMqValidationResults);
+
+        Assert.That(directRabbitMqIsValid, Is.False);
+        Assert.That(directRabbitMqValidationResults.Any(result => result.ErrorMessage?.Contains("field must be empty when QueueName is configured") == true),
+            Is.True);
+
+        var context = CreateLoadedContext(new Dictionary<string, string?>
+        {
+            ["MetaData:Team"] = "Smoke",
+            ["MetaData:System"] = "QaaS",
+            ["Sessions:0:Name"] = "rabbit-session",
+            ["Sessions:0:Publishers:0:Name"] = "publisher",
+            ["Sessions:0:Publishers:0:DataSourceNames:0"] = "source",
+            ["Sessions:0:Publishers:0:RabbitMq:Host"] = "localhost",
+            ["Sessions:0:Publishers:0:RabbitMq:ExchangeName"] = "exchange",
+            ["Sessions:0:Publishers:0:RabbitMq:QueueName"] = "queue",
+            ["Sessions:0:Consumers:0:Name"] = "consumer",
+            ["Sessions:0:Consumers:0:TimeoutMs"] = "1000",
+            ["Sessions:0:Consumers:0:RabbitMq:Host"] = "localhost",
+            ["Sessions:0:Consumers:0:RabbitMq:ExchangeName"] = "exchange",
+            ["Sessions:0:Consumers:0:RabbitMq:QueueName"] = "queue"
+        });
+
+        var builder = new ExecutionBuilder(context, ExecutionType.Run, null, null, null, null);
+        var session = builder.ReadSessions().Single();
+        var publisher = session.ReadPublishers().Single();
+        var sessionPropertyNames = session.GetType()
+            .GetProperties(BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance)
+            .Select(property => property.Name)
+            .ToArray();
+        var publisherPropertyNames = publisher.GetType()
+            .GetProperties(BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance)
+            .Select(property => property.Name)
+            .ToArray();
+        var sessionValidationResults = new List<System.ComponentModel.DataAnnotations.ValidationResult>();
+        var publisherValidationResults = new List<System.ComponentModel.DataAnnotations.ValidationResult>();
+        var sessionIsValid = RunnerValidationUtils.TryValidateObjectRecursive(session, sessionValidationResults);
+        var publisherIsValid = RunnerValidationUtils.TryValidateObjectRecursive(publisher, publisherValidationResults);
+
+        Assert.That(sessionPropertyNames, Contains.Item("Publishers"));
+        Assert.That(publisherPropertyNames, Contains.Item("RabbitMq"));
+        Assert.That(sessionIsValid, Is.False);
+        Assert.That(sessionValidationResults.Any(result => result.ErrorMessage?.Contains("QueueName is configured") == true),
+            Is.True);
+        Assert.That(publisherIsValid, Is.False);
+        Assert.That(publisherValidationResults.Any(result => result.ErrorMessage?.Contains("QueueName is configured") == true),
+            Is.True);
+
+        Assert.Throws<InvalidConfigurationsException>(() => builder.Build());
+    }
+
     private ExecutionBuilder CreateValidExecutionBuilder()
     {
         var builder = new ExecutionBuilder();
@@ -315,7 +419,13 @@ public class ExecutionBuilderTests
         builder.AddAssertion(assertionBuilder);
 
         // Add valid storage builder
-        var storageBuilder = new StorageBuilder().Configure(new S3Config());
+        var storageBuilder = new StorageBuilder().Configure(new S3Config
+        {
+            StorageBucket = "bucket",
+            ServiceURL = "https://s3.test",
+            AccessKey = "access",
+            SecretKey = "secret"
+        });
         builder.AddStorage(storageBuilder);
 
         // Add valid link builder

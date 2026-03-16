@@ -71,4 +71,22 @@ public class CollectorTests
         Assert.That(allMetadataFiltered, Is.True);
         Assert.That(allTimestampFiltered, Is.True);
     }
+
+    [Test]
+    public void Act_WhenCollectionStartIsAfterCollectionEnd_ThrowsArgumentException()
+    {
+        InitFetcher();
+        var collector = new Sessions.Actions.Collectors.Collector(
+            "test collector",
+            _fetcher!.Object,
+            new DataFilter(),
+            100,
+            0,
+            1,
+            NullLogger.Instance);
+        var now = DateTime.UtcNow;
+        collector.SetCollectionTimes(now, now);
+
+        Assert.Throws<ArgumentException>(() => collector.Act());
+    }
 }

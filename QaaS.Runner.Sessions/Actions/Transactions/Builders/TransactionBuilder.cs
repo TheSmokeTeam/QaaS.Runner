@@ -342,8 +342,8 @@ public class TransactionBuilder
             var timeout = TimeSpan.FromMilliseconds(TimeoutMs!.Value);
             var deserializerSpecificType = OutputDeserialize?.SpecificType?.GetConfiguredType();
 
-            var factoryRequest = new TransactionFactoryRequest(Name!, type, context.Logger, timeout);
-            var transactor = context.GetSessionActionFactoryOverrides()?.TransactionFactory?.Invoke(factoryRequest)
+            var overrideRequest = new TransactionOverrideRequest(Name!, type, context.Logger, timeout);
+            var transactor = context.GetSessionActionOverrides()?.Transaction?.Invoke(overrideRequest)
                              ?? TransactorFactory.CreateTransactor(type, context.Logger, timeout);
 
             return new Transaction(Name!, transactor, Stage, InputDataFilter, OutputDataFilter,

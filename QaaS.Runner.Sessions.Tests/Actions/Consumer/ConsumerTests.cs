@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Reflection;
 using System.Runtime.Serialization.Formatters.Binary;
 using Microsoft.VisualStudio.TestPlatform.ObjectModel.Adapter;
 using Moq;
@@ -9,6 +10,7 @@ using NUnit.Framework;
 using QaaS.Framework.Policies;
 using QaaS.Framework.Protocols.Protocols;
 using QaaS.Framework.SDK.Session;
+using QaaS.Framework.SDK.Session.CommunicationDataObjects;
 using QaaS.Framework.SDK.Session.DataObjects;
 using QaaS.Framework.Serialization;
 using QaaS.Runner.Sessions.Actions.Consumers;
@@ -109,5 +111,47 @@ public class ConsumerTests
         // Arrange
         var receivedAmount = context.InternalRunningSessions.RunningSessionsDict[sessionName].Outputs![0].Data.Count;
         _reader.Verify(r => r.Read(It.IsAny<TimeSpan>()), Times.Exactly(receivedAmount));
+    }
+
+    [Test]
+    public void Constructor_WithNullReader_UsesConfiguredSerializationTypeForRunningData()
+    {
+        var consumer = new Sessions.Actions.Consumers.Consumer(
+            "TestConsumer",
+            null,
+            TimeSpan.FromMilliseconds(1),
+            1,
+            null,
+            new DataFilter(),
+            SerializationType.Json,
+            null,
+            Globals.Logger);
+
+        var runningData = (RunningCommunicationData<object>)typeof(BaseConsumer)
+            .GetField("RunningCommunicationData", BindingFlags.Instance | BindingFlags.NonPublic)!
+            .GetValue(consumer)!;
+
+        Assert.That(runningData.SerializationType, Is.EqualTo(SerializationType.Json));
+    }
+
+    [Test]
+    public void Constructor_WithNullChunkReader_UsesConfiguredSerializationTypeForRunningData()
+    {
+        var consumer = new ChunkConsumer(
+            "TestConsumer",
+            null,
+            TimeSpan.FromMilliseconds(1),
+            1,
+            null,
+            new DataFilter(),
+            SerializationType.Json,
+            null,
+            Globals.Logger);
+
+        var runningData = (RunningCommunicationData<object>)typeof(BaseConsumer)
+            .GetField("RunningCommunicationData", BindingFlags.Instance | BindingFlags.NonPublic)!
+            .GetValue(consumer)!;
+
+        Assert.That(runningData.SerializationType, Is.EqualTo(SerializationType.Json));
     }
 }

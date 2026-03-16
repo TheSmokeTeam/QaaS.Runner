@@ -3,6 +3,7 @@
     <PropertyGroup>
         <TargetFramework>net10.0</TargetFramework>
         <Nullable>enable</Nullable>
+        <ImplicitUsings>enable</ImplicitUsings>
         <EnableUnsafeBinaryFormatterSerialization>true</EnableUnsafeBinaryFormatterSerialization>
         <IsPackable>false</IsPackable>
     </PropertyGroup>
@@ -27,6 +28,7 @@
     </ItemGroup>
 
     <ItemGroup>
+        <ProjectReference Include="..\QaaS.Runner\QaaS.Runner.csproj" />
         <ProjectReference Include="..\QaaS.Runner.Sessions\QaaS.Runner.Sessions.csproj"/>
     </ItemGroup>
 </Project>

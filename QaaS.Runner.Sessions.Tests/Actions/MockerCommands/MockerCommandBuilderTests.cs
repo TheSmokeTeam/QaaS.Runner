@@ -25,7 +25,7 @@ public class MockerCommandBuilderTests
     }
 
     [Test]
-    public void Build_WithMissingCommandConfig_ReturnsNullAndAppendsFailure()
+    public void Build_WithMissingCommandConfiguration_ReturnsNullAndAppendsFailure()
     {
         var builder = new MockerCommandBuilder()
             .Named("MockerCommandWithoutConfig");
@@ -42,7 +42,7 @@ public class MockerCommandBuilderTests
     {
         var builder = new MockerCommandBuilder()
             .Named("MockerCommandWithoutType")
-            .WithCommand(new CommandConfig());
+            .WithCommand(new MockerCommandConfig());
 
         var result = builder.Build(_context, _actionFailures, SessionName);
 
@@ -56,7 +56,7 @@ public class MockerCommandBuilderTests
     {
         var builder = new MockerCommandBuilder()
             .Named("MockerCommandWithConflicts")
-            .WithCommand(new CommandConfig
+            .WithCommand(new MockerCommandConfig
             {
                 ChangeActionStub = new ChangeActionStub(),
                 TriggerAction = new TriggerAction()
@@ -70,7 +70,7 @@ public class MockerCommandBuilderTests
     }
 
     [TestCaseSource(nameof(ValidSupportedCommands))]
-    public void Build_WithSingleSupportedTypeAndMissingRedis_ReturnsNullAndAppendsFailure(CommandConfig commandConfig)
+    public void Build_WithSingleSupportedTypeAndMissingRedis_ReturnsNullAndAppendsFailure(MockerCommandConfig commandConfig)
     {
         var builder = new MockerCommandBuilder()
             .Named("MockerCommandWithSingleType")
@@ -86,11 +86,11 @@ public class MockerCommandBuilderTests
     }
 
     [Test]
-    public void UpdateCommand_WithoutExistingCommand_ThrowsInvalidOperationException()
+    public void UpdateConfiguration_WithoutExistingConfiguration_ThrowsInvalidOperationException()
     {
         var builder = new MockerCommandBuilder();
 
-        Assert.Throws<InvalidOperationException>(() => builder.UpdateCommand(command =>
+        Assert.Throws<InvalidOperationException>(() => builder.UpdateConfiguration(command =>
         {
             command.TriggerAction = new TriggerAction();
             return command;
@@ -98,26 +98,26 @@ public class MockerCommandBuilderTests
     }
 
     [Test]
-    public void CreateReadUpdateDeleteCommand_PerformsExpectedCrudFlow()
+    public void CreateReadUpdateDeleteConfiguration_PerformsExpectedCrudFlow()
     {
         var builder = new MockerCommandBuilder();
-        var initialCommand = new CommandConfig { TriggerAction = new TriggerAction() };
+        var initialCommand = new MockerCommandConfig { TriggerAction = new TriggerAction() };
 
-        builder.CreateCommand(initialCommand);
-        Assert.That(builder.ReadCommand(), Is.SameAs(initialCommand));
+        builder.CreateConfiguration(initialCommand);
+        Assert.That(builder.ReadConfiguration(), Is.SameAs(initialCommand));
 
-        builder.UpdateCommand(command =>
+        builder.UpdateConfiguration(command =>
         {
             command.TriggerAction = null;
             command.ChangeActionStub = new ChangeActionStub();
             return command;
         });
 
-        Assert.That(builder.ReadCommand()!.ChangeActionStub, Is.Not.Null);
-        Assert.That(builder.ReadCommand()!.TriggerAction, Is.Null);
+        Assert.That(builder.ReadConfiguration()!.ChangeActionStub, Is.Not.Null);
+        Assert.That(builder.ReadConfiguration()!.TriggerAction, Is.Null);
 
-        builder.DeleteCommand();
-        Assert.That(builder.ReadCommand(), Is.Null);
+        builder.DeleteConfiguration();
+        Assert.That(builder.ReadConfiguration(), Is.Null);
     }
 
     [Test]
@@ -140,11 +140,11 @@ public class MockerCommandBuilderTests
         Assert.That(builder.RequestRetries, Is.EqualTo(9));
     }
 
-    private static IEnumerable<CommandConfig> ValidSupportedCommands()
+    private static IEnumerable<MockerCommandConfig> ValidSupportedCommands()
     {
-        yield return new CommandConfig { ChangeActionStub = new ChangeActionStub() };
-        yield return new CommandConfig { TriggerAction = new TriggerAction() };
-        yield return new CommandConfig { Consume = new ConsumeConfig() };
+        yield return new MockerCommandConfig { ChangeActionStub = new ChangeActionStub() };
+        yield return new MockerCommandConfig { TriggerAction = new TriggerAction() };
+        yield return new MockerCommandConfig { Consume = new ConsumeCommandConfig() };
     }
 }
 

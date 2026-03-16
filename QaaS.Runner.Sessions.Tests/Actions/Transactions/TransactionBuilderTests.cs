@@ -4,7 +4,6 @@ using System.ComponentModel.DataAnnotations;
 using System.Reflection;
 using NUnit.Framework;
 using QaaS.Framework.Policies;
-using QaaS.Framework.Configurations;
 using QaaS.Framework.Protocols.ConfigurationObjects.Grpc;
 using QaaS.Framework.Protocols.ConfigurationObjects.Http;
 using QaaS.Framework.SDK.ContextObjects;
@@ -12,6 +11,7 @@ using QaaS.Framework.SDK.Session;
 using QaaS.Framework.SDK.Session.SessionDataObjects;
 using QaaS.Framework.SDK.Session.SessionDataObjects.RunningSessionsObjects;
 using QaaS.Framework.Serialization;
+using QaaS.Runner;
 using QaaS.Runner.Sessions.Actions.Transactions.Builders;
 using Serilog;
 using Serilog.Events;
@@ -283,8 +283,8 @@ public class TransactionBuilderTests
         });
 
         var validationResults = new List<ValidationResult>();
-        ValidationUtils.TryValidateObjectRecursive(builder, validationResults,
-            bindingFlags: BindingFlags.NonPublic | BindingFlags.Public | BindingFlags.Instance);
+        RunnerValidationUtils.TryValidateProperties(builder, validationResults,
+            "DataSourceNames", "DataSourcePatterns");
 
         Assert.That(validationResults, Is.Not.Empty);
     }
