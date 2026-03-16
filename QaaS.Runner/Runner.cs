@@ -17,6 +17,7 @@ public class Runner : IRunner, IDisposable
     private Serilog.ILogger SerilogLogger { get; set; }
     private bool EmptyResults { get; set; }
     private bool ServeResults { get; set; }
+    private bool DisposeSerilogLogger { get; set; } = true;
 
     /// <summary>
     /// Controls whether <see cref="Run" /> terminates the current process after the runner finishes successfully.
@@ -143,7 +144,7 @@ public class Runner : IRunner, IDisposable
     {
         Logger.LogDebug("Runner teardown started");
         // Disposing logger to enable sending logs to elastic
-        if (SerilogLogger is IDisposable disposableLogger)
+        if (DisposeSerilogLogger && SerilogLogger is IDisposable disposableLogger)
         {
             Logger.LogDebug("Disposing Serilog logger instance");
             disposableLogger.Dispose();
@@ -244,5 +245,11 @@ public class Runner : IRunner, IDisposable
         Logger.LogDebug("Disposing runner scope");
         Scope.Dispose();
         GC.SuppressFinalize(this);
+    }
+
+    internal Runner WithSerilogLoggerDisposal(bool disposeSerilogLogger)
+    {
+        DisposeSerilogLogger = disposeSerilogLogger;
+        return this;
     }
 }

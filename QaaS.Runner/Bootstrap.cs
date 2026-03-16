@@ -17,8 +17,7 @@ namespace QaaS.Runner;
 /// </summary>
 public static class Bootstrap
 {
-
-    private static readonly ILifetimeScope DefaultScope = BuildParentContainer();
+    private static readonly ILifetimeScope DefaultRootScope = BuildParentContainer();
     private static readonly Lazy<bool> ShouldForceDisableSendLogs = new(() => !CanUseFrameworkDefaultLoggers());
 
     /// <summary>
@@ -51,10 +50,7 @@ public static class Bootstrap
         where TRunner : Runner
     {
         if (args == null)
-        {
-            var (logger, serilogLogger) = GetDefaultLoggers();
-            return CreateRunner<TRunner>(DefaultScope, [], logger, serilogLogger);
-        }
+            return CreateDefaultRunner<TRunner>();
 
         // Build CLI parser and parse supported verbs
         using var cliParser = ParserBuilder.BuildParser();
@@ -84,7 +80,7 @@ public static class Bootstrap
     private static TRunner HandleParseError<TRunner>(IEnumerable<Error> errors) where TRunner : Runner
     {
         var errorsArray = errors.ToArray();
-        var (logger, serilogLogger) = GetDefaultLoggers();
+        var (logger, serilogLogger, ownsSerilogLogger) = GetDefaultLoggers();
 
         // If all errors are version requests handle the version request case
         if (errorsArray.All(err => err.Tag is ErrorType.VersionRequestedError))
@@ -92,23 +88,24 @@ public static class Bootstrap
             const string qaasFrameworkAssemblyName = "QaaS.Framework.Executions";
             logger.LogInformation($"\nQaaS Framework Versions:\n" +
                                                    $"{qaasFrameworkAssemblyName} {GetAssemblyVersionFromName(qaasFrameworkAssemblyName)}\n");
-            return CreateRunner<TRunner>(DefaultScope, [], logger, serilogLogger);
+            return CreateDefaultRunner<TRunner>(logger, serilogLogger, ownsSerilogLogger);
         }
 
         // If all errors are help commands requested then the user asked for help and arguments are valid
         if (errorsArray.All(err => err.Tag is ErrorType.HelpRequestedError or ErrorType.HelpVerbRequestedError))
-            return CreateRunner<TRunner>(DefaultScope, [], logger, serilogLogger);
+            return CreateDefaultRunner<TRunner>(logger, serilogLogger, ownsSerilogLogger);
 
         logger.LogCritical("Failed to parse/process the command line arguments");
-        return CreateRunner<TRunner>(DefaultScope, [], logger, serilogLogger);
+        return CreateDefaultRunner<TRunner>(logger, serilogLogger, ownsSerilogLogger);
     }
 
     // Create a custom runner using activator to dynamically get a new instance of any implementation of TRunner
     private static TRunner CreateRunner<TRunner>(ILifetimeScope scope, List<ExecutionBuilder> executionBuilders,
-        ILogger logger, Serilog.ILogger serilogLogger, bool emptyResults = false, bool serveResults = false)
+        ILogger logger, Serilog.ILogger serilogLogger, bool emptyResults = false, bool serveResults = false,
+        bool disposeSerilogLogger = true)
         where TRunner : Runner
     {
-        return (TRunner)Activator.CreateInstance(
+        var runner = (TRunner)Activator.CreateInstance(
             typeof(TRunner),
             scope,
             executionBuilders,
@@ -117,6 +114,8 @@ public static class Bootstrap
             emptyResults,
             serveResults
         )!;
+        runner.WithSerilogLoggerDisposal(disposeSerilogLogger);
+        return runner;
     }
 
     private static string GetAssemblyVersionFromName(string assemblyName)
@@ -139,14 +138,16 @@ public static class Bootstrap
         }
     }
 
-    private static (ILogger logger, Serilog.ILogger serilogLogger) GetDefaultLoggers()
+    private static (ILogger logger, Serilog.ILogger serilogLogger, bool ownsSerilogLogger) GetDefaultLoggers()
     {
         if (!ShouldForceDisableSendLogs.Value)
-            return (Framework.Executions.Constants.DefaultLogger, Framework.Executions.Constants.DefaultSerilogLogger);
+            return (Framework.Executions.Constants.DefaultLogger, Framework.Executions.Constants.DefaultSerilogLogger,
+                false);
 
         var fallbackSerilogLogger = new LoggerConfiguration().WriteTo.Console().CreateLogger();
         return (new SerilogLoggerFactory(fallbackSerilogLogger).CreateLogger("BootstrapFallbackLogger"),
-            fallbackSerilogLogger);
+            fallbackSerilogLogger,
+            true);
     }
 
     private static RunOptions GetSafeLoggerOptions(RunOptions options)
@@ -178,5 +179,29 @@ public static class Bootstrap
     {
         var containerBuilder = new ContainerBuilder();
         return containerBuilder.Build();
+    }
+
+    private static TRunner CreateDefaultRunner<TRunner>(
+        ILogger? logger = null,
+        Serilog.ILogger? serilogLogger = null,
+        bool? ownsSerilogLogger = null)
+        where TRunner : Runner
+    {
+        (ILogger logger, Serilog.ILogger serilogLogger, bool ownsSerilogLogger) resolvedLoggers;
+        if (logger != null && serilogLogger != null && ownsSerilogLogger.HasValue)
+        {
+            resolvedLoggers = (logger, serilogLogger, ownsSerilogLogger.Value);
+        }
+        else
+        {
+            resolvedLoggers = GetDefaultLoggers();
+        }
+
+        return CreateRunner<TRunner>(
+            DefaultRootScope.BeginLifetimeScope(),
+            [],
+            resolvedLoggers.logger,
+            resolvedLoggers.serilogLogger,
+            disposeSerilogLogger: resolvedLoggers.ownsSerilogLogger);
     }
 }

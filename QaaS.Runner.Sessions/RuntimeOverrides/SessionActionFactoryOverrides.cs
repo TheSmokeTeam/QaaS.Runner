@@ -7,7 +7,7 @@ using QaaS.Runner.Sessions.Actions;
 using QaaS.Runner.Sessions.ConfigurationObjects;
 using Qaas.Mocker.CommunicationObjects.ConfigurationObjects.Command;
 
-namespace QaaS.Runner.Sessions.Testing;
+namespace QaaS.Runner.Sessions.RuntimeOverrides;
 
 internal sealed record ConsumerFactoryRequest(string ActionName, IReaderConfig Configuration, ILogger Logger,
     DataFilter DataFilter);

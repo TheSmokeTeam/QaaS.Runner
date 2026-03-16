@@ -72,4 +72,17 @@ public class RunnerTests
         Assert.IsTrue(mockRunner.StartExecutionsCalled);
         Assert.That(mockRunner.ExitCode, Is.EqualTo(0));
     }
+
+    [Test]
+    public void BootstrapNew_RunAndGetExitCode_AllowsMultipleDefaultRunnersSequentially()
+    {
+        var firstRunner = Bootstrap.New();
+        var secondRunner = Bootstrap.New();
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(firstRunner.RunAndGetExitCode(), Is.Zero);
+            Assert.That(secondRunner.RunAndGetExitCode(), Is.Zero);
+        });
+    }
 }
