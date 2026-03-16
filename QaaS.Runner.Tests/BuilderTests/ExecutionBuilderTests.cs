@@ -383,29 +383,22 @@ public class ExecutionBuilderTests
         var builder = new ExecutionBuilder(context, ExecutionType.Run, null, null, null, null);
         var session = builder.ReadSessions().Single();
         var publisher = session.ReadPublishers().Single();
-        var sessionPropertyNames = session.GetType()
-            .GetProperties(BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance)
-            .Select(property => property.Name)
-            .ToArray();
-        var publisherPropertyNames = publisher.GetType()
-            .GetProperties(BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance)
-            .Select(property => property.Name)
-            .ToArray();
-        var sessionValidationResults = new List<System.ComponentModel.DataAnnotations.ValidationResult>();
-        var publisherValidationResults = new List<System.ComponentModel.DataAnnotations.ValidationResult>();
-        var sessionIsValid = RunnerValidationUtils.TryValidateObjectRecursive(session, sessionValidationResults);
-        var publisherIsValid = RunnerValidationUtils.TryValidateObjectRecursive(publisher, publisherValidationResults);
-
-        Assert.That(sessionPropertyNames, Contains.Item("Publishers"));
-        Assert.That(publisherPropertyNames, Contains.Item("RabbitMq"));
-        Assert.That(sessionIsValid, Is.False);
-        Assert.That(sessionValidationResults.Any(result => result.ErrorMessage?.Contains("QueueName is configured") == true),
-            Is.True);
-        Assert.That(publisherIsValid, Is.False);
-        Assert.That(publisherValidationResults.Any(result => result.ErrorMessage?.Contains("QueueName is configured") == true),
-            Is.True);
-
         Assert.Throws<InvalidConfigurationsException>(() => builder.Build());
+        var validationResults = (IReadOnlyList<System.ComponentModel.DataAnnotations.ValidationResult>)typeof(ExecutionBuilder)
+            .GetField("_validationResults", BindingFlags.Instance | BindingFlags.NonPublic)!
+            .GetValue(builder)!;
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(validationResults.Any(result =>
+                    result.ErrorMessage?.Contains("Sessions:0:Publishers:0:RabbitMq", StringComparison.Ordinal) == true &&
+                    result.ErrorMessage.Contains("QueueName is configured", StringComparison.Ordinal)),
+                Is.True);
+            Assert.That(validationResults.Any(result =>
+                    result.ErrorMessage?.Contains("Sessions:0:Consumers:0:RabbitMq", StringComparison.Ordinal) == true &&
+                    result.ErrorMessage.Contains("QueueName is configured", StringComparison.Ordinal)),
+                Is.True);
+        });
     }
 
     [Test]

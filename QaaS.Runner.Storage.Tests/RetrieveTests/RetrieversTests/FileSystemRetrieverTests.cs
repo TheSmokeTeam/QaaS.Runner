@@ -1,4 +1,4 @@
-﻿﻿using System.IO.Abstractions;
+using System.IO.Abstractions;
 using System.Reflection;
 using Microsoft.Extensions.Logging;
 using NUnit.Framework;

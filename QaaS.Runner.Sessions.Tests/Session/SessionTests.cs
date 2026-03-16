@@ -437,7 +437,7 @@ public class SessionTests
             Name = sessionName,
             Inputs = null,
             Outputs = null,
-            SessionFailures = null,
+            SessionFailures = [],
             UtcStartTime = DateTime.UtcNow,
             UtcEndTime = DateTime.UtcNow.AddSeconds(1)
         };

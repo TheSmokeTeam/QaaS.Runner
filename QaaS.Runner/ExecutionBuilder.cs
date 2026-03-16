@@ -1,6 +1,8 @@
+using System.Collections;
 using System.Collections.Immutable;
 using System.ComponentModel;
 using System.ComponentModel.DataAnnotations;
+using System.Reflection;
 using System.Runtime.CompilerServices;
 using Autofac;
 using Microsoft.Extensions.Configuration;
@@ -122,6 +124,8 @@ public class ExecutionBuilder() : BaseExecutionBuilder<InternalContext, Executio
     private string? _configuredExecutionId;
     private Dictionary<string, object?> _globalDict = new();
     private readonly IConfiguration? _templateSourceConfiguration;
+    private const BindingFlags ValidationBindingFlags =
+        BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance;
 
     internal ExecutionBuilder(InternalContext context, ExecutionType executionType, IList<string>? sessionNamesToRun,
         IList<string>? sessionCategoriesToRun, IList<string>? assertionNamesToRun,
@@ -759,8 +763,8 @@ public class ExecutionBuilder() : BaseExecutionBuilder<InternalContext, Executio
 
     private void ValidateConfiguredSections()
     {
-        _ = RunnerValidationUtils.TryValidateProperties(this, _validationResults,
-            nameof(DataSources), nameof(Storages), nameof(Assertions), nameof(Links), nameof(MetaData), nameof(Sessions));
+        TryValidateConfiguredMembers(nameof(DataSources), nameof(Storages), nameof(Assertions), nameof(Links),
+            nameof(MetaData), nameof(Sessions));
 
         ValidateCollection(DataSources, nameof(DataSources));
         ValidateCollection(Storages, nameof(Storages));
@@ -770,7 +774,7 @@ public class ExecutionBuilder() : BaseExecutionBuilder<InternalContext, Executio
 
         if (MetaData != null)
         {
-            _ = RunnerValidationUtils.TryValidateObjectRecursive(MetaData, _validationResults, nameof(MetaData));
+            _ = TryValidateConfiguredObjectRecursive(MetaData, _validationResults, nameof(MetaData));
         }
     }
 
@@ -786,10 +790,269 @@ public class ExecutionBuilder() : BaseExecutionBuilder<InternalContext, Executio
         {
             if (item != null)
             {
-                _ = RunnerValidationUtils.TryValidateObjectRecursive(item, _validationResults, $"{parentPath}:{index}");
+                _ = TryValidateConfiguredObjectRecursive(item, _validationResults, $"{parentPath}:{index}");
             }
 
             index++;
         }
+    }
+
+    private void TryValidateConfiguredMembers(params string[] propertyNames)
+    {
+        foreach (var propertyName in propertyNames.Distinct(StringComparer.Ordinal))
+        {
+            // ExecutionBuilder keeps configuration sections as mutable builder members, some of which are not writable
+            // through the public fluent surface. DataAnnotations can validate those members once we have the property
+            // metadata, but there is no framework API that says "validate exactly these named non-public members".
+            // Reflection is therefore limited to the runner's configuration boundary instead of recursing through the
+            // entire builder object graph the generic framework validator would otherwise inspect.
+            var property = GetType().GetProperty(propertyName, ValidationBindingFlags);
+            if (property == null || property.GetIndexParameters().Length > 0 ||
+                !TryGetPropertyValue(this, property, out var propertyValue))
+            {
+                continue;
+            }
+
+            var validationContext = new ValidationContext(this, null, null)
+            {
+                MemberName = property.Name
+            };
+
+            foreach (var validationAttribute in property.GetCustomAttributes<ValidationAttribute>())
+            {
+                var validationResult = validationAttribute.GetValidationResult(propertyValue, validationContext);
+                if (validationResult != ValidationResult.Success && validationResult != null)
+                {
+                    _validationResults.Add(validationResult);
+                }
+            }
+        }
+    }
+
+    private static bool TryValidateConfiguredObjectRecursive(object? obj, List<ValidationResult> results,
+        string parentPath = "")
+    {
+        if (obj == null)
+        {
+            return true;
+        }
+
+        if (IsTerminalType(obj.GetType()))
+        {
+            var terminalResults = new List<ValidationResult>();
+            _ = TryValidateCurrentObject(obj, terminalResults);
+            results.AddRange(PrefixValidationResults(terminalResults, parentPath));
+            return !terminalResults.Any();
+        }
+
+        var localResults = new List<ValidationResult>();
+        var isValid = TryValidateCurrentObject(obj, localResults);
+        results.AddRange(PrefixValidationResults(localResults, parentPath));
+
+        var properties = obj.GetType()
+            .GetProperties(ValidationBindingFlags)
+            .Where(property => property.GetIndexParameters().Length == 0 &&
+                               property.PropertyType != obj.GetType() &&
+                               ShouldInspectProperty(property));
+
+        foreach (var property in properties)
+        {
+            if (!TryGetPropertyValue(obj, property, out var value))
+            {
+                continue;
+            }
+
+            var propertyPath = $"{parentPath}{ConfigurationConstants.PathSeparator}{property.Name}";
+            if (value is IEnumerable enumerableValue && value is not string)
+            {
+                if (value is IDictionary dictionary)
+                {
+                    foreach (var key in dictionary.Keys)
+                    {
+                        var entry = dictionary[key];
+                        if (entry == null)
+                        {
+                            continue;
+                        }
+
+                        var entryPath = $"{propertyPath}{ConfigurationConstants.PathSeparator}{key}";
+                        if (!TryValidateConfiguredObjectRecursive(entry, results, entryPath))
+                        {
+                            isValid = false;
+                        }
+                    }
+                }
+                else
+                {
+                    var index = 0;
+                    foreach (var item in enumerableValue)
+                    {
+                        if (item != null &&
+                            !TryValidateConfiguredObjectRecursive(item, results,
+                                $"{propertyPath}{ConfigurationConstants.PathSeparator}{index}"))
+                        {
+                            isValid = false;
+                        }
+
+                        index++;
+                    }
+                }
+            }
+            else if (value != null && !IsTerminalType(value.GetType()) &&
+                     !TryValidateConfiguredObjectRecursive(value, results, propertyPath))
+            {
+                isValid = false;
+            }
+        }
+
+        return isValid;
+    }
+
+    private static bool TryValidateCurrentObject(object obj, List<ValidationResult> results)
+    {
+        var validationResults = new List<ValidationResult>();
+        var objectType = obj.GetType();
+
+        if (IsTerminalType(objectType))
+        {
+            var validationContext = new ValidationContext(obj, null, null)
+            {
+                MemberName = string.Empty
+            };
+
+            foreach (var validationAttribute in objectType.GetCustomAttributes<ValidationAttribute>())
+            {
+                var result = validationAttribute.GetValidationResult(obj, validationContext);
+                if (result != ValidationResult.Success && result != null)
+                {
+                    validationResults.Add(result);
+                }
+            }
+        }
+        else
+        {
+            _ = Validator.TryValidateObject(obj, new ValidationContext(obj), validationResults, true);
+            var objectValidationContext = new ValidationContext(obj, null, null)
+            {
+                MemberName = string.Empty
+            };
+
+            foreach (var validationAttribute in objectType.GetCustomAttributes<ValidationAttribute>())
+            {
+                var result = validationAttribute.GetValidationResult(obj, objectValidationContext);
+                if (result != ValidationResult.Success && result != null)
+                {
+                    validationResults.Add(result);
+                }
+            }
+
+            foreach (var property in objectType.GetProperties(ValidationBindingFlags)
+                         .Where(property => property.GetMethod?.IsPublic != true))
+            {
+                var validationAttributes = property.GetCustomAttributes<ValidationAttribute>().ToArray();
+                if (property.GetIndexParameters().Length > 0 || validationAttributes.Length == 0 ||
+                    !TryGetPropertyValue(obj, property, out var propertyValue))
+                {
+                    continue;
+                }
+
+                var validationContext = new ValidationContext(obj, null, null)
+                {
+                    MemberName = property.Name
+                };
+
+                foreach (var validationAttribute in validationAttributes)
+                {
+                    var result = validationAttribute.GetValidationResult(propertyValue, validationContext);
+                    if (result != ValidationResult.Success && result != null)
+                    {
+                        validationResults.Add(result);
+                    }
+                }
+            }
+        }
+
+        results.AddRange(DistinctValidationResults(validationResults));
+        return !validationResults.Any();
+    }
+
+    private static IEnumerable<ValidationResult> PrefixValidationResults(IEnumerable<ValidationResult> validationResults,
+        string parentPath)
+    {
+        var trimmedParentPath = parentPath.TrimStart(ConfigurationConstants.PathSeparator.ToCharArray());
+        var parentPrefix = trimmedParentPath.Length == 0 ? string.Empty : $"{trimmedParentPath} - ";
+
+        return validationResults.Select(result =>
+        {
+            result.ErrorMessage = $"{parentPrefix}{result.ErrorMessage}";
+            return result;
+        });
+    }
+
+    private static IEnumerable<ValidationResult> DistinctValidationResults(
+        IEnumerable<ValidationResult> validationResults)
+    {
+        return validationResults
+            .GroupBy(result => new
+            {
+                Message = result.ErrorMessage ?? string.Empty,
+                Members = string.Join("|", result.MemberNames.OrderBy(member => member, StringComparer.Ordinal))
+            })
+            .Select(group => group.First());
+    }
+
+    private static bool TryGetPropertyValue(object instance, PropertyInfo property, out object? value)
+    {
+        try
+        {
+            value = property.GetValue(instance);
+            return true;
+        }
+        catch (TargetInvocationException)
+        {
+            throw;
+        }
+        catch (Exception exception) when (exception is MethodAccessException or ArgumentException)
+        {
+            var getter = property.GetGetMethod(nonPublic: true);
+            if (getter == null)
+            {
+                value = null;
+                return false;
+            }
+
+            value = getter.Invoke(instance, null);
+            return true;
+        }
+    }
+
+    private static bool IsTerminalType(Type type)
+    {
+        var effectiveType = Nullable.GetUnderlyingType(type) ?? type;
+
+        return effectiveType.IsPrimitive
+               || effectiveType.IsEnum
+               || effectiveType == typeof(string)
+               || effectiveType == typeof(decimal)
+               || effectiveType == typeof(DateTime)
+               || effectiveType == typeof(DateTimeOffset)
+               || effectiveType == typeof(TimeSpan)
+               || effectiveType == typeof(Guid)
+               || effectiveType == typeof(Uri)
+               || effectiveType == typeof(Type)
+               || typeof(Delegate).IsAssignableFrom(effectiveType)
+               || typeof(MemberInfo).IsAssignableFrom(effectiveType)
+               || typeof(Assembly).IsAssignableFrom(effectiveType)
+               || effectiveType == typeof(IntPtr)
+               || effectiveType == typeof(UIntPtr)
+               || effectiveType.IsPointer
+               || effectiveType.IsByRef;
+    }
+
+    private static bool ShouldInspectProperty(PropertyInfo property)
+    {
+        return property.GetCustomAttributes<ValidationAttribute>().Any()
+               || property.GetCustomAttributes<DescriptionAttribute>().Any()
+               || property.GetCustomAttributes<DefaultValueAttribute>().Any();
     }
 }

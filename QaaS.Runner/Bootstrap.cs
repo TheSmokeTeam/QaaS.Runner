@@ -4,6 +4,7 @@ using CommandLine;
 using Microsoft.Extensions.Logging;
 using QaaS.Framework.Executions.CommandLineBuilders;
 using QaaS.Runner.Loaders;
+using QaaS.Runner.Modules;
 using QaaS.Runner.Options;
 using Serilog;
 using Serilog.Extensions.Logging;
@@ -17,7 +18,6 @@ namespace QaaS.Runner;
 /// </summary>
 public static class Bootstrap
 {
-    private static readonly ILifetimeScope DefaultRootScope = BuildParentContainer();
     private static readonly Lazy<bool> ShouldForceDisableSendLogs = new(() => !CanUseFrameworkDefaultLoggers());
 
     /// <summary>
@@ -49,27 +49,29 @@ public static class Bootstrap
     internal static TRunner GetRunner<TRunner>(IEnumerable<string>? args, string? executionId = null)
         where TRunner : Runner
     {
-        var commandLineArgs = args?.ToArray();
-        if (commandLineArgs == null || commandLineArgs.Length == 0)
+        var commandLineArgs = args?.ToArray() ?? [];
+        using var cliParser = ParserBuilder.BuildParser();
+        var cliParserResult = ParseSupportedArguments(cliParser, commandLineArgs);
+
+        // An empty command line is treated as an explicit "show me the top-level usage" request.
+        // The parser still reports it as "no verb selected", but bootstrap upgrades that case to a
+        // successful help flow instead of an error so callers can safely do Bootstrap.New(null).Run().
+        if (commandLineArgs.Length == 0)
         {
-            using var emptyArgsParser = ParserBuilder.BuildParser();
-            return WriteHelpAndCreateBootstrapHandledRunner<TRunner>(emptyArgsParser);
+            return HandleNotParsedResult<TRunner>(cliParserResult, GetParseErrors(cliParserResult),
+                treatNoVerbAsHelpOnly: true);
         }
 
-        // Build CLI parser and parse supported verbs
-        using var cliParser = ParserBuilder.BuildParser();
-        var cliParserResult = cliParser.ParseArguments<RunOptions,
-            ActOptions, AssertOptions, TemplateOptions, ExecuteOptions, int>(commandLineArgs);
+        // Help, version, and real parse failures all surface as NotParsed results. We convert them into a
+        // bootstrap-handled runner here so the public API stays "always return a Runner" while still ensuring
+        // the caller will not accidentally start an empty execution lifecycle after CLI handling is complete.
+        if (cliParserResult is NotParsed<object> notParsedResult)
+        {
+            return HandleNotParsedResult<TRunner>(cliParserResult, notParsedResult.Errors,
+                treatNoVerbAsHelpOnly: false);
+        }
 
-        var runner = cliParserResult
-            .WithNotParsed(errors =>
-            {
-                var parseErrors = errors.ToArray();
-                if (parseErrors.All(error => error.Tag is ErrorType.VersionRequestedError))
-                    return;
-
-                Console.Out.WriteLine(HelpTextBuilder.BuildHelpText(cliParserResult));
-            })
+        return cliParserResult
             .MapResult(
                 (TemplateOptions options) =>
                     new RunLoader<TRunner, TemplateOptions>(GetSafeLoggerOptions(options), executionId).GetLoadedRunner(),
@@ -80,21 +82,28 @@ public static class Bootstrap
                 (AssertOptions options) =>
                     new RunLoader<TRunner, AssertOptions>(GetSafeLoggerOptions(options), executionId).GetLoadedRunner(),
                 (ExecuteOptions options) => new ExecuteLoader<TRunner>(GetSafeLoggerOptions(options)).GetLoadedRunner(),
-                HandleParseError<TRunner>);
-
-        return runner;
+                errors => throw new InvalidOperationException(
+                    $"Parser returned unexpected not-parsed result: {string.Join(", ", errors.Select(error => error.Tag))}"));
     }
 
     /// <summary>
-    /// Handles parsing errors and returns an empty <see cref="Runner" /> object
+    /// Converts a not-parsed command line result into a bootstrap-handled runner.
+    /// CommandLineParser models help/version requests and actual parse failures with the same <see cref="Error" />
+    /// channel, but <see cref="Bootstrap.New(IEnumerable{string})" /> still promises to return a <see cref="Runner" />
+    /// instance in every case. This method therefore performs two jobs:
+    /// 1) emit the user-facing CLI output once (help text or version text)
+    /// 2) return a runner that already knows its final exit code and will skip the execution lifecycle later
+    ///    when <see cref="Runner.RunAndGetExitCode" /> sees <c>BootstrapHandledExitCode</c>
     /// </summary>
-    private static TRunner HandleParseError<TRunner>(IEnumerable<Error> errors) where TRunner : Runner
+    private static TRunner HandleNotParsedResult<TRunner>(ParserResult<object> cliParserResult,
+        IEnumerable<Error> errors, bool treatNoVerbAsHelpOnly) where TRunner : Runner
     {
         var errorsArray = errors.ToArray();
         var (logger, serilogLogger, ownsSerilogLogger) = GetDefaultLoggers();
 
-        // If all errors are version requests handle the version request case
-        if (errorsArray.All(err => err.Tag is ErrorType.VersionRequestedError))
+        // CommandLineParser reports "--version" as a parse error, but from the runner API perspective it is a fully
+        // handled success path: print the versions, then return a sentinel runner that does nothing else.
+        if (IsVersionOnlyRequest(errorsArray))
         {
             const string qaasFrameworkAssemblyName = "QaaS.Framework.Executions";
             logger.LogInformation($"\nQaaS Framework Versions:\n" +
@@ -102,16 +111,55 @@ public static class Bootstrap
             return CreateBootstrapHandledRunner<TRunner>(0, logger, serilogLogger, ownsSerilogLogger);
         }
 
-        // Help requests were already printed to stdout and should not continue into the runner lifecycle.
-        if (errorsArray.All(err => err.Tag is ErrorType.HelpRequestedError or ErrorType.HelpVerbRequestedError))
-            return CreateBootstrapHandledRunner<TRunner>(0, logger, serilogLogger, ownsSerilogLogger);
+        var shouldTreatAsHelpOnly = treatNoVerbAsHelpOnly || IsHelpOnlyRequest(errorsArray);
+        WriteHelpText(cliParserResult);
 
-        logger.LogCritical("Failed to parse/process the command line arguments");
-        return CreateBootstrapHandledRunner<TRunner>(1, logger, serilogLogger, ownsSerilogLogger);
+        if (!shouldTreatAsHelpOnly)
+        {
+            logger.LogCritical("Failed to parse/process the command line arguments");
+        }
+
+        return CreateBootstrapHandledRunner<TRunner>(shouldTreatAsHelpOnly ? 0 : 1, logger, serilogLogger,
+            ownsSerilogLogger);
+    }
+
+    private static bool IsVersionOnlyRequest(IEnumerable<Error> errors)
+    {
+        return errors.All(error => error.Tag is ErrorType.VersionRequestedError);
+    }
+
+    private static bool IsHelpOnlyRequest(IEnumerable<Error> errors)
+    {
+        return errors.All(error => error.Tag is ErrorType.HelpRequestedError or ErrorType.HelpVerbRequestedError);
+    }
+
+    private static RunOptions GetSafeLoggerOptions(RunOptions options)
+    {
+        return ShouldForceDisableSendLogs.Value ? options with { SendLogs = false } : options;
+    }
+
+    private static ActOptions GetSafeLoggerOptions(ActOptions options)
+    {
+        return ShouldForceDisableSendLogs.Value ? options with { SendLogs = false } : options;
+    }
+
+    private static AssertOptions GetSafeLoggerOptions(AssertOptions options)
+    {
+        return ShouldForceDisableSendLogs.Value ? options with { SendLogs = false } : options;
+    }
+
+    private static TemplateOptions GetSafeLoggerOptions(TemplateOptions options)
+    {
+        return ShouldForceDisableSendLogs.Value ? options with { SendLogs = false } : options;
+    }
+
+    private static ExecuteOptions GetSafeLoggerOptions(ExecuteOptions options)
+    {
+        return ShouldForceDisableSendLogs.Value ? options with { SendLogs = false } : options;
     }
 
     // Create a custom runner using activator to dynamically get a new instance of any implementation of TRunner
-    private static TRunner CreateRunner<TRunner>(ILifetimeScope scope, List<ExecutionBuilder> executionBuilders,
+    internal static TRunner CreateRunner<TRunner>(ILifetimeScope scope, List<ExecutionBuilder> executionBuilders,
         ILogger logger, Serilog.ILogger serilogLogger, bool emptyResults = false, bool serveResults = false,
         bool disposeSerilogLogger = true)
         where TRunner : Runner
@@ -161,34 +209,16 @@ public static class Bootstrap
             true);
     }
 
-    private static RunOptions GetSafeLoggerOptions(RunOptions options)
-    {
-        return ShouldForceDisableSendLogs.Value ? options with { SendLogs = false } : options;
-    }
-
-    private static ActOptions GetSafeLoggerOptions(ActOptions options)
-    {
-        return ShouldForceDisableSendLogs.Value ? options with { SendLogs = false } : options;
-    }
-
-    private static AssertOptions GetSafeLoggerOptions(AssertOptions options)
-    {
-        return ShouldForceDisableSendLogs.Value ? options with { SendLogs = false } : options;
-    }
-
-    private static TemplateOptions GetSafeLoggerOptions(TemplateOptions options)
-    {
-        return ShouldForceDisableSendLogs.Value ? options with { SendLogs = false } : options;
-    }
-
-    private static ExecuteOptions GetSafeLoggerOptions(ExecuteOptions options)
-    {
-        return ShouldForceDisableSendLogs.Value ? options with { SendLogs = false } : options;
-    }
-
-    private static ILifetimeScope BuildParentContainer()
+    /// <summary>
+    /// Creates the minimal lifetime scope a runner needs at runtime.
+    /// Both <see cref="RunLoader{TRunner,TOptions}" /> and <see cref="ExecuteLoader{TRunner}" /> build configuration
+    /// directly and only rely on Autofac later for runner lifecycle helpers such as Allure cleanup and serving.
+    /// Keeping that scope minimal avoids the older duplicated loader-specific scope initialization code.
+    /// </summary>
+    internal static ILifetimeScope CreateRunnerScope()
     {
         var containerBuilder = new ContainerBuilder();
+        containerBuilder.RegisterModule<AllureWrapperModule>();
         return containerBuilder.Build();
     }
 
@@ -209,26 +239,33 @@ public static class Bootstrap
         }
 
         return CreateRunner<TRunner>(
-            DefaultRootScope.BeginLifetimeScope(),
+            CreateRunnerScope(),
             [],
             resolvedLoggers.logger,
             resolvedLoggers.serilogLogger,
             disposeSerilogLogger: resolvedLoggers.ownsSerilogLogger);
     }
 
-    /// <summary>
-    /// Prints the top-level help text for empty command lines and returns a runner that only carries the exit code.
-    /// </summary>
-    private static TRunner WriteHelpAndCreateBootstrapHandledRunner<TRunner>(Parser cliParser) where TRunner : Runner
+    private static ParserResult<object> ParseSupportedArguments(Parser cliParser, IEnumerable<string> args)
     {
-        var emptyArgsResult = cliParser.ParseArguments<RunOptions, ActOptions, AssertOptions, TemplateOptions,
-            ExecuteOptions, int>([]);
-        Console.Out.WriteLine(HelpTextBuilder.BuildHelpText(emptyArgsResult));
-        return CreateBootstrapHandledRunner<TRunner>(0);
+        return cliParser.ParseArguments<RunOptions, ActOptions, AssertOptions, TemplateOptions, ExecuteOptions, int>(
+            args);
+    }
+
+    private static IEnumerable<Error> GetParseErrors(ParserResult<object> cliParserResult)
+    {
+        return cliParserResult is NotParsed<object> notParsedResult ? notParsedResult.Errors : [];
+    }
+
+    private static void WriteHelpText(ParserResult<object> cliParserResult)
+    {
+        Console.Out.WriteLine(HelpTextBuilder.BuildHelpText(cliParserResult));
     }
 
     /// <summary>
-    /// Creates a runner that should stop after bootstrap because the command line was fully handled already.
+    /// Creates a minimal runner with no execution builders whose only job is to carry the final bootstrap decision.
+    /// The runner still needs real logger and scope instances so <see cref="Runner.RunAndGetExitCode" /> can dispose
+    /// resources uniformly, but the bootstrap exit code makes that runner skip setup/build/start/teardown entirely.
     /// </summary>
     private static TRunner CreateBootstrapHandledRunner<TRunner>(
         int exitCode,

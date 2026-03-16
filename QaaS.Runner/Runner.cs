@@ -2,6 +2,7 @@ using Autofac;
 using Microsoft.Extensions.Logging;
 using QaaS.Framework.Executions;
 using QaaS.Runner.WrappedExternals;
+using System.Runtime.ExceptionServices;
 using ILogger = Microsoft.Extensions.Logging.ILogger;
 
 namespace QaaS.Runner;
@@ -76,44 +77,19 @@ public class Runner : IRunner, IDisposable
         // because bootstrap already wrote the CLI output and chose the correct exit code.
         if (BootstrapHandledExitCode.HasValue)
         {
-            LastExitCode = BootstrapHandledExitCode.Value;
-            Logger.LogDebug(
-                "Skipping runner lifecycle because bootstrap already handled the command-line request. ExitCode={ExitCode}",
-                BootstrapHandledExitCode.Value);
-            DisposeBootstrapOnlyResources();
-            return BootstrapHandledExitCode.Value;
+            return CompleteBootstrapHandledRun();
         }
 
-        List<Execution>? executions = null;
-        var exitCode = 0;
         LastExitCode = null;
         Logger.LogInformation(
             "Starting runner with {ExecutionCount} execution builders. EmptyResults={EmptyResults}, ServeResults={ServeResults}, ExitProcessOnCompletion={ExitProcessOnCompletion}",
             ExecutionBuilders.Count, EmptyResults, ServeResults, ExitProcessOnCompletion);
-        try
+        var (executions, exitCode, lifecycleFailure) = ExecuteLifecycle();
+
+        var completionFailure = CompleteRun(executions, lifecycleFailure);
+        if (completionFailure != null)
         {
-            Setup();
-            executions = BuildExecutions();
-            exitCode = StartExecutions(executions);
-            LastExitCode = exitCode;
-        }
-        finally
-        {
-            try
-            {
-                DisposeExecutions(executions);
-            }
-            finally
-            {
-                try
-                {
-                    Teardown();
-                }
-                finally
-                {
-                    Dispose();
-                }
-            }
+            throw completionFailure;
         }
 
         Logger.LogInformation("Runner completed. ExitCode={ExitCode}", exitCode);
@@ -218,9 +194,12 @@ public class Runner : IRunner, IDisposable
         var globalDict = new Dictionary<string, object?>();
         // Builders share a single global dictionary so metadata and runtime values written by one
         // execution are visible to later executions in the same runner invocation.
+        // This is mutable per-run state rather than a container-managed dependency, so pushing it through
+        // Autofac would add indirection without improving lifetime management.
         ExecutionBuilders.ForEach(builder => builder.WithGlobalDict(globalDict));
 
-        // passing the same logger reference to every builder
+        // The logger is also assigned directly because execution builders are plain mutable configuration objects,
+        // not services resolved from the Autofac scope.
         ExecutionBuilders.ForEach(builder => builder.WithLogger(Logger));
         var executions = ExecutionBuilders.Select(builder => builder.Build()).ToList();
         Logger.LogInformation("Built {ExecutionCount} executions successfully", executions.Count);
@@ -274,6 +253,73 @@ public class Runner : IRunner, IDisposable
     {
         DisposeSerilogLogger = disposeSerilogLogger;
         return this;
+    }
+
+    private int CompleteBootstrapHandledRun()
+    {
+        LastExitCode = BootstrapHandledExitCode!.Value;
+        Logger.LogDebug(
+            "Skipping runner lifecycle because bootstrap already handled the command-line request. ExitCode={ExitCode}",
+            BootstrapHandledExitCode.Value);
+        DisposeBootstrapOnlyResources();
+        return BootstrapHandledExitCode.Value;
+    }
+
+    private (List<Execution>? Executions, int ExitCode, ExceptionDispatchInfo? LifecycleFailure) ExecuteLifecycle()
+    {
+        List<Execution>? executions = null;
+
+        try
+        {
+            Setup();
+            executions = BuildExecutions();
+            var exitCode = StartExecutions(executions);
+            LastExitCode = exitCode;
+            return (executions, exitCode, null);
+        }
+        catch (Exception exception)
+        {
+            return (executions, 0, ExceptionDispatchInfo.Capture(exception));
+        }
+    }
+
+    private Exception? CompleteRun(List<Execution>? executions, ExceptionDispatchInfo? lifecycleFailure)
+    {
+        var cleanupFailures = new List<Exception>();
+        RunCleanupStep(() => DisposeExecutions(executions), cleanupFailures);
+        RunCleanupStep(Teardown, cleanupFailures);
+        RunCleanupStep(Dispose, cleanupFailures);
+
+        if (lifecycleFailure == null && cleanupFailures.Count == 0)
+        {
+            return null;
+        }
+
+        if (lifecycleFailure != null && cleanupFailures.Count == 0)
+        {
+            lifecycleFailure.Throw();
+        }
+
+        var failures = new List<Exception>();
+        if (lifecycleFailure != null)
+        {
+            failures.Add(lifecycleFailure.SourceException);
+        }
+
+        failures.AddRange(cleanupFailures);
+        return failures.Count == 1 ? failures[0] : new AggregateException(failures);
+    }
+
+    private static void RunCleanupStep(Action cleanupStep, ICollection<Exception> failures)
+    {
+        try
+        {
+            cleanupStep();
+        }
+        catch (Exception exception)
+        {
+            failures.Add(exception);
+        }
     }
 
     private void DisposeBootstrapOnlyResources()

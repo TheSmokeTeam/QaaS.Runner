@@ -5,19 +5,15 @@ using Microsoft.Extensions.Logging;
 using QaaS.Framework.Configurations;
 using QaaS.Framework.Configurations.ConfigurationBuilderExtensions;
 using QaaS.Framework.Executions.Loaders;
-using QaaS.Framework.SDK.Session.SessionDataObjects;
-using QaaS.Framework.SDK.Session.SessionDataObjects.RunningSessionsObjects;
 using QaaS.Runner.ConfigurationObjects;
-using QaaS.Runner.WrappedExternals;
 using ExecuteOptions = QaaS.Runner.Options.ExecuteOptions;
 
 namespace QaaS.Runner.Loaders;
 
 /// <summary>
-///     Loads and constructs a runner of type <typeparamref name="TRunner" /> for executing commands based on configuration
-///     and command IDs
-///     This loader processes a YAML configuration file, validates command IDs, and orchestrates execution of specified
-///     commands
+/// Loads an `execute` command that fans out into multiple nested run-like commands.
+/// Unlike <see cref="RunLoader{TRunner,TOptions}" />, this loader first parses an execution YAML file, bootstraps a
+/// runner per command, and then flattens all child execution builders into one outer runner.
 /// </summary>
 /// <typeparam name="TRunner">The type of runner to instantiate, which must inherit from <see cref="Runner" /></typeparam>
 public class ExecuteLoader<TRunner> : BaseLoader<ExecuteOptions, TRunner> where TRunner : Runner
@@ -31,25 +27,7 @@ public class ExecuteLoader<TRunner> : BaseLoader<ExecuteOptions, TRunner> where 
     /// <param name="executionId">An optional ID to identify the execution session</param>
     public ExecuteLoader(ExecuteOptions options, string? executionId = null) : base(options, executionId)
     {
-        _runScope = InitializeScope();
-    }
-
-    /// <summary>
-    ///     Creates a new Autofac lifetime scope with registered services for the execution context
-    /// </summary>
-    /// <returns>A new <see cref="ILifetimeScope" /> for the execution context</returns>
-    private ILifetimeScope InitializeScope()
-    {
-        var parentScope = new ContainerBuilder().Build();
-        return parentScope.BeginLifetimeScope(scope =>
-        {
-            scope.RegisterInstance(new AllureWrapper()).SingleInstance();
-            scope.RegisterInstance(new RunningSessions(new Dictionary<string, RunningSessionData<object, object>>()))
-                .As<IInternalRunningSessions>();
-
-            // Must not be single instance so it builds a new configuration builder for every context
-            scope.RegisterType<ConfigurationBuilder>().As<IConfigurationBuilder>();
-        });
+        _runScope = Bootstrap.CreateRunnerScope();
     }
 
     /// <summary>
@@ -92,7 +70,7 @@ public class ExecuteLoader<TRunner> : BaseLoader<ExecuteOptions, TRunner> where 
     public override TRunner GetLoadedRunner()
     {
         // Load executable YAML configuration
-        var executableYaml = _runScope.Resolve<IConfigurationBuilder>()
+        var executableYaml = new ConfigurationBuilder()
             .AddYaml(Options.ConfigurationFile!)
             .AddEnvironmentVariables().AddPlaceholderResolver().Build()
             .LoadAndValidateConfiguration<ExecuteConfigurations>();
@@ -112,10 +90,13 @@ public class ExecuteLoader<TRunner> : BaseLoader<ExecuteOptions, TRunner> where 
         var allExecutions = runs.Select(run => run.ExecutionBuilders).SelectMany(runExecutions => runExecutions)
             .ToList();
 
-        // Use Activator to create an instance of the configured implementation of TRunner
-        var runner = (TRunner)Activator.CreateInstance(
-            typeof(TRunner),
-            _runScope, allExecutions, Logger, SerilogLogger, Options.EmptyAllureDirectory, Options.AutoServeTestResults)!;
+        var runner = Bootstrap.CreateRunner<TRunner>(
+            _runScope,
+            allExecutions,
+            Logger,
+            SerilogLogger,
+            Options.EmptyAllureDirectory,
+            Options.AutoServeTestResults);
         runner.ExitProcessOnCompletion = !Options.NoProcessExit;
         return runner;
     }

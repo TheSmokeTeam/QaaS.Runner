@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.ComponentModel.DataAnnotations;
+using System.Linq;
 using System.Reflection;
 using NUnit.Framework;
 using QaaS.Framework.Policies;
@@ -283,7 +284,7 @@ public class TransactionBuilderTests
         });
 
         var validationResults = new List<ValidationResult>();
-        RunnerValidationUtils.TryValidateProperties(builder, validationResults,
+        ValidateMembers(builder, validationResults,
             "DataSourceNames", "DataSourcePatterns");
 
         Assert.That(validationResults, Is.Not.Empty);
@@ -366,5 +367,34 @@ public class TransactionBuilderTests
 
         Assert.That(result, Is.Null);
         Assert.That(_actionFailures, Is.Not.Empty);
+    }
+
+    private static void ValidateMembers(object instance, ICollection<ValidationResult> validationResults,
+        params string[] propertyNames)
+    {
+        foreach (var propertyName in propertyNames.Distinct(StringComparer.Ordinal))
+        {
+            var property = instance.GetType()
+                .GetProperty(propertyName, BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
+            if (property == null || property.GetIndexParameters().Length > 0)
+            {
+                continue;
+            }
+
+            var validationContext = new ValidationContext(instance, null, null)
+            {
+                MemberName = property.Name
+            };
+            var getter = property.GetGetMethod(nonPublic: true);
+            var value = getter?.Invoke(instance, null);
+            foreach (var validationAttribute in property.GetCustomAttributes<ValidationAttribute>())
+            {
+                var result = validationAttribute.GetValidationResult(value, validationContext);
+                if (result != null && result != ValidationResult.Success)
+                {
+                    validationResults.Add(result);
+                }
+            }
+        }
     }
 }

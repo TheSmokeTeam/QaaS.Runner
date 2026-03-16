@@ -490,7 +490,7 @@ public class PublisherBuilderTests
 
         // Act 
         var validationResults = new List<ValidationResult>();
-        RunnerValidationUtils.TryValidateProperties(publisherBuilder, validationResults, "Chunk");
+        ValidateMembers(publisherBuilder, validationResults, "Chunk");
 
         // Assert
         Assert.That(validationResults.Count(r => r.ErrorMessage!.Contains("Chunk")), Is.EqualTo(1));
@@ -508,7 +508,7 @@ public class PublisherBuilderTests
 
         // Act 
         var validationResults = new List<ValidationResult>();
-        RunnerValidationUtils.TryValidateProperties(publisherBuilder, validationResults, "Chunk");
+        ValidateMembers(publisherBuilder, validationResults, "Chunk");
 
         // Assert
         Assert.That(validationResults.Count(r => r.ErrorMessage!.Contains("Chunk")), Is.EqualTo(1));
@@ -526,7 +526,7 @@ public class PublisherBuilderTests
 
         // Act 
         var validationResults = new List<ValidationResult>();
-        RunnerValidationUtils.TryValidateProperties(publisherBuilder, validationResults, "Chunk");
+        ValidateMembers(publisherBuilder, validationResults, "Chunk");
 
         // Assert
         Assert.That(validationResults.Count(r => r.ErrorMessage!.Contains("Chunk")), Is.EqualTo(0));
@@ -546,7 +546,7 @@ public class PublisherBuilderTests
 
         // Act 
         var validationResults = new List<ValidationResult>();
-        RunnerValidationUtils.TryValidateProperties(publisherBuilder, validationResults, "Chunk");
+        ValidateMembers(publisherBuilder, validationResults, "Chunk");
 
         // Assert
         Assert.That(validationResults.Count(r => r.ErrorMessage!.Contains("Chunk")), Is.EqualTo(0));
@@ -558,5 +558,34 @@ public class PublisherBuilderTests
             .GetField(fieldName, BindingFlags.NonPublic | BindingFlags.Public | BindingFlags.Instance);
 
         return field?.GetValue(obj);
+    }
+
+    private static void ValidateMembers(object instance, ICollection<ValidationResult> validationResults,
+        params string[] propertyNames)
+    {
+        foreach (var propertyName in propertyNames.Distinct(StringComparer.Ordinal))
+        {
+            var property = instance.GetType()
+                .GetProperty(propertyName, BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
+            if (property == null || property.GetIndexParameters().Length > 0)
+            {
+                continue;
+            }
+
+            var validationContext = new ValidationContext(instance, null, null)
+            {
+                MemberName = property.Name
+            };
+            var getter = property.GetGetMethod(nonPublic: true);
+            var value = getter?.Invoke(instance, null);
+            foreach (var validationAttribute in property.GetCustomAttributes<ValidationAttribute>())
+            {
+                var result = validationAttribute.GetValidationResult(value, validationContext);
+                if (result != null && result != ValidationResult.Success)
+                {
+                    validationResults.Add(result);
+                }
+            }
+        }
     }
 }
