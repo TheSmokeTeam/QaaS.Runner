@@ -19,6 +19,7 @@ public class FileSystemExtensionsTests
     [Test]
     [TestCase("report?.json", ExpectedResult = "report_.json")]
     [TestCase("...", ExpectedResult = "_")]
+    [TestCase("..", ExpectedResult = "_")]
     [TestCase("", ExpectedResult = "")]
     [TestCase(null, ExpectedResult = null)]
     public string? TestMakeValidFileName_CallFunction_ShouldReturnExpectedResult(string? name)
@@ -32,6 +33,14 @@ public class FileSystemExtensionsTests
         var result = FileSystemExtensions.NormalizeRelativePath("folder/sub/file.json");
 
         Assert.That(result, Is.EqualTo(Path.Combine("folder", "sub", "file.json")));
+    }
+
+    [Test]
+    public void NormalizeRelativePath_WithWhitespace_ReturnsEmptyPath()
+    {
+        var result = FileSystemExtensions.NormalizeRelativePath("   ");
+
+        Assert.That(result, Is.EqualTo(string.Empty));
     }
 
     [Test]
@@ -73,6 +82,16 @@ public class FileSystemExtensionsTests
 
         Assert.Throws<InvalidOperationException>(() =>
             FileSystemExtensions.CombineUnderRoot(root, "..", "outside.json"));
+    }
+
+    [Test]
+    public void CombineUnderRoot_WithNoSegments_ReturnsNormalizedRoot()
+    {
+        var root = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString("N"));
+
+        var result = FileSystemExtensions.CombineUnderRoot(root);
+
+        Assert.That(result, Is.EqualTo(Path.GetFullPath(root)));
     }
 
     [Test]

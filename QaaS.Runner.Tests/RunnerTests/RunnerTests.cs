@@ -96,6 +96,27 @@ public class RunnerTests
     }
 
     [Test]
+    public void BootstrapNew_WithEmptyArguments_WritesHelpWithoutInvokingRunnerLifecycle()
+    {
+        var helpOutput = CaptureStandardOutput(() =>
+        {
+            var runner = Bootstrap.New<MockRunner>([]);
+            var mockRunner = runner as MockRunner;
+
+            var exitCode = runner.RunAndGetExitCode();
+
+            Assert.That(exitCode, Is.Zero);
+            Assert.That(mockRunner, Is.Not.Null);
+            Assert.That(mockRunner!.SetupCalled, Is.False);
+            Assert.That(mockRunner.TeardownCalled, Is.False);
+            Assert.That(mockRunner.BuildExecutionsCalled, Is.False);
+            Assert.That(mockRunner.StartExecutionsCalled, Is.False);
+        });
+
+        Assert.That(helpOutput, Does.Contain("Usage:"));
+    }
+
+    [Test]
     public void BootstrapNew_WithHelpFlag_WritesHelpWithoutInvokingRunnerLifecycle()
     {
         var helpOutput = CaptureStandardOutput(() =>
@@ -114,6 +135,46 @@ public class RunnerTests
         });
 
         Assert.That(helpOutput, Does.Contain("Usage:"));
+    }
+
+    [Test]
+    public void BootstrapNew_WithVersionFlag_DoesNotInvokeRunnerLifecycle()
+    {
+        CaptureStandardOutput(() =>
+        {
+            var runner = Bootstrap.New<MockRunner>(["--version"]);
+            var mockRunner = runner as MockRunner;
+
+            var exitCode = runner.RunAndGetExitCode();
+
+            Assert.That(exitCode, Is.Zero);
+            Assert.That(mockRunner, Is.Not.Null);
+            Assert.That(mockRunner!.SetupCalled, Is.False);
+            Assert.That(mockRunner.TeardownCalled, Is.False);
+            Assert.That(mockRunner.BuildExecutionsCalled, Is.False);
+            Assert.That(mockRunner.StartExecutionsCalled, Is.False);
+        });
+    }
+
+    [Test]
+    public void BootstrapNew_WithInvalidCommand_DoesNotInvokeRunnerLifecycle_AndReturnsFailureExitCode()
+    {
+        var commandOutput = CaptureStandardOutput(() =>
+        {
+            var runner = Bootstrap.New<MockRunner>(["invalid-command"]);
+            var mockRunner = runner as MockRunner;
+
+            var exitCode = runner.RunAndGetExitCode();
+
+            Assert.That(exitCode, Is.EqualTo(1));
+            Assert.That(mockRunner, Is.Not.Null);
+            Assert.That(mockRunner!.SetupCalled, Is.False);
+            Assert.That(mockRunner.TeardownCalled, Is.False);
+            Assert.That(mockRunner.BuildExecutionsCalled, Is.False);
+            Assert.That(mockRunner.StartExecutionsCalled, Is.False);
+        });
+
+        Assert.That(commandOutput, Does.Contain("Usage:"));
     }
 
     [Test]

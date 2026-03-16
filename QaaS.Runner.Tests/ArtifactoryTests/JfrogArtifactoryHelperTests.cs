@@ -140,6 +140,23 @@ public class JfrogArtifactoryHelperTests
         Assert.That(result[0], Is.EqualTo(folderUrl));
     }
 
+    [Test]
+    public async Task TestGetUrlsToAllFilesInArtifactoryFolderAsync_WithEmptyChildrenArray_ReturnsOriginalPath()
+    {
+        var folderUrl = "https://test-artifactory.com/artifactory/folder";
+        var storageApiUrl = JfrogArtifactoryHelper.ParseArtifactoryFolderUrlToStorageApiUrl(folderUrl);
+        using var httpClient = BuildHttpClient(uri =>
+            uri.ToString() == storageApiUrl
+                ? BuildOkJsonResponse("""{"children":[]}""")
+                : throw new InvalidOperationException($"Missing mocked response for uri {uri}"));
+
+        var helper = new JfrogArtifactoryHelper();
+
+        var result = await helper.GetUrlsToAllFilesInArtifactoryFolderAsync(folderUrl, httpClient);
+
+        Assert.That(result, Is.EqualTo(new[] { folderUrl }));
+    }
+
     [Test,
      TestCase(HttpStatusCode.NotFound, typeof(HttpRequestException)),
      TestCase(HttpStatusCode.InternalServerError, typeof(HttpRequestException))]

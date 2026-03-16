@@ -75,6 +75,15 @@ public class S3StorageTests
         }
     }
 
+    private sealed class ExposedS3Storage(S3Config configuration, Formatting jsonStorageFormat)
+        : S3Storage(configuration, jsonStorageFormat)
+    {
+        public IS3Client BuildS3ClientForTest(S3Config config)
+        {
+            return base.BuildS3Client(config);
+        }
+    }
+
     [Test]
     public void StoreSerialized_PrefixesKeysWithSanitizedCaseName_AndDisposesClient()
     {
@@ -123,6 +132,29 @@ public class S3StorageTests
             Assert.That(result[0], Is.Empty);
             Assert.That(result[1], Is.EqualTo(new byte[] { 0x04, 0x05 }));
             Assert.That(fakeClient.Disposed, Is.True);
+        });
+    }
+
+    [Test]
+    public void BuildS3Client_WithConfiguration_ReturnsConcreteClient()
+    {
+        var config = new S3Config
+        {
+            AccessKey = "access-key",
+            SecretKey = "secret-key",
+            ServiceURL = "http://localhost:9000",
+            ForcePathStyle = true,
+            MaximumRetryCount = 7
+        };
+        var storage = new ExposedS3Storage(config, Formatting.None);
+        storage._context = Globals.Context;
+
+        using var client = storage.BuildS3ClientForTest(config);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(client, Is.Not.Null);
+            Assert.That(client.GetType().Name, Is.EqualTo("S3Client"));
         });
     }
 }
