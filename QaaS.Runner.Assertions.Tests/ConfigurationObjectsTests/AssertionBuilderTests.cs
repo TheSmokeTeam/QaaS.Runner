@@ -249,7 +249,8 @@ public class AssertionBuilderTests
 
         Assert.That(builtAssertion.AssertionHook, Is.SameAs(assertionHook));
         Assert.That(builtAssertion.Links, Has.Count.EqualTo(1));
-        Assert.That(builtAssertion.Links[0], Is.TypeOf<global::QaaS.Runner.Assertions.LinkBuilders.PrometheusLink>());
+        Assert.That(builtAssertion.Links, Is.Not.Null);
+        Assert.That(builtAssertion.Links![0], Is.TypeOf<global::QaaS.Runner.Assertions.LinkBuilders.PrometheusLink>());
     }
 
     private static AssertionBuilder CreateBuilder()

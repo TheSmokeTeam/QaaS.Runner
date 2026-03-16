@@ -12,6 +12,9 @@ namespace QaaS.Runner;
 /// </summary>
 public class Runner : IRunner, IDisposable
 {
+    // Tests replace this delegate to verify the base ExitProcess path without terminating the test host.
+    internal static Action<int> ProcessExitHandler { get; set; } = Environment.Exit;
+
     private bool _disposed;
     private ILifetimeScope Scope { get; set; }
     internal ILogger Logger { get; set; }
@@ -173,7 +176,7 @@ public class Runner : IRunner, IDisposable
     /// </summary>
     protected virtual void ExitProcess(int exitCode)
     {
-        Environment.Exit(exitCode);
+        ProcessExitHandler(exitCode);
     }
 
     /// <summary>
@@ -296,9 +299,7 @@ public class Runner : IRunner, IDisposable
         }
 
         if (lifecycleFailure != null && cleanupFailures.Count == 0)
-        {
             lifecycleFailure.Throw();
-        }
 
         var failures = new List<Exception>();
         if (lifecycleFailure != null)

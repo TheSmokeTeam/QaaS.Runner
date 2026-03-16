@@ -24,7 +24,7 @@ public class AllureWrapper
     /// <summary>
     ///     Cleans the allure results directory
     /// </summary>
-    public void CleanTestResultsDirectory()
+    public virtual void CleanTestResultsDirectory()
     {
         AllureLifecycle.Instance.CleanupResultDirectory();
         Console.Out.WriteLine($"Cleaned allure results directory {AllureLifecycle.Instance.ResultsDirectory}");
@@ -33,7 +33,7 @@ public class AllureWrapper
     /// <summary>
     ///     Automatically serves the test results in a human-readable manner
     /// </summary>
-    public void ServeTestResults(string allureRunnablePath = DefaultAllureRunnablePath)
+    public virtual void ServeTestResults(string allureRunnablePath = DefaultAllureRunnablePath)
     {
         using var allureServeProcess = Process.Start(new ProcessStartInfo
         {

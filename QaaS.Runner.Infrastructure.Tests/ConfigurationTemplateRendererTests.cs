@@ -324,8 +324,13 @@ public class ConfigurationTemplateRendererTests
         Assert.Multiple(() =>
         {
             Assert.That(updated[0], Is.EqualTo("plain-item"));
-            Assert.That(((IDictionary<string, object?>)updated[1])["Other"], Is.EqualTo("MissingName"));
-            Assert.That(((IDictionary<string, object?>)updated[2])["StatusesToReport"], Is.EqualTo(new[] { "Failed" }));
+            Assert.That(updated[1], Is.InstanceOf<IDictionary<string, object?>>());
+            Assert.That(updated[2], Is.InstanceOf<IDictionary<string, object?>>());
+
+            var otherItem = (IDictionary<string, object?>)updated[1]!;
+            var mappedItem = (IDictionary<string, object?>)updated[2]!;
+            Assert.That(otherItem["Other"], Is.EqualTo("MissingName"));
+            Assert.That(mappedItem["StatusesToReport"], Is.EqualTo(new[] { "Failed" }));
         });
     }
 
