@@ -25,6 +25,7 @@ public abstract class MockerCommand : StagedAction
     private const string PingContentType = "ping";
     private const string CommandContentType = "command";
     private const int ResponsePollingIntervalMs = 10;
+    private const int ResponseQuietPeriodMs = 50;
 
     private readonly string _commandId;
 
@@ -33,6 +34,7 @@ public abstract class MockerCommand : StagedAction
     private readonly ISubscriber _redisSubscriber;
     private readonly int _requestDurationMs;
     private readonly int _requestRetries;
+    private readonly object _responseStateLock = new();
     private readonly IList<string> _failedCommandResponses;
     private readonly IList<string> _successfulCommandResponseToServerInstanceNames;
     protected readonly object SupportedCommandConfiguration;
@@ -158,7 +160,7 @@ public abstract class MockerCommand : StagedAction
                 Logger.LogDebug("Publishing ping request attempt {Attempt}/{MaxAttempts} for server {ServerName}",
                     retryIndex, _requestRetries, ServerName);
                 _redisSubscriber.Publish(RedisChannel.Literal(pingRequestChannel), PingRequestConstructor());
-                WaitForResponsesUntilTimeout(() => GetServerInstanceNamesSnapshot().Count > 0);
+                WaitForDiscoveryResponses();
                 if (GetServerInstanceNamesSnapshot().Count != 0)
                     break;
             }
@@ -168,7 +170,7 @@ public abstract class MockerCommand : StagedAction
             _redisSubscriber.Unsubscribe(responseChannel, PingResponseHandler);
             Logger.LogDebug("Unsubscribed from ping response channels for server {ServerName}", ServerName);
 
-            lock (ResponseStateLock)
+            lock (_responseStateLock)
             {
                 _serverInstanceNames = _serverInstanceNames
                     .Where(serverInstance => !string.IsNullOrWhiteSpace(serverInstance))
@@ -202,7 +204,7 @@ public abstract class MockerCommand : StagedAction
         if (string.IsNullOrWhiteSpace(pingResponse.ServerInstanceId))
             return;
 
-        lock (ResponseStateLock)
+        lock (_responseStateLock)
         {
             if (!_serverInstanceNames.Contains(pingResponse.ServerInstanceId, StringComparer.Ordinal))
             {
@@ -278,7 +280,7 @@ public abstract class MockerCommand : StagedAction
 
     private bool AllCommandsRequestsAreSuccessful()
     {
-        lock (ResponseStateLock)
+        lock (_responseStateLock)
         {
             return _serverInstanceNames
                 .Where(id => !string.IsNullOrWhiteSpace(id))
@@ -318,7 +320,7 @@ public abstract class MockerCommand : StagedAction
             if (string.IsNullOrWhiteSpace(commandResponse.ServerInstanceId))
                 return;
 
-            lock (ResponseStateLock)
+            lock (_responseStateLock)
             {
                 if (!_successfulCommandResponseToServerInstanceNames.Contains(commandResponse.ServerInstanceId,
                         StringComparer.Ordinal))
@@ -333,7 +335,7 @@ public abstract class MockerCommand : StagedAction
         }
         else
         {
-            lock (ResponseStateLock)
+            lock (_responseStateLock)
             {
                 _failedCommandResponses.Add(
                     $"{commandResponse.ServerInstanceId}: {commandResponse.ExceptionMessage ?? "Unknown command error"}");
@@ -397,10 +399,8 @@ public abstract class MockerCommand : StagedAction
             Name = Name, SerializationType = GetOutputCommunicationSerializationType()
         };
 
-        var runningSession = context.GetRunningSession(sessionName);
-        runningSession.Inputs!.Add(_sentRunningCommunicationData);
-        runningSession.Outputs!
-            .Add(_receivedRunningCommunicationData);
+        context.AddRunningInputData(sessionName, _sentRunningCommunicationData);
+        context.AddRunningOutputData(sessionName, _receivedRunningCommunicationData);
     }
 
     public sealed override string ToString()
@@ -410,7 +410,7 @@ public abstract class MockerCommand : StagedAction
 
     private List<string> GetServerInstanceNamesSnapshot()
     {
-        lock (ResponseStateLock)
+        lock (_responseStateLock)
         {
             return _serverInstanceNames.ToList();
         }
@@ -418,7 +418,7 @@ public abstract class MockerCommand : StagedAction
 
     private List<string> GetSuccessfulResponseNamesSnapshot()
     {
-        lock (ResponseStateLock)
+        lock (_responseStateLock)
         {
             return _successfulCommandResponseToServerInstanceNames.ToList();
         }
@@ -426,7 +426,7 @@ public abstract class MockerCommand : StagedAction
 
     private List<string> GetFailedResponsesSnapshot()
     {
-        lock (ResponseStateLock)
+        lock (_responseStateLock)
         {
             return _failedCommandResponses.ToList();
         }
@@ -434,7 +434,7 @@ public abstract class MockerCommand : StagedAction
 
     private List<string> GetPendingCommandResponseNamesSnapshot(IEnumerable<string> expectedServerInstances)
     {
-        lock (ResponseStateLock)
+        lock (_responseStateLock)
         {
             var successfulInstances = new HashSet<string>(_successfulCommandResponseToServerInstanceNames
                 .Where(id => !string.IsNullOrWhiteSpace(id))
@@ -457,8 +457,37 @@ public abstract class MockerCommand : StagedAction
             Thread.Sleep(ResponsePollingIntervalMs);
     }
 
-    private object ResponseStateLock
+    /// <summary>
+    /// Waits for the discovery response window to complete, or until the discovered instance count
+    /// remains stable for a short quiet period after at least one response arrives.
+    /// </summary>
+    private void WaitForDiscoveryResponses()
     {
-        get => field ??= new object();
-    } = new();
+        if (_requestDurationMs <= 0)
+            return;
+
+        var timeoutStopwatch = Stopwatch.StartNew();
+        var quietPeriodMs = Math.Min(ResponseQuietPeriodMs, _requestDurationMs);
+        var lastKnownCount = GetServerInstanceNamesSnapshot().Count;
+        var unchangedSinceStopwatch = lastKnownCount > 0 ? Stopwatch.StartNew() : null;
+
+        while (timeoutStopwatch.ElapsedMilliseconds < _requestDurationMs)
+        {
+            Thread.Sleep(ResponsePollingIntervalMs);
+
+            var currentCount = GetServerInstanceNamesSnapshot().Count;
+            if (currentCount != lastKnownCount)
+            {
+                lastKnownCount = currentCount;
+                unchangedSinceStopwatch = currentCount > 0 ? Stopwatch.StartNew() : null;
+                continue;
+            }
+
+            if (currentCount > 0 &&
+                unchangedSinceStopwatch?.ElapsedMilliseconds >= quietPeriodMs)
+            {
+                break;
+            }
+        }
+    }
 }

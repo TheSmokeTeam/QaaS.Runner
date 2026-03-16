@@ -1,9 +1,11 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Collections.Concurrent;
 using System.Linq;
 using System.Runtime.CompilerServices;
 using System.Reflection;
 using System.Text.Json;
+using System.Threading.Tasks;
 using Moq;
 using NUnit.Framework;
 using QaaS.Framework.SDK.ContextObjects;
@@ -635,6 +637,111 @@ public class MockerCommandInternalsTests
     }
 
     [Test]
+    public void Command_WithDiscoveryResponsesArrivingWithinRequestWindow_DiscoversAndCommandsAllInstances()
+    {
+        var command = CreateUninitializedTriggerCommand();
+        var subscriberMock = new Mock<ISubscriber>();
+        Action<RedisChannel, RedisValue>? pingResponseHandler = null;
+        var commandResponseHandlers = new ConcurrentDictionary<string, Action<RedisChannel, RedisValue>>();
+        var publishedCommandChannels = new ConcurrentBag<string>();
+
+        var pingRequestChannel = CommunicationMethods.CreateChannelRunnerToMocker("ping", "server-a");
+        var pingResponseChannel = CommunicationMethods.CreateChannelMockerToRunner("ping", "server-a");
+        var commandRequestChannel1 = CommunicationMethods.CreateChannelRunnerToMocker("command", "server-a", "instance-1");
+        var commandRequestChannel2 = CommunicationMethods.CreateChannelRunnerToMocker("command", "server-a", "instance-2");
+        var commandResponseChannel1 = CommunicationMethods.CreateChannelMockerToRunner("command", "server-a", "instance-1");
+        var commandResponseChannel2 = CommunicationMethods.CreateChannelMockerToRunner("command", "server-a", "instance-2");
+
+        subscriberMock.Setup(subscriber => subscriber.Subscribe(
+                It.IsAny<RedisChannel>(), It.IsAny<Action<RedisChannel, RedisValue>>(), It.IsAny<CommandFlags>()))
+            .Callback<RedisChannel, Action<RedisChannel, RedisValue>, CommandFlags>((channel, handler, _) =>
+            {
+                var channelName = channel.ToString();
+                if (channelName == pingResponseChannel)
+                {
+                    pingResponseHandler = handler;
+                    return;
+                }
+
+                commandResponseHandlers[channelName] = handler;
+            });
+
+        subscriberMock.Setup(subscriber => subscriber.Unsubscribe(
+                It.IsAny<RedisChannel>(), It.IsAny<Action<RedisChannel, RedisValue>>(), It.IsAny<CommandFlags>()))
+            .Callback<RedisChannel, Action<RedisChannel, RedisValue>, CommandFlags>((channel, _, _) =>
+            {
+                var channelName = channel.ToString();
+                if (channelName == pingResponseChannel)
+                {
+                    pingResponseHandler = null;
+                    return;
+                }
+
+                commandResponseHandlers.TryRemove(channelName, out _);
+            });
+
+        subscriberMock.Setup(subscriber => subscriber.Publish(It.IsAny<RedisChannel>(), It.IsAny<RedisValue>(),
+                It.IsAny<CommandFlags>()))
+            .Callback<RedisChannel, RedisValue, CommandFlags>((channel, _, _) =>
+            {
+                var channelName = channel.ToString();
+                switch (channelName)
+                {
+                    case var _ when channelName == pingRequestChannel:
+                        _ = Task.Run(async () =>
+                        {
+                            await Task.Delay(10);
+                            pingResponseHandler!(RedisChannel.Literal(pingResponseChannel),
+                                SerializePingResponse("instance-1"));
+                            await Task.Delay(30);
+                            pingResponseHandler!(RedisChannel.Literal(pingResponseChannel),
+                                SerializePingResponse("instance-2"));
+                        });
+                        break;
+                    case var _ when channelName == commandRequestChannel1:
+                        publishedCommandChannels.Add(channelName);
+                        _ = Task.Run(async () =>
+                        {
+                            await Task.Delay(10);
+                            commandResponseHandlers[commandResponseChannel1](
+                                RedisChannel.Literal(commandResponseChannel1),
+                                SerializeCommandResponse("instance-1"));
+                        });
+                        break;
+                    case var _ when channelName == commandRequestChannel2:
+                        publishedCommandChannels.Add(channelName);
+                        _ = Task.Run(async () =>
+                        {
+                            await Task.Delay(10);
+                            commandResponseHandlers[commandResponseChannel2](
+                                RedisChannel.Literal(commandResponseChannel2),
+                                SerializeCommandResponse("instance-2"));
+                        });
+                        break;
+                }
+            });
+
+        SetField(typeof(MockerCommand), command, "_requestRetries", 1);
+        SetField(typeof(MockerCommand), command, "_requestDurationMs", 120);
+        SetField(typeof(MockerCommand), command, "_redisSubscriber", subscriberMock.Object);
+        SetField(typeof(MockerCommand), command, "_serverInstanceNames", new List<string>());
+        SetField(typeof(MockerCommand), command, "_successfulCommandResponseToServerInstanceNames", new List<string>());
+
+        Assert.DoesNotThrow(() => InvokeNonPublicMethod(typeof(MockerCommand), command, "Command"));
+
+        var discoveredInstances = ((IList<string>)GetField(typeof(MockerCommand), command, "_serverInstanceNames"))
+            .OrderBy(instance => instance, StringComparer.Ordinal)
+            .ToList();
+        var commandedChannels = publishedCommandChannels
+            .Distinct(StringComparer.Ordinal)
+            .OrderBy(channel => channel, StringComparer.Ordinal)
+            .ToList();
+
+        Assert.That(discoveredInstances, Is.EqualTo(new[] { "instance-1", "instance-2" }));
+        Assert.That(commandedChannels, Is.EqualTo(new[] { commandRequestChannel1, commandRequestChannel2 }));
+    }
+
+    [Test]
     public void CommandTheMockerInstances_WhenAllResponsesAreAlreadySuccessful_DoesNotRepublish()
     {
         var command = CreateUninitializedTriggerCommand();
@@ -836,6 +943,7 @@ public class MockerCommandInternalsTests
         SetField(typeof(MockerCommand), command, "_requestDurationMs", 0);
         SetField(typeof(MockerCommand), command, "_requestRetries", 1);
         SetField(typeof(MockerCommand), command, "_redisHost", "localhost");
+        SetField(typeof(MockerCommand), command, "_responseStateLock", new object());
         SetField(typeof(MockerCommand), command, "_serverInstanceNames", new List<string>());
         SetField(typeof(MockerCommand), command, "_successfulCommandResponseToServerInstanceNames", new List<string>());
         SetField(typeof(MockerCommand), command, "_failedCommandResponses", new List<string>());
@@ -860,6 +968,7 @@ public class MockerCommandInternalsTests
         SetField(typeof(MockerCommand), command, "_requestDurationMs", 0);
         SetField(typeof(MockerCommand), command, "_requestRetries", 1);
         SetField(typeof(MockerCommand), command, "_redisHost", "localhost");
+        SetField(typeof(MockerCommand), command, "_responseStateLock", new object());
         SetField(typeof(MockerCommand), command, "_serverInstanceNames", new List<string>());
         SetField(typeof(MockerCommand), command, "_successfulCommandResponseToServerInstanceNames", new List<string>());
         SetField(typeof(MockerCommand), command, "_failedCommandResponses", new List<string>());
@@ -883,6 +992,7 @@ public class MockerCommandInternalsTests
         SetField(typeof(MockerCommand), command, "_requestDurationMs", 0);
         SetField(typeof(MockerCommand), command, "_requestRetries", 1);
         SetField(typeof(MockerCommand), command, "_redisHost", "localhost");
+        SetField(typeof(MockerCommand), command, "_responseStateLock", new object());
         SetField(typeof(MockerCommand), command, "_serverInstanceNames", new List<string>());
         SetField(typeof(MockerCommand), command, "_successfulCommandResponseToServerInstanceNames", new List<string>());
         SetField(typeof(MockerCommand), command, "_failedCommandResponses", new List<string>());
@@ -933,6 +1043,28 @@ public class MockerCommandInternalsTests
     {
         var field = declaringType.GetField(fieldName, BindingFlags.Instance | BindingFlags.NonPublic)!;
         return field.GetValue(target)!;
+    }
+
+    private static RedisValue SerializePingResponse(string serverInstanceId)
+    {
+        return (RedisValue)JsonSerializer.SerializeToUtf8Bytes(new PingResponse
+        {
+            Id = "cmd-id",
+            ServerName = "server-a",
+            ServerInstanceId = serverInstanceId,
+            ServerInputOutputState = InputOutputState.OnlyInput
+        });
+    }
+
+    private static RedisValue SerializeCommandResponse(string serverInstanceId)
+    {
+        return (RedisValue)JsonSerializer.SerializeToUtf8Bytes(new CommandResponse
+        {
+            Id = "cmd-id",
+            Command = CommandType.TriggerAction,
+            ServerInstanceId = serverInstanceId,
+            Status = Status.Succeeded
+        });
     }
 }
 

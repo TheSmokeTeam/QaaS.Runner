@@ -39,12 +39,16 @@ public class SessionLogic(List<ISession> sessions, InternalContext context) : IL
             // initial list of sessions that run in current stage
             var sessionsInThisStage = new List<Task<SessionData?>>();
 
-            if (blockingSessions.TryGetValue(stage, out var blockers))
+            if (blockingSessions.Remove(stage, out var blockers))
             {
                 context.Logger.LogDebug(
                     "Waiting for {BlockingSessionCount} deferred session(s) before starting stage {Stage}",
                     blockers.Count, stage);
                 Task.WhenAll(blockers).GetAwaiter().GetResult();
+                executionData.SessionDatas.AddRange(MaterializeSessionResults(blockers));
+                context.Logger.LogDebug(
+                    "Materialized {BlockingSessionCount} deferred session result(s) before stage {Stage}",
+                    blockers.Count, stage);
             }
 
             context.Logger.LogInformation(
@@ -63,16 +67,14 @@ public class SessionLogic(List<ISession> sessions, InternalContext context) : IL
                 blockingSessions[session.RunUntilStage.Value].Add(StartSessionAsync(session, executionData));
             }
 
-            executionData.SessionDatas.AddRange(sessionsInThisStage.Select(sessionTask =>
-                sessionTask.GetAwaiter().GetResult()));
+            executionData.SessionDatas.AddRange(MaterializeSessionResults(sessionsInThisStage));
             context.Logger.LogInformation(
                 "Finished session stage {Stage}. Immediate session results captured: {CapturedSessionCount}",
                 stage, sessionsInThisStage.Count);
         }
 
         blockingSessions.Select(stageToSessions => stageToSessions.Value)
-            .ForEach(sessionsTasks => sessionsTasks
-                .ForEach(sessionTask => executionData.SessionDatas.Add(sessionTask.GetAwaiter().GetResult())));
+            .ForEach(sessionsTasks => executionData.SessionDatas.AddRange(MaterializeSessionResults(sessionsTasks)));
 
         context.Logger.LogInformation("Session logic completed. Total collected session results: {SessionDataCount}",
             executionData.SessionDatas.Count);
@@ -80,8 +82,16 @@ public class SessionLogic(List<ISession> sessions, InternalContext context) : IL
         return executionData;
     }
 
+    /// <summary>
+    /// Materializes completed session tasks into their produced session data in deterministic task order.
+    /// </summary>
+    private static IEnumerable<SessionData?> MaterializeSessionResults(IEnumerable<Task<SessionData?>> sessionTasks)
+    {
+        return sessionTasks.Select(sessionTask => sessionTask.GetAwaiter().GetResult());
+    }
+
     private static Task<SessionData?> StartSessionAsync(ISession session, ExecutionData executionData)
     {
-        return session.RunAsync(executionData) ?? Task.Run(() => session.Run(executionData));
+        return session.RunAsync(executionData);
     }
 }

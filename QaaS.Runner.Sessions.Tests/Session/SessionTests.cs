@@ -14,6 +14,7 @@ using QaaS.Framework.SDK.ConfigurationObjects;
 using QaaS.Framework.SDK.ContextObjects;
 using QaaS.Framework.SDK.DataSourceObjects;
 using QaaS.Framework.SDK.Extensions;
+using QaaS.Framework.SDK.Session;
 using QaaS.Framework.SDK.Session.DataObjects;
 using QaaS.Framework.SDK.Session.SessionDataObjects;
 using QaaS.Framework.SDK.Session.SessionDataObjects.RunningSessionsObjects;
@@ -380,6 +381,85 @@ public class SessionTests
     }
 
     [Test]
+    public void Run_WhenInitializeSessionRunThrows_RemovesRunningSessionAndDisposesActionsOnce()
+    {
+        const string sessionName = "init-failure-session";
+        var context = CreationalFunctions.CreateContext(sessionName, []);
+        var disposeCount = 0;
+
+        var stage = new Stage(context, [], sessionName, 0, 0, 0);
+        stage.AddCommunication(new ThrowingExportAction("throw-on-init", 0, Globals.Logger,
+            new InvalidOperationException("init failed"), () => disposeCount++));
+
+        var session = new Sessions.Session.Session(
+            sessionName,
+            0,
+            true,
+            0,
+            0,
+            new Dictionary<int, Stage> { { 0, stage } },
+            [],
+            context,
+            []);
+
+        var exception = Assert.Throws<InvalidOperationException>(() => session.Run(context.ExecutionData));
+
+        Assert.That(exception!.Message, Is.EqualTo("init failed"));
+        Assert.That(context.InternalRunningSessions.RunningSessionsDict.ContainsKey(sessionName), Is.False);
+        Assert.That(disposeCount, Is.EqualTo(1));
+    }
+
+    [Test]
+    public void Run_WhenCollectorPostSessionSetupThrows_RemovesRunningSessionAndDisposesActionsAndCollectors()
+    {
+        const string sessionName = "collector-setup-session";
+        var logger = new ThrowOnMessageLogger(message =>
+            message.Contains("Running 1 collector task(s) after session collector-setup-session",
+                StringComparison.Ordinal));
+        var context = new InternalContext
+        {
+            Logger = logger,
+            InternalRunningSessions = new RunningSessions(
+                new Dictionary<string, RunningSessionData<object, object>>
+                {
+                    {
+                        sessionName, new RunningSessionData<object, object>
+                        {
+                            Inputs = [],
+                            Outputs = []
+                        }
+                    }
+                }),
+            ExecutionData = new QaaS.Framework.SDK.ExecutionObjects.ExecutionData { DataSources = [] }
+        };
+        context.InsertValueIntoGlobalDictionary(context.GetMetaDataPath(), new MetaDataConfig());
+        var actionDisposeCount = 0;
+        var collectorDisposeCount = 0;
+
+        var stage = new Stage(context, [], sessionName, 0, 0, 0);
+        stage.AddCommunication(new DisposableAction("disposable-action", 0, logger, () => actionDisposeCount++));
+
+        var collector = new DisposableCollector("collector", logger, () => collectorDisposeCount++);
+        var session = new Sessions.Session.Session(
+            sessionName,
+            0,
+            true,
+            0,
+            0,
+            new Dictionary<int, Stage> { { 0, stage } },
+            [collector],
+            context,
+            []);
+
+        var exception = Assert.Throws<InvalidOperationException>(() => session.Run(context.ExecutionData));
+
+        Assert.That(exception!.Message, Is.EqualTo("collector setup failed"));
+        Assert.That(context.InternalRunningSessions.RunningSessionsDict.ContainsKey(sessionName), Is.False);
+        Assert.That(actionDisposeCount, Is.EqualTo(1));
+        Assert.That(collectorDisposeCount, Is.EqualTo(1));
+    }
+
+    [Test]
     public void Run_When_Action_Fails_Skips_Null_Task_Results_And_Returns_Remaining_Data()
     {
         const string sessionName = "partial-failure-session";
@@ -493,6 +573,35 @@ public class SessionTests
         }
     }
 
+    private sealed class ThrowingExportAction(
+        string name,
+        int stage,
+        Microsoft.Extensions.Logging.ILogger logger,
+        Exception exceptionToThrow,
+        System.Action onDispose)
+        : StagedAction(name, stage, null, logger)
+    {
+        internal override void ExportRunningCommunicationData(InternalContext context, string sessionName)
+        {
+            throw exceptionToThrow;
+        }
+
+        internal override InternalCommunicationData<object> Act()
+        {
+            return new InternalCommunicationData<object>();
+        }
+
+        protected internal override void LogData(InternalCommunicationData<object> actData,
+            DetailedData<object> itemBeforeSerialization, InputOutputState? saveAt = null)
+        {
+        }
+
+        public override void Dispose()
+        {
+            onDispose();
+        }
+    }
+
     private sealed class SuccessfulStageAction(string name) : StagedAction(name, 0, null, Globals.Logger)
     {
         internal override void ExportRunningCommunicationData(InternalContext context, string sessionName)
@@ -531,6 +640,21 @@ public class SessionTests
         }
     }
 
+    private sealed class DisposableCollector(string name, ILogger logger, System.Action onDispose)
+        : QaaS.Runner.Sessions.Actions.Collectors.Collector(name, Mock.Of<IFetcher>(), new DataFilter(), 0, 0, 1,
+            logger)
+    {
+        internal override InternalCommunicationData<object> Act()
+        {
+            return new InternalCommunicationData<object> { Output = [] };
+        }
+
+        public override void Dispose()
+        {
+            onDispose();
+        }
+    }
+
     private sealed class CapturingLogger : ILogger
     {
         public List<string> Messages { get; } = [];
@@ -549,6 +673,36 @@ public class SessionTests
             Func<TState, Exception?, string> formatter)
         {
             Messages.Add(formatter(state, exception));
+        }
+
+        private sealed class NoOpScope : IDisposable
+        {
+            public static readonly NoOpScope Instance = new();
+
+            public void Dispose()
+            {
+            }
+        }
+    }
+
+    private sealed class ThrowOnMessageLogger(Func<string, bool> shouldThrow) : ILogger
+    {
+        public IDisposable BeginScope<TState>(TState state) where TState : notnull
+        {
+            return NoOpScope.Instance;
+        }
+
+        public bool IsEnabled(LogLevel logLevel)
+        {
+            return true;
+        }
+
+        public void Log<TState>(LogLevel logLevel, EventId eventId, TState state, Exception? exception,
+            Func<TState, Exception?, string> formatter)
+        {
+            var message = formatter(state, exception);
+            if (shouldThrow(message))
+                throw new InvalidOperationException("collector setup failed");
         }
 
         private sealed class NoOpScope : IDisposable

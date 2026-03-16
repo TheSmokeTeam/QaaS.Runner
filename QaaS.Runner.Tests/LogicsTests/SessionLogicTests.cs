@@ -1,4 +1,5 @@
 using System.Collections.Concurrent;
+using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using Moq;
@@ -181,6 +182,50 @@ public class SessionLogicTests
     }
 
     [Test]
+    public void TestRun_WithDeferredSessionDataNeededByNextStage_MaterializesBeforeStageStartsWithoutDuplication()
+    {
+        var sessionAData = new SessionData { Name = "SessionA" };
+        var sessionBData = new SessionData { Name = "SessionB" };
+
+        var sessionA = new Mock<ISession>();
+        sessionA.SetupGet(s => s.Name).Returns("SessionA");
+        sessionA.SetupGet(s => s.SessionStage).Returns(0);
+        sessionA.SetupGet(s => s.RunUntilStage).Returns(1);
+        sessionA.Setup(s => s.RunAsync(It.IsAny<ExecutionData>()))
+            .Returns(async () =>
+            {
+                await Task.Delay(40);
+                return sessionAData;
+            });
+
+        var sessionB = new Mock<ISession>();
+        sessionB.SetupGet(s => s.Name).Returns("SessionB");
+        sessionB.SetupGet(s => s.SessionStage).Returns(1);
+        sessionB.SetupGet(s => s.RunUntilStage).Returns((int?)null);
+        sessionB.Setup(s => s.RunAsync(It.IsAny<ExecutionData>()))
+            .Returns<ExecutionData>(executionData =>
+            {
+                Assert.That(executionData.SessionDatas.Count, Is.EqualTo(1));
+                Assert.That(executionData.SessionDatas[0], Is.SameAs(sessionAData));
+                return Task.FromResult<SessionData?>(sessionBData);
+            });
+
+        var sessionLogic = new SessionLogic([sessionA.Object, sessionB.Object], new InternalContext
+        {
+            Logger = Globals.Logger
+        });
+        var executionData = new ExecutionData();
+
+        sessionLogic.Run(executionData);
+
+        Assert.That(executionData.SessionDatas, Has.Count.EqualTo(2));
+        Assert.That(executionData.SessionDatas.Count(sessionData => ReferenceEquals(sessionData, sessionAData)),
+            Is.EqualTo(1));
+        Assert.That(executionData.SessionDatas.Count(sessionData => ReferenceEquals(sessionData, sessionBData)),
+            Is.EqualTo(1));
+    }
+
+    [Test]
     public void TestRun_WithBlockingSessionOnMissingTargetStage_AddsBlockingResultAtEnd()
     {
         // Arrange
@@ -210,5 +255,34 @@ public class SessionLogicTests
         Assert.That(executionData.SessionDatas, Has.Count.EqualTo(2));
         Assert.That(executionData.SessionDatas, Contains.Item(blockingSessionData));
         Assert.That(executionData.SessionDatas, Contains.Item(regularSessionData));
+    }
+
+    [Test]
+    public void TestRun_WithSyncOnlySession_UsesDefaultRunAsyncBridge()
+    {
+        var sessionData = new SessionData { Name = "SyncSession" };
+        var session = new SyncOnlySession(sessionData);
+        var sessionLogic = new SessionLogic([session], new InternalContext { Logger = Globals.Logger });
+        var executionData = new ExecutionData();
+
+        sessionLogic.Run(executionData);
+
+        Assert.That(session.RunCalls, Is.EqualTo(1));
+        Assert.That(executionData.SessionDatas, Has.Count.EqualTo(1));
+        Assert.That(executionData.SessionDatas[0], Is.SameAs(sessionData));
+    }
+
+    private sealed class SyncOnlySession(SessionData sessionData) : ISession
+    {
+        public string Name => sessionData.Name!;
+        public int? RunUntilStage => null;
+        public int SessionStage => 0;
+        public int RunCalls { get; private set; }
+
+        public SessionData? Run(ExecutionData executionData)
+        {
+            RunCalls++;
+            return sessionData;
+        }
     }
 }

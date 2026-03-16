@@ -78,42 +78,48 @@ public class Session : ISession
     /// <inheritdoc />
     public async Task<SessionData?> RunAsync(ExecutionData executionData)
     {
-        _context.Logger.LogDebug("Waiting {TimeoutBeforeSessionMs} ms before starting session {SessionName}",
-            TimeoutBeforeSessionMs, Name);
-        await Task.Delay(TimeSpan.FromMilliseconds(TimeoutBeforeSessionMs));
+        List<Task<Tuple<Action, InternalCommunicationData<object>>?>>? actionsTasks = null;
+        SessionData? sessionData = null;
 
-        _context.Logger.LogInformation("Starting session {SessionName}", Name);
-        _context.AppendSessionLog(Name, $"Starting session {Name}");
-        var sessionStartTimeUtc = GetCurrentUtcTime();
-        var actionsTasks = new List<Task<Tuple<Action, InternalCommunicationData<object>>?>>();
+        try
+        {
+            _context.Logger.LogDebug("Waiting {TimeoutBeforeSessionMs} ms before starting session {SessionName}",
+                TimeoutBeforeSessionMs, Name);
+            await Task.Delay(TimeSpan.FromMilliseconds(TimeoutBeforeSessionMs));
 
-        InitializeSessionRun(executionData);
-        _context.Logger.LogDebug("Session {SessionName} contains {StageCount} stage(s) and {CollectorCount} collector(s)",
-            Name, _stages.Count, _collectors?.Length ?? 0);
-        foreach (var (_, stage) in _stages.OrderBy(stage => stage.Key))
-            actionsTasks.AddRange(await stage.RunAsync());
+            _context.Logger.LogInformation("Starting session {SessionName}", Name);
+            _context.AppendSessionLog(Name, $"Starting session {Name}");
+            var sessionStartTimeUtc = GetCurrentUtcTime();
+            actionsTasks = [];
 
-        await Task.WhenAll(actionsTasks);
-        var sessionEndTimeUtc = GetCurrentUtcTime();
+            InitializeSessionRun(executionData);
+            _context.Logger.LogDebug(
+                "Session {SessionName} contains {StageCount} stage(s) and {CollectorCount} collector(s)",
+                Name, _stages.Count, _collectors?.Length ?? 0);
+            foreach (var (_, stage) in _stages.OrderBy(stage => stage.Key))
+                actionsTasks.AddRange(await stage.RunAsync());
 
-        // Perform end session operations
-        var postSessionsTasks = await RunPostSessionTasksAsync(sessionStartTimeUtc, sessionEndTimeUtc);
-        actionsTasks.AddRange(postSessionsTasks);
+            await Task.WhenAll(actionsTasks);
+            var sessionEndTimeUtc = GetCurrentUtcTime();
 
-        var sessionData = CreateSessionData(actionsTasks, sessionStartTimeUtc, sessionEndTimeUtc);
-        actionsTasks.DisposeOfEnumerable("session tasks", _context.Logger);
-        _stages.Values.SelectMany(stage => stage.GetActions())
-            .Concat<Action>(_collectors ?? [])
-            .DisposeOfEnumerable("session actions", _context.Logger);
+            // Perform end session operations
+            await RunPostSessionTasksAsync(actionsTasks, sessionStartTimeUtc, sessionEndTimeUtc);
 
-        // Removing current session from running sessions
-        _context.RemoveRunningSession(Name);
+            sessionData = CreateSessionData(actionsTasks, sessionStartTimeUtc, sessionEndTimeUtc);
+            LogSessionSummary(sessionData);
 
-        LogSessionSummary(sessionData);
-
-        // If session is configured to not save session data
-        if (!SaveData)
-            _context.Logger.LogInformation("Session {SessionName} is configured not to persist output data", Name);
+            // If session is configured to not save session data
+            if (!SaveData)
+                _context.Logger.LogInformation("Session {SessionName} is configured not to persist output data", Name);
+        }
+        finally
+        {
+            actionsTasks.DisposeOfEnumerable("session tasks", _context.Logger);
+            _stages.Values.SelectMany(stage => stage.GetActions())
+                .Concat<Action>(_collectors ?? [])
+                .DisposeOfEnumerable("session actions", _context.Logger);
+            _context.RemoveRunningSession(Name);
+        }
 
         _context.Logger.LogDebug("Waiting {TimeoutAfterSessionMs} ms after finishing session {SessionName}",
             TimeoutAfterSessionMs, Name);
@@ -138,16 +144,17 @@ public class Session : ISession
         }
     }
 
-    private async Task<List<Task<Tuple<Action, InternalCommunicationData<object>>?>>> RunPostSessionTasksAsync(
+    private async Task RunPostSessionTasksAsync(
+        List<Task<Tuple<Action, InternalCommunicationData<object>>?>> actionsTasks,
         DateTime sessionStartTimeUtc, DateTime sessionEndTimeUtc)
     {
         _collectors?.ForEach(collector => collector.SetCollectionTimes(sessionStartTimeUtc, sessionEndTimeUtc));
         var collectorTasks = _collectors?.Select(collector =>
             SessionExtensions.CreateTaskFromAction(_context, collector, Name, _actionFailures)).ToList() ?? [];
+        actionsTasks.AddRange(collectorTasks);
         _context.Logger.LogDebug("Running {CollectorCount} collector task(s) after session {SessionName}",
             collectorTasks.Count, Name);
         await Task.WhenAll(collectorTasks);
-        return collectorTasks;
     }
 
 
