@@ -162,9 +162,24 @@ public class ExecutionBuilder() : BaseExecutionBuilder<InternalContext, Executio
     {
         var configuredDataSources = DataSources ?? [];
         var dataSources = configuredDataSources.Select(dataSourceBuilder => dataSourceBuilder.Register()).ToImmutableList();
+        var resolvedGenerators = scope.Resolve<IList<KeyValuePair<string, IGenerator>>>();
         var resolvedDataSources = configuredDataSources.Select(dataSourceBuilder =>
-            dataSourceBuilder.Build(Context, dataSources,
-                scope.Resolve<IList<KeyValuePair<string, IGenerator>>>()));
+        {
+            var configuredGenerator = dataSourceBuilder.Generator;
+
+            // Runner scopes generator hook instances by data source name so each source can keep
+            // its own generator configuration, even when multiple sources use the same hook type.
+            dataSourceBuilder.Generator = dataSourceBuilder.Name;
+
+            try
+            {
+                return dataSourceBuilder.Build(Context, dataSources, resolvedGenerators);
+            }
+            finally
+            {
+                dataSourceBuilder.Generator = configuredGenerator;
+            }
+        });
         return resolvedDataSources;
     }
 
