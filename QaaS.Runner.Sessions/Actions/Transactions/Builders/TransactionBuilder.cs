@@ -1,6 +1,5 @@
 using System.ComponentModel;
 using System.ComponentModel.DataAnnotations;
-using QaaS.Framework.Configurations.ConfigurationBindingUtils;
 using QaaS.Framework.Configurations.CustomValidationAttributes;
 using QaaS.Framework.Policies;
 using QaaS.Framework.Protocols.ConfigurationObjects;
@@ -11,6 +10,7 @@ using QaaS.Framework.SDK.ContextObjects;
 using QaaS.Framework.SDK.Session;
 using QaaS.Framework.SDK.Session.SessionDataObjects;
 using QaaS.Framework.Serialization;
+using QaaS.Runner.Infrastructure;
 using QaaS.Runner.Sessions.ConfigurationObjects;
 using QaaS.Runner.Sessions.Extensions;
 using QaaS.Runner.Sessions.Testing;
@@ -268,21 +268,21 @@ public class TransactionBuilder
     }
 
     /// <summary>
-    /// Applies a partial update to the current transaction configuration while preserving omitted fields.
+    /// Applies a computed partial update to the current transaction configuration while preserving omitted fields.
     /// </summary>
     public TransactionBuilder UpdateConfiguration(Func<ITransactorConfig, ITransactorConfig> update)
     {
         var currentConfig = ReadConfiguration() ??
                             throw new InvalidOperationException("Transaction configuration is not set");
-        return Configure(currentConfig.MergeConfiguration(update(currentConfig))!);
+        return UpdateConfiguration(update(currentConfig));
     }
 
     /// <summary>
-    /// Upserts the transaction configuration, merging same-type configs and replacing different config types.
+    /// Updates the transaction configuration by merging same-type values and replacing the current type when needed.
     /// </summary>
-    public TransactionBuilder UpsertConfiguration(ITransactorConfig config)
+    public TransactionBuilder UpdateConfiguration(ITransactorConfig config)
     {
-        return Configure(ReadConfiguration().MergeConfiguration(config)!);
+        return Configure(ReadConfiguration().UpdateConfiguration(config));
     }
 
     public TransactionBuilder DeleteConfiguration()

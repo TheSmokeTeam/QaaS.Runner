@@ -33,7 +33,7 @@ public class BuilderCrudTests
         builder.DeletePolicyAt(1);
         builder.CreateConfiguration(new RabbitMqReaderConfig());
         builder.UpdateConfiguration(_ => new KafkaTopicReaderConfig());
-        builder.UpsertConfiguration(new SocketReaderConfig());
+        builder.UpdateConfiguration(new SocketReaderConfig());
 
         Assert.That(builder.ReadPolicies(), Has.Count.EqualTo(1));
         Assert.That(builder.ReadConfiguration(), Is.TypeOf<SocketReaderConfig>());
@@ -43,7 +43,7 @@ public class BuilderCrudTests
     }
 
     [Test]
-    public void ConsumerBuilder_UpsertConfiguration_MergesSameTypeAndPreservesExistingFields()
+    public void ConsumerBuilder_UpdateConfiguration_WithConfiguration_MergesSameTypeAndPreservesExistingFields()
     {
         var builder = new ConsumerBuilder()
             .CreateConfiguration(new RabbitMqReaderConfig
@@ -53,7 +53,7 @@ public class BuilderCrudTests
                 RoutingKey = "created"
             });
 
-        builder.UpsertConfiguration(new RabbitMqReaderConfig
+        builder.UpdateConfiguration(new RabbitMqReaderConfig
         {
             RequestedConnectionTimeoutSeconds = 12
         });
@@ -83,7 +83,7 @@ public class BuilderCrudTests
         builder.UpdateDataSourcePattern("^source-.*$", "^updated-.*$");
         builder.UpdatePolicyAt(0, new PolicyBuilder());
         builder.UpdateConfiguration(_ => new SocketSenderConfig());
-        builder.UpsertConfiguration(new KafkaTopicSenderConfig());
+        builder.UpdateConfiguration(new KafkaTopicSenderConfig());
 
         Assert.That(builder.ReadDataSources(), Is.EquivalentTo(["source-updated"]));
         Assert.That(builder.ReadDataSourcePatterns(), Is.EquivalentTo(["^updated-.*$"]));
@@ -95,7 +95,7 @@ public class BuilderCrudTests
     }
 
     [Test]
-    public void PublisherBuilder_UpsertConfiguration_MergesSameTypeAndPreservesExistingFields()
+    public void PublisherBuilder_UpdateConfiguration_WithConfiguration_MergesSameTypeAndPreservesExistingFields()
     {
         var builder = new PublisherBuilder()
             .CreateConfiguration(new RabbitMqSenderConfig
@@ -105,7 +105,7 @@ public class BuilderCrudTests
                 RoutingKey = "published"
             });
 
-        builder.UpsertConfiguration(new RabbitMqSenderConfig
+        builder.UpdateConfiguration(new RabbitMqSenderConfig
         {
             Expiration = "30000"
         });
@@ -133,7 +133,7 @@ public class BuilderCrudTests
         builder.UpdateDataSource("source-a", "source-updated");
         builder.UpdateDataSourcePattern("^source-.*$", "^updated-.*$");
         builder.UpdateConfiguration(_ => new GrpcTransactorConfig());
-        builder.UpsertConfiguration(new HttpTransactorConfig());
+        builder.UpdateConfiguration(new HttpTransactorConfig());
 
         Assert.That(builder.ReadPolicies(), Has.Count.EqualTo(1));
         Assert.That(builder.ReadDataSources(), Is.EquivalentTo(["source-updated"]));
@@ -152,7 +152,7 @@ public class BuilderCrudTests
     }
 
     [Test]
-    public void TransactionBuilder_UpsertConfiguration_MergesSameTypeAndPreservesExistingFields()
+    public void TransactionBuilder_UpdateConfiguration_WithConfiguration_MergesSameTypeAndPreservesExistingFields()
     {
         var builder = new TransactionBuilder()
             .CreateConfiguration(new HttpTransactorConfig
@@ -163,7 +163,7 @@ public class BuilderCrudTests
                 Retries = 3
             });
 
-        builder.UpsertConfiguration(new HttpTransactorConfig
+        builder.UpdateConfiguration(new HttpTransactorConfig
         {
             MessageSendRetriesIntervalMs = 0
         });
@@ -190,7 +190,7 @@ public class BuilderCrudTests
         builder.UpdateDataSourceName("source-a", "source-updated");
         builder.UpdateDataSourcePattern("^source-.*$", "^updated-.*$");
         builder.UpdateConfiguration(new { threshold = 5 });
-        builder.UpsertConfiguration(new { nested = new { value = "set" } });
+        builder.UpdateConfiguration(new { nested = new { value = "set" } });
 
         Assert.That(builder.ReadDataSourceNames(), Is.EquivalentTo(["source-updated"]));
         Assert.That(builder.ReadDataSourcePatterns(), Is.EquivalentTo(["^updated-.*$"]));
@@ -221,9 +221,9 @@ public class BuilderCrudTests
             Url = "https://prometheus-updated",
             Expression = "sum(up)"
         });
-        builder.UpsertConfiguration(new PrometheusFetcherConfig
+        builder.UpdateConfiguration(new PrometheusFetcherConfig
         {
-            Url = "https://prometheus-upserted",
+            Url = "https://prometheus-updated-again",
             Expression = "max(up)"
         });
 
@@ -235,7 +235,7 @@ public class BuilderCrudTests
     }
 
     [Test]
-    public void CollectorBuilder_UpsertConfiguration_MergesSameTypeAndPreservesExistingFields()
+    public void CollectorBuilder_UpdateConfiguration_WithConfiguration_MergesSameTypeAndPreservesExistingFields()
     {
         var builder = new CollectorBuilder().Create(new PrometheusFetcherConfig
         {
@@ -244,7 +244,7 @@ public class BuilderCrudTests
             SampleIntervalMs = 5000
         });
 
-        builder.UpsertConfiguration(new PrometheusFetcherConfig
+        builder.UpdateConfiguration(new PrometheusFetcherConfig
         {
             ApiKey = "api-key"
         });

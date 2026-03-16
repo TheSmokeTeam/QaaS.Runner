@@ -1,6 +1,6 @@
 ﻿using System.ComponentModel;
 using System.Runtime.CompilerServices;
-using QaaS.Framework.Configurations.ConfigurationBindingUtils;
+using QaaS.Runner.Infrastructure;
 using QaaS.Runner.Assertions.ConfigurationObjects.LinkConfigs;
 using QaaS.Runner.Assertions.LinkBuilders;
 
@@ -49,21 +49,21 @@ public class LinkBuilder
     }
 
     /// <summary>
-    /// Applies a partial update to the currently configured link config while preserving omitted fields.
+    /// Applies a computed partial update to the currently configured link config while preserving omitted fields.
     /// </summary>
     public LinkBuilder UpdateConfiguration(Func<ILinkConfig, ILinkConfig> update)
     {
         var currentConfig = ReadConfiguration() ??
                             throw new InvalidOperationException("Link configuration is not set");
-        return Configure(currentConfig.MergeConfiguration(update(currentConfig))!);
+        return UpdateConfiguration(update(currentConfig));
     }
 
     /// <summary>
-    /// Upserts the configured link config, merging same-type configs and replacing different config types.
+    /// Updates the configured link config by merging same-type values and replacing the current type when needed.
     /// </summary>
-    public LinkBuilder UpsertConfiguration(ILinkConfig config)
+    public LinkBuilder UpdateConfiguration(ILinkConfig config)
     {
-        return Configure(ReadConfiguration().MergeConfiguration(config)!);
+        return Configure(ReadConfiguration().UpdateConfiguration(config));
     }
 
     public LinkBuilder DeleteConfiguration()

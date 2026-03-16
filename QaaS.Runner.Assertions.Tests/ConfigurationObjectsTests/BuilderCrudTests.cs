@@ -40,7 +40,7 @@ public class BuilderCrudTests
                 Expressions = ["up"]
             }))
             .UpdateConfiguration(new { changed = "yes" })
-            .UpsertConfiguration(new { nested = new { enabled = true } });
+            .UpdateConfiguration(new { nested = new { enabled = true } });
 
         Assert.That(builder.ReadSessionNames(), Is.EquivalentTo(["session-updated"]));
         Assert.That(builder.ReadSessionPatterns(), Is.EquivalentTo(["^updated-.*$"]));
@@ -78,9 +78,9 @@ public class BuilderCrudTests
             Url = "https://grafana",
             DashboardId = "dash"
         });
-        builder.UpsertConfiguration(new KibanaLinkConfig
+        builder.UpdateConfiguration(new KibanaLinkConfig
         {
-            Url = "https://kibana-upserted",
+            Url = "https://kibana-updated",
             DataViewId = "view-2"
         });
 
@@ -92,7 +92,7 @@ public class BuilderCrudTests
     }
 
     [Test]
-    public void LinkBuilder_UpsertConfiguration_MergesSameTypeAndPreservesExistingFields()
+    public void LinkBuilder_UpdateConfiguration_WithConfiguration_MergesSameTypeAndPreservesExistingFields()
     {
         var builder = new LinkBuilder()
             .Create(new KibanaLinkConfig
@@ -102,7 +102,7 @@ public class BuilderCrudTests
                 TimestampField = "custom-timestamp"
             });
 
-        builder.UpsertConfiguration(new KibanaLinkConfig
+        builder.UpdateConfiguration(new KibanaLinkConfig
         {
             KqlQuery = "service.name : api"
         });

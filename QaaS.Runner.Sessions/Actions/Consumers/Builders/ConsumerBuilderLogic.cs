@@ -1,4 +1,3 @@
-using QaaS.Framework.Configurations.ConfigurationBindingUtils;
 using QaaS.Framework.Policies;
 using QaaS.Framework.Protocols.ConfigurationObjects;
 using QaaS.Framework.Protocols.ConfigurationObjects.Elastic;
@@ -113,21 +112,21 @@ public partial class ConsumerBuilder
     }
 
     /// <summary>
-    /// Applies a partial update to the current consumer configuration while preserving omitted fields.
+    /// Applies a computed partial update to the current consumer configuration while preserving omitted fields.
     /// </summary>
     public ConsumerBuilder UpdateConfiguration(Func<IReaderConfig, IReaderConfig> update)
     {
         var currentConfig = ReadConfiguration() ??
                             throw new InvalidOperationException("Consumer configuration is not set");
-        return Configure(currentConfig.MergeConfiguration(update(currentConfig))!);
+        return UpdateConfiguration(update(currentConfig));
     }
 
     /// <summary>
-    /// Upserts the consumer configuration, merging same-type configs and replacing different config types.
+    /// Updates the consumer configuration by merging same-type values and replacing the current type when needed.
     /// </summary>
-    public ConsumerBuilder UpsertConfiguration(IReaderConfig config)
+    public ConsumerBuilder UpdateConfiguration(IReaderConfig config)
     {
-        return Configure(ReadConfiguration().MergeConfiguration(config)!);
+        return Configure(ReadConfiguration().UpdateConfiguration(config));
     }
 
     public ConsumerBuilder DeleteConfiguration()

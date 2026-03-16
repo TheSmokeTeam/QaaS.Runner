@@ -18,7 +18,7 @@ public class StorageBuilderCrudTests
         Assert.That(builder.ReadConfiguration(), Is.TypeOf<FilesInFileSystemConfig>());
 
         builder.UpdateConfiguration(_ => new S3Config { Prefix = "prefix" });
-        builder.UpsertConfiguration(new FilesInFileSystemConfig { Path = "two/path" });
+        builder.UpdateConfiguration(new FilesInFileSystemConfig { Path = "two/path" });
         Assert.That(builder.ReadConfiguration(), Is.TypeOf<FilesInFileSystemConfig>());
 
         builder.DeleteConfiguration();
@@ -26,7 +26,7 @@ public class StorageBuilderCrudTests
     }
 
     [Test]
-    public void StorageBuilder_UpsertConfiguration_MergesSameTypeAndPreservesExistingFields()
+    public void StorageBuilder_UpdateConfiguration_WithConfiguration_MergesSameTypeAndPreservesExistingFields()
     {
         var builder = new StorageBuilder()
             .Create(new S3Config
@@ -40,7 +40,7 @@ public class StorageBuilderCrudTests
                 SkipEmptyObjects = true
             });
 
-        builder.UpsertConfiguration(new S3Config
+        builder.UpdateConfiguration(new S3Config
         {
             MaximumRetryCount = 5,
             SkipEmptyObjects = false

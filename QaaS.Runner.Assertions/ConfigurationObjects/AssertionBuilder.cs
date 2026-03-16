@@ -9,6 +9,7 @@ using QaaS.Framework.Configurations.ConfigurationBindingUtils;
 using QaaS.Framework.Configurations.CustomValidationAttributes;
 using QaaS.Framework.SDK.ContextObjects;
 using QaaS.Framework.SDK.Hooks.Assertion;
+using QaaS.Runner.Infrastructure;
 using YamlDotNet.Core;
 using YamlDotNet.Serialization;
 using Assertion = QaaS.Runner.Assertions.AssertionObjects.Assertion;
@@ -447,13 +448,8 @@ public class AssertionBuilder : IYamlConvertible
 
     public AssertionBuilder UpdateConfiguration(object configuration)
     {
-        AssertionConfiguration = AssertionConfiguration.BindConfigurationObjectToIConfiguration(configuration);
+        AssertionConfiguration = AssertionConfiguration.UpdateConfiguration(configuration);
         return this;
-    }
-
-    public AssertionBuilder UpsertConfiguration(object configuration)
-    {
-        return UpdateConfiguration(configuration);
     }
 
     public AssertionBuilder DeleteConfiguration()

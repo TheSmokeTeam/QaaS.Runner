@@ -163,13 +163,8 @@ public class ProbeBuilder : IYamlConvertible
 
     public ProbeBuilder UpdateConfiguration(object configuration)
     {
-        ProbeConfiguration = ProbeConfiguration.BindConfigurationObjectToIConfiguration(configuration);
+        ProbeConfiguration = ProbeConfiguration.UpdateConfiguration(configuration);
         return this;
-    }
-
-    public ProbeBuilder UpsertConfiguration(object configuration)
-    {
-        return UpdateConfiguration(configuration);
     }
 
     public ProbeBuilder DeleteConfiguration()

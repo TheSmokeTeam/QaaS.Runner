@@ -1,4 +1,3 @@
-using QaaS.Framework.Configurations.ConfigurationBindingUtils;
 using QaaS.Framework.Policies;
 using QaaS.Framework.Protocols.ConfigurationObjects;
 using QaaS.Framework.Protocols.ConfigurationObjects.Elastic;
@@ -221,21 +220,21 @@ public partial class PublisherBuilder
     }
 
     /// <summary>
-    /// Applies a partial update to the current publisher configuration while preserving omitted fields.
+    /// Applies a computed partial update to the current publisher configuration while preserving omitted fields.
     /// </summary>
     public PublisherBuilder UpdateConfiguration(Func<ISenderConfig, ISenderConfig> update)
     {
         var currentConfig = ReadConfiguration() ??
                             throw new InvalidOperationException("Publisher configuration is not set");
-        return Configure(currentConfig.MergeConfiguration(update(currentConfig))!);
+        return UpdateConfiguration(update(currentConfig));
     }
 
     /// <summary>
-    /// Upserts the publisher configuration, merging same-type configs and replacing different config types.
+    /// Updates the publisher configuration by merging same-type values and replacing the current type when needed.
     /// </summary>
-    public PublisherBuilder UpsertConfiguration(ISenderConfig config)
+    public PublisherBuilder UpdateConfiguration(ISenderConfig config)
     {
-        return Configure(ReadConfiguration().MergeConfiguration(config)!);
+        return Configure(ReadConfiguration().UpdateConfiguration(config));
     }
 
     public PublisherBuilder DeleteConfiguration()
