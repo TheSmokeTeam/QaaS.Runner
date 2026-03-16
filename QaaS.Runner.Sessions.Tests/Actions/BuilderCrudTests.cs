@@ -69,6 +69,33 @@ public class BuilderCrudTests
     }
 
     [Test]
+    public void ConsumerBuilder_UpdateConfiguration_WithSparseSameTypeUpdate_DoesNotClearExistingStringFields()
+    {
+        var builder = new ConsumerBuilder()
+            .CreateConfiguration(new RabbitMqReaderConfig
+            {
+                Host = "rabbitmq.local",
+                ExchangeName = "events",
+                QueueName = "messages",
+                RoutingKey = "created"
+            });
+
+        builder.UpdateConfiguration(new RabbitMqReaderConfig
+        {
+            HandshakeContinuationTimeoutSeconds = 7
+        });
+
+        var mergedConfiguration = (RabbitMqReaderConfig)builder.ReadConfiguration()!;
+        Assert.Multiple(() =>
+        {
+            Assert.That(mergedConfiguration.ExchangeName, Is.EqualTo("events"));
+            Assert.That(mergedConfiguration.QueueName, Is.EqualTo("messages"));
+            Assert.That(mergedConfiguration.RoutingKey, Is.EqualTo("created"));
+            Assert.That(mergedConfiguration.HandshakeContinuationTimeoutSeconds, Is.EqualTo(7));
+        });
+    }
+
+    [Test]
     public void PublisherBuilder_ShouldSupportDataSourcePolicyAndConfigurationCrud()
     {
         var builder = new PublisherBuilder()
@@ -117,6 +144,33 @@ public class BuilderCrudTests
             Assert.That(mergedConfiguration.ExchangeName, Is.EqualTo("events"));
             Assert.That(mergedConfiguration.RoutingKey, Is.EqualTo("published"));
             Assert.That(mergedConfiguration.Expiration, Is.EqualTo("30000"));
+        });
+    }
+
+    [Test]
+    public void PublisherBuilder_UpdateConfiguration_WithSparseSameTypeUpdate_DoesNotClearExistingStringFields()
+    {
+        var builder = new PublisherBuilder()
+            .CreateConfiguration(new RabbitMqSenderConfig
+            {
+                Host = "rabbitmq.local",
+                ExchangeName = "events",
+                QueueName = "messages",
+                RoutingKey = "published"
+            });
+
+        builder.UpdateConfiguration(new RabbitMqSenderConfig
+        {
+            HandshakeContinuationTimeoutSeconds = 5
+        });
+
+        var mergedConfiguration = (RabbitMqSenderConfig)builder.ReadConfiguration()!;
+        Assert.Multiple(() =>
+        {
+            Assert.That(mergedConfiguration.ExchangeName, Is.EqualTo("events"));
+            Assert.That(mergedConfiguration.QueueName, Is.EqualTo("messages"));
+            Assert.That(mergedConfiguration.RoutingKey, Is.EqualTo("published"));
+            Assert.That(mergedConfiguration.HandshakeContinuationTimeoutSeconds, Is.EqualTo(5));
         });
     }
 
