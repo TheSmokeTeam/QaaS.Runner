@@ -22,12 +22,6 @@
         <None Update="test.qaas.yaml">
             <CopyToOutputDirectory>Always</CopyToOutputDirectory>
         </None>
-        <None Update="test.no-metadata.qaas.yaml">
-            <CopyToOutputDirectory>Always</CopyToOutputDirectory>
-        </None>
-        <None Update="test.rabbit.qaas.yaml">
-            <CopyToOutputDirectory>Always</CopyToOutputDirectory>
-        </None>
         <None Update="executable.yaml">
             <CopyToOutputDirectory>Always</CopyToOutputDirectory>
         </None>
