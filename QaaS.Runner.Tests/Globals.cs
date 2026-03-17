@@ -13,7 +13,7 @@ namespace QaaS.Runner.Tests;
 public static class Globals
 {
     public static readonly ILogger Logger = new SerilogLoggerFactory(
-        new LoggerConfiguration().MinimumLevel.Debug()
+        new LoggerConfiguration().MinimumLevel.Warning()
             .CreateLogger()).CreateLogger("TestsLogger");
 
     private static readonly InternalContext Context = new()
