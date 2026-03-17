@@ -16,6 +16,7 @@ using QaaS.Framework.Executions;
 using QaaS.Framework.Providers;
 using QaaS.Framework.Providers.Modules;
 using QaaS.Framework.Providers.ObjectCreation;
+using QaaS.Framework.Providers.Providers;
 using QaaS.Framework.SDK;
 using QaaS.Framework.SDK.ContextObjects;
 using QaaS.Framework.SDK.DataSourceObjects;
@@ -448,8 +449,16 @@ public class ExecutionBuilder() : BaseExecutionBuilder<InternalContext, Executio
                 new HooksLoaderModule<IAssertion>(_validationResults)); // Loads all IAssertion hooks
             containerBuilder.RegisterModule(
                 new HooksLoaderModule<IGenerator>(_validationResults)); // Loads all IGenerator hooks
-            containerBuilder.RegisterModule(
-                new HooksLoaderModule<IProbe>(_validationResults)); // Loads all IProbe hooks
+            containerBuilder.Register<IComponentContext, IList<KeyValuePair<string, IProbe>>>(scope =>
+            {
+                var objectCreator = scope.Resolve<IByNameObjectCreator>();
+                return LoadProbeHooks(
+                    Context,
+                    scope.Resolve<IEnumerable<HookData<IProbe>>>(),
+                    new HookProvider<IProbe>(Context, objectCreator),
+                    objectCreator,
+                    _validationResults);
+            }).InstancePerLifetimeScope();
 
             // loads logics
             containerBuilder.RegisterType<DataSourceLogic>().As<DataSourceLogic>();
@@ -480,6 +489,65 @@ public class ExecutionBuilder() : BaseExecutionBuilder<InternalContext, Executio
                 };
             }
         }
+    }
+
+    /// <summary>
+    /// Loads probe hooks while resolving each configured probe type only once.
+    /// Multiple sessions may use the same probe implementation with different scoped names and
+    /// configurations, so additional instances are created directly from the resolved type instead
+    /// of asking the generic hook provider to rediscover the same type and log it again.
+    /// </summary>
+    internal static IList<KeyValuePair<string, IProbe>> LoadProbeHooks(
+        Context context,
+        IEnumerable<HookData<IProbe>> probeHookData,
+        IHookProvider<IProbe> hookProvider,
+        IByNameObjectCreator objectCreator,
+        List<ValidationResult> validationResults)
+    {
+        context.Logger.LogDebug("Starting loading and validation of all hooks of type {HookType}",
+            typeof(IProbe).Name);
+
+        var resolvedProbeTypes = new Dictionary<string, Type>(StringComparer.Ordinal);
+        var loadedHooks = new List<KeyValuePair<string, IProbe>>();
+
+        foreach (var hookData in probeHookData)
+        {
+            IProbe hook;
+
+            try
+            {
+                if (!resolvedProbeTypes.TryGetValue(hookData.Type, out var resolvedProbeType))
+                {
+                    hook = hookProvider.GetSupportedInstanceByName(hookData.Type);
+                    resolvedProbeTypes[hookData.Type] = hook.GetType();
+                }
+                else
+                {
+                    hook = objectCreator.GetInstanceOfSubClassOfTByNameFromAssemblies<IProbe>(
+                        resolvedProbeType.FullName!,
+                        [resolvedProbeType.Assembly]);
+                    hook.Context = context;
+                }
+            }
+            catch (ArgumentException e)
+            {
+                context.Logger.LogCritical(
+                    "Encountered exception while loading {HookType} instance {InstanceName} - {Exception}",
+                    typeof(IProbe).Name, hookData.Type, e);
+                throw;
+            }
+
+            var configurationsValidationResults = (hook.LoadAndValidateConfiguration(
+                hookData.Configuration) ?? Enumerable.Empty<ValidationResult>()).ToList();
+            foreach (var validationResult in configurationsValidationResults)
+                validationResult.ErrorMessage = $"In Hook of {typeof(IProbe).Name} named {hookData.Name} of type" +
+                                                $" {hookData.Type} {validationResult.ErrorMessage}";
+
+            validationResults.AddRange(configurationsValidationResults);
+            loadedHooks.Add(new KeyValuePair<string, IProbe>(hookData.Name, hook));
+        }
+
+        return loadedHooks;
     }
 
     private void ValidateProbeDefinitions()

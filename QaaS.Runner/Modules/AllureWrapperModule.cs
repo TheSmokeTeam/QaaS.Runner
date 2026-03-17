@@ -4,7 +4,7 @@ using QaaS.Runner.WrappedExternals;
 namespace QaaS.Runner.Modules;
 
 /// <summary>
-/// Registers the runner's Allure wrapper as a shared lifecycle service.
+/// Registers a single <see cref="AllureWrapper" /> instance for the Autofac root container.
 /// </summary>
 public class AllureWrapperModule : Module
 {

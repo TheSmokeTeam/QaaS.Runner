@@ -198,7 +198,7 @@ public class ProbeBuilder : IYamlConvertible
             context.Logger.LogDebugWithMetaData("Started building Probe of type {type}",
                 context.GetMetaDataOrDefault(), new object?[] { probeTypeName });
 
-            return new Probe(Name!, Stage, probeHook, DataSourceNames, DataSourcePatterns, context.Logger);
+            return new Probe(Name!, sessionName, Stage, probeHook, DataSourceNames, DataSourcePatterns, context.Logger);
         }
         catch (Exception e)
         {

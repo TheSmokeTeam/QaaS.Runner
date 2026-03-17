@@ -23,6 +23,11 @@ internal sealed record MockerCommandOverrideRequest(string ActionName, int Stage
     MockerCommandConfig Command, RedisConfig Redis, string ServerName, int RequestDurationMs, int RequestRetries,
     ILogger Logger);
 
+/// <summary>
+/// Stores optional factory overrides for session actions in the runtime context.
+/// Tests use these hooks to inject deterministic transports and action implementations without
+/// mutating the production builders or protocol registration flow.
+/// </summary>
 internal sealed class SessionActionOverrides
 {
     public Func<ConsumerOverrideRequest, (IReader? Reader, IChunkReader? ChunkReader)>? Consumer { get; init; }
@@ -40,12 +45,20 @@ internal static class SessionActionOverrideExtensions
 {
     private const string OverridesKey = "QaaS.Runner.Sessions.SessionActionOverrides";
 
+    /// <summary>
+    /// Persists the current session-action override set on the shared internal context so the
+    /// builders can swap real runtime dependencies for test doubles on demand.
+    /// </summary>
     public static void SetSessionActionOverrides(this InternalContext context, SessionActionOverrides overrides)
     {
         context.InternalGlobalDict ??= new Dictionary<string, object?>();
         context.InternalGlobalDict[OverridesKey] = overrides;
     }
 
+    /// <summary>
+    /// Retrieves the current session-action overrides if the context contains a correctly typed
+    /// override payload. Missing or mismatched entries are treated as "no overrides configured".
+    /// </summary>
     public static SessionActionOverrides? GetSessionActionOverrides(this InternalContext context)
     {
         if (context.InternalGlobalDict == null)

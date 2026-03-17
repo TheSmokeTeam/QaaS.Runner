@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
 using System.Threading;
+using Microsoft.Extensions.Logging;
 using Moq;
 using MoreLinq.Extensions;
 using NUnit.Framework;
@@ -152,6 +153,30 @@ public class PublisherTest
         var receivedDataContent = context.InternalRunningSessions.RunningSessionsDict[sessionName].Inputs![0].GetData()
             .Select(data => data.Body);
         CollectionAssert.AreEquivalent(expectedDataContent, receivedDataContent);
+    }
+
+    [Test]
+    public void Constructor_LogsStructuredInitializationMessage()
+    {
+        var logger = new CapturingLogger();
+
+        _ = new Sessions.Actions.Publishers.Publisher(
+            "TestPublisher",
+            new NamedSender(),
+            0,
+            new DataFilter(),
+            null,
+            false,
+            null,
+            1,
+            0,
+            SerializationType.Json,
+            null,
+            null,
+            logger);
+
+        Assert.That(logger.Messages,
+            Contains.Item("Initializing Publisher TestPublisher with Sender type NamedSender and Serializer Json"));
     }
 
     private const int TimeoutMsForWork = 10;
@@ -393,5 +418,56 @@ public class PublisherTest
 
         Assert.That(items, Is.Empty);
         Assert.That(iterator.IteratedData, Is.Empty);
+    }
+
+    private sealed class NamedSender : ISender
+    {
+        public void Connect()
+        {
+        }
+
+        public void Disconnect()
+        {
+        }
+
+        public SerializationType? GetSerializationType()
+        {
+            return SerializationType.Json;
+        }
+
+        public DetailedData<object> Send(Data<object> dataToSend)
+        {
+            return new DetailedData<object> { Body = dataToSend.Body };
+        }
+    }
+
+    private sealed class CapturingLogger : ILogger
+    {
+        public List<string> Messages { get; } = [];
+
+        public IDisposable BeginScope<TState>(TState state) where TState : notnull
+        {
+            return NoOpScope.Instance;
+        }
+
+        public bool IsEnabled(LogLevel logLevel)
+        {
+            return true;
+        }
+
+        public void Log<TState>(LogLevel logLevel, EventId eventId, TState state, Exception? exception,
+            Func<TState, Exception?, string> formatter)
+        {
+            Messages.Add(formatter(state, exception));
+        }
+
+        private sealed class NoOpScope : IDisposable
+        {
+            public static readonly NoOpScope Instance = new();
+
+            public void Dispose()
+            {
+            }
+        }
     }
 }

@@ -14,11 +14,14 @@ public class AllureWrapperModuleTests
         var builder = new ContainerBuilder();
         builder.RegisterModule<AllureWrapperModule>();
         using var container = builder.Build();
-        using var scope = container.BeginLifetimeScope();
+        using var firstScope = container.BeginLifetimeScope();
+        using var secondScope = container.BeginLifetimeScope();
 
-        var firstResolution = scope.Resolve<AllureWrapper>();
-        var secondResolution = scope.Resolve<AllureWrapper>();
+        var rootResolution = container.Resolve<AllureWrapper>();
+        var firstScopeResolution = firstScope.Resolve<AllureWrapper>();
+        var secondScopeResolution = secondScope.Resolve<AllureWrapper>();
 
-        Assert.That(firstResolution, Is.SameAs(secondResolution));
+        Assert.That(firstScopeResolution, Is.SameAs(rootResolution));
+        Assert.That(secondScopeResolution, Is.SameAs(rootResolution));
     }
 }

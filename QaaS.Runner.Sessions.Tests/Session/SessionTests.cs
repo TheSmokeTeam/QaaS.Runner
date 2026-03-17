@@ -489,6 +489,39 @@ public class SessionTests
     }
 
     [Test]
+    public void Run_WhenActionProducesInput_UsesInternalCommunicationDataContractForSessionInputs()
+    {
+        const string sessionName = "input-materialization-session";
+        var context = CreationalFunctions.CreateContext(sessionName, []);
+        var stage = new Stage(context, [], sessionName, 0, 0, 0);
+        var action = new InputAndOutputStageAction("io-action");
+        stage.AddCommunication(action);
+
+        var session = new Sessions.Session.Session(
+            sessionName,
+            0,
+            true,
+            0,
+            0,
+            new Dictionary<int, Stage> { { 0, stage } },
+            [],
+            context,
+            []);
+
+        var sessionData = session.Run(context.ExecutionData);
+        var materializedSessionData = sessionData!;
+
+        Assert.That(materializedSessionData, Is.Not.Null);
+        Assert.That(materializedSessionData.Inputs, Has.Count.EqualTo(1));
+        Assert.That(materializedSessionData.Outputs, Has.Count.EqualTo(1));
+        Assert.That(materializedSessionData.Inputs![0], Is.InstanceOf<InternalCommunicationData<object>>());
+        Assert.That(materializedSessionData.Inputs[0].Name, Is.EqualTo("io-action"));
+        Assert.That(materializedSessionData.Inputs[0].Data, Is.SameAs(action.ActData.Input));
+        Assert.That(materializedSessionData.Outputs![0], Is.Not.SameAs(action.ActData));
+        Assert.That(materializedSessionData.Outputs[0].Name, Is.EqualTo("io-action"));
+    }
+
+    [Test]
     public void LogSessionSummary_When_Collections_Are_Null_Logs_Zero_Counts()
     {
         const string sessionName = "summary-null-session";
@@ -739,6 +772,37 @@ public class SessionTests
             {
                 Output = [new DetailedData<object> { Body = "ok" }]
             };
+        }
+
+        protected internal override void LogData(InternalCommunicationData<object> actData,
+            DetailedData<object> itemBeforeSerialization, InputOutputState? saveAt = null)
+        {
+        }
+    }
+
+    private sealed class InputAndOutputStageAction(string name) : StagedAction(name, 0, null, Globals.Logger)
+    {
+        public InternalCommunicationData<object> ActData { get; } = new()
+        {
+            Input =
+            [
+                new DetailedData<object> { Body = "input" }
+            ],
+            InputSerializationType = QaaS.Framework.Serialization.SerializationType.Json,
+            Output =
+            [
+                new DetailedData<object> { Body = "output" }
+            ],
+            OutputSerializationType = QaaS.Framework.Serialization.SerializationType.Json
+        };
+
+        internal override void ExportRunningCommunicationData(InternalContext context, string sessionName)
+        {
+        }
+
+        internal override InternalCommunicationData<object> Act()
+        {
+            return ActData;
         }
 
         protected internal override void LogData(InternalCommunicationData<object> actData,

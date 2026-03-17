@@ -1,6 +1,7 @@
 using System.Reflection;
 using Autofac;
 using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Logging;
 using NUnit.Framework;
 using QaaS.Framework.Configurations;
 using QaaS.Framework.Configurations.CustomExceptions;
@@ -200,6 +201,62 @@ public class ExecutionBuilderTests
         Assert.That(runs, Has.Count.EqualTo(2));
         Assert.That(runs, Contains.Item((nameof(FirstTestProbe), "first-config")));
         Assert.That(runs, Contains.Item((nameof(SecondTestProbe), "second-config")));
+    }
+
+    [Test]
+    public void Start_WithSameProbeTypeAcrossDifferentSessions_LogsDiscoveryOnceAndSessionScopedProbeInitialization()
+    {
+        const string sharedProbeName = "SharedProbe";
+        var logger = new CapturingLogger();
+        var builder = new ExecutionBuilder()
+            .AddSession(new SessionBuilder
+            {
+                Name = "session-a",
+                Stage = 0,
+                Probes =
+                [
+                    new ProbeBuilder()
+                        .Named(sharedProbeName)
+                        .HookNamed(nameof(FirstTestProbe))
+                        .Configure(new ProbeMarkerConfig { Marker = "first-config" })
+                ]
+            })
+            .AddSession(new SessionBuilder
+            {
+                Name = "session-b",
+                Stage = 1,
+                Probes =
+                [
+                    new ProbeBuilder()
+                        .Named(sharedProbeName)
+                        .HookNamed(nameof(FirstTestProbe))
+                        .Configure(new ProbeMarkerConfig { Marker = "second-config" })
+                ]
+            })
+            .ExecutionType(ExecutionType.Run)
+            .SetExecutionId("probe-log-shape")
+            .SetCase("probe-log-shape-case")
+            .WithLogger(logger)
+            .WithGlobalDict(new Dictionary<string, object?>())
+            .WithMetadata(new MetaDataConfig { Team = "Smoke", System = "QaaS" });
+
+        var execution = builder.Build();
+        var exitCode = execution.Start();
+        var messages = logger.Entries
+            .Where(entry => entry.LogLevel == LogLevel.Information)
+            .Select(entry => entry.Message)
+            .ToArray();
+
+        Assert.That(exitCode, Is.EqualTo(0));
+        Assert.That(ProbeRunRecorder.GetRuns(), Has.Count.EqualTo(2));
+        Assert.That(messages.Count(message =>
+                message.Contains($"Found IProbe hook instance {nameof(FirstTestProbe)} in provided assembly",
+                    StringComparison.Ordinal)),
+            Is.EqualTo(1));
+        Assert.That(messages,
+            Contains.Item("Initializing Probe SharedProbe for session session-a with Hook type FirstTestProbe"));
+        Assert.That(messages,
+            Contains.Item("Initializing Probe SharedProbe for session session-b with Hook type FirstTestProbe"));
     }
 
     [Test]
@@ -847,4 +904,36 @@ public class ExecutionBuilderTests
             .Build();
         return CreateLoadedContext(configuration);
     }
+
+    private sealed class CapturingLogger : ILogger
+    {
+        public List<LogEntry> Entries { get; } = [];
+
+        public IDisposable BeginScope<TState>(TState state) where TState : notnull
+        {
+            return NoOpScope.Instance;
+        }
+
+        public bool IsEnabled(LogLevel logLevel)
+        {
+            return true;
+        }
+
+        public void Log<TState>(LogLevel logLevel, EventId eventId, TState state, Exception? exception,
+            Func<TState, Exception?, string> formatter)
+        {
+            Entries.Add(new LogEntry(logLevel, formatter(state, exception)));
+        }
+
+        private sealed class NoOpScope : IDisposable
+        {
+            public static readonly NoOpScope Instance = new();
+
+            public void Dispose()
+            {
+            }
+        }
+    }
+
+    private sealed record LogEntry(LogLevel LogLevel, string Message);
 }

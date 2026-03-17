@@ -23,7 +23,7 @@ public sealed class Publisher : BasePublisher
         logger)
     {
         _sender = dataSender;
-        Logger.LogInformation("Initializing {Publisher} {PublisherName} with Sender of type" +
+        Logger.LogInformation("Initializing {Publisher} {PublisherName} with Sender type" +
                               " {SenderType} and Serializer {SerializerType}",
             GetType().Name, Name, _sender?.GetType().Name, SerializationType);
         RunningCommunicationData = new RunningCommunicationData<object>

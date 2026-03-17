@@ -4,6 +4,7 @@ using System.IO;
 using System.Linq;
 using System.Reflection;
 using System.Runtime.Serialization.Formatters.Binary;
+using Microsoft.Extensions.Logging;
 using Microsoft.VisualStudio.TestPlatform.ObjectModel.Adapter;
 using Moq;
 using NUnit.Framework;
@@ -153,5 +154,76 @@ public class ConsumerTests
             .GetValue(consumer)!;
 
         Assert.That(runningData.SerializationType, Is.EqualTo(SerializationType.Json));
+    }
+
+    [Test]
+    public void Constructor_LogsStructuredInitializationMessage()
+    {
+        var logger = new CapturingLogger();
+
+        _ = new Sessions.Actions.Consumers.Consumer(
+            "TestConsumer",
+            new NamedReader(),
+            TimeSpan.FromMilliseconds(1),
+            1,
+            null,
+            new DataFilter(),
+            SerializationType.Json,
+            null,
+            logger);
+
+        Assert.That(logger.Messages,
+            Contains.Item("Initializing Consumer TestConsumer with Reader type NamedReader and Deserializer Json"));
+    }
+
+    private sealed class NamedReader : IReader
+    {
+        public void Connect()
+        {
+        }
+
+        public void Disconnect()
+        {
+        }
+
+        public SerializationType? GetSerializationType()
+        {
+            return SerializationType.Json;
+        }
+
+        public DetailedData<object>? Read(TimeSpan timeout)
+        {
+            return null;
+        }
+    }
+
+    private sealed class CapturingLogger : ILogger
+    {
+        public List<string> Messages { get; } = [];
+
+        public IDisposable BeginScope<TState>(TState state) where TState : notnull
+        {
+            return NoOpScope.Instance;
+        }
+
+        public bool IsEnabled(LogLevel logLevel)
+        {
+            return true;
+        }
+
+        public void Log<TState>(LogLevel logLevel, EventId eventId, TState state, Exception? exception,
+            Func<TState, Exception?, string> formatter)
+        {
+            Messages.Add(formatter(state, exception));
+        }
+
+        private sealed class NoOpScope : IDisposable
+        {
+            public static readonly NoOpScope Instance = new();
+
+            public void Dispose()
+            {
+            }
+        }
     }
 }

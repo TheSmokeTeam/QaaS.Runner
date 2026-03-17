@@ -15,14 +15,18 @@ public class Probe : StagedAction
 {
     private readonly string[]? _dataSourceNames;
     private readonly string[]? _dataSourcePatterns;
+    private readonly string _sessionName;
 
-    public Probe(string name, int stage, IProbe probeHook, string[] dataSourceNames, string[] dataSourcePatterns,
+    public Probe(string name, string sessionName, int stage, IProbe probeHook, string[] dataSourceNames,
+        string[] dataSourcePatterns,
         ILogger logger) : base(name, stage, null, logger)
     {
+        _sessionName = sessionName;
         ProbeHook = probeHook;
         _dataSourceNames = dataSourceNames;
         _dataSourcePatterns = dataSourcePatterns;
-        Logger.LogInformation("Initializing Probe {Name} of type {ProbeType}", Name, ProbeHook.GetType());
+        Logger.LogInformation("Initializing Probe {ProbeName} for session {SessionName} with Hook type {HookType}",
+            Name, _sessionName, ProbeHook.GetType().Name);
     }
 
     public List<DataSource> DataSources { get; set; } = [];
