@@ -865,6 +865,8 @@ public class MockerCommandInternalsTests
 
         Assert.That(result.Input, Is.Not.Null);
         Assert.That(result.Output, Is.Not.Null);
+        Assert.That(result.Input, Has.Count.EqualTo(1));
+        Assert.That(result.Output, Has.Count.EqualTo(1));
         Assert.That(sentRunningData.Data, Has.Count.EqualTo(1));
         Assert.That(receivedRunningData.Data, Has.Count.EqualTo(1));
         Assert.That(sentRunningData.Data!.Single().Body, Is.Not.TypeOf<byte[]>());

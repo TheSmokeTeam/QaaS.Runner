@@ -128,17 +128,20 @@ public abstract class MockerCommand : StagedAction
             return (null, null);
 
         var commandResult = AdditionalDataExchangeWithTheMocker();
-        commandResult.Item1?.ForEach(inputData =>
+        var inputDataList = commandResult.Item1?.ToList();
+        var outputDataList = commandResult.Item2?.ToList();
+
+        inputDataList?.ForEach(inputData =>
         {
             _sentRunningCommunicationData.Data.Add(inputData);
             _sentRunningCommunicationData.Queue.Enqueue(inputData);
         });
-        commandResult.Item2?.ForEach(outputData =>
+        outputDataList?.ForEach(outputData =>
         {
             _receivedRunningCommunicationData.Data.Add(outputData);
             _receivedRunningCommunicationData.Queue.Enqueue(outputData);
         });
-        return commandResult;
+        return (inputDataList, outputDataList);
     }
 
     /// <summary>
