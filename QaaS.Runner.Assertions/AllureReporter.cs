@@ -132,16 +132,6 @@ public class AllureReporter : BaseReporter
             FileSystem.Directory.CreateDirectory(resultsDirectory);
     }
 
-    /// <summary>
-    ///     Keeps the historical folder layout in allure-results for direct filesystem inspection
-    ///     while the Allure lifecycle owns the actual attachment source used by the report.
-    /// </summary>
-    private void SaveLegacyAttachmentCopy(byte[] data, string attachmentDirectory, string fileName)
-    {
-        EnsureResultsDirectoryExists();
-        SaveAttachmentIfNotAlreadySaved(data, attachmentDirectory, fileName);
-    }
-
     private static string ResolveAttachmentExtension(string fileName, string attachmentType)
     {
         var extension = Path.GetExtension(fileName);
@@ -175,8 +165,6 @@ public class AllureReporter : BaseReporter
             $"{sessionData.Name}.json",
             nameof(SessionData),
             JsonAttachmentType);
-        SaveLegacyAttachmentCopy(serializedSessionData, GetAttachmentDirectory("SessionsData"),
-            $"{sessionData.Name}.json");
     }
 
     private void AddConfigurationTemplateToCurrentItem(IConfiguration configuration)
@@ -191,7 +179,6 @@ public class AllureReporter : BaseReporter
             attachmentFile,
             attachmentFile,
             YamlAttachmentType);
-        SaveLegacyAttachmentCopy(renderedTemplateBytes, GetAttachmentDirectory("Templates"), attachmentFile);
     }
 
     private void AddSessionLogToCurrentItem(SessionData sessionData)
@@ -208,12 +195,10 @@ public class AllureReporter : BaseReporter
             $"{sessionData.Name}.log",
             "SessionLog",
             textAttachmentType);
-        SaveLegacyAttachmentCopy(sessionLogBytes, GetAttachmentDirectory("SessionLogs"), $"{sessionData.Name}.log");
     }
 
     private void AddAssertionAttachmentsToCurrentItem(AssertionResult assertionResult)
     {
-        const string assertionsAttachmentsDirectory = "AssertionsAttachments";
         var assertionHook = assertionResult.Assertion.AssertionHook;
         if (assertionHook?.AssertionAttachments == null)
             return;
@@ -252,10 +237,6 @@ public class AllureReporter : BaseReporter
                     : Path.Join(attachmentDirectoryName, attachmentFileName),
                 attachmentPath,
                 GetAttachmentTypeBySerializationType(assertionAttachment.SerializationType));
-            SaveLegacyAttachmentCopy(assertionData,
-                Path.Join(GetAttachmentDirectory(assertionsAttachmentsDirectory, assertionResult.Assertion.Name),
-                    attachmentDirectoryName),
-                attachmentFileName);
         }
     }
 

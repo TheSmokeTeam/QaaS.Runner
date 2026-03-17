@@ -35,23 +35,60 @@ public class AllureWrapper
     /// </summary>
     public virtual void ServeTestResults(string allureRunnablePath = DefaultAllureRunnablePath)
     {
-        using var allureServeProcess = Process.Start(new ProcessStartInfo
-        {
-            WorkingDirectory = Directory.GetCurrentDirectory(),
-            FileName = RuntimeInformation.IsOSPlatform(OSPlatform.Windows) ? "cmd" :
-                RuntimeInformation.IsOSPlatform(OSPlatform.Linux) ? "bash" :
-                RuntimeInformation.IsOSPlatform(OSPlatform.OSX) ? "bash" :
-                throw new InvalidOperationException("Unknown OS"),
-            Arguments = $"/c {allureRunnablePath} serve",
-            RedirectStandardOutput = true,
-            RedirectStandardError = true,
-            UseShellExecute = false
-        }) ?? throw new InvalidOperationException("Failed to start Allure serve process.");
+        using var allureServeProcess = StartProcess(CreateServeProcessStartInfo(allureRunnablePath));
 
         // Log process output with logger
         while (!allureServeProcess.StandardOutput.EndOfStream)
             Console.Out.WriteLine(allureServeProcess.StandardOutput.ReadLine());
         while (!allureServeProcess.StandardError.EndOfStream)
             Console.Out.WriteLine(allureServeProcess.StandardError.ReadLine());
+    }
+
+    /// <summary>
+    ///     Starts the configured shell process for serving Allure results. Tests override this seam
+    ///     to replace the long-lived external process with a deterministic short-lived one.
+    /// </summary>
+    protected virtual Process StartProcess(ProcessStartInfo startInfo)
+    {
+        return Process.Start(startInfo) ?? throw new InvalidOperationException("Failed to start Allure serve process.");
+    }
+
+    /// <summary>
+    ///     Builds the shell command used to launch <c>allure serve</c>. Empty or whitespace inputs
+    ///     intentionally fall back to the default executable name so callers do not have to special-case it.
+    /// </summary>
+    protected virtual ProcessStartInfo CreateServeProcessStartInfo(string allureRunnablePath)
+    {
+        var resolvedAllureRunnablePath = string.IsNullOrWhiteSpace(allureRunnablePath)
+            ? DefaultAllureRunnablePath
+            : allureRunnablePath;
+
+        if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
+        {
+            return new ProcessStartInfo
+            {
+                WorkingDirectory = Directory.GetCurrentDirectory(),
+                FileName = "cmd",
+                Arguments = $"/c {resolvedAllureRunnablePath} serve",
+                RedirectStandardOutput = true,
+                RedirectStandardError = true,
+                UseShellExecute = false
+            };
+        }
+
+        if (RuntimeInformation.IsOSPlatform(OSPlatform.Linux) || RuntimeInformation.IsOSPlatform(OSPlatform.OSX))
+        {
+            return new ProcessStartInfo
+            {
+                WorkingDirectory = Directory.GetCurrentDirectory(),
+                FileName = "bash",
+                Arguments = $"-lc \"{resolvedAllureRunnablePath} serve\"",
+                RedirectStandardOutput = true,
+                RedirectStandardError = true,
+                UseShellExecute = false
+            };
+        }
+
+        throw new InvalidOperationException("Unknown OS");
     }
 }

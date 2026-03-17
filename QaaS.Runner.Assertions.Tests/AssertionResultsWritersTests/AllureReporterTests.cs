@@ -81,7 +81,7 @@ public class AllureReporterTests
                     IsFlaky = false,
                     FlakinessReasons = new List<KeyValuePair<string, List<ActionFailure>>>()
                 }
-            }, false, true, 3).SetName("NoSessionData");
+            }, false, true, 2).SetName("NoSessionData");
 
         yield return new TestCaseData(new Context[] { new() { Logger = Globals.Logger } },
             new AssertionResult
@@ -109,7 +109,7 @@ public class AllureReporterTests
                     IsFlaky = false,
                     FlakinessReasons = new List<KeyValuePair<string, List<ActionFailure>>>()
                 }
-            }, true, false, 3).SetName("WithOneSessionData");
+            }, true, false, 2).SetName("WithOneSessionData");
 
         yield return new TestCaseData(
             new Context[]
@@ -141,7 +141,7 @@ public class AllureReporterTests
                     IsFlaky = false,
                     FlakinessReasons = new List<KeyValuePair<string, List<ActionFailure>>>()
                 }
-            }, true, true, 10).SetName("MultipleCasesWithOneSameSessionData");
+            }, true, true, 6).SetName("MultipleCasesWithOneSameSessionData");
 
         yield return new TestCaseData(
             new Context[]
@@ -173,7 +173,7 @@ public class AllureReporterTests
                     IsFlaky = false,
                     FlakinessReasons = new List<KeyValuePair<string, List<ActionFailure>>>()
                 }
-            }, true, false, 6).SetName("MultipleExecutionsSameCasesWithOneSameSessionData");
+            }, true, false, 4).SetName("MultipleExecutionsSameCasesWithOneSameSessionData");
 
         yield return new TestCaseData(new Context[] { new() { Logger = Globals.Logger } },
             new AssertionResult
@@ -210,7 +210,7 @@ public class AllureReporterTests
                     IsFlaky = false,
                     FlakinessReasons = new List<KeyValuePair<string, List<ActionFailure>>>()
                 }
-            }, true, false, 7).SetName("WithMultipleSessionData");
+            }, true, false, 4).SetName("WithMultipleSessionData");
 
 
         yield return new TestCaseData(new Context[] { new() { Logger = Globals.Logger } },
@@ -263,7 +263,7 @@ public class AllureReporterTests
                     IsFlaky = false,
                     FlakinessReasons = new List<KeyValuePair<string, List<ActionFailure>>>()
                 }
-            }, true, true, 12).SetName("WithMultipleSessionDataDuplicated");
+            }, true, true, 8).SetName("WithMultipleSessionDataDuplicated");
     }
 
     [Test]
@@ -542,13 +542,6 @@ public class AllureReporterTests
         Reporter.WriteTestResults(assertionResult);
         var resultFile = Directory.GetFiles(AllureResultsFolder, "*-result.json", SearchOption.TopDirectoryOnly).Single();
         var contents = File.ReadAllText(resultFile);
-        var sessionsDataCopy = Directory.GetFiles(Path.Combine(AllureResultsFolder, "SessionsData"), "*.json",
-            SearchOption.AllDirectories).Single();
-        var sessionLogCopy = Directory.GetFiles(Path.Combine(AllureResultsFolder, "SessionLogs"), "*.log",
-            SearchOption.AllDirectories).Single();
-        var templateCopy = Directory.GetFiles(Path.Combine(AllureResultsFolder, "Templates"), "*.yaml",
-            SearchOption.AllDirectories).Single();
-
         Assert.Multiple(() =>
         {
             Assert.That(contents, Does.Contain("-attachment.json"));
@@ -557,9 +550,9 @@ public class AllureReporterTests
             Assert.That(contents, Does.Not.Contain("SessionsData\\"));
             Assert.That(contents, Does.Not.Contain("SessionLogs\\"));
             Assert.That(contents, Does.Not.Contain("Templates\\"));
-            Assert.That(File.Exists(sessionsDataCopy), Is.True);
-            Assert.That(File.Exists(sessionLogCopy), Is.True);
-            Assert.That(File.Exists(templateCopy), Is.True);
+            Assert.That(Directory.Exists(Path.Combine(AllureResultsFolder, "SessionsData")), Is.False);
+            Assert.That(Directory.Exists(Path.Combine(AllureResultsFolder, "SessionLogs")), Is.False);
+            Assert.That(Directory.Exists(Path.Combine(AllureResultsFolder, "Templates")), Is.False);
         });
     }
 
