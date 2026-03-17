@@ -81,7 +81,7 @@ public class AllureReporterTests
                     IsFlaky = false,
                     FlakinessReasons = new List<KeyValuePair<string, List<ActionFailure>>>()
                 }
-            }, false, true, 2).SetName("NoSessionData");
+            }, false, true, 3).SetName("NoSessionData");
 
         yield return new TestCaseData(new Context[] { new() { Logger = Globals.Logger } },
             new AssertionResult
@@ -109,7 +109,7 @@ public class AllureReporterTests
                     IsFlaky = false,
                     FlakinessReasons = new List<KeyValuePair<string, List<ActionFailure>>>()
                 }
-            }, true, false, 2).SetName("WithOneSessionData");
+            }, true, false, 3).SetName("WithOneSessionData");
 
         yield return new TestCaseData(
             new Context[]
@@ -141,7 +141,7 @@ public class AllureReporterTests
                     IsFlaky = false,
                     FlakinessReasons = new List<KeyValuePair<string, List<ActionFailure>>>()
                 }
-            }, true, true, 6).SetName("MultipleCasesWithOneSameSessionData");
+            }, true, true, 10).SetName("MultipleCasesWithOneSameSessionData");
 
         yield return new TestCaseData(
             new Context[]
@@ -173,7 +173,7 @@ public class AllureReporterTests
                     IsFlaky = false,
                     FlakinessReasons = new List<KeyValuePair<string, List<ActionFailure>>>()
                 }
-            }, true, false, 4).SetName("MultipleExecutionsSameCasesWithOneSameSessionData");
+            }, true, false, 6).SetName("MultipleExecutionsSameCasesWithOneSameSessionData");
 
         yield return new TestCaseData(new Context[] { new() { Logger = Globals.Logger } },
             new AssertionResult
@@ -210,7 +210,7 @@ public class AllureReporterTests
                     IsFlaky = false,
                     FlakinessReasons = new List<KeyValuePair<string, List<ActionFailure>>>()
                 }
-            }, true, false, 4).SetName("WithMultipleSessionData");
+            }, true, false, 7).SetName("WithMultipleSessionData");
 
 
         yield return new TestCaseData(new Context[] { new() { Logger = Globals.Logger } },
@@ -263,7 +263,7 @@ public class AllureReporterTests
                     IsFlaky = false,
                     FlakinessReasons = new List<KeyValuePair<string, List<ActionFailure>>>()
                 }
-            }, true, true, 5).SetName("WithMultipleSessionDataDuplicated");
+            }, true, true, 12).SetName("WithMultipleSessionDataDuplicated");
     }
 
     [Test]
@@ -462,9 +462,11 @@ public class AllureReporterTests
     }
 
     [Test]
-    public void CreateSessionStep_WithStoredSessionLogs_AddsSessionLogAttachment()
+    public void WriteTestResults_WithStoredSessionLogs_PersistsGeneratedSessionLogAttachment()
     {
-        Reporter!.SaveSessionData = true;
+        Reporter!.SaveSessionData = false;
+        Reporter.SaveTemplate = false;
+        Reporter.SaveAttachments = false;
         Reporter.Context.AppendSessionLog("test-session", "Starting session test-session");
         Reporter.Context.AppendSessionLog("test-session", "Session test-session completed.");
         var sessionData = new SessionData
@@ -474,17 +476,91 @@ public class AllureReporterTests
             UtcEndTime = DateTime.UtcNow,
             SessionFailures = []
         };
+        var assertionResult = new AssertionResult
+        {
+            Assertion = new Assertion
+            {
+                Name = "log-assertion",
+                AssertionName = "LogAssertion",
+                SessionDataList = new List<SessionData> { sessionData }.ToImmutableList(),
+                StatussesToReport = null
+            },
+            AssertionStatus = AssertionStatus.Passed,
+            TestDurationMs = 10,
+            Flaky = new Flaky { IsFlaky = false, FlakinessReasons = [] }
+        };
 
-        var method = Reporter.GetType()
-            .GetMethod("CreateSessionStep", BindingFlags.NonPublic | BindingFlags.Instance)!;
-        var step = (StepResult)method.Invoke(Reporter, [sessionData])!;
-        var logAttachment = step.attachments!.Single(attachment => attachment.name == "SessionLog");
-        var logAttachmentPath = Path.Combine(AllureResultsFolder, logAttachment.source);
+        Reporter.WriteTestResults(assertionResult);
+        var resultFile = Directory.GetFiles(AllureResultsFolder, "*-result.json", SearchOption.TopDirectoryOnly).Single();
+        var logAttachmentPath = Directory.GetFiles(AllureResultsFolder, "*-attachment.log", SearchOption.TopDirectoryOnly)
+            .Single();
 
-        Assert.That(step.attachments, Has.Count.EqualTo(2));
+        Assert.That(File.ReadAllText(resultFile), Does.Contain("SessionLog"));
         Assert.That(File.Exists(logAttachmentPath), Is.True);
         Assert.That(File.ReadAllText(logAttachmentPath), Does.Contain("Starting session test-session"));
         Assert.That(File.ReadAllText(logAttachmentPath), Does.Contain("Session test-session completed."));
+    }
+
+    [Test]
+    public void WriteTestResults_WithSessionArtifacts_UsesLifecycleAttachmentSources()
+    {
+        Reporter!.SaveSessionData = true;
+        Reporter.SaveTemplate = true;
+        Reporter.SaveAttachments = false;
+        Reporter.Context = new Context
+        {
+            Logger = Globals.Logger,
+            RootConfiguration = new ConfigurationBuilder()
+                .AddInMemoryCollection(new Dictionary<string, string?>
+                {
+                    ["Sessions:0:Name"] = "RabbitRoundTrip"
+                })
+                .Build()
+        };
+        Reporter.Context.AppendSessionLog("test-session", "session-log-entry");
+        var sessionData = new SessionData
+        {
+            Name = "test-session",
+            UtcStartTime = DateTime.UtcNow.AddSeconds(-1),
+            UtcEndTime = DateTime.UtcNow,
+            SessionFailures = []
+        };
+        var assertionResult = new AssertionResult
+        {
+            Assertion = new Assertion
+            {
+                Name = "artifact-assertion",
+                AssertionName = "ArtifactAssertion",
+                SessionDataList = new List<SessionData> { sessionData }.ToImmutableList(),
+                StatussesToReport = null
+            },
+            AssertionStatus = AssertionStatus.Passed,
+            TestDurationMs = 10,
+            Flaky = new Flaky { IsFlaky = false, FlakinessReasons = [] }
+        };
+
+        Reporter.WriteTestResults(assertionResult);
+        var resultFile = Directory.GetFiles(AllureResultsFolder, "*-result.json", SearchOption.TopDirectoryOnly).Single();
+        var contents = File.ReadAllText(resultFile);
+        var sessionsDataCopy = Directory.GetFiles(Path.Combine(AllureResultsFolder, "SessionsData"), "*.json",
+            SearchOption.AllDirectories).Single();
+        var sessionLogCopy = Directory.GetFiles(Path.Combine(AllureResultsFolder, "SessionLogs"), "*.log",
+            SearchOption.AllDirectories).Single();
+        var templateCopy = Directory.GetFiles(Path.Combine(AllureResultsFolder, "Templates"), "*.yaml",
+            SearchOption.AllDirectories).Single();
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(contents, Does.Contain("-attachment.json"));
+            Assert.That(contents, Does.Contain("-attachment.log"));
+            Assert.That(contents, Does.Contain("-attachment.yaml"));
+            Assert.That(contents, Does.Not.Contain("SessionsData\\"));
+            Assert.That(contents, Does.Not.Contain("SessionLogs\\"));
+            Assert.That(contents, Does.Not.Contain("Templates\\"));
+            Assert.That(File.Exists(sessionsDataCopy), Is.True);
+            Assert.That(File.Exists(sessionLogCopy), Is.True);
+            Assert.That(File.Exists(templateCopy), Is.True);
+        });
     }
 
     [Test]
@@ -746,9 +822,11 @@ public class AllureReporterTests
     }
 
     [Test]
-    public void CreateSessionStep_WithFailuresAndNoAttachments_CreatesFailureSubStep()
+    public void WriteTestResults_WithFailures_CreatesFailureSubStep()
     {
         Reporter!.SaveSessionData = false;
+        Reporter.SaveTemplate = false;
+        Reporter.SaveAttachments = false;
         var sessionData = new SessionData
         {
             Name = "failed-session",
@@ -769,24 +847,30 @@ public class AllureReporterTests
                 }
             ]
         };
+        var assertionResult = new AssertionResult
+        {
+            Assertion = new Assertion
+            {
+                Name = "failed-assertion",
+                AssertionName = "FailedAssertion",
+                SessionDataList = new List<SessionData> { sessionData }.ToImmutableList(),
+                StatussesToReport = null
+            },
+            AssertionStatus = AssertionStatus.Failed,
+            TestDurationMs = 10,
+            Flaky = new Flaky { IsFlaky = false, FlakinessReasons = [] }
+        };
 
-        var method = Reporter.GetType()
-            .GetMethod("CreateSessionStep", BindingFlags.NonPublic | BindingFlags.Instance)!;
-        var step = (StepResult)method.Invoke(Reporter, [sessionData])!;
+        Reporter.WriteTestResults(assertionResult);
+        var resultFile = Directory.GetFiles(AllureResultsFolder, "*-result.json", SearchOption.TopDirectoryOnly).Single();
+        var contents = File.ReadAllText(resultFile);
 
         Assert.Multiple(() =>
         {
-            Assert.That(step.attachments, Is.Null);
-            Assert.That(step.steps, Has.Count.EqualTo(1));
-            Assert.That(step.steps![0].name, Is.EqualTo(nameof(sessionData.SessionFailures)));
-            Assert.That(step.steps[0].steps, Has.Count.EqualTo(1));
-            Assert.That(step.steps[0].steps![0].parameters!.Select(parameter => parameter.name),
-                Is.EquivalentTo(new[]
-                {
-                    nameof(ActionFailure.Name),
-                    nameof(ActionFailure.ActionType),
-                    nameof(ActionFailure.Reason.Description)
-                }));
+            Assert.That(contents, Does.Contain(nameof(sessionData.SessionFailures)));
+            Assert.That(contents, Does.Contain("action-name"));
+            Assert.That(Directory.GetFiles(AllureResultsFolder, "*-attachment*", SearchOption.TopDirectoryOnly),
+                Is.Empty);
         });
     }
 
@@ -1099,8 +1183,8 @@ public class AllureReporterTests
         Assert.Multiple(() =>
         {
             Assert.That(step.status, Is.EqualTo(Status.passed));
-            Assert.That(step.attachments, Is.Null);
-            Assert.That(step.steps, Is.Null);
+            Assert.That(step.attachments, Is.Empty);
+            Assert.That(step.steps, Is.Empty);
         });
     }
 }
