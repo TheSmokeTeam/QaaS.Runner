@@ -45,8 +45,8 @@ public class AllureReporter : BaseReporter
     private readonly ConcurrentDictionary<string, byte> _alreadySavedAttachments = new();
 
     /// <summary>
-    ///     Retained for focused writer tests that validate attachment file-path normalization and
-    ///     deduplication. Runtime attachment publishing goes through the active Allure lifecycle.
+    ///     Saves an attachment as a file in the allure results directory, if it was already saved
+    ///     doesn't save it again.
     /// </summary>
     protected virtual void SaveAttachmentIfNotAlreadySaved(byte[] attachmentContent,
         string attachmentDirectory, string attachmentFileName)
@@ -132,6 +132,17 @@ public class AllureReporter : BaseReporter
             FileSystem.Directory.CreateDirectory(resultsDirectory);
     }
 
+    /// <summary>
+    ///     Keeps the legacy folder layout in allure-results for consumers that inspect the raw
+    ///     filesystem, while the lifecycle-managed attachment source remains the one referenced by
+    ///     the generated Allure result JSON.
+    /// </summary>
+    private void SaveLegacyAttachmentCopy(byte[] data, string attachmentDirectory, string fileName)
+    {
+        EnsureResultsDirectoryExists();
+        SaveAttachmentIfNotAlreadySaved(data, attachmentDirectory, fileName);
+    }
+
     private static string ResolveAttachmentExtension(string fileName, string attachmentType)
     {
         var extension = Path.GetExtension(fileName);
@@ -165,6 +176,8 @@ public class AllureReporter : BaseReporter
             $"{sessionData.Name}.json",
             nameof(SessionData),
             JsonAttachmentType);
+        SaveLegacyAttachmentCopy(serializedSessionData, GetAttachmentDirectory("SessionsData"),
+            $"{sessionData.Name}.json");
     }
 
     private void AddConfigurationTemplateToCurrentItem(IConfiguration configuration)
@@ -179,6 +192,7 @@ public class AllureReporter : BaseReporter
             attachmentFile,
             attachmentFile,
             YamlAttachmentType);
+        SaveLegacyAttachmentCopy(renderedTemplateBytes, GetAttachmentDirectory("Templates"), attachmentFile);
     }
 
     private void AddSessionLogToCurrentItem(SessionData sessionData)
@@ -195,10 +209,12 @@ public class AllureReporter : BaseReporter
             $"{sessionData.Name}.log",
             "SessionLog",
             textAttachmentType);
+        SaveLegacyAttachmentCopy(sessionLogBytes, GetAttachmentDirectory("SessionLogs"), $"{sessionData.Name}.log");
     }
 
     private void AddAssertionAttachmentsToCurrentItem(AssertionResult assertionResult)
     {
+        const string assertionsAttachmentsDirectory = "AssertionsAttachments";
         var assertionHook = assertionResult.Assertion.AssertionHook;
         if (assertionHook?.AssertionAttachments == null)
             return;
@@ -237,6 +253,10 @@ public class AllureReporter : BaseReporter
                     : Path.Join(attachmentDirectoryName, attachmentFileName),
                 attachmentPath,
                 GetAttachmentTypeBySerializationType(assertionAttachment.SerializationType));
+            SaveLegacyAttachmentCopy(assertionData,
+                Path.Join(GetAttachmentDirectory(assertionsAttachmentsDirectory, assertionResult.Assertion.Name),
+                    attachmentDirectoryName),
+                attachmentFileName);
         }
     }
 
@@ -545,15 +565,13 @@ public class AllureReporter : BaseReporter
                     Label.Severity(AssertionSeverityToAllureSeverityMap
                         [Severity])
                 ])),
+            steps = assertionResult.Assertion.SessionDataList?.Select(CreateSessionStep).ToList(),
+            attachments = GetAttachmentsForAssertion(assertionResult),
             statusDetails = GetStatusDetailsAccordingToStatus(assertionResult)
         };
 
         // Save test result
         AllureLifecycle.Instance.StartTestCase(testResult);
-        foreach (var sessionData in assertionResult.Assertion.SessionDataList ?? [])
-            WriteSessionStep(sessionData);
-
-        AddTestCaseAttachments(assertionResult);
         AllureLifecycle.Instance.StopTestCase(testUniqueId);
         AllureLifecycle.Instance.UpdateTestCase(testUniqueId, result =>
         {
@@ -566,6 +584,14 @@ public class AllureReporter : BaseReporter
 
     private StepResult CreateSessionStep(SessionData sessionData)
     {
+        var attachments = new List<Attachment>();
+        if (SaveSessionData)
+            attachments.Add(SaveSessionsDataToAllure(sessionData));
+
+        var sessionLogAttachment = SaveSessionLogToAllure(sessionData);
+        if (sessionLogAttachment != null)
+            attachments.Add(sessionLogAttachment);
+
         return new StepResult
         {
             name = sessionData.Name,
@@ -588,7 +614,19 @@ public class AllureReporter : BaseReporter
             ],
             status = sessionData.SessionFailures.Any() ? Status.failed : Status.passed,
             start = new DateTimeOffset(sessionData.UtcStartTime, new TimeSpan(0)).ToUnixTimeMilliseconds(),
-            stop = new DateTimeOffset(sessionData.UtcEndTime, new TimeSpan(0)).ToUnixTimeMilliseconds()
+            stop = new DateTimeOffset(sessionData.UtcEndTime, new TimeSpan(0)).ToUnixTimeMilliseconds(),
+            attachments = attachments.Count == 0 ? null : attachments,
+            steps = sessionData.SessionFailures.Any()
+                ? new List<StepResult>
+                {
+                    new()
+                    {
+                        name = nameof(sessionData.SessionFailures),
+                        status = Status.failed,
+                        steps = sessionData.SessionFailures.Select(CreateActionFailureStep).ToList()
+                    }
+                }
+                : null
         };
     }
 

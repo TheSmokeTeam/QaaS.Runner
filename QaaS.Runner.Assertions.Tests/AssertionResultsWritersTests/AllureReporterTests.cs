@@ -263,7 +263,7 @@ public class AllureReporterTests
                     IsFlaky = false,
                     FlakinessReasons = new List<KeyValuePair<string, List<ActionFailure>>>()
                 }
-            }, true, true, 8).SetName("WithMultipleSessionDataDuplicated");
+            }, true, true, 5).SetName("WithMultipleSessionDataDuplicated");
     }
 
     [Test]
@@ -492,17 +492,23 @@ public class AllureReporterTests
 
         Reporter.WriteTestResults(assertionResult);
         var resultFile = Directory.GetFiles(AllureResultsFolder, "*-result.json", SearchOption.TopDirectoryOnly).Single();
-        var logAttachmentPath = Directory.GetFiles(AllureResultsFolder, "*-attachment.log", SearchOption.TopDirectoryOnly)
+        var logAttachmentPath = Directory.GetFiles(Path.Combine(AllureResultsFolder, "SessionLogs"), "*.log",
+            SearchOption.AllDirectories)
             .Single();
 
-        Assert.That(File.ReadAllText(resultFile), Does.Contain("SessionLog"));
-        Assert.That(File.Exists(logAttachmentPath), Is.True);
-        Assert.That(File.ReadAllText(logAttachmentPath), Does.Contain("Starting session test-session"));
-        Assert.That(File.ReadAllText(logAttachmentPath), Does.Contain("Session test-session completed."));
+        Assert.Multiple(() =>
+        {
+            Assert.That(File.ReadAllText(resultFile), Does.Contain("SessionLog"));
+            Assert.That(File.ReadAllText(resultFile), Does.Contain("SessionLogs\\"));
+            Assert.That(Directory.GetFiles(AllureResultsFolder, "*-attachment*", SearchOption.TopDirectoryOnly), Is.Empty);
+            Assert.That(File.Exists(logAttachmentPath), Is.True);
+            Assert.That(File.ReadAllText(logAttachmentPath), Does.Contain("Starting session test-session"));
+            Assert.That(File.ReadAllText(logAttachmentPath), Does.Contain("Session test-session completed."));
+        });
     }
 
     [Test]
-    public void WriteTestResults_WithSessionArtifacts_UsesLifecycleAttachmentSources()
+    public void WriteTestResults_WithSessionArtifacts_StoresAttachmentsOnlyInsideLegacyFolders()
     {
         Reporter!.SaveSessionData = true;
         Reporter.SaveTemplate = true;
@@ -542,17 +548,68 @@ public class AllureReporterTests
         Reporter.WriteTestResults(assertionResult);
         var resultFile = Directory.GetFiles(AllureResultsFolder, "*-result.json", SearchOption.TopDirectoryOnly).Single();
         var contents = File.ReadAllText(resultFile);
+        var sessionsDataCopy = Directory.GetFiles(Path.Combine(AllureResultsFolder, "SessionsData"), "*.json",
+            SearchOption.AllDirectories).Single();
+        var sessionLogCopy = Directory.GetFiles(Path.Combine(AllureResultsFolder, "SessionLogs"), "*.log",
+            SearchOption.AllDirectories).Single();
+        var templateCopy = Directory.GetFiles(Path.Combine(AllureResultsFolder, "Templates"), "*.yaml",
+            SearchOption.AllDirectories).Single();
+
         Assert.Multiple(() =>
         {
-            Assert.That(contents, Does.Contain("-attachment.json"));
-            Assert.That(contents, Does.Contain("-attachment.log"));
-            Assert.That(contents, Does.Contain("-attachment.yaml"));
-            Assert.That(contents, Does.Not.Contain("SessionsData\\"));
-            Assert.That(contents, Does.Not.Contain("SessionLogs\\"));
-            Assert.That(contents, Does.Not.Contain("Templates\\"));
-            Assert.That(Directory.Exists(Path.Combine(AllureResultsFolder, "SessionsData")), Is.False);
-            Assert.That(Directory.Exists(Path.Combine(AllureResultsFolder, "SessionLogs")), Is.False);
-            Assert.That(Directory.Exists(Path.Combine(AllureResultsFolder, "Templates")), Is.False);
+            Assert.That(contents, Does.Contain("SessionsData\\"));
+            Assert.That(contents, Does.Contain("SessionLogs\\"));
+            Assert.That(contents, Does.Contain("Templates\\"));
+            Assert.That(Directory.GetFiles(AllureResultsFolder, "*-attachment*", SearchOption.TopDirectoryOnly), Is.Empty);
+            Assert.That(File.ReadAllText(sessionsDataCopy), Does.Contain("\"Name\": \"test-session\""));
+            Assert.That(File.ReadAllText(sessionLogCopy), Does.Contain("session-log-entry"));
+            Assert.That(File.ReadAllText(templateCopy), Does.Contain("RabbitRoundTrip"));
+        });
+    }
+
+    [Test]
+    public void WriteTestResults_WithCustomAttachments_StoresAttachmentOnlyInsideAssertionFolders()
+    {
+        Reporter!.SaveSessionData = false;
+        Reporter.SaveTemplate = false;
+        Reporter.SaveAttachments = true;
+        var assertionResult = new AssertionResult
+        {
+            Assertion = new Assertion
+            {
+                Name = "custom-attachments",
+                AssertionName = "CustomAttachmentAssertion",
+                AssertionHook = new AssertionHookMock
+                {
+                    AssertionAttachments =
+                    [
+                        new AssertionAttachment
+                        {
+                            Path = "payloads/payload.json",
+                            SerializationType = SerializationType.Json,
+                            Data = new { Value = 5 }
+                        }
+                    ]
+                },
+                SessionDataList = [],
+                StatussesToReport = null
+            },
+            AssertionStatus = AssertionStatus.Passed,
+            TestDurationMs = 10,
+            Flaky = new Flaky { IsFlaky = false, FlakinessReasons = [] }
+        };
+
+        Reporter.WriteTestResults(assertionResult);
+        var resultFile = Directory.GetFiles(AllureResultsFolder, "*-result.json", SearchOption.TopDirectoryOnly).Single();
+        var legacyAttachmentCopy = Directory.GetFiles(Path.Combine(AllureResultsFolder, "AssertionsAttachments"),
+            "payload.json", SearchOption.AllDirectories).Single();
+        var contents = File.ReadAllText(resultFile);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(contents, Does.Contain("AssertionsAttachments\\"));
+            Assert.That(Directory.GetFiles(AllureResultsFolder, "*-attachment*", SearchOption.TopDirectoryOnly), Is.Empty);
+            Assert.That(File.ReadAllText(legacyAttachmentCopy), Does.Contain("\"Value\":5"));
         });
     }
 
@@ -1176,8 +1233,8 @@ public class AllureReporterTests
         Assert.Multiple(() =>
         {
             Assert.That(step.status, Is.EqualTo(Status.passed));
-            Assert.That(step.attachments, Is.Empty);
-            Assert.That(step.steps, Is.Empty);
+            Assert.That(step.attachments, Is.Null);
+            Assert.That(step.steps, Is.Null);
         });
     }
 }
