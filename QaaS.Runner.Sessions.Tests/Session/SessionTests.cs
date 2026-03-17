@@ -531,6 +531,79 @@ public class SessionTests
         Assert.That(logger.Messages, Has.Some.EqualTo($"Session {sessionName} Failures=0"));
     }
 
+    [Test]
+    public void Run_WithNoStagesAndNullCollectors_ReturnsEmptySessionData_AndExposesSessionProperties()
+    {
+        const string sessionName = "empty-session";
+        var context = CreationalFunctions.CreateContext(sessionName, []);
+        var session = new Sessions.Session.Session(
+            sessionName,
+            3,
+            true,
+            0,
+            0,
+            new Dictionary<int, Stage>(),
+            null,
+            context,
+            [],
+            runUntil: 7);
+
+        var sessionData = session.Run(context.ExecutionData);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(session.Name, Is.EqualTo(sessionName));
+            Assert.That(session.SessionStage, Is.EqualTo(3));
+            Assert.That(session.RunUntilStage, Is.EqualTo(7));
+            Assert.That(sessionData, Is.Not.Null);
+            Assert.That(sessionData!.Inputs, Is.Empty);
+            Assert.That(sessionData.Outputs, Is.Empty);
+            Assert.That(sessionData.SessionFailures, Is.Empty);
+            Assert.That(context.InternalRunningSessions.RunningSessionsDict.ContainsKey(sessionName), Is.False);
+        });
+    }
+
+    [Test]
+    public void LogSessionSummary_WhenSessionFailuresIsNull_LogsZeroFailureCount()
+    {
+        const string sessionName = "summary-null-failures-session";
+        var logger = new CapturingLogger();
+        var context = new InternalContext
+        {
+            Logger = logger,
+            InternalGlobalDict = new Dictionary<string, object?>(),
+            InternalRunningSessions = new RunningSessions(new Dictionary<string, RunningSessionData<object, object>>())
+        };
+        context.InsertValueIntoGlobalDictionary(context.GetMetaDataPath(), new MetaDataConfig());
+
+        var session = new Sessions.Session.Session(
+            sessionName,
+            0,
+            true,
+            0,
+            0,
+            [],
+            [],
+            context,
+            []);
+
+        var sessionData = new SessionData
+        {
+            Name = sessionName,
+            Inputs = [],
+            Outputs = [],
+            SessionFailures = null!,
+            UtcStartTime = DateTime.UtcNow,
+            UtcEndTime = DateTime.UtcNow.AddSeconds(1)
+        };
+
+        typeof(global::QaaS.Runner.Sessions.Session.Session)
+            .GetMethod("LogSessionSummary", BindingFlags.Instance | BindingFlags.NonPublic)!
+            .Invoke(session, [sessionData]);
+
+        Assert.That(logger.Messages, Has.Some.EqualTo($"Session {sessionName} Failures=0"));
+    }
+
     private sealed class RecordingAction(string name, int stage, Microsoft.Extensions.Logging.ILogger logger, System.Action callback)
         : StagedAction(name, stage, null, logger)
     {

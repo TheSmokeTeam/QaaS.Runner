@@ -8,6 +8,7 @@ using QaaS.Framework.SDK.Session.CommunicationDataObjects;
 using QaaS.Framework.SDK.Session.DataObjects;
 using QaaS.Framework.SDK.Session.SessionDataObjects;
 using QaaS.Framework.SDK.Session.SessionDataObjects.RunningSessionsObjects;
+using QaaS.Framework.Serialization;
 using QaaS.Runner.Sessions.Extensions;
 using QaaS.Runner.Sessions.Tests.Actions.Utils;
 using SessionAction = QaaS.Runner.Sessions.Actions.Action;
@@ -84,6 +85,34 @@ public class SessionExtensionsTests
 
         Assert.That(failures, Has.Count.EqualTo(1));
         Assert.That(failures.First().Reason.Message, Is.EqualTo("custom message"));
+    }
+
+    [Test]
+    public void InternalCommunicationData_InheritsCommunicationDataContract_ForInputData()
+    {
+        var input = new List<DetailedData<string>>
+        {
+            new() { Body = "input-body" }
+        };
+        var output = new List<DetailedData<string>?>
+        {
+            new() { Body = "output-body" }
+        };
+        var internalCommunicationData = new QaaS.Runner.Sessions.Actions.InternalCommunicationData<string>
+        {
+            Input = input,
+            Output = output,
+            InputSerializationType = SerializationType.Json,
+            OutputSerializationType = SerializationType.Binary
+        };
+
+        CommunicationData<string> communicationData = internalCommunicationData;
+
+        Assert.That(communicationData.Data, Is.SameAs(input));
+        Assert.That(communicationData.SerializationType, Is.EqualTo(SerializationType.Json));
+        Assert.That(internalCommunicationData.Input, Is.SameAs(input));
+        Assert.That(internalCommunicationData.Output, Is.SameAs(output));
+        Assert.That(internalCommunicationData.Output![0]!.Body, Is.EqualTo("output-body"));
     }
 
     [Test]

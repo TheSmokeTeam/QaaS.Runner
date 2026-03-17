@@ -37,6 +37,7 @@ using QaaS.Framework.SDK.Session.DataObjects;
 using QaaS.Framework.SDK.Session.SessionDataObjects;
 using QaaS.Framework.SDK.Session.SessionDataObjects.RunningSessionsObjects;
 using QaaS.Framework.Serialization;
+using QaaS.Runner.Infrastructure;
 using QaaS.Runner.Loaders;
 using QaaS.Runner.Options;
 using QaaS.Runner.Sessions.Actions;
@@ -126,6 +127,37 @@ public class SessionExecutionCoverageTests
         Assert.That(sessionData, Is.Not.Null);
         Assert.That(sessionData!.Name, Is.EqualTo(scenario.Name));
         AssertScenario(sessionData, registry, scenario);
+    }
+
+    [TestCaseSource(nameof(GetStageLayoutScenarioCases))]
+    public void Session_WithActionStageLayouts_CanRunFromCodeAndYaml(object layoutObject, object sourceObject)
+    {
+        var layout = (ActionStageLayout)layoutObject;
+        var source = (ScenarioSource)sourceObject;
+        var scenario = CreateActionStageScenario(layout.Name);
+        var registry = new MockRuntimeRegistry();
+        var context = source == ScenarioSource.Code
+            ? CreateSessionContext()
+            : CreateContextFromYaml(BuildYamlConfiguration([scenario]));
+
+        context.ExecutionData.DataSources = CreateDataSources();
+        context.ExecutionData.SessionDatas.Clear();
+        context.SetSessionActionOverrides(CreateActionOverrides(registry, scenario));
+
+        var sessionBuilder = source == ScenarioSource.Code
+            ? CreateCodeSessionBuilder(scenario)
+            : CreateYamlSessionBuilder(context, scenario);
+        ApplyActionStageLayout(sessionBuilder, scenario, layout);
+
+        var session = sessionBuilder.Build(context, []);
+        var sessionData = session.Run(context.ExecutionData);
+        var sessionLog = context.GetSessionLog(scenario.Name);
+
+        Assert.That(sessionData, Is.Not.Null);
+        Assert.That(sessionLog, Is.Not.Null);
+        Assert.That(sessionData!.Name, Is.EqualTo(scenario.Name));
+        AssertScenario(sessionData, registry, scenario);
+        AssertStageLayoutLogged(sessionLog!, scenario.Name, layout);
     }
 
     [TestCase(ScenarioSource.Code)]
@@ -245,6 +277,18 @@ public class SessionExecutionCoverageTests
             {
                 yield return new TestCaseData(scenario, source)
                     .SetName($"{scenario.Name}_{source}");
+            }
+        }
+    }
+
+    private static IEnumerable<TestCaseData> GetStageLayoutScenarioCases()
+    {
+        foreach (var layout in CreateActionStageLayouts())
+        {
+            foreach (var source in Enum.GetValues<ScenarioSource>())
+            {
+                yield return new TestCaseData(layout, source)
+                    .SetName($"{layout.Name}_{source}");
             }
         }
     }
@@ -592,6 +636,79 @@ public class SessionExecutionCoverageTests
                             : new MockerCommandConfig { TriggerAction = new TriggerAction() },
                         Flavor: useConsumeCommand ? CommandFlavor.Consume : CommandFlavor.TriggerAction));
         }
+    }
+
+    private static IEnumerable<ActionStageLayout> CreateActionStageLayouts()
+    {
+        yield return new ActionStageLayout("stage-layout-all-same", 0, 0, 0, 0);
+        yield return new ActionStageLayout("stage-layout-split", 0, 1, 1, 2);
+        yield return new ActionStageLayout("stage-layout-staggered", 0, 1, 2, 4);
+    }
+
+    private static SessionScenarioDefinition CreateActionStageScenario(string layoutName)
+    {
+        return new SessionScenarioDefinition(
+            Name: layoutName,
+            Publisher: CreateSinglePublisher("publisher-stage-layout", "RabbitMq",
+                CreateValidRabbitMqSenderConfig("https://publisher.test"), useBinarySerialization: false),
+            Consumer: CreateSingleReaderConsumer("consumer-stage-layout", "RabbitMq",
+                CreateValidRabbitMqReaderConfig("https://consumer.test"), useBinarySerialization: false),
+            Transaction: new TransactionDefinition(
+                ActionName: "transaction-stage-layout",
+                ConfigKey: "Http",
+                Configuration: new HttpTransactorConfig
+                {
+                    Method = HttpMethods.Post,
+                    BaseAddress = "https://transaction.test"
+                },
+                UseDataSourcePatterns: false,
+                UseBinarySerialization: false,
+                Iterations: 1),
+            Mocker: new MockerDefinition(
+                ActionName: "mocker-stage-layout",
+                Command: new MockerCommandConfig { Consume = new ConsumeCommandConfig() },
+                Flavor: CommandFlavor.Consume));
+    }
+
+    private static void ApplyActionStageLayout(SessionBuilder builder, SessionScenarioDefinition scenario,
+        ActionStageLayout layout)
+    {
+        if (scenario.Consumer != null)
+        {
+            builder.UpdateConsumer(scenario.Consumer.ActionName, consumer => consumer.AtStage(layout.ConsumerStage));
+            EnsureZeroTimeoutStageConfiguration(builder, layout.ConsumerStage);
+        }
+
+        if (scenario.Publisher != null)
+        {
+            builder.UpdatePublisher(scenario.Publisher.ActionName,
+                publisher => publisher.AtStage(layout.PublisherStage));
+            EnsureZeroTimeoutStageConfiguration(builder, layout.PublisherStage);
+        }
+
+        if (scenario.Transaction != null)
+        {
+            builder.UpdateTransaction(scenario.Transaction.ActionName,
+                transaction => transaction.AtStage(layout.TransactionStage));
+            EnsureZeroTimeoutStageConfiguration(builder, layout.TransactionStage);
+        }
+
+        if (scenario.Mocker != null)
+        {
+            builder.UpdateMockerCommand(scenario.Mocker.ActionName, command => command.AtStage(layout.MockerStage));
+            EnsureZeroTimeoutStageConfiguration(builder, layout.MockerStage);
+        }
+    }
+
+    private static void EnsureZeroTimeoutStageConfiguration(SessionBuilder builder, int stageNumber)
+    {
+        if (builder.ReadStage(stageNumber) == null)
+        {
+            builder.AddStage(new StageConfig(stageNumber, timeoutBefore: 0, timeoutAfter: 0));
+            return;
+        }
+
+        builder.UpdateStage(stageNumber, new StageConfig(stageNumber, timeoutBefore: 0, timeoutAfter: 0));
     }
 
     private static ConsumerDefinition CreateSingleReaderConsumer(string actionName, string configKey,
@@ -1167,6 +1284,34 @@ public class SessionExecutionCoverageTests
         });
     }
 
+    private static void AssertStageLayoutLogged(string sessionLog, string sessionName, ActionStageLayout layout)
+    {
+        var expectedStageCounts = new Dictionary<int, int>();
+
+        AddStageCount(expectedStageCounts, layout.ConsumerStage);
+        AddStageCount(expectedStageCounts, layout.PublisherStage);
+        AddStageCount(expectedStageCounts, layout.TransactionStage);
+        AddStageCount(expectedStageCounts, layout.MockerStage);
+
+        Assert.Multiple(() =>
+        {
+            foreach (var expectedStageCount in expectedStageCounts.OrderBy(item => item.Key))
+            {
+                Assert.That(sessionLog, Does.Contain(
+                    $"Starting session {sessionName} stage {expectedStageCount.Key} with {expectedStageCount.Value} action(s)"));
+                Assert.That(sessionLog, Does.Contain($"Finished session {sessionName} stage {expectedStageCount.Key}"));
+            }
+        });
+    }
+
+    private static void AddStageCount(IDictionary<int, int> expectedStageCounts, int stage)
+    {
+        if (!expectedStageCounts.TryAdd(stage, 1))
+        {
+            expectedStageCounts[stage]++;
+        }
+    }
+
     private static string[] GetBodies(IEnumerable<CommunicationData<object>>? communicationData, string actionName)
     {
         return communicationData?
@@ -1681,6 +1826,9 @@ public class SessionExecutionCoverageTests
 
     private sealed record MockerDefinition(string ActionName, MockerCommandConfig Command, CommandFlavor Flavor,
         bool UseBinarySerialization = false);
+
+    private sealed record ActionStageLayout(string Name, int ConsumerStage, int PublisherStage, int TransactionStage,
+        int MockerStage);
 
     private enum CommandFlavor
     {

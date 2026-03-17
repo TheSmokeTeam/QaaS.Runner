@@ -258,6 +258,125 @@ public class SessionLogicTests
     }
 
     [Test]
+    public void TestRun_WithMultipleSessionsInSameStage_MaterializesAllBeforeNextStageStarts()
+    {
+        var firstStageCompletedCount = 0;
+        var stage0SessionAData = new SessionData { Name = "Stage0-A" };
+        var stage0SessionBData = new SessionData { Name = "Stage0-B" };
+        var stage1SessionData = new SessionData { Name = "Stage1" };
+
+        var stage0SessionA = new Mock<ISession>();
+        stage0SessionA.SetupGet(s => s.Name).Returns("Stage0-A");
+        stage0SessionA.SetupGet(s => s.SessionStage).Returns(0);
+        stage0SessionA.SetupGet(s => s.RunUntilStage).Returns((int?)null);
+        stage0SessionA.Setup(s => s.RunAsync(It.IsAny<ExecutionData>()))
+            .Returns(async () =>
+            {
+                await Task.Delay(50);
+                Interlocked.Increment(ref firstStageCompletedCount);
+                return stage0SessionAData;
+            });
+
+        var stage0SessionB = new Mock<ISession>();
+        stage0SessionB.SetupGet(s => s.Name).Returns("Stage0-B");
+        stage0SessionB.SetupGet(s => s.SessionStage).Returns(0);
+        stage0SessionB.SetupGet(s => s.RunUntilStage).Returns((int?)null);
+        stage0SessionB.Setup(s => s.RunAsync(It.IsAny<ExecutionData>()))
+            .Returns(async () =>
+            {
+                await Task.Delay(20);
+                Interlocked.Increment(ref firstStageCompletedCount);
+                return stage0SessionBData;
+            });
+
+        var stage1Session = new Mock<ISession>();
+        stage1Session.SetupGet(s => s.Name).Returns("Stage1");
+        stage1Session.SetupGet(s => s.SessionStage).Returns(1);
+        stage1Session.SetupGet(s => s.RunUntilStage).Returns((int?)null);
+        stage1Session.Setup(s => s.RunAsync(It.IsAny<ExecutionData>()))
+            .Returns<ExecutionData>(executionData =>
+            {
+                Assert.That(Interlocked.CompareExchange(ref firstStageCompletedCount, 0, 0), Is.EqualTo(2));
+                Assert.That(executionData.SessionDatas, Has.Count.EqualTo(2));
+                Assert.That(executionData.SessionDatas, Contains.Item(stage0SessionAData));
+                Assert.That(executionData.SessionDatas, Contains.Item(stage0SessionBData));
+                return Task.FromResult<SessionData?>(stage1SessionData);
+            });
+
+        var sessionLogic = new SessionLogic(
+            [stage0SessionA.Object, stage0SessionB.Object, stage1Session.Object],
+            new InternalContext { Logger = Globals.Logger });
+        var executionData = new ExecutionData();
+
+        sessionLogic.Run(executionData);
+
+        Assert.That(executionData.SessionDatas, Has.Count.EqualTo(3));
+        Assert.That(executionData.SessionDatas, Contains.Item(stage1SessionData));
+    }
+
+    [Test]
+    public void TestRun_WithDeferredSession_OverlapsIntermediateStageButBlocksItsTargetStage()
+    {
+        var deferredCompleted = 0;
+        var deferredSessionData = new SessionData { Name = "Deferred" };
+        var intermediateSessionData = new SessionData { Name = "Intermediate" };
+        var blockedSessionData = new SessionData { Name = "Blocked" };
+
+        var deferredSession = new Mock<ISession>();
+        deferredSession.SetupGet(s => s.Name).Returns("Deferred");
+        deferredSession.SetupGet(s => s.SessionStage).Returns(0);
+        deferredSession.SetupGet(s => s.RunUntilStage).Returns(2);
+        deferredSession.Setup(s => s.RunAsync(It.IsAny<ExecutionData>()))
+            .Returns(async () =>
+            {
+                await Task.Delay(75);
+                Interlocked.Exchange(ref deferredCompleted, 1);
+                return deferredSessionData;
+            });
+
+        var intermediateSession = new Mock<ISession>();
+        intermediateSession.SetupGet(s => s.Name).Returns("Intermediate");
+        intermediateSession.SetupGet(s => s.SessionStage).Returns(1);
+        intermediateSession.SetupGet(s => s.RunUntilStage).Returns((int?)null);
+        intermediateSession.Setup(s => s.RunAsync(It.IsAny<ExecutionData>()))
+            .Returns<ExecutionData>(executionData =>
+            {
+                Assert.That(Interlocked.CompareExchange(ref deferredCompleted, 0, 0), Is.EqualTo(0));
+                Assert.That(executionData.SessionDatas, Is.Empty);
+                return Task.FromResult<SessionData?>(intermediateSessionData);
+            });
+
+        var blockedSession = new Mock<ISession>();
+        blockedSession.SetupGet(s => s.Name).Returns("Blocked");
+        blockedSession.SetupGet(s => s.SessionStage).Returns(2);
+        blockedSession.SetupGet(s => s.RunUntilStage).Returns((int?)null);
+        blockedSession.Setup(s => s.RunAsync(It.IsAny<ExecutionData>()))
+            .Returns<ExecutionData>(executionData =>
+            {
+                Assert.That(Interlocked.CompareExchange(ref deferredCompleted, 0, 0), Is.EqualTo(1));
+                Assert.That(executionData.SessionDatas, Has.Count.EqualTo(2));
+                Assert.That(executionData.SessionDatas, Contains.Item(deferredSessionData));
+                Assert.That(executionData.SessionDatas, Contains.Item(intermediateSessionData));
+                return Task.FromResult<SessionData?>(blockedSessionData);
+            });
+
+        var sessionLogic = new SessionLogic(
+            [deferredSession.Object, intermediateSession.Object, blockedSession.Object],
+            new InternalContext { Logger = Globals.Logger });
+        var executionData = new ExecutionData();
+
+        sessionLogic.Run(executionData);
+
+        Assert.That(executionData.SessionDatas, Has.Count.EqualTo(3));
+        Assert.That(executionData.SessionDatas.Count(sessionData => ReferenceEquals(sessionData, deferredSessionData)),
+            Is.EqualTo(1));
+        Assert.That(executionData.SessionDatas.Count(sessionData => ReferenceEquals(sessionData, intermediateSessionData)),
+            Is.EqualTo(1));
+        Assert.That(executionData.SessionDatas.Count(sessionData => ReferenceEquals(sessionData, blockedSessionData)),
+            Is.EqualTo(1));
+    }
+
+    [Test]
     public void TestRun_WithSyncOnlySession_UsesDefaultRunAsyncBridge()
     {
         var sessionData = new SessionData { Name = "SyncSession" };
