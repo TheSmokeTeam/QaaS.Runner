@@ -1298,8 +1298,9 @@ public class SessionExecutionCoverageTests
             foreach (var expectedStageCount in expectedStageCounts.OrderBy(item => item.Key))
             {
                 Assert.That(sessionLog, Does.Contain(
-                    $"Starting session {sessionName} stage {expectedStageCount.Key} with {expectedStageCount.Value} action(s)"));
-                Assert.That(sessionLog, Does.Contain($"Finished session {sessionName} stage {expectedStageCount.Key}"));
+                    $"Starting action stage {expectedStageCount.Key} for session {sessionName} with {expectedStageCount.Value} action(s)"));
+                Assert.That(sessionLog, Does.Contain(
+                    $"Finished action stage {expectedStageCount.Key} for session {sessionName}"));
             }
         });
     }

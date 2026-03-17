@@ -87,8 +87,12 @@ public class Session : ISession
                 TimeoutBeforeSessionMs, Name);
             await Task.Delay(TimeSpan.FromMilliseconds(TimeoutBeforeSessionMs));
 
-            _context.Logger.LogInformation("Starting session {SessionName}", Name);
-            _context.AppendSessionLog(Name, $"Starting session {Name}");
+            var (startingActionStage, startingActionCount) = GetStartingActionStageSummary();
+            _context.Logger.LogInformation(
+                "Starting session {SessionName} on stage {StageNumber} with {ActionCount} action(s)",
+                Name, startingActionStage, startingActionCount);
+            _context.AppendSessionLog(Name,
+                $"Starting session {Name} on stage {startingActionStage} with {startingActionCount} action(s)");
             var sessionStartTimeUtc = GetCurrentUtcTime();
             actionsTasks = [];
 
@@ -126,6 +130,19 @@ public class Session : ISession
         await Task.Delay(TimeSpan.FromMilliseconds(TimeoutAfterSessionMs));
 
         return SaveData ? sessionData : null;
+    }
+
+    /// <summary>
+    ///     initializing the running of the session by exporting the running session data and populating data for publishing
+    ///     actions
+    /// </summary>
+    private (int StageNumber, int ActionCount) GetStartingActionStageSummary()
+    {
+        if (_stages.Count == 0)
+            return (SessionStage, 0);
+
+        var firstStage = _stages.OrderBy(stage => stage.Key).First();
+        return (firstStage.Key, firstStage.Value.GetActions().Count);
     }
 
     /// <summary>
@@ -247,8 +264,9 @@ public class Session : ISession
                 $"Output Source {output.Name} Contains {numberOfOutputs} Outputs");
         }
 
-        _context.Logger.LogInformation("Session {SessionName} completed.", sessionData.Name);
-        _context.AppendSessionLog(sessionData.Name, $"Session {sessionData.Name} completed.");
+        _context.Logger.LogInformation("Finished session {SessionName} stage {SessionStage}", sessionData.Name,
+            SessionStage);
+        _context.AppendSessionLog(sessionData.Name, $"Finished session {sessionData.Name} stage {SessionStage}");
         _context.Logger.LogInformation("Session {SessionName} Inputs={InputCount}", sessionData.Name,
             sessionData.Inputs?.Count ?? 0);
         _context.AppendSessionLog(sessionData.Name,

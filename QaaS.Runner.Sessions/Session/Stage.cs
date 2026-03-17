@@ -89,11 +89,11 @@ public class Stage
                 SleepBeforeMilliseconds, _sessionName, _stage);
             await Task.Delay((int)SleepBeforeMilliseconds);
         }
-        _context.Logger.LogInformation(
-            "Starting session {SessionName} stage {StageNumber} with {ActionCount} action(s)",
+        _context.Logger.LogDebug(
+            "Starting action stage {StageNumber} for session {SessionName} with {ActionCount} action(s)",
             _sessionName, _stage, Actions.Count);
         _context.AppendSessionLog(_sessionName,
-            $"Starting session {_sessionName} stage {_stage} with {Actions.Count} action(s)");
+            $"Starting action stage {_stage} for session {_sessionName} with {Actions.Count} action(s)");
         _context.Logger.LogDebug("Session {SessionName} stage {StageNumber} actions: {ActionNames}",
             _sessionName, _stage, string.Join(", ", Actions.Select(action => $"{action.GetType().Name}:{action.Name}")));
 
@@ -102,9 +102,9 @@ public class Stage
                 SessionExtensions.CreateTaskFromAction(_context, action, _sessionName, _actionFailures)).ToList();
         _ = Task.WhenAll(stageTasks).ContinueWith(_ =>
             {
-                _context.Logger.LogInformation("Finished session {SessionName} stage {StageNumber}",
+                _context.Logger.LogDebug("Finished action stage {StageNumber} for session {SessionName}",
                     _sessionName, _stage);
-                _context.AppendSessionLog(_sessionName, $"Finished session {_sessionName} stage {_stage}");
+                _context.AppendSessionLog(_sessionName, $"Finished action stage {_stage} for session {_sessionName}");
             },
             TaskScheduler.Default);
 

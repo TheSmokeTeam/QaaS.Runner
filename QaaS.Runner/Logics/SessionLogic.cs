@@ -68,7 +68,7 @@ public class SessionLogic(List<ISession> sessions, InternalContext context) : IL
             }
 
             executionData.SessionDatas.AddRange(MaterializeSessionResults(sessionsInThisStage));
-            context.Logger.LogInformation(
+            context.Logger.LogDebug(
                 "Finished session stage {Stage}. Immediate session results captured: {CapturedSessionCount}",
                 stage, sessionsInThisStage.Count);
         }

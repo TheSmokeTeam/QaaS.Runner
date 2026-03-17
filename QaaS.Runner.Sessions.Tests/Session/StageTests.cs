@@ -97,8 +97,8 @@ public class StageTests
 
         var sessionLog = context.GetSessionLog(_sessionName);
         Assert.That(tasks, Has.Count.EqualTo(1));
-        Assert.That(sessionLog, Does.Contain("Starting session TestSession stage 0"));
-        Assert.That(sessionLog, Does.Contain("Finished session TestSession stage 0"));
+        Assert.That(sessionLog, Does.Contain("Starting action stage 0 for session TestSession with 1 action(s)"));
+        Assert.That(sessionLog, Does.Contain("Finished action stage 0 for session TestSession"));
     }
 
     private IProbe InitializeProbeHook()

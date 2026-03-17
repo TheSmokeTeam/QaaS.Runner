@@ -346,7 +346,7 @@ public class SessionTests
 
         session.Run(context.ExecutionData);
 
-        Assert.That(logger.Messages, Has.Some.EqualTo($"Session {sessionName} completed."));
+        Assert.That(logger.Messages, Has.Some.EqualTo($"Finished session {sessionName} stage 0"));
         Assert.That(logger.Messages, Has.Some.EqualTo($"Session {sessionName} Inputs=0"));
         Assert.That(logger.Messages, Has.Some.EqualTo($"Session {sessionName} Outputs=0"));
         Assert.That(logger.Messages, Has.Some.EqualTo($"Session {sessionName} Failures=0"));
@@ -564,6 +564,58 @@ public class SessionTests
     }
 
     [Test]
+    public void Run_WithMultipleInternalStages_LogsSingleStructuredSessionStartAndFinishAtInformationLevel()
+    {
+        const string sessionName = "structured-session";
+        var logger = new CapturingLogger();
+        var context = new InternalContext
+        {
+            Logger = logger,
+            InternalGlobalDict = new Dictionary<string, object?>(),
+            InternalRunningSessions = new RunningSessions(new Dictionary<string, RunningSessionData<object, object>>()),
+            ExecutionData = new QaaS.Framework.SDK.ExecutionObjects.ExecutionData { DataSources = [] }
+        };
+        context.InsertValueIntoGlobalDictionary(context.GetMetaDataPath(), new MetaDataConfig());
+
+        var stage0 = new Stage(context, [], sessionName, 0, 0, 0);
+        stage0.AddCommunication(new RecordingAction("stage-0", 0, logger, () => { }));
+
+        var stage1 = new Stage(context, [], sessionName, 1, 0, 0);
+        stage1.AddCommunication(new RecordingAction("stage-1", 1, logger, () => { }));
+
+        var stage3 = new Stage(context, [], sessionName, 3, 0, 0);
+        stage3.AddCommunication(new RecordingAction("stage-3", 3, logger, () => { }));
+
+        var session = new Sessions.Session.Session(
+            sessionName,
+            1,
+            true,
+            0,
+            0,
+            new Dictionary<int, Stage> { { 0, stage0 }, { 1, stage1 }, { 3, stage3 } },
+            [],
+            context,
+            []);
+
+        session.Run(context.ExecutionData);
+
+        var informationMessages = logger.Entries
+            .Where(entry => entry.LogLevel == LogLevel.Information)
+            .Select(entry => entry.Message)
+            .ToArray();
+
+        Assert.That(informationMessages,
+            Contains.Item($"Starting session {sessionName} on stage 0 with 1 action(s)"));
+        Assert.That(informationMessages, Contains.Item($"Finished session {sessionName} stage 1"));
+        Assert.That(informationMessages,
+            Has.None.Matches<string>(message =>
+                message == $"Starting session {sessionName} stage 1 with 1 action(s)" ||
+                message == $"Starting session {sessionName} stage 3 with 1 action(s)" ||
+                message == $"Finished session {sessionName} stage 0" ||
+                message == $"Finished session {sessionName} stage 3"));
+    }
+
+    [Test]
     public void LogSessionSummary_WhenSessionFailuresIsNull_LogsZeroFailureCount()
     {
         const string sessionName = "summary-null-failures-session";
@@ -730,7 +782,8 @@ public class SessionTests
 
     private sealed class CapturingLogger : ILogger
     {
-        public List<string> Messages { get; } = [];
+        public List<LogEntry> Entries { get; } = [];
+        public List<string> Messages => Entries.Select(entry => entry.Message).ToList();
 
         public IDisposable BeginScope<TState>(TState state) where TState : notnull
         {
@@ -745,7 +798,7 @@ public class SessionTests
         public void Log<TState>(LogLevel logLevel, EventId eventId, TState state, Exception? exception,
             Func<TState, Exception?, string> formatter)
         {
-            Messages.Add(formatter(state, exception));
+            Entries.Add(new LogEntry(logLevel, formatter(state, exception)));
         }
 
         private sealed class NoOpScope : IDisposable
@@ -757,6 +810,8 @@ public class SessionTests
             }
         }
     }
+
+    private sealed record LogEntry(LogLevel LogLevel, string Message);
 
     private sealed class ThrowOnMessageLogger(Func<string, bool> shouldThrow) : ILogger
     {

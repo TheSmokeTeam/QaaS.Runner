@@ -2,6 +2,7 @@ using System.Collections.Concurrent;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
+using Microsoft.Extensions.Logging;
 using Moq;
 using NUnit.Framework;
 using QaaS.Framework.SDK.ContextObjects;
@@ -391,6 +392,34 @@ public class SessionLogicTests
         Assert.That(executionData.SessionDatas[0], Is.SameAs(sessionData));
     }
 
+    [Test]
+    public void TestRun_LogsStageStartAtInformationLevel_WithoutPrematureStageFinishNoise()
+    {
+        var logger = new CapturingLogger();
+        var session = new Mock<ISession>();
+        session.SetupGet(s => s.Name).Returns("SessionA");
+        session.SetupGet(s => s.SessionStage).Returns(0);
+        session.SetupGet(s => s.RunUntilStage).Returns((int?)null);
+        session.Setup(s => s.RunAsync(It.IsAny<ExecutionData>()))
+            .ReturnsAsync(new SessionData { Name = "SessionA" });
+
+        var sessionLogic = new SessionLogic([session.Object], new InternalContext { Logger = logger });
+        var executionData = new ExecutionData();
+
+        sessionLogic.Run(executionData);
+
+        var informationMessages = logger.Entries
+            .Where(entry => entry.LogLevel == LogLevel.Information)
+            .Select(entry => entry.Message)
+            .ToArray();
+
+        Assert.That(informationMessages,
+            Contains.Item("Starting session stage 0 with 1 session(s): SessionA"));
+        Assert.That(informationMessages,
+            Has.None.Matches<string>(message => message.StartsWith("Finished session stage 0",
+                StringComparison.Ordinal)));
+    }
+
     private sealed class SyncOnlySession(SessionData sessionData) : ISession
     {
         public string Name => sessionData.Name!;
@@ -404,4 +433,36 @@ public class SessionLogicTests
             return sessionData;
         }
     }
+
+    private sealed class CapturingLogger : ILogger
+    {
+        public List<LogEntry> Entries { get; } = [];
+
+        public IDisposable BeginScope<TState>(TState state) where TState : notnull
+        {
+            return NoOpScope.Instance;
+        }
+
+        public bool IsEnabled(LogLevel logLevel)
+        {
+            return true;
+        }
+
+        public void Log<TState>(LogLevel logLevel, EventId eventId, TState state, Exception? exception,
+            Func<TState, Exception?, string> formatter)
+        {
+            Entries.Add(new LogEntry(logLevel, formatter(state, exception)));
+        }
+
+        private sealed class NoOpScope : IDisposable
+        {
+            public static readonly NoOpScope Instance = new();
+
+            public void Dispose()
+            {
+            }
+        }
+    }
+
+    private sealed record LogEntry(LogLevel LogLevel, string Message);
 }
