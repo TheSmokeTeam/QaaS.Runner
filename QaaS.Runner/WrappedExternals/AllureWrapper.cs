@@ -56,22 +56,17 @@ public class AllureWrapper
     public virtual void ServeTestResults(string allureRunnablePath = DefaultAllureRunnablePath)
     {
         var resolvedAllureRunnablePath = ResolveAllureRunnablePath(allureRunnablePath);
-        var temporaryReportDirectory = CreateTemporaryReportDirectory();
+        var generatedReportDirectory = ResolveReportDirectory();
 
-        try
-        {
-            RunProcess(CreateGenerateProcessStartInfo(resolvedAllureRunnablePath, temporaryReportDirectory));
-            CopyGeneratedHistoryToResultsDirectory(temporaryReportDirectory);
-        }
-        finally
-        {
-            if (Directory.Exists(temporaryReportDirectory))
-                Directory.Delete(temporaryReportDirectory, true);
-        }
-
-        RunProcess(CreateServeProcessStartInfo(resolvedAllureRunnablePath));
+        RunProcess(CreateGenerateProcessStartInfo(resolvedAllureRunnablePath, generatedReportDirectory));
+        CopyGeneratedHistoryToResultsDirectory(generatedReportDirectory);
+        RunProcess(CreateOpenProcessStartInfo(resolvedAllureRunnablePath, generatedReportDirectory));
     }
 
+    /// <summary>
+    ///     Starts the configured process and forwards its standard output and error streams to the current console.
+    /// </summary>
+    /// <param name="startInfo">The start info for the child process.</param>
     private void RunProcess(ProcessStartInfo startInfo)
     {
         using var process = StartProcess(startInfo);
@@ -92,7 +87,7 @@ public class AllureWrapper
     }
 
     /// <summary>
-    ///     Builds the shell command used to refresh the report history in a temporary report directory.
+    ///     Builds the shell command used to refresh the report history in the generated report directory.
     /// </summary>
     protected virtual ProcessStartInfo CreateGenerateProcessStartInfo(string allureRunnablePath,
         string generatedReportDirectory)
@@ -102,11 +97,12 @@ public class AllureWrapper
     }
 
     /// <summary>
-    ///     Builds the shell command used to launch <c>allure serve</c> directly from the results directory.
+    ///     Builds the shell command used to launch <c>allure open</c> against the generated report directory.
     /// </summary>
-    protected virtual ProcessStartInfo CreateServeProcessStartInfo(string allureRunnablePath)
+    protected virtual ProcessStartInfo CreateOpenProcessStartInfo(string allureRunnablePath,
+        string generatedReportDirectory)
     {
-        return CreateAllureProcessStartInfo(allureRunnablePath, $"serve {QuoteForShell(ResolveResultsDirectory())}");
+        return CreateAllureProcessStartInfo(allureRunnablePath, $"open {QuoteForShell(generatedReportDirectory)}");
     }
 
     /// <summary>
@@ -146,21 +142,39 @@ public class AllureWrapper
         throw new InvalidOperationException("Unknown OS");
     }
 
+    /// <summary>
+    ///     Resolves the working directory used for Allure CLI commands.
+    /// </summary>
+    /// <returns>The current process working directory.</returns>
     protected virtual string ResolveWorkingDirectory()
     {
         return Directory.GetCurrentDirectory();
     }
 
+    /// <summary>
+    ///     Resolves the absolute Allure results directory path from the current working directory.
+    /// </summary>
+    /// <returns>The absolute Allure results directory path.</returns>
     protected virtual string ResolveResultsDirectory()
     {
         return Path.GetFullPath(AllureLifecycle.Instance.ResultsDirectory, ResolveWorkingDirectory());
     }
 
-    protected virtual string CreateTemporaryReportDirectory()
+    /// <summary>
+    ///     Resolves the generated Allure report directory that will be reused instead of a temporary folder.
+    /// </summary>
+    /// <returns>The absolute or working-directory-relative generated report directory.</returns>
+    protected virtual string ResolveReportDirectory()
     {
-        return Path.Combine(Path.GetTempPath(), $"qaas-allure-{Guid.NewGuid():N}");
+        var resultsDirectory = ResolveResultsDirectory();
+        var reportParentDirectory = Directory.GetParent(resultsDirectory)?.FullName ?? ResolveWorkingDirectory();
+        return Path.Combine(reportParentDirectory, "allure-report");
     }
 
+    /// <summary>
+    ///     Copies generated report history back into the raw results directory so future runs preserve trend data.
+    /// </summary>
+    /// <param name="generatedReportDirectory">The generated report directory that may contain a history folder.</param>
     protected virtual void CopyGeneratedHistoryToResultsDirectory(string generatedReportDirectory)
     {
         var generatedHistoryDirectory = Path.Combine(generatedReportDirectory, HistoryDirectoryName);
@@ -175,6 +189,11 @@ public class AllureWrapper
         Console.Out.WriteLine($"Restored allure history to {resultsHistoryDirectory}");
     }
 
+    /// <summary>
+    ///     Normalizes the configured Allure executable path by falling back to the default command when needed.
+    /// </summary>
+    /// <param name="allureRunnablePath">The caller-provided Allure executable path.</param>
+    /// <returns>The executable path that should be invoked.</returns>
     private static string ResolveAllureRunnablePath(string allureRunnablePath)
     {
         return string.IsNullOrWhiteSpace(allureRunnablePath)
@@ -182,11 +201,21 @@ public class AllureWrapper
             : allureRunnablePath;
     }
 
+    /// <summary>
+    ///     Quotes a shell argument so spaces in paths survive command-line parsing.
+    /// </summary>
+    /// <param name="path">The path to quote.</param>
+    /// <returns>The quoted shell-safe path.</returns>
     private static string QuoteForShell(string path)
     {
         return $"\"{path}\"";
     }
 
+    /// <summary>
+    ///     Recursively copies a directory tree into the destination path.
+    /// </summary>
+    /// <param name="sourceDirectory">The source directory to copy from.</param>
+    /// <param name="destinationDirectory">The destination directory to copy into.</param>
     private static void CopyDirectory(string sourceDirectory, string destinationDirectory)
     {
         Directory.CreateDirectory(destinationDirectory);

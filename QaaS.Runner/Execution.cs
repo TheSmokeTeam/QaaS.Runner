@@ -15,10 +15,54 @@ using TemplateLogic = QaaS.Runner.Logics.TemplateLogic;
 namespace QaaS.Runner;
 
 /// <summary>
-///     Represents a single execution of QaaS's tests
+/// Represents a single QaaS execution and orchestrates the logic pipeline associated with its
+/// <see cref="ExecutionType" />.
 /// </summary>
+/// <remarks>
+/// The class uses a small strategy/pipeline model instead of embedding execution-type branching
+/// directly inside <see cref="Start" />. Each supported <see cref="ExecutionType" /> maps to an
+/// <see cref="ExecutionPlan" /> that declares:
+/// - which logic steps run, in order
+/// - how the final exit code is computed
+///
+/// This keeps orchestration open to extension while preserving the exact runtime behavior expected
+/// by the current tests and callers.
+/// </remarks>
 public class Execution : BaseExecution
 {
+    private static readonly IReadOnlyDictionary<ExecutionType, ExecutionPlan> ExecutionPlans =
+        new Dictionary<ExecutionType, ExecutionPlan>
+        {
+            [ExecutionType.Run] = new(
+                [
+                    execution => execution.DataSourceLogic,
+                    execution => execution.SessionLogic,
+                    execution => execution.AssertionLogic,
+                    execution => execution.ReportLogic
+                ],
+                execution => execution.ResolveAssertionExitCode()),
+            [ExecutionType.Act] = new(
+                [
+                    execution => execution.DataSourceLogic,
+                    execution => execution.SessionLogic,
+                    execution => execution.StorageLogic
+                ],
+                _ => 0),
+            [ExecutionType.Assert] = new(
+                [
+                    execution => execution.DataSourceLogic,
+                    execution => execution.StorageLogic,
+                    execution => execution.AssertionLogic,
+                    execution => execution.ReportLogic
+                ],
+                execution => execution.ResolveAssertionExitCode()),
+            [ExecutionType.Template] = new(
+                [
+                    execution => execution.TemplateLogic
+                ],
+                _ => 0)
+        };
+
     private readonly ILifetimeScope? _ownedScope;
 
     /// <summary>
@@ -56,56 +100,50 @@ public class Execution : BaseExecution
         Context.Logger.LogInformation(
             "Running {ExecutionType} execution with executionId {ExecutionId} and case name {CaseName}", Type,
             Context.ExecutionId, Context.CaseName);
-        return Type switch
-        {
-            ExecutionType.Run => Run(),
-            ExecutionType.Template => Template(),
-            ExecutionType.Act => Act(),
-            ExecutionType.Assert => Assert(),
-            _ => throw new ArgumentOutOfRangeException()
-        };
-    }
-
-    private int Act()
-    {
-        DataSourceLogic.Run(Context.ExecutionData);
-        SessionLogic.Run(Context.ExecutionData);
-        StorageLogic.Run(Context.ExecutionData);
-        return 0;
-    }
-
-    private int Assert()
-    {
-        DataSourceLogic.Run(Context.ExecutionData);
-        StorageLogic.Run(Context.ExecutionData);
-        AssertionLogic.Run(Context.ExecutionData);
-        ReportLogic.Run(Context.ExecutionData);
-        return Context.ExecutionData.AssertionResults.All(result =>
-            ((AssertionResult)result).AssertionStatus == AssertionStatus.Passed)
-            ? 0
-            : 1;
-    }
-
-    private int Run()
-    {
-        DataSourceLogic.Run(Context.ExecutionData);
-        SessionLogic.Run(Context.ExecutionData);
-        AssertionLogic.Run(Context.ExecutionData);
-        ReportLogic.Run(Context.ExecutionData);
-        return Context.ExecutionData.AssertionResults.All(result =>
-            ((AssertionResult)result).AssertionStatus == AssertionStatus.Passed)
-            ? 0
-            : 1;
-    }
-
-    private int Template()
-    {
-        TemplateLogic.Run(Context.ExecutionData);
-        return 0;
+        return ResolvePlan(Type).Execute(this);
     }
 
     public override void Dispose()
     {
         _ownedScope?.Dispose();
+    }
+
+    private static ExecutionPlan ResolvePlan(ExecutionType executionType)
+    {
+        return ExecutionPlans.TryGetValue(executionType, out var executionPlan)
+            ? executionPlan
+            : throw new ArgumentOutOfRangeException(nameof(executionType), executionType,
+                "Unsupported execution type.");
+    }
+
+    private int ResolveAssertionExitCode()
+    {
+        return Context.ExecutionData.AssertionResults.All(result =>
+            ((AssertionResult)result).AssertionStatus == AssertionStatus.Passed)
+            ? 0
+            : 1;
+    }
+
+    /// <summary>
+    /// Encapsulates the ordered logic pipeline and exit-code policy for one execution type.
+    /// </summary>
+    /// <param name="logicSelectors">
+    /// Selectors that resolve the concrete logic instances from an <see cref="Execution" /> and run
+    /// them in declaration order.
+    /// </param>
+    /// <param name="exitCodeResolver">
+    /// Strategy used to compute the final process exit code after the pipeline completes.
+    /// </param>
+    private sealed class ExecutionPlan(
+        IReadOnlyList<Func<Execution, QaaS.Framework.Executions.Logics.ILogic>> logicSelectors,
+        Func<Execution, int> exitCodeResolver)
+    {
+        public int Execute(Execution execution)
+        {
+            foreach (var logicSelector in logicSelectors)
+                logicSelector(execution).Run(execution.Context.ExecutionData);
+
+            return exitCodeResolver(execution);
+        }
     }
 }

@@ -292,6 +292,51 @@ public class RunnerBehaviorTests
         }
     }
 
+    private sealed class FailingStartRunner(
+        ILifetimeScope scope,
+        List<ExecutionBuilder> executionBuilders,
+        Microsoft.Extensions.Logging.ILogger logger,
+        Serilog.ILogger serilogLogger,
+        List<Execution> executions,
+        Exception startFailure) : Runner(scope, executionBuilders, logger, serilogLogger)
+    {
+        private readonly List<Execution> _executions = executions;
+        private readonly Exception _startFailure = startFailure;
+
+        public List<string> Calls { get; } = [];
+
+        protected override void Setup() => Calls.Add("setup");
+
+        protected override List<Execution> BuildExecutions()
+        {
+            Calls.Add("build");
+            return _executions;
+        }
+
+        protected override int StartExecutions(List<Execution> executions)
+        {
+            Calls.Add("start");
+            throw _startFailure;
+        }
+
+        protected override void DisposeExecutions(IEnumerable<Execution>? executions)
+        {
+            Calls.Add("dispose-executions");
+            base.DisposeExecutions(executions);
+        }
+
+        protected override void Teardown()
+        {
+            Calls.Add("teardown");
+        }
+
+        public override void Dispose()
+        {
+            Calls.Add("dispose");
+            base.Dispose();
+        }
+    }
+
     [Test]
     public void Setup_WithEmptyResultsEnabled_CleansAllureResultsDirectory()
     {
@@ -604,6 +649,27 @@ public class RunnerBehaviorTests
         Assert.That(exitCode, Is.Zero);
         firstExecution.Verify(execution => execution.Dispose(), Times.Once);
         secondExecution.Verify(execution => execution.Dispose(), Times.Once);
+    }
+
+    [Test]
+    public void RunAndGetExitCode_WhenStartExecutionsThrows_DisposesBuiltExecutionsAndRethrowsFailure()
+    {
+        using var scope = BuildScope();
+        var context = CreateContext();
+        var execution = new Mock<Execution>(ExecutionType.Run, context);
+        var startFailure = new InvalidOperationException("start failed");
+        var runner = new FailingStartRunner(scope, [], Globals.Logger, new Mock<Serilog.ILogger>().Object,
+            [execution.Object], startFailure);
+
+        var exception = Assert.Throws<InvalidOperationException>(() => runner.RunAndGetExitCode());
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(exception, Is.SameAs(startFailure));
+            Assert.That(runner.Calls, Is.EqualTo(new[] { "setup", "build", "start", "dispose-executions", "teardown", "dispose" }));
+            Assert.That(runner.LastExitCode, Is.Null);
+        });
+        execution.Verify(currentExecution => currentExecution.Dispose(), Times.Once);
     }
 
     [Test]

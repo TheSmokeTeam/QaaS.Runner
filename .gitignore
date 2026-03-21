@@ -379,6 +379,7 @@ Chart.lock
 
 # allure results
 **/allure-results/
+**/allure-report/
 
 # local restore scratch directories created during CI/debug verification
 .tmp-packages-*/

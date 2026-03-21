@@ -18,11 +18,11 @@ public class AllureWrapperTests
     private sealed class TestableAllureWrapper : AllureWrapper
     {
         public List<ProcessStartInfo> StartInfos { get; } = [];
-        public string TemporaryReportDirectory { get; set; } = string.Empty;
+        public string GeneratedReportDirectory { get; set; } = string.Empty;
 
-        protected override string CreateTemporaryReportDirectory()
+        protected override string ResolveReportDirectory()
         {
-            return TemporaryReportDirectory;
+            return GeneratedReportDirectory;
         }
 
         protected override Process StartProcess(ProcessStartInfo startInfo)
@@ -30,8 +30,8 @@ public class AllureWrapperTests
             StartInfos.Add(startInfo);
             if (startInfo.Arguments.Contains(" generate", StringComparison.Ordinal))
             {
-                Directory.CreateDirectory(Path.Combine(TemporaryReportDirectory, "history"));
-                File.WriteAllText(Path.Combine(TemporaryReportDirectory, "history", "history-trend.json"),
+                Directory.CreateDirectory(Path.Combine(GeneratedReportDirectory, "history"));
+                File.WriteAllText(Path.Combine(GeneratedReportDirectory, "history", "history-trend.json"),
                     "history-content");
             }
 
@@ -55,7 +55,7 @@ public class AllureWrapperTests
         Directory.SetCurrentDirectory(_workingDirectory);
         _wrapper = new TestableAllureWrapper
         {
-            TemporaryReportDirectory = Path.Combine(_workingDirectory, "temp-allure-report")
+            GeneratedReportDirectory = Path.Combine(_workingDirectory, "allure-report")
         };
     }
 
@@ -107,7 +107,8 @@ public class AllureWrapperTests
             Assert.That(_wrapper.StartInfos, Has.Count.EqualTo(2));
             Assert.That(_wrapper.StartInfos[0].Arguments, Does.Contain($"{expectedRunnablePath} generate"));
             Assert.That(_wrapper.StartInfos[0].Arguments, Does.Contain("-o"));
-            Assert.That(_wrapper.StartInfos[1].Arguments, Does.Contain($"{expectedRunnablePath} serve"));
+            Assert.That(_wrapper.StartInfos[1].Arguments, Does.Contain($"{expectedRunnablePath} open"));
+            Assert.That(_wrapper.StartInfos[1].Arguments, Does.Contain(_wrapper.GeneratedReportDirectory));
         });
     }
 
@@ -120,7 +121,7 @@ public class AllureWrapperTests
         {
             Assert.That(_wrapper.StartInfos, Has.Count.EqualTo(2));
             Assert.That(_wrapper.StartInfos[0].Arguments, Does.Contain("echo generate"));
-            Assert.That(_wrapper.StartInfos[1].Arguments, Does.Contain("echo serve"));
+            Assert.That(_wrapper.StartInfos[1].Arguments, Does.Contain("echo open"));
         });
     }
 

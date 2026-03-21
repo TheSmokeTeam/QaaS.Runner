@@ -15,7 +15,9 @@ using QaaS.Framework.SDK.Session.SessionDataObjects.RunningSessionsObjects;
 using QaaS.Runner.Assertions.ConfigurationObjects;
 using QaaS.Runner.Assertions.ConfigurationObjects.LinkConfigs;
 using QaaS.Runner.Infrastructure;
+using QaaS.Runner.Sessions.Actions.MockerCommands;
 using QaaS.Runner.Sessions.Actions.Probes;
+using QaaS.Runner.Sessions.ConfigurationObjects;
 using QaaS.Runner.Sessions.Session.Builders;
 using QaaS.Runner.Storage;
 using QaaS.Runner.Storage.ConfigurationObjects;
@@ -321,6 +323,43 @@ public class ExecutionBuilderTests
             .ExecutionType(ExecutionType.Template)
             .SetExecutionId("invalid-probe-name")
             .SetCase("invalid-probe-name-case")
+            .WithLogger(Globals.Logger)
+            .WithGlobalDict(new Dictionary<string, object?>())
+            .WithMetadata(new MetaDataConfig { Team = "Smoke", System = "QaaS" });
+
+        Assert.Throws<InvalidConfigurationsException>(() => builder.Build());
+    }
+
+    [Test]
+    public void Build_WithDuplicateMockerCommandNames_ThrowsInvalidConfigurationsException()
+    {
+        var builder = new ExecutionBuilder()
+            .AddSession(new SessionBuilder
+            {
+                Name = "session-with-duplicate-mocker-commands",
+                Stage = 0,
+                Probes = [],
+                MockerCommands =
+                [
+                    new MockerCommandBuilder()
+                        .Named("duplicate-command")
+                        .WithServerName("server-a")
+                        .WithCommand(new MockerCommandConfig
+                        {
+                            TriggerAction = new Qaas.Mocker.CommunicationObjects.ConfigurationObjects.Command.TriggerAction()
+                        }),
+                    new MockerCommandBuilder()
+                        .Named("duplicate-command")
+                        .WithServerName("server-b")
+                        .WithCommand(new MockerCommandConfig
+                        {
+                            TriggerAction = new Qaas.Mocker.CommunicationObjects.ConfigurationObjects.Command.TriggerAction()
+                        })
+                ]
+            })
+            .ExecutionType(ExecutionType.Template)
+            .SetExecutionId("duplicate-mocker-command")
+            .SetCase("duplicate-mocker-command-case")
             .WithLogger(Globals.Logger)
             .WithGlobalDict(new Dictionary<string, object?>())
             .WithMetadata(new MetaDataConfig { Team = "Smoke", System = "QaaS" });

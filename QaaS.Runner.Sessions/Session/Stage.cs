@@ -91,7 +91,7 @@ public class Stage
         }
         _context.Logger.LogDebug(
             "Starting action stage {StageNumber} for session {SessionName} with {ActionCount} action(s)",
-            _sessionName, _stage, Actions.Count);
+            _stage, _sessionName, Actions.Count);
         _context.AppendSessionLog(_sessionName,
             $"Starting action stage {_stage} for session {_sessionName} with {Actions.Count} action(s)");
         _context.Logger.LogDebug("Session {SessionName} stage {StageNumber} actions: {ActionNames}",
@@ -100,12 +100,15 @@ public class Stage
         var stageTasks =
             Actions.Select(action =>
                 SessionExtensions.CreateTaskFromAction(_context, action, _sessionName, _actionFailures)).ToList();
-        _ = Task.WhenAll(stageTasks).ContinueWith(_ =>
+        var stageCompletionTask = Task.WhenAll(stageTasks);
+        _ = stageCompletionTask.ContinueWith(_ =>
             {
                 _context.Logger.LogDebug("Finished action stage {StageNumber} for session {SessionName}",
-                    _sessionName, _stage);
+                    _stage, _sessionName);
                 _context.AppendSessionLog(_sessionName, $"Finished action stage {_stage} for session {_sessionName}");
             },
+            CancellationToken.None,
+            TaskContinuationOptions.ExecuteSynchronously,
             TaskScheduler.Default);
 
         if (SleepAfterMilliseconds is > 0)
