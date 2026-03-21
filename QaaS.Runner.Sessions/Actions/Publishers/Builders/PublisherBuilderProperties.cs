@@ -57,12 +57,6 @@ public partial class PublisherBuilder
     internal Parallel? Parallel { get; set; }
 
     [Description("Determines whether the publisher acts as a chunk publisher")]
-    [RequiredOrNullBasedOnOtherFieldsConfiguration(
-        [
-            nameof(ElasticIndex), nameof(MongoDbCollection), nameof(OracleSqlTable), nameof(MsSqlTable), nameof(Redis),
-            nameof(S3Bucket), nameof(Socket), nameof(Sftp), nameof(KafkaTopic), nameof(RabbitMq)
-        ],
-        true, true, true, true, true, false, false, false, false, false)]
     internal Chunks? Chunk { get; set; }
 
     [Description("The stage in which the Publisher runs at")]

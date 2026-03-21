@@ -14,6 +14,7 @@ using QaaS.Framework.SDK.Session;
 using QaaS.Framework.SDK.Session.SessionDataObjects;
 using QaaS.Framework.Serialization;
 using QaaS.Runner.Infrastructure;
+using QaaS.Runner.Sessions.Actions;
 using QaaS.Runner.Sessions.Extensions;
 using QaaS.Runner.Sessions.RuntimeOverrides;
 using InvalidOperationException = System.InvalidOperationException;
@@ -219,6 +220,13 @@ public partial class ConsumerBuilder
 
             type = allTypes.FirstOrDefault(configuredType => configuredType != null) ??
                    throw new InvalidOperationException($"Missing supported type in consumer {Name}");
+            var readerChunkMode = ProtocolChunkSupport.ResolveReaderMode(type);
+            if (readerChunkMode == ProtocolChunkMode.SingleOrChunk)
+            {
+                var propertyName = ProtocolChunkSupport.GetReaderConfigurationPropertyName(type);
+                throw new InvalidOperationException(
+                    $"The {propertyName} field is ambiguous because the configured protocol supports both single and chunk reading, but consumer configuration does not expose a chunk selection option.");
+            }
 
             var overrideRequest = new ConsumerOverrideRequest(Name!, type, context.Logger, DataFilter);
             var (reader, chunkReader) = context.GetSessionActionOverrides()?.Consumer?.Invoke(overrideRequest)

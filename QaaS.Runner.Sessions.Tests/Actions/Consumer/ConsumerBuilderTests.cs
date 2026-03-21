@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.ComponentModel.DataAnnotations;
 using System.Net.Sockets;
 using System.Reflection;
 using Moq;
@@ -17,6 +18,8 @@ using QaaS.Framework.SDK.Session;
 using QaaS.Framework.SDK.Session.SessionDataObjects;
 using QaaS.Framework.Serialization;
 using QaaS.Runner.Sessions.Actions.Consumers.Builders;
+using ConsumerAction = QaaS.Runner.Sessions.Actions.Consumers.Consumer;
+using ChunkConsumerAction = QaaS.Runner.Sessions.Actions.Consumers.ChunkConsumer;
 
 namespace QaaS.Runner.Sessions.Tests.Actions.Consumer;
 
@@ -38,6 +41,102 @@ public class ConsumerBuilderTests
         yield return new TestCaseData(new TrinoReaderConfig()).SetName("ReadConfiguration_WithTrino_ReturnsTrino");
         yield return new TestCaseData(new ElasticReaderConfig()).SetName("ReadConfiguration_WithElastic_ReturnsElastic");
         yield return new TestCaseData(new S3BucketReaderConfig()).SetName("ReadConfiguration_WithS3_ReturnsS3");
+    }
+
+    private static IEnumerable<TestCaseData> ReaderConfigurationsWhichCreateSingleConsumers()
+    {
+        yield return new TestCaseData(
+            new RabbitMqReaderConfig { Host = "https://test" },
+            typeof(ConsumerAction)).SetName("RabbitMqReader_CreatesSingleConsumer");
+        yield return new TestCaseData(
+            new KafkaTopicReaderConfig
+            {
+                TopicName = "test",
+                GroupId = "test",
+                HostNames = ["host1:8080"],
+                Username = "test",
+                Password = "test"
+            },
+            typeof(ConsumerAction)).SetName("KafkaReader_CreatesSingleConsumer");
+        yield return new TestCaseData(
+            new SocketReaderConfig
+            {
+                Host = "https:test",
+                Port = 8080,
+                ProtocolType = ProtocolType.IP
+            },
+            typeof(ConsumerAction)).SetName("SocketReader_CreatesSingleConsumer");
+        yield return new TestCaseData(
+            new IbmMqReaderConfig
+            {
+                HostName = "https:tests",
+                Port = 8080,
+                Channel = "test",
+                Manager = "test",
+                QueueName = "test"
+            },
+            typeof(ConsumerAction)).SetName("IbmMqReader_CreatesSingleConsumer");
+    }
+
+    private static IEnumerable<TestCaseData> ReaderConfigurationsWhichCreateChunkConsumers()
+    {
+        yield return new TestCaseData(
+            new PostgreSqlReaderConfig
+            {
+                ConnectionString = "Host=trino.test.com;Port=8443;",
+                TableName = "test"
+            },
+            typeof(ChunkConsumerAction)).SetName("PostgreSqlReader_CreatesChunkConsumer");
+        yield return new TestCaseData(
+            new OracleReaderConfig
+            {
+                ConnectionString = "Data Source=OracleSql.test.com;User Id=test;Password=test",
+                TableName = "test"
+            },
+            typeof(ChunkConsumerAction)).SetName("OracleReader_CreatesChunkConsumer");
+        yield return new TestCaseData(
+            new MsSqlReaderConfig
+            {
+                ConnectionString = "Server=testServer;Database=testDataBase;User Id=test;Password=test;",
+                TableName = "test"
+            },
+            typeof(ChunkConsumerAction)).SetName("MsSqlReader_CreatesChunkConsumer");
+        yield return new TestCaseData(
+            new TrinoReaderConfig
+            {
+                ConnectionString = "Host=trino.test.com;Port=8443;",
+                TableName = "test",
+                Username = "test",
+                Password = "test",
+                ClientTag = "test",
+                Schema = "default",
+                Catalog = "hive",
+                Hostname = "https://trino.test.com"
+            },
+            typeof(ChunkConsumerAction)).SetName("TrinoReader_CreatesChunkConsumer");
+        yield return new TestCaseData(
+            new ElasticReaderConfig
+            {
+                TimestampField = "log_timestamp",
+                ReadBatchSize = 500,
+                ScrollContextExpirationMs = 30000,
+                ReadFromRunStartTime = true,
+                FilterSecondsBeforeRunStartTime = 300,
+                IndexPattern = "*-test",
+                Url = "http://test",
+                Username = "test",
+                Password = "123456"
+            },
+            typeof(ChunkConsumerAction)).SetName("ElasticReader_CreatesChunkConsumer");
+        yield return new TestCaseData(
+            new S3BucketReaderConfig
+            {
+                StorageBucket = "test",
+                ServiceURL = "url",
+                AccessKey = "test",
+                SecretKey = "test"
+            },
+            typeof(ChunkConsumerAction)).SetName("S3Reader_CreatesChunkConsumer");
     }
 
     [SetUp]
@@ -653,6 +752,45 @@ public class ConsumerBuilderTests
         // Assert
         Assert.That(result, Is.Not.Null);
         Assert.That(result!.Name, Is.EqualTo("TestConsumer"));
+    }
+
+    [Test]
+    [TestCaseSource(nameof(ReaderConfigurationsWhichCreateSingleConsumers))]
+    [TestCaseSource(nameof(ReaderConfigurationsWhichCreateChunkConsumers))]
+    public void Build_WithSupportedReaderConfig_CreatesExpectedConsumerMode(IReaderConfig config, Type expectedType)
+    {
+        var builder = new ConsumerBuilder()
+            .Named("TestConsumer")
+            .AtStage(1)
+            .WithTimeout(1000)
+            .FilterData(new DataFilter())
+            .Configure(config);
+
+        var result = builder.Build(Globals.GetContextWithMetadata(), _actionFailures, _sessionName);
+
+        Assert.That(result, Is.InstanceOf(expectedType));
+    }
+
+    [Test]
+    [TestCaseSource(nameof(ReaderConfigurationsWhichCreateSingleConsumers))]
+    [TestCaseSource(nameof(ReaderConfigurationsWhichCreateChunkConsumers))]
+    public void Validate_WithSupportedReaderConfig_HasNoChunkModeErrors(IReaderConfig config, Type expectedType)
+    {
+        var builder = new ConsumerBuilder()
+            .Named("TestConsumer")
+            .AtStage(1)
+            .WithTimeout(1000)
+            .FilterData(new DataFilter())
+            .Configure(config);
+
+        _ = expectedType;
+        var validationResults = ((IValidatableObject)builder)
+            .Validate(new ValidationContext(builder))
+            .ToList();
+
+        Assert.That(
+            validationResults.Count(result => result.ErrorMessage!.Contains("chunk", StringComparison.OrdinalIgnoreCase)),
+            Is.EqualTo(0));
     }
 
     [Test]

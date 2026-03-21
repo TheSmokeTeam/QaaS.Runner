@@ -16,6 +16,7 @@ using QaaS.Framework.SDK.Session;
 using QaaS.Framework.SDK.Session.SessionDataObjects;
 using QaaS.Framework.Serialization;
 using QaaS.Runner.Infrastructure;
+using QaaS.Runner.Sessions.Actions;
 using QaaS.Runner.Sessions.ConfigurationObjects;
 using QaaS.Runner.Sessions.Extensions;
 using QaaS.Runner.Sessions.RuntimeOverrides;
@@ -328,6 +329,19 @@ public partial class PublisherBuilder
 
             type = allTypes.FirstOrDefault(configuredType => configuredType != null) ??
                    throw new InvalidOperationException($"Missing supported type in publisher {Name}");
+            var senderChunkMode = ProtocolChunkSupport.ResolveSenderMode(type);
+            var propertyName = ProtocolChunkSupport.GetSenderConfigurationPropertyName(type);
+            if (Chunk == null && senderChunkMode == ProtocolChunkMode.ChunkOnly)
+            {
+                throw new InvalidOperationException(
+                    $"The {nameof(Chunk)} field is required when {propertyName} is configured.");
+            }
+
+            if (Chunk != null && senderChunkMode == ProtocolChunkMode.SingleOnly)
+            {
+                throw new InvalidOperationException(
+                    $"The {nameof(Chunk)} field must be empty when {propertyName} is configured.");
+            }
             
             var overrideRequest = new PublisherOverrideRequest(Name!, type, Chunk != null, context.Logger, DataFilter);
             var (sender, chunkSender) = context.GetSessionActionOverrides()?.Publisher?.Invoke(overrideRequest)

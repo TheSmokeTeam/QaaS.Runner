@@ -5,6 +5,7 @@ using Microsoft.Extensions.Logging;
 using NUnit.Framework;
 using QaaS.Framework.Configurations;
 using QaaS.Framework.Configurations.CustomExceptions;
+using QaaS.Framework.Protocols.ConfigurationObjects.Elastic;
 using QaaS.Framework.Protocols.ConfigurationObjects.RabbitMq;
 using QaaS.Framework.SDK;
 using QaaS.Framework.SDK.ContextObjects;
@@ -17,6 +18,7 @@ using QaaS.Runner.Assertions.ConfigurationObjects.LinkConfigs;
 using QaaS.Runner.Infrastructure;
 using QaaS.Runner.Sessions.Actions.MockerCommands;
 using QaaS.Runner.Sessions.Actions.Probes;
+using QaaS.Runner.Sessions.Actions.Publishers.Builders;
 using QaaS.Runner.Sessions.ConfigurationObjects;
 using QaaS.Runner.Sessions.Session.Builders;
 using QaaS.Runner.Storage;
@@ -498,6 +500,43 @@ public class ExecutionBuilderTests
     }
 
     [Test]
+    public void Build_WithChunkOnlyPublisherMissingChunkConfiguration_ThrowsInvalidConfigurationsException()
+    {
+        var builder = CreateExecutionBuilderWithPublisher(new PublisherBuilder
+            {
+                Name = "elastic-publisher",
+                DataSourceNames = ["payload"]
+            }
+            .Configure(new ElasticSenderConfig
+            {
+                Url = "http://localhost:9200",
+                Username = "elastic",
+                Password = "password",
+                IndexName = "session-data"
+            }));
+
+        Assert.Throws<InvalidConfigurationsException>(() => builder.Build());
+    }
+
+    [Test]
+    public void Build_WithSingleOnlyPublisherConfiguredWithChunkConfiguration_ThrowsInvalidConfigurationsException()
+    {
+        var builder = CreateExecutionBuilderWithPublisher(new PublisherBuilder
+            {
+                Name = "rabbit-publisher",
+                DataSourceNames = ["payload"]
+            }
+            .WithChunks(new Chunks { ChunkSize = 64 })
+            .Configure(new RabbitMqSenderConfig
+            {
+                Host = "localhost",
+                QueueName = "queue"
+            }));
+
+        Assert.Throws<InvalidConfigurationsException>(() => builder.Build());
+    }
+
+    [Test]
     public void UpdateAndDeleteIndexedCollections_WithInvalidIndex_ThrowArgumentOutOfRangeException()
     {
         var builder = new ExecutionBuilder
@@ -886,6 +925,25 @@ public class ExecutionBuilderTests
         return builder.SetExecutionId("test").SetCase("valid").WithLogger(Globals.Logger)
             .WithMetadata(new MetaDataConfig { Team = "Smoke", System = "QaaS" })
             .WithGlobalDict(new Dictionary<string, object?>());
+    }
+
+    private ExecutionBuilder CreateExecutionBuilderWithPublisher(PublisherBuilder publisherBuilder)
+    {
+        return new ExecutionBuilder()
+            .AddSession(new SessionBuilder
+            {
+                Name = "publisher-session",
+                Stage = 0,
+                Publishers = [publisherBuilder],
+                Probes = []
+            })
+            .AddDataSource(new DataSourceBuilder().Named("payload").HookNamed("TestGenerator"))
+            .ExecutionType(ExecutionType.Act)
+            .SetExecutionId("publisher-validation")
+            .SetCase("publisher-validation-case")
+            .WithLogger(Globals.Logger)
+            .WithGlobalDict(new Dictionary<string, object?>())
+            .WithMetadata(new MetaDataConfig { Team = "Smoke", System = "QaaS" });
     }
 
     private ExecutionBuilder CreateInvalidExecutionBuilder()

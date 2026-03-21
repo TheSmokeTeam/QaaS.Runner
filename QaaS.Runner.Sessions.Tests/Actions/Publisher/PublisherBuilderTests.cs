@@ -489,8 +489,7 @@ public class PublisherBuilderTests
         publisherBuilder.Configure(senderConfiguration);
 
         // Act 
-        var validationResults = new List<ValidationResult>();
-        ValidateMembers(publisherBuilder, validationResults, "Chunk");
+        var validationResults = ValidateBuilder(publisherBuilder);
 
         // Assert
         Assert.That(validationResults.Count(r => r.ErrorMessage!.Contains("Chunk")), Is.EqualTo(1));
@@ -507,8 +506,7 @@ public class PublisherBuilderTests
         publisherBuilder.Configure(senderConfiguration);
 
         // Act 
-        var validationResults = new List<ValidationResult>();
-        ValidateMembers(publisherBuilder, validationResults, "Chunk");
+        var validationResults = ValidateBuilder(publisherBuilder);
 
         // Assert
         Assert.That(validationResults.Count(r => r.ErrorMessage!.Contains("Chunk")), Is.EqualTo(1));
@@ -525,8 +523,7 @@ public class PublisherBuilderTests
         publisherBuilder.Configure(senderConfiguration);
 
         // Act 
-        var validationResults = new List<ValidationResult>();
-        ValidateMembers(publisherBuilder, validationResults, "Chunk");
+        var validationResults = ValidateBuilder(publisherBuilder);
 
         // Assert
         Assert.That(validationResults.Count(r => r.ErrorMessage!.Contains("Chunk")), Is.EqualTo(0));
@@ -545,11 +542,32 @@ public class PublisherBuilderTests
         publisherBuilder.Configure(senderConfiguration);
 
         // Act 
-        var validationResults = new List<ValidationResult>();
-        ValidateMembers(publisherBuilder, validationResults, "Chunk");
+        var validationResults = ValidateBuilder(publisherBuilder);
 
         // Assert
         Assert.That(validationResults.Count(r => r.ErrorMessage!.Contains("Chunk")), Is.EqualTo(0));
+    }
+
+    [Test]
+    [TestCaseSource(nameof(TestSendersWhichSupportAllSending))]
+    public void
+        TestValidationOfChunks_ConfigureProtocolWhichSupportsSingleAndChunkModes_ShouldBeValidWithAndWithoutChunks(
+            ISenderConfig senderConfiguration)
+    {
+        var withoutChunksBuilder = new PublisherBuilder()
+            .Configure(senderConfiguration);
+        var withChunksBuilder = new PublisherBuilder()
+            .WithChunks(new Chunks())
+            .Configure(senderConfiguration);
+
+        var withoutChunksResults = ValidateBuilder(withoutChunksBuilder);
+        var withChunksResults = ValidateBuilder(withChunksBuilder);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(withoutChunksResults.Count(result => result.ErrorMessage!.Contains("Chunk")), Is.EqualTo(0));
+            Assert.That(withChunksResults.Count(result => result.ErrorMessage!.Contains("Chunk")), Is.EqualTo(0));
+        });
     }
 
     private static object? GetFieldValue(object? obj, string fieldName)
@@ -560,32 +578,10 @@ public class PublisherBuilderTests
         return field?.GetValue(obj);
     }
 
-    private static void ValidateMembers(object instance, ICollection<ValidationResult> validationResults,
-        params string[] propertyNames)
+    private static List<ValidationResult> ValidateBuilder(object instance)
     {
-        foreach (var propertyName in propertyNames.Distinct(StringComparer.Ordinal))
-        {
-            var property = instance.GetType()
-                .GetProperty(propertyName, BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
-            if (property == null || property.GetIndexParameters().Length > 0)
-            {
-                continue;
-            }
-
-            var validationContext = new ValidationContext(instance, null, null)
-            {
-                MemberName = property.Name
-            };
-            var getter = property.GetGetMethod(nonPublic: true);
-            var value = getter?.Invoke(instance, null);
-            foreach (var validationAttribute in property.GetCustomAttributes<ValidationAttribute>())
-            {
-                var result = validationAttribute.GetValidationResult(value, validationContext);
-                if (result != null && result != ValidationResult.Success)
-                {
-                    validationResults.Add(result);
-                }
-            }
-        }
+        return instance is IValidatableObject validatable
+            ? validatable.Validate(new ValidationContext(instance)).ToList()
+            : [];
     }
 }
