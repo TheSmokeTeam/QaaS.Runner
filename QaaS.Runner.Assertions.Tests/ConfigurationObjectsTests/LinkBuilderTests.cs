@@ -69,6 +69,14 @@ public class LinkBuilderTests
     }
 
     [Test]
+    public void UpdateConfiguration_WithConfigurationWithoutExistingConfiguration_ThrowsInvalidOperationException()
+    {
+        var builder = new LinkBuilder();
+
+        Assert.Throws<InvalidOperationException>(() => builder.UpdateConfiguration(new KibanaLinkConfig()));
+    }
+
+    [Test]
     public void Build_WithoutConfiguredType_ThrowsInvalidOperationException()
     {
         var builder = new LinkBuilder();
@@ -81,7 +89,7 @@ public class LinkBuilderTests
     {
         var builder = new LinkBuilder()
             .Named("kibana-link")
-            .Configure(new KibanaLinkConfig
+            .CreateConfiguration(new KibanaLinkConfig
             {
                 Url = "https://kibana.local",
                 DataViewId = "data-view"
@@ -98,7 +106,7 @@ public class LinkBuilderTests
     public void Build_WithPrometheusConfig_ReturnsPrometheusLink()
     {
         var builder = new LinkBuilder()
-            .Configure(new PrometheusLinkConfig
+            .CreateConfiguration(new PrometheusLinkConfig
             {
                 Url = "https://prometheus.local",
                 Expressions = ["up"]
@@ -113,7 +121,7 @@ public class LinkBuilderTests
     public void Build_WithGrafanaConfig_ReturnsGrafanaLink()
     {
         var builder = new LinkBuilder()
-            .Configure(new GrafanaLinkConfig
+            .CreateConfiguration(new GrafanaLinkConfig
             {
                 Url = "https://grafana.local",
                 DashboardId = "dashboard-id"
@@ -128,7 +136,7 @@ public class LinkBuilderTests
     public void Build_WithoutConfiguredName_UsesConfigTypeName()
     {
         var builder = new LinkBuilder()
-            .Configure(new KibanaLinkConfig
+            .CreateConfiguration(new KibanaLinkConfig
             {
                 Url = "https://kibana.local",
                 DataViewId = "data-view"

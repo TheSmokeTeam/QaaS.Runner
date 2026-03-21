@@ -866,6 +866,14 @@ public class ConsumerBuilderTests
     }
 
     [Test]
+    public void UpdateConfiguration_WithConfigurationWithoutExistingConfiguration_ThrowsInvalidOperationException()
+    {
+        var builder = new ConsumerBuilder();
+
+        Assert.Throws<InvalidOperationException>(() => builder.UpdateConfiguration(new RabbitMqReaderConfig()));
+    }
+
+    [Test]
     public void UpdatePolicyAt_WithValidIndex_ReplacesPolicy()
     {
         var replacementPolicy = new PolicyBuilder();

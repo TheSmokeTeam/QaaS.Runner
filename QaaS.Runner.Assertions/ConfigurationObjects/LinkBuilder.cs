@@ -8,6 +8,9 @@ using QaaS.Runner.Assertions.LinkBuilders;
 
 namespace QaaS.Runner.Assertions.ConfigurationObjects;
 
+/// <summary>
+/// Fluent builder for assertion link configuration and runtime link creation.
+/// </summary>
 public class LinkBuilder
 {
     [Description("The display name of the link in the test results, if none is given uses the `Type` as the name")]
@@ -22,17 +25,34 @@ public class LinkBuilder
     [Description("Links the grafana dashboard filtered for the test's session times to each test result.")]
     internal GrafanaLinkConfig? Grafana { get; set; }
 
+    /// <summary>
+    /// Sets the display name used for the generated link.
+    /// </summary>
     public LinkBuilder Named(string name)
     {
         Name = name;
         return this;
     }
 
+    /// <summary>
+    /// Compatibility alias for <see cref="CreateConfiguration" />.
+    /// </summary>
     public LinkBuilder Create(ILinkConfig config)
+    {
+        return CreateConfiguration(config);
+    }
+
+    /// <summary>
+    /// Sets the configured link source.
+    /// </summary>
+    public LinkBuilder CreateConfiguration(ILinkConfig config)
     {
         return Configure(config);
     }
 
+    /// <summary>
+    /// Returns the currently configured link source, if any.
+    /// </summary>
     public ILinkConfig? ReadConfiguration()
     {
         if (Kibana != null)
@@ -63,13 +83,17 @@ public class LinkBuilder
     /// </summary>
     public LinkBuilder UpdateConfiguration(ILinkConfig config)
     {
-        return Configure(ReadConfiguration().UpdateConfiguration(config));
+        var currentConfig = ReadConfiguration() ??
+                            throw new InvalidOperationException("Link configuration is not set");
+        return Configure(currentConfig.UpdateConfiguration(config));
     }
 
+    /// <summary>
+    /// Clears the configured link source.
+    /// </summary>
     public LinkBuilder DeleteConfiguration()
     {
-        Reset();
-        return this;
+        return Reset();
     }
     
     private LinkBuilder Reset()
@@ -80,6 +104,9 @@ public class LinkBuilder
         return this;
     }
 
+    /// <summary>
+    /// Replaces the current link source with the provided configuration type.
+    /// </summary>
     public LinkBuilder Configure(ILinkConfig config)
     {
         Reset();

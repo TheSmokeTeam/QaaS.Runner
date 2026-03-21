@@ -107,33 +107,53 @@ public class MockerCommandBuilder
         return this;
     }
 
+    /// <summary>
+    /// Compatibility alias for <see cref="Configure" />.
+    /// </summary>
     public MockerCommandBuilder WithCommand(MockerCommandConfig command)
     {
         return Configure(command);
     }
 
+    /// <summary>
+    /// Compatibility alias for <see cref="Configure" /> that matches the configuration CRUD pattern used by other builders.
+    /// </summary>
     public MockerCommandBuilder CreateConfiguration(MockerCommandConfig command)
     {
         return Configure(command);
     }
 
+    /// <summary>
+    /// Returns the currently configured mocker command configuration, if any.
+    /// </summary>
     public MockerCommandConfig? ReadConfiguration()
     {
         return Command;
     }
 
+    /// <summary>
+    /// Applies a computed partial update to the current mocker command configuration while preserving omitted fields.
+    /// </summary>
     public MockerCommandBuilder UpdateConfiguration(Func<MockerCommandConfig, MockerCommandConfig> update)
     {
         Command = update(ReadConfiguration() ?? throw new InvalidOperationException("Command configuration is not set"));
         return this;
     }
 
+    /// <summary>
+    /// Updates the mocker command configuration by merging same-type values and replacing the current type when needed.
+    /// </summary>
     public MockerCommandBuilder UpdateConfiguration(MockerCommandConfig command)
     {
-        Command = ReadConfiguration().UpdateConfiguration(command);
+        var currentConfig = ReadConfiguration() ??
+                            throw new InvalidOperationException("Command configuration is not set");
+        Command = currentConfig.UpdateConfiguration(command);
         return this;
     }
 
+    /// <summary>
+    /// Clears the configured mocker command.
+    /// </summary>
     public MockerCommandBuilder DeleteConfiguration()
     {
         Command = null;

@@ -72,6 +72,30 @@ public class ProbeBuilderTests
     }
 
     [Test]
+    public void DeleteDataSourceName_Should_Remove_From_Array()
+    {
+        var builder = new ProbeBuilder()
+            .AddDataSourceName("DataSource1")
+            .AddDataSourceName("DataSource2");
+
+        builder.DeleteDataSourceName("DataSource1");
+
+        Assert.That(builder.DataSourceNames, Is.EquivalentTo(["DataSource2"]));
+    }
+
+    [Test]
+    public void DeleteDataSourcePattern_Should_Remove_From_Array()
+    {
+        var builder = new ProbeBuilder()
+            .AddDataSourcePattern(@"^\w+$")
+            .AddDataSourcePattern(@"^\d+$");
+
+        builder.DeleteDataSourcePattern(@"^\w+$");
+
+        Assert.That(builder.DataSourcePatterns, Is.EquivalentTo([@"^\d+$"]));
+    }
+
+    [Test]
     public void AddDataSourceFilters_When_Collections_Are_Null_Initializes_Them()
     {
         var builder = new ProbeBuilder();

@@ -14,6 +14,9 @@ using QaaS.Runner.Sessions.RuntimeOverrides;
 
 namespace QaaS.Runner.Sessions.Actions.Collectors;
 
+/// <summary>
+/// Fluent builder for collector actions and their fetcher configuration.
+/// </summary>
 public class CollectorBuilder
 {
     [Required]
@@ -40,29 +43,52 @@ public class CollectorBuilder
         " its result array represents a single value at a certain time.")]
     internal PrometheusFetcherConfig? Prometheus { get; set; }
 
+    /// <summary>
+    /// Sets the collector name.
+    /// </summary>
     public CollectorBuilder Named(string name)
     {
         Name = name;
         return this;
     }
 
+    /// <summary>
+    /// Sets the collector's data filter.
+    /// </summary>
     public CollectorBuilder FilterData(DataFilter dataFilter)
     {
         DataFilter = dataFilter;
         return this;
     }
 
+    /// <summary>
+    /// Sets the relative time window used for collection.
+    /// </summary>
     public CollectorBuilder CollectInRange(CollectionRange collectionRange)
     {
         CollectionRange = collectionRange;
         return this;
     }
 
+    /// <summary>
+    /// Compatibility alias for <see cref="CreateConfiguration" />.
+    /// </summary>
     public CollectorBuilder Create(IFetcherConfig config)
+    {
+        return CreateConfiguration(config);
+    }
+
+    /// <summary>
+    /// Sets the configured collector fetcher source.
+    /// </summary>
+    public CollectorBuilder CreateConfiguration(IFetcherConfig config)
     {
         return Configure(config);
     }
 
+    /// <summary>
+    /// Returns the currently configured fetcher source, if any.
+    /// </summary>
     public IFetcherConfig? ReadConfiguration()
     {
         return Prometheus;
@@ -83,20 +109,28 @@ public class CollectorBuilder
     /// </summary>
     public CollectorBuilder UpdateConfiguration(IFetcherConfig config)
     {
-        return Configure(ReadConfiguration().UpdateConfiguration(config));
+        var currentConfig = ReadConfiguration() ??
+                            throw new InvalidOperationException("Collector configuration is not set");
+        return Configure(currentConfig.UpdateConfiguration(config));
     }
 
+    /// <summary>
+    /// Clears the configured fetcher source.
+    /// </summary>
     public CollectorBuilder DeleteConfiguration()
     {
-        Reset();
+        return Reset();
+    }
+
+    private CollectorBuilder Reset()
+    {
+        Prometheus = null;
         return this;
     }
 
-    private void Reset()
-    {
-        Prometheus = null;
-    }
-
+    /// <summary>
+    /// Replaces the current collector fetcher source with the provided configuration type.
+    /// </summary>
     public CollectorBuilder Configure(IFetcherConfig config)
     {
         Reset();

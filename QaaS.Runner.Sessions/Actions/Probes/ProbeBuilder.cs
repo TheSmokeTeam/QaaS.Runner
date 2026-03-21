@@ -17,6 +17,9 @@ using YamlDotNet.Serialization;
 
 namespace QaaS.Runner.Sessions.Actions.Probes;
 
+/// <summary>
+/// Fluent builder for probe configuration and runtime probe action creation.
+/// </summary>
 public class ProbeBuilder : IYamlConvertible
 {
     [Required]
@@ -41,12 +44,18 @@ public class ProbeBuilder : IYamlConvertible
                  "the configuration given here is loaded into the provided probe dynamically.")]
     internal IConfiguration ProbeConfiguration { get; set; } = new ConfigurationBuilder().Build();
 
+    /// <summary>
+    /// Reads YAML configuration for a probe builder.
+    /// </summary>
     public void Read(IParser parser, Type expectedType, ObjectDeserializer nestedObjectDeserializer)
     {
         throw new NotSupportedException($"{nameof(Read)} doesn't support custom" +
                                         $" deserialization from Yaml for {nameof(ProbeBuilder)}");
     }
 
+    /// <summary>
+    /// Writes the probe builder configuration to YAML.
+    /// </summary>
     public void Write(IEmitter emitter, ObjectSerializer nestedObjectSerializer)
     {
         var probeConfiguration = ProbeConfiguration
@@ -60,24 +69,36 @@ public class ProbeBuilder : IYamlConvertible
         });
     }
 
+    /// <summary>
+    /// Sets the probe name.
+    /// </summary>
     public ProbeBuilder Named(string name)
     {
         Name = name;
         return this;
     }
 
+    /// <summary>
+    /// Sets the stage in which the probe runs.
+    /// </summary>
     public ProbeBuilder AtStage(int stage)
     {
         Stage = stage;
         return this;
     }
 
+    /// <summary>
+    /// Sets the probe hook implementation name.
+    /// </summary>
     public ProbeBuilder HookNamed(string hookName)
     {
         Probe = hookName;
         return this;
     }
 
+    /// <summary>
+    /// Adds a data source name input to the probe.
+    /// </summary>
     public ProbeBuilder AddDataSourceName(string dataSourceName)
     {
         var dataSourceNamesList = DataSourceNames?.ToList() ?? [];
@@ -86,16 +107,25 @@ public class ProbeBuilder : IYamlConvertible
         return this;
     }
 
+    /// <summary>
+    /// Compatibility alias for <see cref="AddDataSourceName" />.
+    /// </summary>
     public ProbeBuilder CreateDataSourceName(string dataSourceName)
     {
         return AddDataSourceName(dataSourceName);
     }
 
+    /// <summary>
+    /// Returns the configured probe data source names.
+    /// </summary>
     public IReadOnlyList<string> ReadDataSourceNames()
     {
         return DataSourceNames;
     }
 
+    /// <summary>
+    /// Replaces one configured probe data source name with another.
+    /// </summary>
     public ProbeBuilder UpdateDataSourceName(string existingValue, string newValue)
     {
         var index = Array.IndexOf(DataSourceNames, existingValue);
@@ -107,12 +137,26 @@ public class ProbeBuilder : IYamlConvertible
         return this;
     }
 
-    public ProbeBuilder RemoveDataSourceName(string dataSourceName)
+    /// <summary>
+    /// Removes a configured probe data source name.
+    /// </summary>
+    public ProbeBuilder DeleteDataSourceName(string dataSourceName)
     {
         DataSourceNames = DataSourceNames.Where(value => value != dataSourceName).ToArray();
         return this;
     }
 
+    /// <summary>
+    /// Compatibility alias for <see cref="DeleteDataSourceName" />.
+    /// </summary>
+    public ProbeBuilder RemoveDataSourceName(string dataSourceName)
+    {
+        return DeleteDataSourceName(dataSourceName);
+    }
+
+    /// <summary>
+    /// Adds a data source pattern input to the probe.
+    /// </summary>
     public ProbeBuilder AddDataSourcePattern(string dataSourcePattern)
     {
         var dataSourcePatternsList = DataSourcePatterns?.ToList() ?? [];
@@ -121,16 +165,25 @@ public class ProbeBuilder : IYamlConvertible
         return this;
     }
 
+    /// <summary>
+    /// Compatibility alias for <see cref="AddDataSourcePattern" />.
+    /// </summary>
     public ProbeBuilder CreateDataSourcePattern(string dataSourcePattern)
     {
         return AddDataSourcePattern(dataSourcePattern);
     }
 
+    /// <summary>
+    /// Returns the configured probe data source patterns.
+    /// </summary>
     public IReadOnlyList<string> ReadDataSourcePatterns()
     {
         return DataSourcePatterns;
     }
 
+    /// <summary>
+    /// Replaces one configured probe data source pattern with another.
+    /// </summary>
     public ProbeBuilder UpdateDataSourcePattern(string existingValue, string newValue)
     {
         var index = Array.IndexOf(DataSourcePatterns, existingValue);
@@ -142,12 +195,26 @@ public class ProbeBuilder : IYamlConvertible
         return this;
     }
 
-    public ProbeBuilder RemoveDataSourcePattern(string dataSourcePattern)
+    /// <summary>
+    /// Removes a configured probe data source pattern.
+    /// </summary>
+    public ProbeBuilder DeleteDataSourcePattern(string dataSourcePattern)
     {
         DataSourcePatterns = DataSourcePatterns.Where(value => value != dataSourcePattern).ToArray();
         return this;
     }
 
+    /// <summary>
+    /// Compatibility alias for <see cref="DeleteDataSourcePattern" />.
+    /// </summary>
+    public ProbeBuilder RemoveDataSourcePattern(string dataSourcePattern)
+    {
+        return DeleteDataSourcePattern(dataSourcePattern);
+    }
+
+    /// <summary>
+    /// Replaces the current probe configuration with the provided configuration object.
+    /// </summary>
     public ProbeBuilder Configure(object configuration)
     {
         var stream = new MemoryStream(Encoding.UTF8.GetBytes(JsonSerializer.Serialize(configuration)));
@@ -155,17 +222,26 @@ public class ProbeBuilder : IYamlConvertible
         return this;
     }
 
+    /// <summary>
+    /// Returns the currently configured probe configuration.
+    /// </summary>
     public IConfiguration ReadConfiguration()
     {
         return ProbeConfiguration;
     }
 
+    /// <summary>
+    /// Merges the provided configuration object into the current probe configuration.
+    /// </summary>
     public ProbeBuilder UpdateConfiguration(object configuration)
     {
         ProbeConfiguration = ProbeConfiguration.UpdateConfiguration(configuration);
         return this;
     }
 
+    /// <summary>
+    /// Clears the configured probe configuration.
+    /// </summary>
     public ProbeBuilder DeleteConfiguration()
     {
         ProbeConfiguration = new ConfigurationBuilder().Build();

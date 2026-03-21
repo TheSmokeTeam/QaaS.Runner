@@ -35,17 +35,34 @@ public class StorageBuilder
         return this;
     }
 
+    /// <summary>
+    /// Sets the JSON formatting used by runtime storages.
+    /// </summary>
     public StorageBuilder WithJsonStorageFormat(Formatting format)
     {
         JsonStorageFormat = format;
         return this;
     }
 
+    /// <summary>
+    /// Compatibility alias for <see cref="CreateConfiguration" />.
+    /// </summary>
     public StorageBuilder Create(IStorageConfig storageConfig)
+    {
+        return CreateConfiguration(storageConfig);
+    }
+
+    /// <summary>
+    /// Sets the configured storage implementation source.
+    /// </summary>
+    public StorageBuilder CreateConfiguration(IStorageConfig storageConfig)
     {
         return Configure(storageConfig);
     }
 
+    /// <summary>
+    /// Returns the currently configured storage source, if any.
+    /// </summary>
     public IStorageConfig? ReadConfiguration()
     {
         return (IStorageConfig?)S3 ?? FileSystem;
@@ -66,15 +83,22 @@ public class StorageBuilder
     /// </summary>
     public StorageBuilder UpdateConfiguration(IStorageConfig storageConfig)
     {
-        return Configure(ReadConfiguration().UpdateConfiguration(storageConfig));
+        var currentConfig = ReadConfiguration() ??
+                            throw new InvalidOperationException("Storage configuration is not set");
+        return Configure(currentConfig.UpdateConfiguration(storageConfig));
     }
 
+    /// <summary>
+    /// Clears the configured storage source.
+    /// </summary>
     public StorageBuilder DeleteConfiguration()
     {
-        Reset();
-        return this;
+        return Reset();
     }
 
+    /// <summary>
+    /// Replaces the current storage source with the provided configuration type.
+    /// </summary>
     public StorageBuilder Configure(IStorageConfig storageConfig)
     {
         Reset();

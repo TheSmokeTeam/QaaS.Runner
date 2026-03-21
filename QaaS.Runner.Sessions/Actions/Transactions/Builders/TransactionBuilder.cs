@@ -257,11 +257,17 @@ public class TransactionBuilder
         return this;
     }
 
+    /// <summary>
+    /// Compatibility alias for <see cref="Configure" /> that matches the configuration CRUD pattern used by other builders.
+    /// </summary>
     public TransactionBuilder CreateConfiguration(ITransactorConfig config)
     {
         return Configure(config);
     }
 
+    /// <summary>
+    /// Returns the currently configured transactor source, if any.
+    /// </summary>
     public ITransactorConfig? ReadConfiguration()
     {
         return (ITransactorConfig?)Http ?? Grpc;
@@ -282,9 +288,14 @@ public class TransactionBuilder
     /// </summary>
     public TransactionBuilder UpdateConfiguration(ITransactorConfig config)
     {
-        return Configure(ReadConfiguration().UpdateConfiguration(config));
+        var currentConfig = ReadConfiguration() ??
+                            throw new InvalidOperationException("Transaction configuration is not set");
+        return Configure(currentConfig.UpdateConfiguration(config));
     }
 
+    /// <summary>
+    /// Clears the configured transactor source.
+    /// </summary>
     public TransactionBuilder DeleteConfiguration()
     {
         return Reset();
@@ -297,6 +308,9 @@ public class TransactionBuilder
         return this;
     }
 
+    /// <summary>
+    /// Replaces the current transactor source with the provided configuration type.
+    /// </summary>
     public TransactionBuilder Configure(ITransactorConfig config)
     {
         Reset();

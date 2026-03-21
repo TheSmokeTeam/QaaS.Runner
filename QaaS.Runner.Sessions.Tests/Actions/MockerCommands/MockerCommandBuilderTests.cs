@@ -98,6 +98,15 @@ public class MockerCommandBuilderTests
     }
 
     [Test]
+    public void UpdateConfiguration_WithConfigurationWithoutExistingConfiguration_ThrowsInvalidOperationException()
+    {
+        var builder = new MockerCommandBuilder();
+
+        Assert.Throws<InvalidOperationException>(() =>
+            builder.UpdateConfiguration(new MockerCommandConfig { TriggerAction = new TriggerAction() }));
+    }
+
+    [Test]
     public void CreateReadUpdateDeleteConfiguration_PerformsExpectedCrudFlow()
     {
         var builder = new MockerCommandBuilder();

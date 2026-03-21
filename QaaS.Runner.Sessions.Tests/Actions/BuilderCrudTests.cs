@@ -252,8 +252,8 @@ public class BuilderCrudTests
         Assert.That(builder.ReadConfiguration()["threshold"], Is.EqualTo("5"));
         Assert.That(builder.ReadConfiguration()["nested:value"], Is.EqualTo("set"));
 
-        builder.RemoveDataSourceName("source-updated")
-            .RemoveDataSourcePattern("^updated-.*$")
+        builder.DeleteDataSourceName("source-updated")
+            .DeleteDataSourcePattern("^updated-.*$")
             .DeleteConfiguration();
 
         Assert.That(builder.ReadDataSourceNames(), Is.Empty);
@@ -264,7 +264,7 @@ public class BuilderCrudTests
     [Test]
     public void CollectorBuilder_ShouldSupportConfigurationCrud()
     {
-        var builder = new CollectorBuilder().Create(new PrometheusFetcherConfig
+        var builder = new CollectorBuilder().CreateConfiguration(new PrometheusFetcherConfig
         {
             Url = "https://prometheus",
             Expression = "up"
@@ -291,7 +291,7 @@ public class BuilderCrudTests
     [Test]
     public void CollectorBuilder_UpdateConfiguration_WithConfiguration_MergesSameTypeAndPreservesExistingFields()
     {
-        var builder = new CollectorBuilder().Create(new PrometheusFetcherConfig
+        var builder = new CollectorBuilder().CreateConfiguration(new PrometheusFetcherConfig
         {
             Url = "https://prometheus",
             Expression = "up",

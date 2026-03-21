@@ -71,7 +71,7 @@ public class BuilderCrudTests
     public void LinkBuilder_ShouldSupportConfigurationCrud()
     {
         var builder = new LinkBuilder()
-            .Create(new KibanaLinkConfig { Url = "https://kibana", DataViewId = "view" });
+            .CreateConfiguration(new KibanaLinkConfig { Url = "https://kibana", DataViewId = "view" });
 
         builder.UpdateConfiguration(_ => new GrafanaLinkConfig
         {
@@ -95,7 +95,7 @@ public class BuilderCrudTests
     public void LinkBuilder_UpdateConfiguration_WithConfiguration_MergesSameTypeAndPreservesExistingFields()
     {
         var builder = new LinkBuilder()
-            .Create(new KibanaLinkConfig
+            .CreateConfiguration(new KibanaLinkConfig
             {
                 Url = "https://kibana",
                 DataViewId = "view",

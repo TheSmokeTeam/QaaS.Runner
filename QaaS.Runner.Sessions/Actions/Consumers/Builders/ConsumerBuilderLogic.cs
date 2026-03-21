@@ -93,11 +93,17 @@ public partial class ConsumerBuilder
         return this;
     }
 
+    /// <summary>
+    /// Compatibility alias for <see cref="Configure" /> that matches the configuration CRUD pattern used by other builders.
+    /// </summary>
     public ConsumerBuilder CreateConfiguration(IReaderConfig config)
     {
         return Configure(config);
     }
 
+    /// <summary>
+    /// Returns the currently configured reader source, if any.
+    /// </summary>
     public IReaderConfig? ReadConfiguration()
     {
         if (RabbitMq != null) return RabbitMq;
@@ -127,9 +133,14 @@ public partial class ConsumerBuilder
     /// </summary>
     public ConsumerBuilder UpdateConfiguration(IReaderConfig config)
     {
-        return Configure(ReadConfiguration().UpdateConfiguration(config));
+        var currentConfig = ReadConfiguration() ??
+                            throw new InvalidOperationException("Consumer configuration is not set");
+        return Configure(currentConfig.UpdateConfiguration(config));
     }
 
+    /// <summary>
+    /// Clears the configured reader source.
+    /// </summary>
     public ConsumerBuilder DeleteConfiguration()
     {
         return Reset();
@@ -150,6 +161,9 @@ public partial class ConsumerBuilder
         return this;
     }
 
+    /// <summary>
+    /// Replaces the current reader source with the provided configuration type.
+    /// </summary>
     public ConsumerBuilder Configure(IReaderConfig config)
     {
         Reset();

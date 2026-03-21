@@ -213,6 +213,14 @@ public class TransactionBuilderTests
     }
 
     [Test]
+    public void UpdateConfiguration_WithConfigurationWithoutExistingConfiguration_ThrowsInvalidOperationException()
+    {
+        var builder = new TransactionBuilder();
+
+        Assert.Throws<InvalidOperationException>(() => builder.UpdateConfiguration(new HttpTransactorConfig()));
+    }
+
+    [Test]
     public void Build_Throws_When_No_Transactor_Config()
     {
         var builder = new TransactionBuilder();

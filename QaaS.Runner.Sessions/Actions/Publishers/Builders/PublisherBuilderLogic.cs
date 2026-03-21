@@ -200,11 +200,17 @@ public partial class PublisherBuilder
         return this;
     }
 
+    /// <summary>
+    /// Compatibility alias for <see cref="Configure" /> that matches the configuration CRUD pattern used by other builders.
+    /// </summary>
     public PublisherBuilder CreateConfiguration(ISenderConfig config)
     {
         return Configure(config);
     }
 
+    /// <summary>
+    /// Returns the currently configured sender source, if any.
+    /// </summary>
     public ISenderConfig? ReadConfiguration()
     {
         if (RabbitMq != null) return RabbitMq;
@@ -235,9 +241,14 @@ public partial class PublisherBuilder
     /// </summary>
     public PublisherBuilder UpdateConfiguration(ISenderConfig config)
     {
-        return Configure(ReadConfiguration().UpdateConfiguration(config));
+        var currentConfig = ReadConfiguration() ??
+                            throw new InvalidOperationException("Publisher configuration is not set");
+        return Configure(currentConfig.UpdateConfiguration(config));
     }
 
+    /// <summary>
+    /// Clears the configured sender source.
+    /// </summary>
     public PublisherBuilder DeleteConfiguration()
     {
         return Reset();
@@ -259,6 +270,9 @@ public partial class PublisherBuilder
         return this;
     }
 
+    /// <summary>
+    /// Replaces the current sender source with the provided configuration type.
+    /// </summary>
     public PublisherBuilder Configure(ISenderConfig config)
     {
         Reset();

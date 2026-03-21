@@ -364,6 +364,14 @@ public class PublisherBuilderTests
     }
 
     [Test]
+    public void UpdateConfiguration_WithConfigurationWithoutExistingConfiguration_ThrowsInvalidOperationException()
+    {
+        var builder = new PublisherBuilder();
+
+        Assert.Throws<InvalidOperationException>(() => builder.UpdateConfiguration(new RabbitMqSenderConfig()));
+    }
+
+    [Test]
     public void UpdatePolicyAt_WithValidIndex_ReplacesPolicy()
     {
         var replacementPolicy = new PolicyBuilder();

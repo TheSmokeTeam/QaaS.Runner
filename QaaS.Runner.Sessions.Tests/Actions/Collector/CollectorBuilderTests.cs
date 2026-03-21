@@ -142,6 +142,16 @@ public class CollectorBuilderTests
     }
 
     [Test]
+    public void UpdateConfiguration_WithConfigurationWithoutExistingConfiguration_Should_Throw()
+    {
+        var builder = new CollectorBuilder()
+            .Named("TestCollector");
+
+        Assert.Throws<InvalidOperationException>(() =>
+            builder.UpdateConfiguration(new PrometheusFetcherConfig()));
+    }
+
+    [Test]
     public void Build_With_Runtime_Override_Uses_Override_Action()
     {
         var fetcher = new Mock<IFetcher>();
@@ -153,7 +163,7 @@ public class CollectorBuilderTests
 
         var builder = new CollectorBuilder()
             .Named("TestCollector")
-            .Configure(new PrometheusFetcherConfig { Url = "https://promql:8080", Expression = "sum ()" });
+            .CreateConfiguration(new PrometheusFetcherConfig { Url = "https://promql:8080", Expression = "sum ()" });
 
         var result = builder.Build(context, _actionFailures, _sessionName);
         var fetcherField = typeof(global::QaaS.Runner.Sessions.Actions.Collectors.Collector)
@@ -173,7 +183,7 @@ public class CollectorBuilderTests
         });
         var builder = new CollectorBuilder()
             .Named("TestCollector")
-            .Configure(new PrometheusFetcherConfig { Url = "https://promql:8080", Expression = "sum ()" });
+            .CreateConfiguration(new PrometheusFetcherConfig { Url = "https://promql:8080", Expression = "sum ()" });
 
         var result = builder.Build(context, _actionFailures, _sessionName);
 
