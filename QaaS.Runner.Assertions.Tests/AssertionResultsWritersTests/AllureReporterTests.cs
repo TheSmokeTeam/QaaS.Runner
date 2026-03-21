@@ -41,6 +41,7 @@ public class AllureReporterTests
             {
                 Logger = Globals.Logger
             },
+            SaveLogs = true,
             SaveAttachments = true,
             FileSystem = new FileSystem(),
             Name = null
@@ -465,6 +466,7 @@ public class AllureReporterTests
     public void WriteTestResults_WithStoredSessionLogs_PersistsGeneratedSessionLogAttachment()
     {
         Reporter!.SaveSessionData = false;
+        Reporter.SaveLogs = true;
         Reporter.SaveTemplate = false;
         Reporter.SaveAttachments = false;
         Reporter.Context.AppendSessionLog("test-session", "Starting session test-session");
@@ -504,6 +506,47 @@ public class AllureReporterTests
             Assert.That(File.Exists(logAttachmentPath), Is.True);
             Assert.That(File.ReadAllText(logAttachmentPath), Does.Contain("Starting session test-session"));
             Assert.That(File.ReadAllText(logAttachmentPath), Does.Contain("Session test-session completed."));
+        });
+    }
+
+    [Test]
+    public void WriteTestResults_WithStoredSessionLogsAndSaveLogsDisabled_DoesNotPersistSessionLogAttachment()
+    {
+        Reporter!.SaveSessionData = false;
+        Reporter.SaveLogs = false;
+        Reporter.SaveTemplate = false;
+        Reporter.SaveAttachments = false;
+        Reporter.Context.AppendSessionLog("test-session", "Starting session test-session");
+        Reporter.Context.AppendSessionLog("test-session", "Session test-session completed.");
+        var sessionData = new SessionData
+        {
+            Name = "test-session",
+            UtcStartTime = DateTime.UtcNow.AddSeconds(-1),
+            UtcEndTime = DateTime.UtcNow,
+            SessionFailures = []
+        };
+        var assertionResult = new AssertionResult
+        {
+            Assertion = new Assertion
+            {
+                Name = "log-assertion",
+                AssertionName = "LogAssertion",
+                SessionDataList = new List<SessionData> { sessionData }.ToImmutableList(),
+                StatussesToReport = null
+            },
+            AssertionStatus = AssertionStatus.Passed,
+            TestDurationMs = 10,
+            Flaky = new Flaky { IsFlaky = false, FlakinessReasons = [] }
+        };
+
+        Reporter.WriteTestResults(assertionResult);
+        var resultFile = Directory.GetFiles(AllureResultsFolder, "*-result.json", SearchOption.TopDirectoryOnly).Single();
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(File.ReadAllText(resultFile), Does.Not.Contain("SessionLog"));
+            Assert.That(Directory.Exists(Path.Combine(AllureResultsFolder, "SessionLogs")), Is.False);
+            Assert.That(Directory.GetFiles(AllureResultsFolder, "*-attachment*", SearchOption.TopDirectoryOnly), Is.Empty);
         });
     }
 

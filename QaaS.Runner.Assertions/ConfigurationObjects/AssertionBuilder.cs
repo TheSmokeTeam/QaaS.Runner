@@ -65,6 +65,10 @@ public class AssertionBuilder : IYamlConvertible
     [DefaultValue(true)]
     internal bool SaveSessionData { get; set; } = true;
 
+    [Description("Whether to save the session logs belonging to this assertion in the test report")]
+    [DefaultValue(true)]
+    internal bool SaveLogs { get; set; } = true;
+
     [Description("Whether to save the attachments of the assertion in the test report (true) or not (false)")]
     [DefaultValue(true)]
     internal bool SaveAttachments { get; set; } = true;
@@ -121,6 +125,7 @@ public class AssertionBuilder : IYamlConvertible
             SessionNames,
             DataSourceNames,
             SaveSessionData,
+            SaveLogs,
             SaveAttachments,
             Name,
             DisplayTrace,
@@ -158,6 +163,17 @@ public class AssertionBuilder : IYamlConvertible
     public AssertionBuilder WeatherToSaveSessionData(bool weatherToSaveSessionData)
     {
         SaveSessionData = weatherToSaveSessionData;
+        return this;
+    }
+
+    /// <summary>
+    /// Sets whether to save session logs.
+    /// </summary>
+    /// <param name="weatherToSaveLogs">Whether to save session logs</param>
+    /// <returns>This builder instance for chaining</returns>
+    public AssertionBuilder WeatherToSaveLogs(bool weatherToSaveLogs)
+    {
+        SaveLogs = weatherToSaveLogs;
         return this;
     }
     
@@ -532,6 +548,7 @@ public class AssertionBuilder : IYamlConvertible
 
         Reporter.DisplayTrace = DisplayTrace;
         Reporter.SaveSessionData = SaveSessionData;
+        Reporter.SaveLogs = SaveLogs;
         Reporter.SaveAttachments = SaveAttachments;
         Reporter.SaveTemplate = SaveTemplate;
         Reporter.Severity = Severity;

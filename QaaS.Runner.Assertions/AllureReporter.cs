@@ -588,7 +588,7 @@ public class AllureReporter : BaseReporter
         if (SaveSessionData)
             attachments.Add(SaveSessionsDataToAllure(sessionData));
 
-        var sessionLogAttachment = SaveSessionLogToAllure(sessionData);
+        var sessionLogAttachment = SaveLogs ? SaveSessionLogToAllure(sessionData) : null;
         if (sessionLogAttachment != null)
             attachments.Add(sessionLogAttachment);
 
@@ -668,7 +668,8 @@ public class AllureReporter : BaseReporter
             if (SaveSessionData)
                 AddSessionsDataToCurrentItem(sessionData);
 
-            AddSessionLogToCurrentItem(sessionData);
+            if (SaveLogs)
+                AddSessionLogToCurrentItem(sessionData);
             if (sessionData.SessionFailures.Any())
                 WriteSessionFailureSteps(sessionData.SessionFailures);
         }

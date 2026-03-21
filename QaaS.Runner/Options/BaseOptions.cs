@@ -24,6 +24,12 @@ public abstract record BaseOptions : LoggerOptions
             "List of files to overwrite the qaas configuration with, The first file overwrites the qaas configuration file and then the one after it overwrite the result and so on...")]
     public IList<string> OverwriteFiles { get; init; } = Array.Empty<string>();
 
+    [AllPathsInEnumerableValid]
+    [Option('f', "with-folders", Default = null,
+        HelpText =
+            "List of folders whose yaml files overwrite the qaas configuration in alphabetical order, after overwrite files and in the order the folders are given.")]
+    public IList<string> OverwriteFolders { get; init; } = Array.Empty<string>();
+
     [Option('r', "overwrite-arguments", Default = null,
         HelpText = @"
 List of arguments to overwrite the qaas configuration with, The first argument overwrites the qaas configuration and then the one after it overwrites the result and so on...

@@ -69,6 +69,7 @@ namespace QaaS.Runner.Tests.LoadersTests
             {
                 ConfigurationFile = "test.yaml",
                 OverwriteFiles = new List<string>(),
+                OverwriteFolders = new List<string>(),
                 OverwriteArguments = new List<string>(),
                 PushReferences = new List<string>(),
                 SendLogs = false
@@ -94,6 +95,7 @@ namespace QaaS.Runner.Tests.LoadersTests
             {
                 ConfigurationFile = "test.yaml",
                 OverwriteFiles = new List<string> { "file1.yaml", "file2.yaml" },
+                OverwriteFolders = new List<string>(),
                 OverwriteArguments = new List<string>(),
                 PushReferences = new List<string>(),
                 SendLogs = false
@@ -101,11 +103,25 @@ namespace QaaS.Runner.Tests.LoadersTests
             yield return new TestCaseData(optionsWithOverwriteFiles, null, null)
                 .SetName("WithOverwriteFiles");
 
-            // Test Case 6: Build context with overwrite arguments
+            // Test Case 6: Build context with overwrite folders
+            var optionsWithOverwriteFolders = new RunOptions
+            {
+                ConfigurationFile = "test.yaml",
+                OverwriteFiles = new List<string>(),
+                OverwriteFolders = new List<string> { "folder1", "folder2" },
+                OverwriteArguments = new List<string>(),
+                PushReferences = new List<string>(),
+                SendLogs = false
+            };
+            yield return new TestCaseData(optionsWithOverwriteFolders, null, null)
+                .SetName("WithOverwriteFolders");
+
+            // Test Case 7: Build context with overwrite arguments
             var optionsWithOverwriteArgs = new RunOptions
             {
                 ConfigurationFile = "test.yaml",
                 OverwriteFiles = new List<string>(),
+                OverwriteFolders = new List<string>(),
                 OverwriteArguments = new List<string> { "arg1=value1", "arg2=value2" },
                 PushReferences = new List<string>(),
                 SendLogs = false
@@ -113,11 +129,12 @@ namespace QaaS.Runner.Tests.LoadersTests
             yield return new TestCaseData(optionsWithOverwriteArgs, null, null)
                 .SetName("WithOverwriteArguments");
 
-            // Test Case 7: Build context with push references
+            // Test Case 8: Build context with push references
             var optionsWithReferences = new RunOptions
             {
                 ConfigurationFile = "test.yaml",
                 OverwriteFiles = new List<string>(),
+                OverwriteFolders = new List<string>(),
                 OverwriteArguments = new List<string>(),
                 PushReferences = new List<string> { "Sessions", "ref1.yml", "ref2.yml" },
                 SendLogs = false
@@ -125,11 +142,12 @@ namespace QaaS.Runner.Tests.LoadersTests
             yield return new TestCaseData(optionsWithReferences, null, null)
                 .SetName("WithPushReferences");
 
-            // Test Case 8: Build context with all options enabled
+            // Test Case 9: Build context with all options enabled
             var allOptions = new RunOptions
             {
                 ConfigurationFile = "full-config.yaml",
                 OverwriteFiles = new List<string> { "overwrite1.yaml" },
+                OverwriteFolders = new List<string> { "overwrite-folder" },
                 OverwriteArguments = new List<string> { "arg=value" },
                 PushReferences = new List<string> { "Sessions", "ref1.yml", "ref2.yml" },
                 ResolveCasesLast = true,
@@ -139,11 +157,12 @@ namespace QaaS.Runner.Tests.LoadersTests
             yield return new TestCaseData(allOptions, "full-execution", "cases/full-case.yaml")
                 .SetName("FullOptionsEnabled");
 
-            // Test Case 9: Build context without environment variable resolution
+            // Test Case 10: Build context without environment variable resolution
             var noEnvResolutionOptions = new RunOptions
             {
                 ConfigurationFile = "no-env.yaml",
                 OverwriteFiles = new List<string>(),
+                OverwriteFolders = new List<string>(),
                 OverwriteArguments = new List<string>(),
                 PushReferences = new List<string>(),
                 DontResolveWithEnvironmentVariables = true,
@@ -190,6 +209,14 @@ namespace QaaS.Runner.Tests.LoadersTests
                 foreach (var overwriteFile in options.OverwriteFiles)
                 {
                     mockContextBuilder.Verify(cb => cb.WithOverwriteFile(overwriteFile), Times.Once);
+                }
+            }
+
+            if (options.OverwriteFolders != null && options.OverwriteFolders.Any())
+            {
+                foreach (var overwriteFolder in options.OverwriteFolders)
+                {
+                    mockContextBuilder.Verify(cb => cb.WithOverwriteFolder(overwriteFolder), Times.Once);
                 }
             }
 

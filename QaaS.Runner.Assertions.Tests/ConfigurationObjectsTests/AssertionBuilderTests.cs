@@ -83,6 +83,7 @@ public class AssertionBuilderTests
         var builder = CreateBuilder()
             .Named("assertion-display")
             .WeatherToSaveSessionData(false)
+            .WeatherToSaveLogs(false)
             .WeatherToSaveAttachments(false)
             .WeatherToSaveConfigurationTemplate(false)
             .WeatherToDisplayTrace(false)
@@ -104,6 +105,7 @@ public class AssertionBuilderTests
         Assert.That(allureReporter.AssertionName, Is.EqualTo("assertion-display"));
         Assert.That(allureReporter.Context, Is.SameAs(context));
         Assert.That(allureReporter.SaveSessionData, Is.False);
+        Assert.That(allureReporter.SaveLogs, Is.False);
         Assert.That(allureReporter.SaveAttachments, Is.False);
         Assert.That(allureReporter.SaveTemplate, Is.False);
         Assert.That(allureReporter.DisplayTrace, Is.False);
@@ -200,6 +202,7 @@ public class AssertionBuilderTests
             .Named("assertion-display")
             .HookNamed("hook-type")
             .WithCategory("smoke")
+            .WeatherToSaveLogs(false)
             .Configure(new
             {
                 Enabled = true,
@@ -218,6 +221,7 @@ public class AssertionBuilderTests
             Assert.That(builder.Category, Is.EqualTo("smoke"));
             Assert.That(serializedType.GetProperty("Assertion")!.GetValue(serialized), Is.EqualTo("hook-type"));
             Assert.That(serializedType.GetProperty("Name")!.GetValue(serialized), Is.EqualTo("assertion-display"));
+            Assert.That(serializedType.GetProperty("SaveLogs")!.GetValue(serialized), Is.EqualTo(false));
         });
         Assert.That(assertionConfiguration, Is.Not.Null);
         Assert.Multiple(() =>

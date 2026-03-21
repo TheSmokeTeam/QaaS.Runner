@@ -55,6 +55,8 @@ public class RunLoader<TRunner, TOptions> : BaseLoader<TOptions, TRunner>
             new RunningSessions(new Dictionary<string, RunningSessionData<object, object>>()));
         foreach (var overwriteFile in Options.OverwriteFiles)
             contextBuilder.WithOverwriteFile(overwriteFile);
+        foreach (var overwriteFolder in Options.OverwriteFolders)
+            contextBuilder.WithOverwriteFolder(overwriteFolder);
         contextBuilder.SetCase(relativeCaseFilePath);
         foreach (var overwriteArgument in Options.OverwriteArguments)
             contextBuilder.WithOverwriteArgument(overwriteArgument);
