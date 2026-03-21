@@ -1319,8 +1319,27 @@ public class SessionExecutionCoverageTests
             .Where(data => data.Name == actionName)
             .SelectMany(data => data.Data)
             .OfType<DetailedData<object>>()
-            .Select(item => item.Body?.ToString() ?? string.Empty)
+            .Select(item => NormalizeBody(item.Body))
             .ToArray() ?? [];
+    }
+
+    private static string NormalizeBody(object? body)
+    {
+        if (body is byte[] bytes)
+        {
+            try
+            {
+                return new QaaS.Framework.Serialization.Deserializers.Binary()
+                           .Deserialize(bytes, typeof(string))
+                           ?.ToString() ?? string.Empty;
+            }
+            catch
+            {
+                return Convert.ToBase64String(bytes);
+            }
+        }
+
+        return body?.ToString() ?? string.Empty;
     }
 
     private static string[] GetSelectedPayloads(bool usePatterns)
