@@ -1,4 +1,5 @@
 using System.Collections;
+using System.Globalization;
 using System.Reflection;
 using Microsoft.Extensions.Configuration;
 using QaaS.Framework.Configurations.ConfigurationBindingUtils;
@@ -73,14 +74,31 @@ public static class ConfigurationTemplateRenderer
         IReadOnlyDictionary<string, object?> rootSections,
         out object? sectionValue)
     {
+        var hasFallbackValue = TryGetAliasedValue(sectionName, fallbackSections, out var fallbackValue);
+        var hasRootValue = TryGetAliasedValue(sectionName, rootSections, out var rootValue);
+        if (hasFallbackValue)
+        {
+            sectionValue = hasRootValue
+                ? PreserveSourceStructure(rootValue, fallbackValue)
+                : fallbackValue;
+            return true;
+        }
+
+        sectionValue = hasRootValue ? rootValue : null;
+        return hasRootValue;
+    }
+
+    /// <summary>
+    /// Looks up a section value using the current section name and any supported aliases.
+    /// </summary>
+    private static bool TryGetAliasedValue(
+        string sectionName,
+        IReadOnlyDictionary<string, object?> sections,
+        out object? sectionValue)
+    {
         foreach (var key in ResolveSectionAliases(sectionName))
         {
-            if (fallbackSections.TryGetValue(key, out sectionValue))
-            {
-                return true;
-            }
-
-            if (rootSections.TryGetValue(key, out sectionValue))
+            if (sections.TryGetValue(key, out sectionValue))
             {
                 return true;
             }
@@ -184,6 +202,33 @@ public static class ConfigurationTemplateRenderer
         return serializedDictionary;
     }
 
+    /// <summary>
+    /// Reuses the source configuration's sparse numeric-key structure when the rendered fallback value would otherwise
+    /// collapse it into a dense list.
+    /// </summary>
+    private static object? PreserveSourceStructure(object? sourceValue, object? renderedValue)
+    {
+        if (renderedValue == null)
+        {
+            return sourceValue;
+        }
+
+        if (sourceValue is IDictionary sourceDictionary &&
+            renderedValue is IList renderedList &&
+            IsNumericKeyDictionary(sourceDictionary))
+        {
+            return RehydrateSparseIndexedDictionary(sourceDictionary, renderedList);
+        }
+
+        if (sourceValue is IDictionary sourceObject &&
+            renderedValue is IDictionary renderedObject)
+        {
+            return MergeDictionariesPreservingSourceStructure(sourceObject, renderedObject);
+        }
+
+        return renderedValue;
+    }
+
     private static List<object?> SerializeEnumerable(
         IEnumerable enumerable,
         string currentPath,
@@ -204,6 +249,154 @@ public static class ConfigurationTemplateRenderer
         }
 
         return serializedList;
+    }
+
+    /// <summary>
+    /// Merges object dictionaries while preserving sparse list-shaped dictionaries from the source configuration.
+    /// </summary>
+    private static Dictionary<string, object?> MergeDictionariesPreservingSourceStructure(
+        IDictionary sourceDictionary,
+        IDictionary renderedDictionary)
+    {
+        var merged = new Dictionary<string, object?>(StringComparer.Ordinal);
+        var renderedEntries = GetDictionaryEntries(renderedDictionary)
+            .ToDictionary(entry => entry.Key, entry => entry.Value, StringComparer.Ordinal);
+
+        foreach (var sourceEntry in GetDictionaryEntries(sourceDictionary))
+        {
+            merged[sourceEntry.Key] = renderedEntries.TryGetValue(sourceEntry.Key, out var renderedValue)
+                ? PreserveSourceStructure(sourceEntry.Value, renderedValue)
+                : sourceEntry.Value;
+        }
+
+        foreach (var renderedEntry in renderedEntries)
+        {
+            if (!merged.ContainsKey(renderedEntry.Key))
+            {
+                merged[renderedEntry.Key] = renderedEntry.Value;
+            }
+        }
+
+        return merged;
+    }
+
+    /// <summary>
+    /// Restores sparse numeric keys for list-like sections by matching rendered items back to the original source keys.
+    /// </summary>
+    private static Dictionary<string, object?> RehydrateSparseIndexedDictionary(
+        IDictionary sourceDictionary,
+        IList renderedList)
+    {
+        var sourceEntries = GetDictionaryEntries(sourceDictionary).ToList();
+        var renderedItems = renderedList.Cast<object?>().ToList();
+        var matchedRenderedIndices = MatchRenderedItemsByName(sourceEntries, renderedItems);
+        var consumedRenderedIndices = matchedRenderedIndices.Values.ToHashSet();
+        var remainingRenderedIndices = new Queue<int>(Enumerable.Range(0, renderedItems.Count)
+            .Where(index => !consumedRenderedIndices.Contains(index)));
+        var rehydrated = new Dictionary<string, object?>(StringComparer.Ordinal);
+
+        foreach (var sourceEntry in sourceEntries)
+        {
+            if (matchedRenderedIndices.TryGetValue(sourceEntry.Key, out var renderedIndex))
+            {
+                rehydrated[sourceEntry.Key] =
+                    PreserveSourceStructure(sourceEntry.Value, renderedItems[renderedIndex]);
+                continue;
+            }
+
+            if (remainingRenderedIndices.Count == 0)
+            {
+                continue;
+            }
+
+            renderedIndex = remainingRenderedIndices.Dequeue();
+            rehydrated[sourceEntry.Key] = PreserveSourceStructure(sourceEntry.Value, renderedItems[renderedIndex]);
+        }
+
+        var nextSparseIndex = sourceEntries
+            .Select(entry => int.Parse(entry.Key, CultureInfo.InvariantCulture))
+            .DefaultIfEmpty(-1)
+            .Max();
+        while (remainingRenderedIndices.Count > 0)
+        {
+            nextSparseIndex++;
+            var renderedIndex = remainingRenderedIndices.Dequeue();
+            rehydrated[nextSparseIndex.ToString(CultureInfo.InvariantCulture)] = renderedItems[renderedIndex];
+        }
+
+        return rehydrated;
+    }
+
+    /// <summary>
+    /// Matches rendered list items to sparse source entries by item name when possible so filtered named sections keep
+    /// their original indexes.
+    /// </summary>
+    private static Dictionary<string, int> MatchRenderedItemsByName(
+        IReadOnlyList<KeyValuePair<string, object?>> sourceEntries,
+        IReadOnlyList<object?> renderedItems)
+    {
+        var matchedIndices = new Dictionary<string, int>(StringComparer.Ordinal);
+        var consumedRenderedIndices = new HashSet<int>();
+
+        foreach (var sourceEntry in sourceEntries)
+        {
+            if (!TryGetItemName(sourceEntry.Value, out var sourceName))
+            {
+                continue;
+            }
+
+            for (var renderedIndex = 0; renderedIndex < renderedItems.Count; renderedIndex++)
+            {
+                if (consumedRenderedIndices.Contains(renderedIndex) ||
+                    !TryGetItemName(renderedItems[renderedIndex], out var renderedName) ||
+                    !string.Equals(sourceName, renderedName, StringComparison.Ordinal))
+                {
+                    continue;
+                }
+
+                matchedIndices[sourceEntry.Key] = renderedIndex;
+                consumedRenderedIndices.Add(renderedIndex);
+                break;
+            }
+        }
+
+        return matchedIndices;
+    }
+
+    /// <summary>
+    /// Returns <see langword="true" /> when every key in the dictionary is numeric, which indicates the dictionary
+    /// represents a sparse list from the source configuration.
+    /// </summary>
+    private static bool IsNumericKeyDictionary(IDictionary dictionary)
+    {
+        var hasEntries = false;
+        foreach (var entry in GetDictionaryEntries(dictionary))
+        {
+            hasEntries = true;
+            if (!int.TryParse(entry.Key, NumberStyles.None, CultureInfo.InvariantCulture, out _))
+            {
+                return false;
+            }
+        }
+
+        return hasEntries;
+    }
+
+    /// <summary>
+    /// Enumerates dictionary entries while skipping blank keys.
+    /// </summary>
+    private static IEnumerable<KeyValuePair<string, object?>> GetDictionaryEntries(IDictionary dictionary)
+    {
+        foreach (DictionaryEntry entry in dictionary)
+        {
+            var key = entry.Key?.ToString();
+            if (string.IsNullOrWhiteSpace(key))
+            {
+                continue;
+            }
+
+            yield return new KeyValuePair<string, object?>(key, entry.Value);
+        }
     }
 
     private static Dictionary<string, object?> SerializeObject(
@@ -396,11 +589,29 @@ public static class ConfigurationTemplateRenderer
 
     private static object? FilterNamedSection(object? sectionValue, ISet<string>? includedNames)
     {
-        if (includedNames == null || sectionValue is not IList sectionList)
+        if (includedNames == null)
         {
             return sectionValue;
         }
 
+        if (sectionValue is IList sectionList)
+        {
+            return FilterNamedListSection(sectionList, includedNames);
+        }
+
+        if (sectionValue is IDictionary sectionDictionary && IsNumericKeyDictionary(sectionDictionary))
+        {
+            return FilterNamedDictionarySection(sectionDictionary, includedNames);
+        }
+
+        return sectionValue;
+    }
+
+    /// <summary>
+    /// Filters list-based named sections while preserving item order.
+    /// </summary>
+    private static List<object?> FilterNamedListSection(IList sectionList, ISet<string> includedNames)
+    {
         var filteredItems = new List<object?>();
         foreach (var item in sectionList)
         {
@@ -418,59 +629,141 @@ public static class ConfigurationTemplateRenderer
         return filteredItems;
     }
 
+    /// <summary>
+    /// Filters sparse numeric-key dictionaries without rewriting the original item indexes.
+    /// </summary>
+    private static Dictionary<string, object?> FilterNamedDictionarySection(
+        IDictionary sectionDictionary,
+        ISet<string> includedNames)
+    {
+        var filteredItems = new Dictionary<string, object?>(StringComparer.Ordinal);
+        foreach (var entry in GetDictionaryEntries(sectionDictionary))
+        {
+            if (entry.Value is not IDictionary dictionary || !TryGetName(dictionary, out var itemName))
+            {
+                continue;
+            }
+
+            if (includedNames.Contains(itemName))
+            {
+                filteredItems[entry.Key] = entry.Value;
+            }
+        }
+
+        return filteredItems;
+    }
+
     private static object? AugmentAssertionStatuses(
         object? sectionValue,
         IDictionary<string, IReadOnlyList<string>>? assertionStatusesToReport)
     {
-        if (assertionStatusesToReport == null || sectionValue is not IList assertionList)
+        if (assertionStatusesToReport == null)
         {
             return sectionValue;
         }
 
+        if (sectionValue is IList assertionList)
+        {
+            return AugmentAssertionStatusList(assertionList, assertionStatusesToReport);
+        }
+
+        if (sectionValue is IDictionary assertionDictionary && IsNumericKeyDictionary(assertionDictionary))
+        {
+            return AugmentAssertionStatusDictionary(assertionDictionary, assertionStatusesToReport);
+        }
+
+        return sectionValue;
+    }
+
+    /// <summary>
+    /// Updates assertion status lists for dense list-based sections.
+    /// </summary>
+    private static List<object?> AugmentAssertionStatusList(
+        IList assertionList,
+        IDictionary<string, IReadOnlyList<string>> assertionStatusesToReport)
+    {
         var updatedAssertions = new List<object?>();
         foreach (var item in assertionList)
         {
-            if (item is not IDictionary dictionary || !TryGetName(dictionary, out var assertionName))
-            {
-                updatedAssertions.Add(item);
-                continue;
-            }
-
-            if (!assertionStatusesToReport.TryGetValue(assertionName, out var statuses))
-            {
-                updatedAssertions.Add(item);
-                continue;
-            }
-
-            var updatedAssertion = new Dictionary<string, object?>(StringComparer.Ordinal);
-            var replacedExistingStatuses = false;
-            foreach (DictionaryEntry entry in dictionary)
-            {
-                if (string.IsNullOrWhiteSpace(entry.Key?.ToString()))
-                {
-                    continue;
-                }
-
-                var key = entry.Key!.ToString()!;
-                if (key == "StatusesToReport")
-                {
-                    updatedAssertion[key] = statuses.ToList();
-                    replacedExistingStatuses = true;
-                    continue;
-                }
-
-                updatedAssertion[key] = NormalizeValue(entry.Value);
-            }
-
-            if (!replacedExistingStatuses)
-            {
-                updatedAssertion["StatusesToReport"] = statuses.ToList();
-            }
-
-            updatedAssertions.Add(updatedAssertion);
+            updatedAssertions.Add(UpdateAssertionStatuses(item, assertionStatusesToReport));
         }
 
         return updatedAssertions;
+    }
+
+    /// <summary>
+    /// Updates assertion status lists for sparse numeric-key dictionary sections while keeping original indexes.
+    /// </summary>
+    private static Dictionary<string, object?> AugmentAssertionStatusDictionary(
+        IDictionary assertionDictionary,
+        IDictionary<string, IReadOnlyList<string>> assertionStatusesToReport)
+    {
+        var updatedAssertions = new Dictionary<string, object?>(StringComparer.Ordinal);
+        foreach (var entry in GetDictionaryEntries(assertionDictionary))
+        {
+            updatedAssertions[entry.Key] = UpdateAssertionStatuses(entry.Value, assertionStatusesToReport);
+        }
+
+        return updatedAssertions;
+    }
+
+    /// <summary>
+    /// Replaces or appends the runtime assertion statuses for a single assertion item.
+    /// </summary>
+    private static object? UpdateAssertionStatuses(
+        object? item,
+        IDictionary<string, IReadOnlyList<string>> assertionStatusesToReport)
+    {
+        if (item is not IDictionary dictionary || !TryGetName(dictionary, out var assertionName))
+        {
+            return item;
+        }
+
+        if (!assertionStatusesToReport.TryGetValue(assertionName, out var statuses))
+        {
+            return item;
+        }
+
+        var updatedAssertion = new Dictionary<string, object?>(StringComparer.Ordinal);
+        var replacedExistingStatuses = false;
+        foreach (DictionaryEntry entry in dictionary)
+        {
+            if (string.IsNullOrWhiteSpace(entry.Key?.ToString()))
+            {
+                continue;
+            }
+
+            var key = entry.Key!.ToString()!;
+            if (key == "StatusesToReport")
+            {
+                updatedAssertion[key] = statuses.ToList();
+                replacedExistingStatuses = true;
+                continue;
+            }
+
+            updatedAssertion[key] = NormalizeValue(entry.Value);
+        }
+
+        if (!replacedExistingStatuses)
+        {
+            updatedAssertion["StatusesToReport"] = statuses.ToList();
+        }
+
+        return updatedAssertion;
+    }
+
+    /// <summary>
+    /// Tries to read the <c>Name</c> field from a rendered list item.
+    /// </summary>
+    private static bool TryGetItemName(object? item, out string name)
+    {
+        if (item is IDictionary dictionary)
+        {
+            return TryGetName(dictionary, out name);
+        }
+
+        name = string.Empty;
+        return false;
     }
 
     private static bool TryGetName(IDictionary dictionary, out string name)

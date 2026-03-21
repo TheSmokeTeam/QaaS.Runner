@@ -238,6 +238,67 @@ public class ConfigurationTemplateRendererTests
     }
 
     [Test]
+    public void Render_WithSparseSourceIndexes_PreservesOriginalIndexesWhenFallbackSectionsAreRendered()
+    {
+        var configuration = new ConfigurationBuilder()
+            .AddInMemoryCollection(new Dictionary<string, string?>
+            {
+                ["Sessions:10:Name"] = "SparseSession",
+                ["Sessions:10:Publishers:10:Name"] = "SparsePublisher",
+                ["Assertions:10:Name"] = "SparseAssertion",
+                ["Assertions:10:Assertion"] = "SparseAssertion"
+            })
+            .Build();
+
+        var yaml = ConfigurationTemplateRenderer.Render(
+            configuration,
+            fallbackSections:
+            [
+                new KeyValuePair<string, object?>("Sessions", new object?[]
+                {
+                    new Dictionary<string, object?>
+                    {
+                        ["Name"] = "SparseSession",
+                        ["Publishers"] = new object?[]
+                        {
+                            new Dictionary<string, object?>
+                            {
+                                ["Name"] = "SparsePublisher"
+                            }
+                        }
+                    }
+                }),
+                new KeyValuePair<string, object?>("Assertions", new object?[]
+                {
+                    new Dictionary<string, object?>
+                    {
+                        ["Name"] = "SparseAssertion",
+                        ["Assertion"] = "SparseAssertion"
+                    }
+                })
+            ],
+            sectionOrder: ["Sessions", "Assertions"],
+            includedSessionNames: new HashSet<string>(["SparseSession"], StringComparer.Ordinal),
+            assertionStatusesToReport: new Dictionary<string, IReadOnlyList<string>>(StringComparer.Ordinal)
+            {
+                ["SparseAssertion"] = ["Passed"]
+            });
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(yaml, Does.Contain("Sessions:"));
+            Assert.That(yaml, Does.Contain("  10:"));
+            Assert.That(yaml, Does.Contain("Name: SparseSession"));
+            Assert.That(yaml, Does.Contain("Publishers:"));
+            Assert.That(yaml, Does.Contain("SparsePublisher"));
+            Assert.That(yaml, Does.Contain("Assertions:"));
+            Assert.That(yaml, Does.Contain("Name: SparseAssertion"));
+            Assert.That(yaml, Does.Contain("- Passed"));
+            Assert.That(yaml, Does.Not.Contain("- Name: SparseSession"));
+        });
+    }
+
+    [Test]
     public void NormalizeValue_DropsBlankDictionaryKeysAndNullEnumerableItems()
     {
         var normalized = (IDictionary<string, object?>)InvokePrivate("NormalizeValue", new Hashtable
