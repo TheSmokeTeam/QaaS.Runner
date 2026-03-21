@@ -2,6 +2,7 @@ using System.Collections.Generic;
 using Microsoft.Extensions.Configuration;
 using QaaS.Framework.SDK;
 using QaaS.Framework.SDK.ContextObjects;
+using QaaS.Framework.SDK.Extensions;
 using QaaS.Framework.SDK.Session.SessionDataObjects;
 using QaaS.Framework.SDK.Session.SessionDataObjects.RunningSessionsObjects;
 using Serilog;
@@ -13,7 +14,7 @@ namespace QaaS.Runner.Sessions.Tests;
 public static class Globals
 {
     public static readonly ILogger Logger = new SerilogLoggerFactory(
-        new LoggerConfiguration().MinimumLevel.Debug()
+        new LoggerConfiguration().MinimumLevel.Warning()
             .CreateLogger()).CreateLogger("TestsLogger");
 
     private static readonly InternalContext Context = new()
@@ -24,7 +25,7 @@ public static class Globals
 
     public static InternalContext GetContextWithMetadata()
     {
-        Context.InsertValueIntoGlobalDictionary([nameof(MetaDataConfig)],new MetaDataConfig
+        Context.InsertValueIntoGlobalDictionary(Context.GetMetaDataPath(), new MetaDataConfig
         {
             Team = "Smoke",
             System = "QaaS"

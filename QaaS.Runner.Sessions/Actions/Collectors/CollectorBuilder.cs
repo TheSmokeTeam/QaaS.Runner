@@ -1,5 +1,6 @@
 using System.ComponentModel;
 using System.ComponentModel.DataAnnotations;
+using QaaS.Framework.Configurations;
 using QaaS.Framework.Protocols.ConfigurationObjects;
 using QaaS.Framework.Protocols.ConfigurationObjects.Prometheus;
 using QaaS.Framework.Protocols.Protocols.Factories;
@@ -7,11 +8,16 @@ using QaaS.Framework.SDK.ContextObjects;
 using QaaS.Framework.SDK.Extensions;
 using QaaS.Framework.SDK.Session;
 using QaaS.Framework.SDK.Session.SessionDataObjects;
+using QaaS.Runner.Infrastructure;
 using QaaS.Runner.Sessions.ConfigurationObjects;
 using QaaS.Runner.Sessions.Extensions;
+using QaaS.Runner.Sessions.RuntimeOverrides;
 
 namespace QaaS.Runner.Sessions.Actions.Collectors;
 
+/// <summary>
+/// Fluent builder for collector actions and their fetcher configuration.
+/// </summary>
 public class CollectorBuilder
 {
     [Required]
@@ -38,52 +44,104 @@ public class CollectorBuilder
         " its result array represents a single value at a certain time.")]
     internal PrometheusFetcherConfig? Prometheus { get; set; }
 
+    /// <summary>
+    /// Sets the collector name.
+    /// </summary>
     public CollectorBuilder Named(string name)
     {
         Name = name;
         return this;
     }
 
+    /// <summary>
+    /// Sets the collector's data filter.
+    /// </summary>
     public CollectorBuilder FilterData(DataFilter dataFilter)
     {
         DataFilter = dataFilter;
         return this;
     }
 
+    /// <summary>
+    /// Sets the relative time window used for collection.
+    /// </summary>
     public CollectorBuilder CollectInRange(CollectionRange collectionRange)
     {
         CollectionRange = collectionRange;
         return this;
     }
 
+    /// <summary>
+    /// Compatibility alias for <see cref="CreateConfiguration" />.
+    /// </summary>
     public CollectorBuilder Create(IFetcherConfig config)
+    {
+        return CreateConfiguration(config);
+    }
+
+    /// <summary>
+    /// Sets the configured collector fetcher source.
+    /// </summary>
+    public CollectorBuilder CreateConfiguration(IFetcherConfig config)
     {
         return Configure(config);
     }
 
+    /// <summary>
+    /// Returns the currently configured fetcher source, if any.
+    /// </summary>
     public IFetcherConfig? ReadConfiguration()
     {
         return Prometheus;
     }
 
+    /// <summary>
+    /// Applies a computed partial update to the current collector configuration while preserving omitted fields.
+    /// </summary>
     public CollectorBuilder UpdateConfiguration(Func<IFetcherConfig, IFetcherConfig> update)
     {
         var currentConfig = ReadConfiguration() ??
                             throw new InvalidOperationException("Collector configuration is not set");
-        return Configure(update(currentConfig));
+        return UpdateConfiguration(update(currentConfig));
     }
 
+    /// <summary>
+    /// Updates the collector configuration by merging same-type values and replacing the current type when needed.
+    /// </summary>
+    public CollectorBuilder UpdateConfiguration(IFetcherConfig config)
+    {
+        var currentConfig = ReadConfiguration() ??
+                            throw new InvalidOperationException("Collector configuration is not set");
+        return Configure(ConfigurationUpdateExtensions.UpdateConfiguration(currentConfig, config));
+    }
+
+    /// <summary>
+    /// Updates the collector configuration from an object-shaped patch while preserving omitted fields.
+    /// </summary>
+    public CollectorBuilder UpdateConfiguration(object configuration)
+    {
+        var currentConfig = ReadConfiguration() ??
+                            throw new InvalidOperationException("Collector configuration is not set");
+        return Configure(ConfigurationUpdateExtensions.UpdateConfiguration(currentConfig, configuration));
+    }
+
+    /// <summary>
+    /// Clears the configured fetcher source.
+    /// </summary>
     public CollectorBuilder DeleteConfiguration()
     {
-        Reset();
+        return Reset();
+    }
+
+    private CollectorBuilder Reset()
+    {
+        Prometheus = null;
         return this;
     }
 
-    private void Reset()
-    {
-        Prometheus = null;
-    }
-
+    /// <summary>
+    /// Replaces the current collector fetcher source with the provided configuration type.
+    /// </summary>
     public CollectorBuilder Configure(IFetcherConfig config)
     {
         Reset();
@@ -126,9 +184,11 @@ public class CollectorBuilder
                    throw new InvalidOperationException($"Missing supported type in collector {Name}");
             var collectorTypeName = type.GetType().Name;
             context.Logger.LogDebugWithMetaData("Started building Collector of type {type}",
-                context.GetMetaDataFromContext(), new object?[] { collectorTypeName });
+                context.GetMetaDataOrDefault(), new object?[] { collectorTypeName });
 
-            var fetcher = FetcherFactory.CreateFetcher(type, context.Logger);
+            var overrideRequest = new CollectorOverrideRequest(Name!, type, context.Logger);
+            var fetcher = context.GetSessionActionOverrides()?.Collector?.Invoke(overrideRequest)
+                          ?? FetcherFactory.CreateFetcher(type, context.Logger);
             
             return new Collector(Name!, fetcher, DataFilter, CollectionRange.StartTimeMs, CollectionRange.EndTimeMs,
                 EndTimeReachedCheckIntervalMs, context.Logger);
@@ -136,7 +196,7 @@ public class CollectorBuilder
         catch (Exception e)
         {
             actionFailures.AppendActionFailure(e, sessionName, context.Logger, nameof(Collector), Name!,
-                type?.GetType().ToString());
+                type?.GetType().Name);
         }
 
         return null;

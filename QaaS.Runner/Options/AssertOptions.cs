@@ -7,8 +7,7 @@ namespace QaaS.Runner.Options;
 /// <summary>
 /// Options object to be mapped for `assert` runnable command 
 /// </summary>
-[Verb("assert", HelpText = "Run a qaas test with only the assertions on already existing sessionData."),
- ExcludeFromCodeCoverage]
+[Verb("assert", HelpText = "Run a qaas test with only the assertions on already existing sessionData.")]
 public record AssertOptions : AssertableOptions
 {
     /// <inheritdoc />

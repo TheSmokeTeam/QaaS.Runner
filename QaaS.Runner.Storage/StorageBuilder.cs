@@ -1,6 +1,7 @@
 ﻿using System.ComponentModel;
 using System.IO.Abstractions;
 using System.Runtime.CompilerServices;
+using QaaS.Framework.Configurations;
 using QaaS.Framework.Configurations.CommonConfigurationObjects;
 using QaaS.Framework.SDK.ContextObjects;
 using QaaS.Runner.Storage.ConfigurationObjects;
@@ -34,35 +35,80 @@ public class StorageBuilder
         return this;
     }
 
+    /// <summary>
+    /// Sets the JSON formatting used by runtime storages.
+    /// </summary>
     public StorageBuilder WithJsonStorageFormat(Formatting format)
     {
         JsonStorageFormat = format;
         return this;
     }
 
+    /// <summary>
+    /// Compatibility alias for <see cref="CreateConfiguration" />.
+    /// </summary>
     public StorageBuilder Create(IStorageConfig storageConfig)
+    {
+        return CreateConfiguration(storageConfig);
+    }
+
+    /// <summary>
+    /// Sets the configured storage implementation source.
+    /// </summary>
+    public StorageBuilder CreateConfiguration(IStorageConfig storageConfig)
     {
         return Configure(storageConfig);
     }
 
+    /// <summary>
+    /// Returns the currently configured storage source, if any.
+    /// </summary>
     public IStorageConfig? ReadConfiguration()
     {
         return (IStorageConfig?)S3 ?? FileSystem;
     }
 
+    /// <summary>
+    /// Applies a computed partial update to the current storage configuration while preserving omitted fields.
+    /// </summary>
     public StorageBuilder UpdateConfiguration(Func<IStorageConfig, IStorageConfig> update)
     {
         var currentConfig = ReadConfiguration() ??
                             throw new InvalidOperationException("Storage configuration is not set");
-        return Configure(update(currentConfig));
+        return UpdateConfiguration(update(currentConfig));
     }
 
+    /// <summary>
+    /// Updates the storage configuration by merging same-type values and replacing the current type when needed.
+    /// </summary>
+    public StorageBuilder UpdateConfiguration(IStorageConfig storageConfig)
+    {
+        var currentConfig = ReadConfiguration() ??
+                            throw new InvalidOperationException("Storage configuration is not set");
+        return Configure(currentConfig.UpdateConfiguration(storageConfig));
+    }
+
+    /// <summary>
+    /// Updates the storage configuration from an object-shaped patch while preserving omitted fields.
+    /// </summary>
+    public StorageBuilder UpdateConfiguration(object configuration)
+    {
+        var currentConfig = ReadConfiguration() ??
+                            throw new InvalidOperationException("Storage configuration is not set");
+        return Configure(currentConfig.UpdateConfiguration(configuration));
+    }
+
+    /// <summary>
+    /// Clears the configured storage source.
+    /// </summary>
     public StorageBuilder DeleteConfiguration()
     {
-        Reset();
-        return this;
+        return Reset();
     }
 
+    /// <summary>
+    /// Replaces the current storage source with the provided configuration type.
+    /// </summary>
     public StorageBuilder Configure(IStorageConfig storageConfig)
     {
         Reset();

@@ -1,4 +1,8 @@
-﻿using System.Reflection;
+using System.Collections.Generic;
+using System.Diagnostics;
+using System.IO;
+using System.Reflection;
+using Allure.Commons;
 using NUnit.Framework;
 using QaaS.Runner.WrappedExternals;
 
@@ -7,47 +11,144 @@ namespace QaaS.Runner.Tests.WrappedExternalTests;
 [TestFixture]
 public class AllureWrapperTests
 {
-    private AllureWrapper _wrapper;
+    private TestableAllureWrapper _wrapper;
+    private string _originalCurrentDirectory;
+    private string _workingDirectory;
+
+    private sealed class TestableAllureWrapper : AllureWrapper
+    {
+        public List<ProcessStartInfo> StartInfos { get; } = [];
+        public string GeneratedReportDirectory { get; set; } = string.Empty;
+
+        protected override string ResolveReportDirectory()
+        {
+            return GeneratedReportDirectory;
+        }
+
+        protected override Process StartProcess(ProcessStartInfo startInfo)
+        {
+            StartInfos.Add(startInfo);
+            if (startInfo.Arguments.Contains(" generate", StringComparison.Ordinal))
+            {
+                Directory.CreateDirectory(Path.Combine(GeneratedReportDirectory, "history"));
+                File.WriteAllText(Path.Combine(GeneratedReportDirectory, "history", "history-trend.json"),
+                    "history-content");
+            }
+
+            return Process.Start(new ProcessStartInfo
+            {
+                FileName = "cmd",
+                Arguments = "/c echo allure-serve-test",
+                RedirectStandardOutput = true,
+                RedirectStandardError = true,
+                UseShellExecute = false
+            })!;
+        }
+    }
 
     [SetUp]
     public void SetUp()
     {
-        _wrapper = new AllureWrapper();
+        _originalCurrentDirectory = Directory.GetCurrentDirectory();
+        _workingDirectory = Path.Combine(Path.GetTempPath(), $"allure-wrapper-tests-{Guid.NewGuid():N}");
+        Directory.CreateDirectory(_workingDirectory);
+        Directory.SetCurrentDirectory(_workingDirectory);
+        _wrapper = new TestableAllureWrapper
+        {
+            GeneratedReportDirectory = Path.Combine(_workingDirectory, "allure-report")
+        };
+    }
+
+    [TearDown]
+    public void TearDown()
+    {
+        Directory.SetCurrentDirectory(_originalCurrentDirectory);
+        if (Directory.Exists(_workingDirectory))
+            Directory.Delete(_workingDirectory, true);
     }
 
     [Test]
     public void TestCleanTestResultsDirectory_ShouldExecuteWithoutException()
     {
-        // Act & Assert
         Assert.DoesNotThrow(() => _wrapper.CleanTestResultsDirectory());
     }
 
-    [Test,
-     TestCase("unknown-path", TestName = "allure path wrong"),
-     TestCase("allure", TestName = "allure path right"),
-     TestCase("",TestName = "default allure path right")]
-    public void TestServeTestResults_WithVariousPaths_ShouldExecuteWithoutException(string path)
+    [Test]
+    public void TestCleanTestResultsDirectory_PreservesHistoryDirectory()
     {
-        // Act & Assert
+        var resultsDirectory = Path.GetFullPath(AllureLifecycle.Instance.ResultsDirectory, _workingDirectory);
+        var historyDirectory = Path.Combine(resultsDirectory, "history");
+        Directory.CreateDirectory(historyDirectory);
+        Directory.CreateDirectory(Path.Combine(resultsDirectory, "SessionLogs"));
+        File.WriteAllText(Path.Combine(historyDirectory, "history-trend.json"), "history-content");
+        File.WriteAllText(Path.Combine(resultsDirectory, "marker.txt"), "marker");
+
+        _wrapper.CleanTestResultsDirectory();
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(File.Exists(Path.Combine(historyDirectory, "history-trend.json")), Is.True);
+            Assert.That(File.Exists(Path.Combine(resultsDirectory, "marker.txt")), Is.False);
+            Assert.That(Directory.Exists(Path.Combine(resultsDirectory, "SessionLogs")), Is.False);
+        });
+    }
+
+    [Test]
+    [TestCase("unknown-path", "unknown-path", TestName = "allure path wrong")]
+    [TestCase("allure", "allure", TestName = "allure path right")]
+    [TestCase("", "allure", TestName = "default allure path right")]
+    public void TestServeTestResults_WithVariousPaths_ShouldExecuteWithoutException(string path,
+        string expectedRunnablePath)
+    {
         Assert.DoesNotThrow(() => _wrapper.ServeTestResults(path));
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(_wrapper.StartInfos, Has.Count.EqualTo(2));
+            Assert.That(_wrapper.StartInfos[0].Arguments, Does.Contain($"{expectedRunnablePath} generate"));
+            Assert.That(_wrapper.StartInfos[0].Arguments, Does.Contain("-o"));
+            Assert.That(_wrapper.StartInfos[1].Arguments, Does.Contain($"{expectedRunnablePath} open"));
+            Assert.That(_wrapper.StartInfos[1].Arguments, Does.Contain(_wrapper.GeneratedReportDirectory));
+        });
     }
 
     [Test]
     public void TestServeTestResults_WithEchoCommand_ShouldReadStandardOutputWithoutException()
     {
         Assert.DoesNotThrow(() => _wrapper.ServeTestResults("echo"));
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(_wrapper.StartInfos, Has.Count.EqualTo(2));
+            Assert.That(_wrapper.StartInfos[0].Arguments, Does.Contain("echo generate"));
+            Assert.That(_wrapper.StartInfos[1].Arguments, Does.Contain("echo open"));
+        });
+    }
+
+    [Test]
+    public void TestServeTestResults_WithExistingHistory_CopiesHistoryIntoResultsDirectory()
+    {
+        _wrapper.ServeTestResults();
+
+        var resultsHistoryFile = Path.Combine(Path.GetFullPath(AllureLifecycle.Instance.ResultsDirectory, _workingDirectory),
+            "history", "history-trend.json");
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(File.Exists(resultsHistoryFile), Is.True);
+            Assert.That(File.ReadAllText(resultsHistoryFile), Is.EqualTo("history-content"));
+            Assert.That(_wrapper.StartInfos, Has.Count.EqualTo(2));
+        });
     }
 
     [Test]
     public void TestMethodExistence_ShouldHaveExpectedMethods()
     {
-        // Act
         var cleanMethod = typeof(AllureWrapper).GetMethod("CleanTestResultsDirectory",
             BindingFlags.Public | BindingFlags.Instance);
         var serveMethod =
             typeof(AllureWrapper).GetMethod("ServeTestResults", BindingFlags.Public | BindingFlags.Instance);
 
-        // Assert
         Assert.Multiple(() =>
         {
             Assert.That(cleanMethod, Is.Not.Null);
@@ -60,10 +161,8 @@ public class AllureWrapperTests
     [Test]
     public void TestConstructor_ShouldInitializeSuccessfully()
     {
-        // Act
         var wrapper = new AllureWrapper();
 
-        // Assert
         Assert.That(wrapper, Is.Not.Null);
     }
 }

@@ -3,9 +3,12 @@ using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
 using NUnit.Framework;
+using QaaS.Framework.SDK.ContextObjects;
 using QaaS.Framework.SDK.Session.CommunicationDataObjects;
 using QaaS.Framework.SDK.Session.DataObjects;
 using QaaS.Framework.SDK.Session.SessionDataObjects;
+using QaaS.Framework.SDK.Session.SessionDataObjects.RunningSessionsObjects;
+using QaaS.Framework.Serialization;
 using QaaS.Runner.Sessions.Extensions;
 using QaaS.Runner.Sessions.Tests.Actions.Utils;
 using SessionAction = QaaS.Runner.Sessions.Actions.Action;
@@ -85,6 +88,34 @@ public class SessionExtensionsTests
     }
 
     [Test]
+    public void InternalCommunicationData_InheritsCommunicationDataContract_ForInputData()
+    {
+        var input = new List<DetailedData<string>>
+        {
+            new() { Body = "input-body" }
+        };
+        var output = new List<DetailedData<string>?>
+        {
+            new() { Body = "output-body" }
+        };
+        var internalCommunicationData = new QaaS.Runner.Sessions.Actions.InternalCommunicationData<string>
+        {
+            Input = input,
+            Output = output,
+            InputSerializationType = SerializationType.Json,
+            OutputSerializationType = SerializationType.Binary
+        };
+
+        CommunicationData<string> communicationData = internalCommunicationData;
+
+        Assert.That(communicationData.Data, Is.SameAs(input));
+        Assert.That(communicationData.SerializationType, Is.EqualTo(SerializationType.Json));
+        Assert.That(internalCommunicationData.Input, Is.SameAs(input));
+        Assert.That(internalCommunicationData.Output, Is.SameAs(output));
+        Assert.That(internalCommunicationData.Output![0]!.Body, Is.EqualTo("output-body"));
+    }
+
+    [Test]
     public void CreateTaskFromAction_WhenActionSucceeds_ReturnsActionAndData()
     {
         var context = CreationalFunctions.CreateContext(SessionName, []);
@@ -92,7 +123,7 @@ public class SessionExtensionsTests
         var action = new SuccessfulAction("SuccessfulAction");
 
         var task = SessionExtensions.CreateTaskFromAction(context, action, SessionName, failures);
-        task.RunSynchronously();
+        task.GetAwaiter().GetResult();
 
         Assert.That(task.Result, Is.Not.Null);
         Assert.That(task.Result!.Item1, Is.SameAs(action));
@@ -108,7 +139,7 @@ public class SessionExtensionsTests
         var action = new ExceptionalAction("ExceptionalAction", new InvalidOperationException("boom"));
 
         var task = SessionExtensions.CreateTaskFromAction(context, action, SessionName, failures);
-        task.RunSynchronously();
+        task.GetAwaiter().GetResult();
 
         Assert.That(task.Result, Is.Null);
         Assert.That(failures, Has.Count.EqualTo(1));
@@ -123,7 +154,7 @@ public class SessionExtensionsTests
         var action = new ExceptionalAction("CanceledAction", new OperationCanceledException());
 
         var task = SessionExtensions.CreateTaskFromAction(context, action, SessionName, failures);
-        task.RunSynchronously();
+        task.GetAwaiter().GetResult();
 
         Assert.That(task.Result, Is.Null);
         Assert.That(failures, Has.Count.EqualTo(1));
@@ -138,14 +169,67 @@ public class SessionExtensionsTests
         var action = new ExceptionalAction("CancelableAction", new OperationCanceledException());
         var inputRcd = new RunningCommunicationData<object> { Name = action.Name };
         var outputRcd = new RunningCommunicationData<object> { Name = action.Name };
-        context.InternalRunningSessions.RunningSessionsDict[SessionName].Inputs!.Add(inputRcd);
-        context.InternalRunningSessions.RunningSessionsDict[SessionName].Outputs!.Add(outputRcd);
+        context.AddRunningInputData(SessionName, inputRcd);
+        context.AddRunningOutputData(SessionName, outputRcd);
 
         var task = SessionExtensions.CreateTaskFromAction(context, action, SessionName, failures);
-        task.RunSynchronously();
+        task.GetAwaiter().GetResult();
 
         Assert.That(inputRcd.DataCancellationTokenSource.IsCancellationRequested, Is.True);
         Assert.That(outputRcd.DataCancellationTokenSource.IsCancellationRequested, Is.True);
+    }
+
+    [Test]
+    public void CreateTaskFromAction_WhenRunningSessionEntryIsMissing_AppendsOriginalFailureWithoutMaskingException()
+    {
+        var context = new InternalContext
+        {
+            Logger = Globals.Logger,
+            InternalRunningSessions = new RunningSessions(new Dictionary<string, RunningSessionData<object, object>>())
+        };
+        var failures = new ConcurrentBag<ActionFailure>();
+        var action = new ExceptionalAction("MissingSessionAction", new InvalidOperationException("boom"));
+
+        var task = SessionExtensions.CreateTaskFromAction(context, action, SessionName, failures);
+
+        Assert.DoesNotThrow(() => task.GetAwaiter().GetResult());
+        Assert.That(task.Result, Is.Null);
+        Assert.That(failures, Has.Count.EqualTo(1));
+        Assert.That(failures.First().Reason.Message, Is.EqualTo("boom"));
+    }
+
+    [Test]
+    public void RunningSessionHelpers_SetGetAndRemoveSessionData()
+    {
+        var context = CreationalFunctions.CreateContext(SessionName, []);
+        var runningSession = new RunningSessionData<object, object>
+        {
+            Inputs = [],
+            Outputs = []
+        };
+
+        context.SetRunningSession("other-session", runningSession);
+
+        Assert.That(context.TryGetRunningSession("other-session", out var foundRunningSession), Is.True);
+        Assert.That(foundRunningSession, Is.SameAs(runningSession));
+        Assert.That(context.GetRunningSession("other-session"), Is.SameAs(runningSession));
+        Assert.That(context.RemoveRunningSession("other-session"), Is.True);
+        Assert.That(context.TryGetRunningSession("other-session", out _), Is.False);
+    }
+
+    [Test]
+    public void RunningSessionHelpers_AddRunningCommunicationData_AppendsToInputsAndOutputs()
+    {
+        var context = CreationalFunctions.CreateContext(SessionName, []);
+        var input = new RunningCommunicationData<object> { Name = "input" };
+        var output = new RunningCommunicationData<object> { Name = "output" };
+
+        context.AddRunningInputData(SessionName, input);
+        context.AddRunningOutputData(SessionName, output);
+
+        var runningSession = context.GetRunningSession(SessionName);
+        Assert.That(runningSession.Inputs, Contains.Item(input));
+        Assert.That(runningSession.Outputs, Contains.Item(output));
     }
 
     private sealed class DisposableTracker : IDisposable

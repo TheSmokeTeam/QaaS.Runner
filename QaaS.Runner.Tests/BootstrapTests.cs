@@ -1,7 +1,12 @@
-﻿namespace QaaS.Runner.Tests;
+namespace QaaS.Runner.Tests;
 
 using System.Collections.Generic;
+using Autofac;
+using Microsoft.Extensions.Logging;
 using NUnit.Framework;
+using QaaS.Runner.Options;
+using QaaS.Runner.WrappedExternals;
+using Serilog;
 
 [TestFixture]
 public class BootstrapTests
@@ -13,48 +18,141 @@ public class BootstrapTests
     {
         Runner result;
 
-        // Act
         result = Bootstrap.New(args);
 
-        // Assert
         Assert.That(result, Is.Not.Null);
         Assert.That(result, Is.InstanceOf<Runner>());
+    }
+
+    [TestCaseSource(nameof(GetNoProcessExitRunnerTestCases))]
+    public void TestGetRunner_WithNoProcessExitFlag_DisablesProcessExit(string[] args)
+    {
+        var result = Bootstrap.New(args);
+
+        Assert.That(result.ExitProcessOnCompletion, Is.False);
+    }
+
+    [Test]
+    public void CreateRunnerScope_RegistersAllureWrapper()
+    {
+        using var scope = Bootstrap.CreateRunnerScope();
+
+        Assert.That(scope.Resolve<AllureWrapper>(), Is.Not.Null);
+    }
+
+    [Test]
+    public void CanUseFrameworkDefaultLoggers_ReturnsTrue_WhenAccessorsSucceed()
+    {
+        var canUseDefaultLoggers = Bootstrap.CanUseFrameworkDefaultLoggers(
+            () => LoggerFactory.Create(_ => { }).CreateLogger("test"),
+            () => new LoggerConfiguration().CreateLogger());
+
+        Assert.That(canUseDefaultLoggers, Is.True);
+    }
+
+    [Test]
+    public void CanUseFrameworkDefaultLoggers_ReturnsFalse_WhenLoggerAccessorThrowsTypeInitializationException()
+    {
+        var canUseDefaultLoggers = Bootstrap.CanUseFrameworkDefaultLoggers(
+            () => throw new TypeInitializationException("BrokenLogger", new InvalidOperationException("boom")),
+            () => new LoggerConfiguration().CreateLogger());
+
+        Assert.That(canUseDefaultLoggers, Is.False);
+    }
+
+    [Test]
+    public void CanUseFrameworkDefaultLoggers_ReturnsFalse_WhenSerilogAccessorThrowsUriFormatException()
+    {
+        var canUseDefaultLoggers = Bootstrap.CanUseFrameworkDefaultLoggers(
+            () => LoggerFactory.Create(_ => { }).CreateLogger("test"),
+            () => throw new UriFormatException("bad uri"));
+
+        Assert.That(canUseDefaultLoggers, Is.False);
+    }
+
+    [Test]
+    public void GetDefaultLoggers_WhenFrameworkDefaultsAreAvailable_ReusesFrameworkInstances()
+    {
+        var (logger, serilogLogger, ownsSerilogLogger) = Bootstrap.GetDefaultLoggers(false);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(logger, Is.SameAs(QaaS.Framework.Executions.Constants.DefaultLogger));
+            Assert.That(serilogLogger, Is.SameAs(QaaS.Framework.Executions.Constants.DefaultSerilogLogger));
+            Assert.That(ownsSerilogLogger, Is.False);
+        });
+    }
+
+    [Test]
+    public void GetDefaultLoggers_WhenFrameworkDefaultsAreDisabled_CreatesOwnedFallbackLogger()
+    {
+        var (logger, serilogLogger, ownsSerilogLogger) = Bootstrap.GetDefaultLoggers(true);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(logger, Is.Not.Null);
+            Assert.That(serilogLogger, Is.Not.Null);
+            Assert.That(ownsSerilogLogger, Is.True);
+            Assert.That(serilogLogger, Is.AssignableTo<IDisposable>());
+        });
+    }
+
+    [Test]
+    public void GetSafeLoggerOptions_ReturnsOriginalOptions_WhenSendLogsMayRemainEnabled()
+    {
+        var options = new RunOptions { SendLogs = true };
+
+        var safeOptions = Bootstrap.GetSafeLoggerOptions(options, false, currentOptions =>
+            currentOptions with { SendLogs = false });
+
+        Assert.That(safeOptions.SendLogs, Is.True);
+    }
+
+    [Test]
+    public void GetSafeLoggerOptions_DisablesSendLogs_WhenForced()
+    {
+        var options = new RunOptions { SendLogs = true };
+
+        var safeOptions = Bootstrap.GetSafeLoggerOptions(options, true, currentOptions =>
+            currentOptions with { SendLogs = false });
+
+        Assert.That(safeOptions.SendLogs, Is.False);
     }
 
     private static IEnumerable<TestCaseData> GetRunnerTestCases()
     {
         yield return new TestCaseData(
-            new string[] { "run", "TestData/test.qaas.yaml", "-w", "TestData/override.yaml", "--send-logs", "true" },
+            new[] { "run", "TestData/test.qaas.yaml", "-w", "TestData/override.yaml", "--send-logs", "true" },
             "Runner"
         ).SetName("WithRunOptions");
 
         yield return new TestCaseData(
-            new string[] { "act", "TestData/test.qaas.yaml", "-w", "TestData/override.yaml", "--send-logs", "false" },
+            new[] { "act", "TestData/test.qaas.yaml", "-w", "TestData/override.yaml", "--send-logs", "false" },
             "Runner"
         ).SetName("WithActOptions");
 
         yield return new TestCaseData(
-            new string[] { "assert", "TestData/test.qaas.yaml", "-w", "TestData/override.yaml", "--send-logs", "false" },
+            new[] { "assert", "TestData/test.qaas.yaml", "-w", "TestData/override.yaml", "--send-logs", "false" },
             "Runner"
         ).SetName("WithAssertOptions");
 
         yield return new TestCaseData(
-            new string[] { "template", "TestData/test.qaas.yaml", "-w", "TestData/override.yaml", "--send-logs", "false" },
+            new[] { "template", "TestData/test.qaas.yaml", "-w", "TestData/override.yaml", "--send-logs", "false" },
             "Runner"
         ).SetName("WithTemplateOptions");
 
         yield return new TestCaseData(
-            new string[] { "execute", "TestData/executable.yaml", "--send-logs", "true" },
+            new[] { "execute", "TestData/executable.yaml", "--send-logs", "true" },
             "Runner"
         ).SetName("WithExecuteOptions");
 
         yield return new TestCaseData(
-            new string[] { "--help" },
+            new[] { "--help" },
             "Runner"
         ).SetName("WithHelpFlag");
 
         yield return new TestCaseData(
-            new string[] { "--version" },
+            new[] { "--version" },
             "Runner"
         ).SetName("WithVersionFlag");
 
@@ -62,5 +160,14 @@ public class BootstrapTests
             new[] { "invalid-command" },
             "Runner"
         ).SetName("WithInvalidCommand");
+    }
+
+    private static IEnumerable<TestCaseData> GetNoProcessExitRunnerTestCases()
+    {
+        yield return new TestCaseData(new object[] { new[] { "run", "TestData/test.qaas.yaml", "--no-process-exit" } })
+            .SetName("WithRunNoProcessExitFlag");
+
+        yield return new TestCaseData(new object[] { new[] { "execute", "TestData/executable.yaml", "--no-process-exit" } })
+            .SetName("WithExecuteNoProcessExitFlag");
     }
 }

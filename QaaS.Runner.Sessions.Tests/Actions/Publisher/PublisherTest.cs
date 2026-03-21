@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
 using System.Threading;
+using Microsoft.Extensions.Logging;
 using Moq;
 using MoreLinq.Extensions;
 using NUnit.Framework;
@@ -23,6 +24,7 @@ namespace QaaS.Runner.Sessions.Tests.Actions.Publisher;
 [TestFixture]
 public class PublisherTest
 {
+    private const int DefaultTestMessagesPerSecond = 100_000;
     private static Mock<ISender>? _sender;
     private static Mock<IChunkSender>? _chunkSender;
     private static List<Data<object>> _infoSent = [];
@@ -31,7 +33,7 @@ public class PublisherTest
         string[]? dsPatterns,
         string[]? dsNames,
         int maxAmountOfMessages,
-        int msgPerSec = 100)
+        int msgPerSec = DefaultTestMessagesPerSecond)
     {
         _infoSent = CreationalFunctions.InitSender(ref _sender!);
 
@@ -153,7 +155,31 @@ public class PublisherTest
         CollectionAssert.AreEquivalent(expectedDataContent, receivedDataContent);
     }
 
-    private const int TimeoutMsForWork = 100;
+    [Test]
+    public void Constructor_LogsStructuredInitializationMessage()
+    {
+        var logger = new CapturingLogger();
+
+        _ = new Sessions.Actions.Publishers.Publisher(
+            "TestPublisher",
+            new NamedSender(),
+            0,
+            new DataFilter(),
+            null,
+            false,
+            null,
+            1,
+            0,
+            SerializationType.Json,
+            null,
+            null,
+            logger);
+
+        Assert.That(logger.Messages,
+            Contains.Item("Initializing Publisher TestPublisher with Sender type NamedSender and Serializer Json"));
+    }
+
+    private const int TimeoutMsForWork = 10;
 
     private readonly FieldInfo _iterableSerializableSaveIteratorField =
         typeof(Sessions.Actions.Publishers.Publisher).GetField("IterableSerializableSaveIterator",
@@ -280,5 +306,168 @@ public class PublisherTest
         Assert.That(testActData.Input.Count, Is.EqualTo(numberOfItems));
         var expectedMaxConcurrency = Math.Min(numberOfItems, parallelism);
         Assert.That(maxActiveThreads, Is.InRange(1, expectedMaxConcurrency));
+    }
+
+    [Test]
+    public void TestPublish_WithParallelism_PreservesReturnedTimestampPerBody()
+    {
+        var baseTime = DateTime.UtcNow;
+        var dataToPublish = Enumerable.Range(0, 6)
+            .Select(index => new Data<object>
+            {
+                Body = $"body-{index}",
+                MetaData = new MetaData()
+            })
+            .ToArray();
+
+        var expectedTimestamps = dataToPublish.ToDictionary(
+            item => (string)item.Body!,
+            item => baseTime.AddMilliseconds(int.Parse(item.Body!.ToString()!.Split('-')[1])));
+
+        var senderMock = new Mock<ISender>();
+        senderMock.Setup(sender => sender.Send(It.IsAny<Data<object>>()))
+            .Returns((Data<object> sentData) =>
+            {
+                var body = sentData.Body!.ToString()!;
+                var index = int.Parse(body.Split('-')[1]);
+                Thread.Sleep((dataToPublish.Length - index) * 2);
+                return new DetailedData<object>
+                {
+                    Body = sentData.Body,
+                    MetaData = sentData.MetaData,
+                    Timestamp = expectedTimestamps[body]
+                };
+            });
+
+        Sessions.Actions.Publishers.Publisher publisher = new("test", senderMock.Object, 0, new DataFilter(), null,
+            false, 4, 1, 0, null, [], [], Globals.Logger);
+        var testActData = new InternalCommunicationData<object>
+        {
+            Input = [],
+            InputSerializationType = SerializationType.Json
+        };
+        _iterableSerializableSaveIteratorField.SetValue(publisher,
+            new IterableSerializableDataIterator(dataToPublish, null));
+
+        typeof(Sessions.Actions.Publishers.Publisher).GetMethod("Publish",
+                BindingFlags.NonPublic | BindingFlags.Instance)!
+            .Invoke(publisher, [testActData]);
+
+        Assert.That(testActData.Input, Has.Count.EqualTo(dataToPublish.Length));
+        Assert.That(testActData.Input!.All(item =>
+            item.Timestamp == expectedTimestamps[item.Body!.ToString()!]), Is.True);
+    }
+
+    [Test]
+    public void Act_WithNullSenderAndNoDataSources_ReturnsEmptyInputWithConfiguredSerialization()
+    {
+        var publisher = new Sessions.Actions.Publishers.Publisher(
+            "test",
+            null,
+            0,
+            new DataFilter(),
+            null,
+            false,
+            null,
+            1,
+            0,
+            SerializationType.Json,
+            null,
+            null,
+            Globals.Logger);
+
+        publisher.InitializeIterableSerializableSaveIterator([], []);
+        var result = publisher.Act();
+
+        Assert.That(result.Input, Is.Empty);
+        Assert.That(result.InputSerializationType, Is.EqualTo(SerializationType.Json));
+    }
+
+    [Test]
+    public void ChunkAct_WithNullSenderAndNoDataSources_ReturnsEmptyInputWithConfiguredSerialization()
+    {
+        var publisher = new Sessions.Actions.Publishers.ChunkPublisher(
+            "test",
+            null,
+            0,
+            new DataFilter(),
+            null,
+            null,
+            2,
+            false,
+            1,
+            0,
+            SerializationType.Json,
+            null,
+            null,
+            Globals.Logger);
+
+        publisher.InitializeIterableSerializableSaveIterator([], []);
+        var result = publisher.Act();
+
+        Assert.That(result.Input, Is.Empty);
+        Assert.That(result.InputSerializationType, Is.EqualTo(SerializationType.Json));
+    }
+
+    [Test]
+    public void IterateWithOriginal_WhenIterableIsNull_ReturnsEmptySequence()
+    {
+        var iterator = new IterableSerializableDataIterator(null, null);
+
+        var items = iterator.IterateWithOriginal().ToArray();
+
+        Assert.That(items, Is.Empty);
+        Assert.That(iterator.IteratedData, Is.Empty);
+    }
+
+    private sealed class NamedSender : ISender
+    {
+        public void Connect()
+        {
+        }
+
+        public void Disconnect()
+        {
+        }
+
+        public SerializationType? GetSerializationType()
+        {
+            return SerializationType.Json;
+        }
+
+        public DetailedData<object> Send(Data<object> dataToSend)
+        {
+            return new DetailedData<object> { Body = dataToSend.Body };
+        }
+    }
+
+    private sealed class CapturingLogger : ILogger
+    {
+        public List<string> Messages { get; } = [];
+
+        public IDisposable BeginScope<TState>(TState state) where TState : notnull
+        {
+            return NoOpScope.Instance;
+        }
+
+        public bool IsEnabled(LogLevel logLevel)
+        {
+            return true;
+        }
+
+        public void Log<TState>(LogLevel logLevel, EventId eventId, TState state, Exception? exception,
+            Func<TState, Exception?, string> formatter)
+        {
+            Messages.Add(formatter(state, exception));
+        }
+
+        private sealed class NoOpScope : IDisposable
+        {
+            public static readonly NoOpScope Instance = new();
+
+            public void Dispose()
+            {
+            }
+        }
     }
 }

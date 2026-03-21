@@ -45,14 +45,15 @@ public class Assertion
     {
         var nonNullSessionDataList = sessionDataList.Where(sessionData => sessionData != null).Select(sd => sd!)
             .ToImmutableList();
+        var availableDataSources = dataSourceList ?? ImmutableList<DataSource>.Empty;
 
         // Set assertion's dataSources and sessions based on provided names & patterns
         DataSourceList = EnumerableExtensions.GetFilteredConfigurationObjectList(
-                dataSourceList ?? new ImmutableArray<DataSource>().ToImmutableList(),
+                availableDataSources,
                 _dataSourcePatterns, RegexFilters.DataSource,
                 "DataSource List")
             .Union(EnumerableExtensions.GetFilteredConfigurationObjectList(
-                dataSourceList ?? new ImmutableArray<DataSource>(),
+                availableDataSources,
                 _dataSourceNames, NameFilters.DataSource,
                 "DataSource List")).ToImmutableList();
         SessionDataList = EnumerableExtensions.GetFilteredConfigurationObjectList(nonNullSessionDataList,
@@ -73,7 +74,7 @@ public class Assertion
         {
             var assertionBooleanResult =
                 AssertionHook.Assert(SessionDataList,
-                    DataSourceList ?? new ImmutableArray<DataSource>());
+                    DataSourceList ?? ImmutableList<DataSource>.Empty);
 
             // Initialized AssertionStatus overrides Assertion return value
             assertionStatus = AssertionHook.AssertionStatus ??

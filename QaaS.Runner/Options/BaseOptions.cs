@@ -24,6 +24,12 @@ public abstract record BaseOptions : LoggerOptions
             "List of files to overwrite the qaas configuration with, The first file overwrites the qaas configuration file and then the one after it overwrite the result and so on...")]
     public IList<string> OverwriteFiles { get; init; } = Array.Empty<string>();
 
+    [AllPathsInEnumerableValid]
+    [Option('f', "with-folders", Default = null,
+        HelpText =
+            "List of folders whose yaml files overwrite the qaas configuration in alphabetical order, after overwrite files and in the order the folders are given.")]
+    public IList<string> OverwriteFolders { get; init; } = Array.Empty<string>();
+
     [Option('r', "overwrite-arguments", Default = null,
         HelpText = @"
 List of arguments to overwrite the qaas configuration with, The first argument overwrites the qaas configuration and then the one after it overwrites the result and so on...
@@ -86,6 +92,14 @@ Or
         HelpText = "Names of the test-cases to run.")]
     public IList<string> CasesNamesToRun { get; init; } = Array.Empty<string>();
 
+    [Option("cases-names-ignore", Default = null,
+        HelpText = "Names of the test-cases to ignore.")]
+    public IList<string> CasesNamesToIgnore { get; init; } = Array.Empty<string>();
+
+    [Option("cases-name-patterns-ignore", Default = null,
+        HelpText = "Regex patterns of test-case names to ignore.")]
+    public IList<string> CasesNamePatternsToIgnore { get; init; } = Array.Empty<string>();
+
     [Option('i', "session-names", Default = null,
         HelpText = "Names of the sessions to run.")]
     public IList<string> SessionNamesToRun { get; init; } = Array.Empty<string>();
@@ -111,6 +125,12 @@ Or
     [Option("no-env", Default = false,
         HelpText = "When this flag is used environment variables will not override loaded configurations.")]
     public bool DontResolveWithEnvironmentVariables { get; init; } = false;
+
+    [Option("no-process-exit", Default = false,
+        HelpText =
+            "When this flag is used the runner will not terminate the current process after it completes. " +
+            "Useful when embedding QaaS.Runner and orchestrating multiple runners in a single host process.")]
+    public bool NoProcessExit { get; init; } = false;
 
     /// <summary>
     ///     Gets the execution type of the command

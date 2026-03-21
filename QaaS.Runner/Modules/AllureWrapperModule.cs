@@ -4,13 +4,13 @@ using QaaS.Runner.WrappedExternals;
 namespace QaaS.Runner.Modules;
 
 /// <summary>
-///     Module that provides the allureWrapper
+/// Registers a single <see cref="AllureWrapper" /> instance for the Autofac root container.
 /// </summary>
 public class AllureWrapperModule : Module
 {
     /// <inheritdoc />
     protected override void Load(ContainerBuilder builder)
     {
-        builder.RegisterInstance(new AllureWrapper()).SingleInstance();
+        builder.RegisterType<AllureWrapper>().SingleInstance();
     }
 }

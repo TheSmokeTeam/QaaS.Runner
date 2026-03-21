@@ -23,7 +23,7 @@ public class StorageBuilderTests
     public void Build_WithFileSystemConfiguration_ReturnsFileSystemStorageAndSetsContext()
     {
         var builder = new StorageBuilder()
-            .Configure(new FilesInFileSystemConfig { Path = "some/path" });
+            .CreateConfiguration(new FilesInFileSystemConfig { Path = "some/path" });
 
         var storage = InvokeBuild(builder, Globals.Context);
 
@@ -35,7 +35,7 @@ public class StorageBuilderTests
     public void Build_WithS3Configuration_ReturnsS3StorageAndSetsContext()
     {
         var builder = new StorageBuilder()
-            .Configure(new S3Config());
+            .CreateConfiguration(new S3Config());
 
         var storage = InvokeBuild(builder, Globals.Context);
 
@@ -47,7 +47,7 @@ public class StorageBuilderTests
     public void Configure_WhenCalledMultipleTimes_ResetsPreviousConfiguration()
     {
         var builder = new StorageBuilder()
-            .Configure(new S3Config())
+            .CreateConfiguration(new S3Config())
             .Configure(new FilesInFileSystemConfig { Path = "some/path" });
 
         var storage = InvokeBuild(builder, Globals.Context);
@@ -63,6 +63,24 @@ public class StorageBuilderTests
         var returnedBuilder = builder.WithJsonStorageFormat(Formatting.None);
 
         Assert.That(returnedBuilder, Is.SameAs(builder));
+    }
+
+    [Test]
+    public void UpdateConfiguration_WithoutExistingConfiguration_ThrowsInvalidOperationException()
+    {
+        var builder = new StorageBuilder();
+
+        Assert.Throws<InvalidOperationException>(() =>
+            builder.UpdateConfiguration(config => config));
+    }
+
+    [Test]
+    public void UpdateConfiguration_WithConfigurationWithoutExistingConfiguration_ThrowsInvalidOperationException()
+    {
+        var builder = new StorageBuilder();
+
+        Assert.Throws<InvalidOperationException>(() =>
+            builder.UpdateConfiguration(new FilesInFileSystemConfig { Path = "some/path" }));
     }
 
     private static IStorage InvokeBuild(StorageBuilder builder, Context context)

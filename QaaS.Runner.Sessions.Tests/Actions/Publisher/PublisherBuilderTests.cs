@@ -5,7 +5,6 @@ using System.Linq;
 using System.Net.Sockets;
 using System.Reflection;
 using NUnit.Framework;
-using QaaS.Framework.Configurations;
 using QaaS.Framework.Policies;
 using QaaS.Framework.Protocols.ConfigurationObjects;
 using QaaS.Framework.Protocols.ConfigurationObjects.Elastic;
@@ -22,6 +21,7 @@ using QaaS.Framework.SDK.Session;
 using QaaS.Framework.SDK.Session.SessionDataObjects;
 using QaaS.Framework.SDK.Session.SessionDataObjects.RunningSessionsObjects;
 using QaaS.Framework.Serialization;
+using QaaS.Runner;
 using QaaS.Runner.Sessions.Actions.Publishers.Builders;
 using QaaS.Runner.Sessions.ConfigurationObjects;
 using Serilog;
@@ -35,6 +35,21 @@ public class PublisherBuilderTests
 {
     private IList<ActionFailure> _actionFailures = null!;
     private string _sessionName = null!;
+
+    private static IEnumerable<TestCaseData> SupportedSenderConfigurationsForRead()
+    {
+        yield return new TestCaseData(new RabbitMqSenderConfig()).SetName("ReadConfiguration_WithRabbitMq_ReturnsRabbitMq");
+        yield return new TestCaseData(new KafkaTopicSenderConfig()).SetName("ReadConfiguration_WithKafkaTopic_ReturnsKafkaTopic");
+        yield return new TestCaseData(new SocketSenderConfig()).SetName("ReadConfiguration_WithSocket_ReturnsSocket");
+        yield return new TestCaseData(new SftpSenderConfig()).SetName("ReadConfiguration_WithSftp_ReturnsSftp");
+        yield return new TestCaseData(new PostgreSqlSenderConfig()).SetName("ReadConfiguration_WithPostgreSql_ReturnsPostgreSql");
+        yield return new TestCaseData(new OracleSenderConfig()).SetName("ReadConfiguration_WithOracle_ReturnsOracle");
+        yield return new TestCaseData(new MsSqlSenderConfig()).SetName("ReadConfiguration_WithMsSql_ReturnsMsSql");
+        yield return new TestCaseData(new ElasticSenderConfig()).SetName("ReadConfiguration_WithElastic_ReturnsElastic");
+        yield return new TestCaseData(new RedisSenderConfig()).SetName("ReadConfiguration_WithRedis_ReturnsRedis");
+        yield return new TestCaseData(new S3BucketSenderConfig()).SetName("ReadConfiguration_WithS3_ReturnsS3");
+        yield return new TestCaseData(new MongoDbCollectionSenderConfig()).SetName("ReadConfiguration_WithMongo_ReturnsMongo");
+    }
 
     [SetUp]
     public void SetUp()
@@ -142,6 +157,24 @@ public class PublisherBuilderTests
     }
 
     [Test]
+    public void DeleteDataSource_WhenCollectionIsNull_DoesNothing()
+    {
+        var builder = new PublisherBuilder();
+
+        Assert.DoesNotThrow(() => builder.DeleteDataSource("missing"));
+        Assert.That(builder.ReadDataSources(), Is.Empty);
+    }
+
+    [Test]
+    public void DeleteDataSourcePattern_WhenCollectionIsNull_DoesNothing()
+    {
+        var builder = new PublisherBuilder();
+
+        Assert.DoesNotThrow(() => builder.DeleteDataSourcePattern("missing"));
+        Assert.That(builder.ReadDataSourcePatterns(), Is.Empty);
+    }
+
+    [Test]
     public void InLoops_Should_Set_Loop_Property()
     {
         var builder = new PublisherBuilder();
@@ -229,6 +262,23 @@ public class PublisherBuilderTests
     }
 
     [Test]
+    [TestCaseSource(nameof(SupportedSenderConfigurationsForRead))]
+    public void ReadConfiguration_WithConfiguredType_ReturnsConfiguredInstance(ISenderConfig config)
+    {
+        var builder = new PublisherBuilder().Configure(config);
+
+        Assert.That(builder.ReadConfiguration(), Is.SameAs(config));
+    }
+
+    [Test]
+    public void ReadConfiguration_WithoutConfiguredType_ReturnsNull()
+    {
+        var builder = new PublisherBuilder();
+
+        Assert.That(builder.ReadConfiguration(), Is.Null);
+    }
+
+    [Test]
     public void Configure_MultipleSenderConfigs_ThrowsInvalidOperationException()
     {
         var rabbitMq = new RabbitMqSenderConfig();
@@ -303,6 +353,36 @@ public class PublisherBuilderTests
 
         Assert.That(result, Is.Null);
         Assert.That(_actionFailures.Count, Is.GreaterThan(0));
+    }
+
+    [Test]
+    public void UpdateConfiguration_WithoutExistingConfiguration_ThrowsInvalidOperationException()
+    {
+        var builder = new PublisherBuilder();
+
+        Assert.Throws<InvalidOperationException>(() => builder.UpdateConfiguration(config => config));
+    }
+
+    [Test]
+    public void UpdateConfiguration_WithConfigurationWithoutExistingConfiguration_ThrowsInvalidOperationException()
+    {
+        var builder = new PublisherBuilder();
+
+        Assert.Throws<InvalidOperationException>(() => builder.UpdateConfiguration(new RabbitMqSenderConfig()));
+    }
+
+    [Test]
+    public void UpdatePolicyAt_WithValidIndex_ReplacesPolicy()
+    {
+        var replacementPolicy = new PolicyBuilder();
+        var builder = new PublisherBuilder()
+            .AddPolicy(new PolicyBuilder())
+            .AddPolicy(new PolicyBuilder());
+
+        builder.UpdatePolicyAt(0, replacementPolicy);
+
+        Assert.That(builder.Policies[0], Is.SameAs(replacementPolicy));
+        Assert.That(builder.Policies[1], Is.Not.SameAs(replacementPolicy));
     }
 
     private static IEnumerable<TestCaseData> TestSendersWhichSupportSingleSending()
@@ -417,9 +497,7 @@ public class PublisherBuilderTests
         publisherBuilder.Configure(senderConfiguration);
 
         // Act 
-        var validationResults = new List<ValidationResult>();
-        ValidationUtils.TryValidateObjectRecursive(publisherBuilder, validationResults,
-            bindingFlags: BindingFlags.NonPublic | BindingFlags.Public | BindingFlags.Instance);
+        var validationResults = ValidateBuilder(publisherBuilder);
 
         // Assert
         Assert.That(validationResults.Count(r => r.ErrorMessage!.Contains("Chunk")), Is.EqualTo(1));
@@ -436,16 +514,13 @@ public class PublisherBuilderTests
         publisherBuilder.Configure(senderConfiguration);
 
         // Act 
-        var validationResults = new List<ValidationResult>();
-        ValidationUtils.TryValidateObjectRecursive(publisherBuilder, validationResults,
-            bindingFlags: BindingFlags.NonPublic | BindingFlags.Public | BindingFlags.Instance);
+        var validationResults = ValidateBuilder(publisherBuilder);
 
         // Assert
         Assert.That(validationResults.Count(r => r.ErrorMessage!.Contains("Chunk")), Is.EqualTo(1));
     }
 
     [Test]
-    [TestCaseSource(nameof(TestSendersWhichSupportAllSending))]
     [TestCaseSource(nameof(TestSendersWhichSupportSingleSending))]
     public void
         TestValidationOfChunks_ConfigureValidConfigurationAccordingToIfTheProtocolNeedsChunksOrNot_ShouldBeValidOnSingleProtocols(
@@ -456,9 +531,7 @@ public class PublisherBuilderTests
         publisherBuilder.Configure(senderConfiguration);
 
         // Act 
-        var validationResults = new List<ValidationResult>();
-        ValidationUtils.TryValidateObjectRecursive(publisherBuilder, validationResults,
-            bindingFlags: BindingFlags.NonPublic | BindingFlags.Public | BindingFlags.Instance);
+        var validationResults = ValidateBuilder(publisherBuilder);
 
         // Assert
         Assert.That(validationResults.Count(r => r.ErrorMessage!.Contains("Chunk")), Is.EqualTo(0));
@@ -466,7 +539,6 @@ public class PublisherBuilderTests
 
 
     [Test]
-    [TestCaseSource(nameof(TestSendersWhichSupportAllSending))]
     [TestCaseSource(nameof(TestSendersWhichSupportChunkSending))]
     public void
         TestValidationOfChunks_ConfigureValidConfigurationAccordingToIfTheProtocolNeedsChunksOrNot_ShouldBeValidOnChunkProtocols(
@@ -478,12 +550,32 @@ public class PublisherBuilderTests
         publisherBuilder.Configure(senderConfiguration);
 
         // Act 
-        var validationResults = new List<ValidationResult>();
-        ValidationUtils.TryValidateObjectRecursive(publisherBuilder, validationResults,
-            bindingFlags: BindingFlags.NonPublic | BindingFlags.Public | BindingFlags.Instance);
+        var validationResults = ValidateBuilder(publisherBuilder);
 
         // Assert
         Assert.That(validationResults.Count(r => r.ErrorMessage!.Contains("Chunk")), Is.EqualTo(0));
+    }
+
+    [Test]
+    [TestCaseSource(nameof(TestSendersWhichSupportAllSending))]
+    public void
+        TestValidationOfChunks_ConfigureProtocolWhichSupportsSingleAndChunkModes_ShouldBeValidWithAndWithoutChunks(
+            ISenderConfig senderConfiguration)
+    {
+        var withoutChunksBuilder = new PublisherBuilder()
+            .Configure(senderConfiguration);
+        var withChunksBuilder = new PublisherBuilder()
+            .WithChunks(new Chunks())
+            .Configure(senderConfiguration);
+
+        var withoutChunksResults = ValidateBuilder(withoutChunksBuilder);
+        var withChunksResults = ValidateBuilder(withChunksBuilder);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(withoutChunksResults.Count(result => result.ErrorMessage!.Contains("Chunk")), Is.EqualTo(0));
+            Assert.That(withChunksResults.Count(result => result.ErrorMessage!.Contains("Chunk")), Is.EqualTo(0));
+        });
     }
 
     private static object? GetFieldValue(object? obj, string fieldName)
@@ -492,5 +584,12 @@ public class PublisherBuilderTests
             .GetField(fieldName, BindingFlags.NonPublic | BindingFlags.Public | BindingFlags.Instance);
 
         return field?.GetValue(obj);
+    }
+
+    private static List<ValidationResult> ValidateBuilder(object instance)
+    {
+        return instance is IValidatableObject validatable
+            ? validatable.Validate(new ValidationContext(instance)).ToList()
+            : [];
     }
 }

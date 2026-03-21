@@ -1,5 +1,6 @@
 using System.ComponentModel;
 using System.ComponentModel.DataAnnotations;
+using QaaS.Framework.Configurations;
 using QaaS.Framework.Configurations.CustomValidationAttributes;
 using QaaS.Framework.Policies;
 using QaaS.Framework.Protocols.ConfigurationObjects;
@@ -12,6 +13,7 @@ using QaaS.Framework.SDK.Session.SessionDataObjects;
 using QaaS.Framework.Serialization;
 using QaaS.Runner.Sessions.ConfigurationObjects;
 using QaaS.Runner.Sessions.Extensions;
+using QaaS.Runner.Sessions.RuntimeOverrides;
 
 namespace QaaS.Runner.Sessions.Actions.Transactions.Builders;
 
@@ -255,23 +257,63 @@ public class TransactionBuilder
         return this;
     }
 
+    /// <summary>
+    /// Compatibility alias for <see cref="Configure" /> that matches the configuration CRUD pattern used by other builders.
+    /// </summary>
     public TransactionBuilder CreateConfiguration(ITransactorConfig config)
     {
         return Configure(config);
     }
 
+    /// <summary>
+    /// Compatibility alias for <see cref="CreateConfiguration" />.
+    /// </summary>
+    public TransactionBuilder Create(ITransactorConfig config)
+    {
+        return CreateConfiguration(config);
+    }
+
+    /// <summary>
+    /// Returns the currently configured transactor source, if any.
+    /// </summary>
     public ITransactorConfig? ReadConfiguration()
     {
         return (ITransactorConfig?)Http ?? Grpc;
     }
 
+    /// <summary>
+    /// Applies a computed partial update to the current transaction configuration while preserving omitted fields.
+    /// </summary>
     public TransactionBuilder UpdateConfiguration(Func<ITransactorConfig, ITransactorConfig> update)
     {
         var currentConfig = ReadConfiguration() ??
                             throw new InvalidOperationException("Transaction configuration is not set");
-        return Configure(update(currentConfig));
+        return UpdateConfiguration(update(currentConfig));
     }
 
+    /// <summary>
+    /// Updates the transaction configuration by merging same-type values and replacing the current type when needed.
+    /// </summary>
+    public TransactionBuilder UpdateConfiguration(ITransactorConfig config)
+    {
+        var currentConfig = ReadConfiguration() ??
+                            throw new InvalidOperationException("Transaction configuration is not set");
+        return Configure(currentConfig.UpdateConfiguration(config));
+    }
+
+    /// <summary>
+    /// Updates the transaction configuration from an object-shaped patch while preserving omitted fields.
+    /// </summary>
+    public TransactionBuilder UpdateConfiguration(object configuration)
+    {
+        var currentConfig = ReadConfiguration() ??
+                            throw new InvalidOperationException("Transaction configuration is not set");
+        return Configure(currentConfig.UpdateConfiguration(configuration));
+    }
+
+    /// <summary>
+    /// Clears the configured transactor source.
+    /// </summary>
     public TransactionBuilder DeleteConfiguration()
     {
         return Reset();
@@ -284,6 +326,9 @@ public class TransactionBuilder
         return this;
     }
 
+    /// <summary>
+    /// Replaces the current transactor source with the provided configuration type.
+    /// </summary>
     public TransactionBuilder Configure(ITransactorConfig config)
     {
         Reset();
@@ -329,7 +374,9 @@ public class TransactionBuilder
             var timeout = TimeSpan.FromMilliseconds(TimeoutMs!.Value);
             var deserializerSpecificType = OutputDeserialize?.SpecificType?.GetConfiguredType();
 
-            var transactor = TransactorFactory.CreateTransactor(type, context.Logger, timeout);
+            var overrideRequest = new TransactionOverrideRequest(Name!, type, context.Logger, timeout);
+            var transactor = context.GetSessionActionOverrides()?.Transaction?.Invoke(overrideRequest)
+                             ?? TransactorFactory.CreateTransactor(type, context.Logger, timeout);
 
             return new Transaction(Name!, transactor, Stage, InputDataFilter, OutputDataFilter,
                 PolicyBuilder.BuildPolicies(Policies), Loop, Iterations, SleepTimeMs,
@@ -339,7 +386,7 @@ public class TransactionBuilder
         catch (Exception e)
         {
             actionFailures.AppendActionFailure(e, sessionName, context.Logger, nameof(Transaction), Name!,
-                type?.GetType().ToString()!);
+                type?.GetType().Name);
         }
 
         return null;

@@ -1,4 +1,5 @@
-﻿using Moq;
+using System.Linq;
+using Moq;
 using Moq.Protected;
 using NUnit.Framework;
 using QaaS.Framework.SDK.ContextObjects;
@@ -12,21 +13,6 @@ namespace QaaS.Runner.Tests.LogicsTests;
 
 public class ReportLogicTests
 {
-    [TestCase(ExecutionType.Assert, true)]
-    [TestCase(ExecutionType.Run, true)]
-    [TestCase(ExecutionType.Template, false)]
-    [TestCase(ExecutionType.Act, false)]
-    public void TestShouldRun_WithExecutionType_ReturnsExpectedBoolean(ExecutionType executionType, bool expected)
-    {
-        // Arrange
-        var mockReporters = new List<IReporter>();
-        var context = new InternalContext();
-        var reportLogic = new ReportLogic(mockReporters, context);
-
-        // Act & Assert
-        Assert.That(reportLogic.ShouldRun(executionType), Is.EqualTo(expected));
-    }
-
     [TestCase(1)]
     [TestCase(5)]
     public void TestRun_WithReportersAndAssertionResults_WritesResultsToReporters(int reportersCount)
@@ -39,6 +25,7 @@ public class ReportLogicTests
         {
             var mockReporter = new Mock<IReporter>();
             mockReporter.SetupGet(r => r.Name).Returns($"Assertion{i + 1}");
+            mockReporter.SetupGet(r => r.AssertionName).Returns($"Assertion{i + 1}");
             mockReporters.Add(mockReporter);
             var assertion = new Assertion
             {
@@ -93,7 +80,8 @@ public class ReportLogicTests
     {
         // Arrange
         var mockReporter = new Mock<IReporter>();
-        mockReporter.Setup(r => r.Name).Returns("NonExistentReporter");
+        mockReporter.SetupGet(r => r.Name).Returns("Allure");
+        mockReporter.SetupGet(r => r.AssertionName).Returns("NonExistentAssertion");
 
         var assertionResult = new AssertionResult
         {
@@ -116,5 +104,77 @@ public class ReportLogicTests
 
         // Act & Assert
         Assert.Throws<ArgumentException>(() => reportLogic.Run(executionData));
+    }
+
+    [Test]
+    public void TestRun_WithMultipleReportersTargetingSameAssertion_WritesToEachReporter()
+    {
+        var firstReporter = new Mock<IReporter>();
+        firstReporter.SetupGet(r => r.Name).Returns("ReporterOne");
+        firstReporter.SetupGet(r => r.AssertionName).Returns("AssertionA");
+
+        var secondReporter = new Mock<IReporter>();
+        secondReporter.SetupGet(r => r.Name).Returns("ReporterTwo");
+        secondReporter.SetupGet(r => r.AssertionName).Returns("AssertionA");
+
+        var assertionResult = new AssertionResult
+        {
+            Assertion = new Assertion
+            {
+                Name = "AssertionA",
+                StatussesToReport =
+                [
+                    AssertionStatus.Broken,
+                    AssertionStatus.Failed,
+                    AssertionStatus.Passed,
+                    AssertionStatus.Skipped,
+                    AssertionStatus.Unknown
+                ],
+                AssertionName = null,
+                AssertionHook = null
+            },
+            AssertionStatus = AssertionStatus.Passed,
+            TestDurationMs = 0,
+            Flaky = null
+        };
+
+        var reportLogic = new ReportLogic([firstReporter.Object, secondReporter.Object], Globals.GetContextWithMetadata());
+        var executionData = new ExecutionData();
+        executionData.AssertionResults.Add(assertionResult);
+
+        var result = reportLogic.Run(executionData);
+
+        Assert.That(result, Is.SameAs(executionData));
+        firstReporter.Verify(reporter => reporter.WriteTestResults(assertionResult), Times.Once);
+        secondReporter.Verify(reporter => reporter.WriteTestResults(assertionResult), Times.Once);
+    }
+
+    [Test]
+    public void TestRun_WhenAssertionStatusIsNotConfiguredForReporting_DoesNotWriteResults()
+    {
+        var reporter = new Mock<IReporter>();
+        reporter.SetupGet(r => r.Name).Returns("Reporter");
+        reporter.SetupGet(r => r.AssertionName).Returns("AssertionA");
+        var assertionResult = new AssertionResult
+        {
+            Assertion = new Assertion
+            {
+                Name = "AssertionA",
+                StatussesToReport = [AssertionStatus.Failed],
+                AssertionName = null,
+                AssertionHook = null
+            },
+            AssertionStatus = AssertionStatus.Passed,
+            TestDurationMs = 0,
+            Flaky = null
+        };
+        var executionData = new ExecutionData();
+        executionData.AssertionResults.Add(assertionResult);
+        var logic = new ReportLogic([reporter.Object], Globals.GetContextWithMetadata());
+
+        var result = logic.Run(executionData);
+
+        Assert.That(result, Is.SameAs(executionData));
+        reporter.Verify(currentReporter => currentReporter.WriteTestResults(It.IsAny<AssertionResult>()), Times.Never);
     }
 }

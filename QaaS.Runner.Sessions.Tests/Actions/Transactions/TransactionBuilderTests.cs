@@ -1,10 +1,10 @@
 using System;
 using System.Collections.Generic;
 using System.ComponentModel.DataAnnotations;
+using System.Linq;
 using System.Reflection;
 using NUnit.Framework;
 using QaaS.Framework.Policies;
-using QaaS.Framework.Configurations;
 using QaaS.Framework.Protocols.ConfigurationObjects.Grpc;
 using QaaS.Framework.Protocols.ConfigurationObjects.Http;
 using QaaS.Framework.SDK.ContextObjects;
@@ -12,6 +12,7 @@ using QaaS.Framework.SDK.Session;
 using QaaS.Framework.SDK.Session.SessionDataObjects;
 using QaaS.Framework.SDK.Session.SessionDataObjects.RunningSessionsObjects;
 using QaaS.Framework.Serialization;
+using QaaS.Runner;
 using QaaS.Runner.Sessions.Actions.Transactions.Builders;
 using Serilog;
 using Serilog.Events;
@@ -212,6 +213,14 @@ public class TransactionBuilderTests
     }
 
     [Test]
+    public void UpdateConfiguration_WithConfigurationWithoutExistingConfiguration_ThrowsInvalidOperationException()
+    {
+        var builder = new TransactionBuilder();
+
+        Assert.Throws<InvalidOperationException>(() => builder.UpdateConfiguration(new HttpTransactorConfig()));
+    }
+
+    [Test]
     public void Build_Throws_When_No_Transactor_Config()
     {
         var builder = new TransactionBuilder();
@@ -283,8 +292,8 @@ public class TransactionBuilderTests
         });
 
         var validationResults = new List<ValidationResult>();
-        ValidationUtils.TryValidateObjectRecursive(builder, validationResults,
-            bindingFlags: BindingFlags.NonPublic | BindingFlags.Public | BindingFlags.Instance);
+        ValidateMembers(builder, validationResults,
+            "DataSourceNames", "DataSourcePatterns");
 
         Assert.That(validationResults, Is.Not.Empty);
     }
@@ -366,5 +375,34 @@ public class TransactionBuilderTests
 
         Assert.That(result, Is.Null);
         Assert.That(_actionFailures, Is.Not.Empty);
+    }
+
+    private static void ValidateMembers(object instance, ICollection<ValidationResult> validationResults,
+        params string[] propertyNames)
+    {
+        foreach (var propertyName in propertyNames.Distinct(StringComparer.Ordinal))
+        {
+            var property = instance.GetType()
+                .GetProperty(propertyName, BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
+            if (property == null || property.GetIndexParameters().Length > 0)
+            {
+                continue;
+            }
+
+            var validationContext = new ValidationContext(instance, null, null)
+            {
+                MemberName = property.Name
+            };
+            var getter = property.GetGetMethod(nonPublic: true);
+            var value = getter?.Invoke(instance, null);
+            foreach (var validationAttribute in property.GetCustomAttributes<ValidationAttribute>())
+            {
+                var result = validationAttribute.GetValidationResult(value, validationContext);
+                if (result != null && result != ValidationResult.Success)
+                {
+                    validationResults.Add(result);
+                }
+            }
+        }
     }
 }

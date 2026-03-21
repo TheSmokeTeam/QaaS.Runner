@@ -78,4 +78,43 @@ public class BaseStorageTests
         Assert.That(result.Select(session => session.Name), Is.EquivalentTo(["session-a", "session-b"]));
         Assert.That(storage.CaseName, Is.EqualTo("case-c"));
     }
+
+    [Test]
+    public void Store_WithMissingSessionName_ThrowsInvalidOperationException()
+    {
+        var storage = new InspectableStorage(Formatting.None);
+        var sessions = new List<SessionData?> { new() { Name = "" } }.ToImmutableList();
+
+        Assert.Throws<InvalidOperationException>(() => storage.Store(sessions, "case-d"));
+    }
+
+    [Test]
+    public void Store_WithDuplicateNormalizedFileNames_ThrowsInvalidOperationException()
+    {
+        var storage = new InspectableStorage(Formatting.None);
+        var sessions = new List<SessionData?>
+        {
+            new() { Name = "session/a" },
+            new() { Name = "session\\a" }
+        }.ToImmutableList();
+
+        Assert.Throws<InvalidOperationException>(() => storage.Store(sessions, "case-e"));
+    }
+
+    [Test]
+    public void Retrieve_WhenContextWasNotAssigned_StillDeserializesSessions()
+    {
+        var options = new JsonSerializerOptions
+        {
+            DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull
+        };
+        var storage = new InspectableStorage(Formatting.None,
+        [
+            SessionDataSerialization.SerializeSessionData(new SessionData { Name = "session-no-context" }, options)
+        ]);
+
+        var result = storage.Retrieve("case-f");
+
+        Assert.That(result.Select(session => session.Name), Is.EqualTo(new[] { "session-no-context" }));
+    }
 }

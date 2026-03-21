@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using Microsoft.Extensions.Logging.Abstractions;
 using Moq;
 using QaaS.Framework.Policies;
 using QaaS.Framework.Protocols.Protocols;
@@ -15,14 +16,13 @@ using QaaS.Framework.SDK.Session.MetaDataObjects;
 using QaaS.Framework.SDK.Session.SessionDataObjects;
 using QaaS.Framework.SDK.Session.SessionDataObjects.RunningSessionsObjects;
 using QaaS.Framework.Serialization;
-using Serilog;
-using Serilog.Events;
-using Serilog.Extensions.Logging;
 
 namespace QaaS.Runner.Sessions.Tests.Actions.Utils;
 
 public static class CreationalFunctions
 {
+    private const int DefaultTestMessagesPerSecond = 100_000;
+
     public static InternalContext CreateContext(string sessionName, List<DataSource> dataSources)
     {
         var context = new InternalContext
@@ -39,9 +39,7 @@ public static class CreationalFunctions
                     }
                 }),
             ExecutionData = new ExecutionData {DataSources = dataSources},
-            Logger = new SerilogLoggerFactory(new LoggerConfiguration().MinimumLevel
-                .Is(LogEventLevel.Information).WriteTo
-                .Console().CreateLogger()).CreateLogger("DefaultLogger")
+            Logger = NullLogger.Instance
         };
         context.InsertValueIntoGlobalDictionary(context.GetMetaDataPath(), new MetaDataConfig());
         return context;
@@ -122,9 +120,7 @@ public static class CreationalFunctions
             new DataFilter {Body = true, MetaData = false, Timestamp = false},
             SerializationType.Binary,
             null,
-            new SerilogLoggerFactory(new LoggerConfiguration().MinimumLevel
-                .Is(LogEventLevel.Information).WriteTo
-                .Console().CreateLogger()).CreateLogger("DefaultLogger"));
+            NullLogger.Instance);
     }
     
     public static Sessions.Actions.Consumers.ChunkConsumer CreateChunkConsumer(
@@ -141,9 +137,7 @@ public static class CreationalFunctions
             new DataFilter {Body = true, MetaData = false, Timestamp = false},
             SerializationType.Binary,
             null,
-            new SerilogLoggerFactory(new LoggerConfiguration().MinimumLevel
-                .Is(LogEventLevel.Information).WriteTo
-                .Console().CreateLogger()).CreateLogger("DefaultLogger"));
+            NullLogger.Instance);
     }
     
     public static Sessions.Actions.Publishers.Publisher CreatePublisherWithIterations(
@@ -152,7 +146,7 @@ public static class CreationalFunctions
         string[]? dsPatterns,
         string[]? dsNames,
         int numberOfIterations,
-        int msgPerSec = 100)
+        int msgPerSec = DefaultTestMessagesPerSecond)
     {
         infoSent = InitSender(ref sender);
         
@@ -166,9 +160,7 @@ public static class CreationalFunctions
             0,
             null, 
             dsPatterns, dsNames,
-            new SerilogLoggerFactory(new LoggerConfiguration().MinimumLevel
-                .Is(LogEventLevel.Information).WriteTo
-                .Console().CreateLogger()).CreateLogger("DefaultLogger"));
+            NullLogger.Instance);
     }
     
     public static Sessions.Actions.Publishers.ChunkPublisher CreateChunkPublisherWithIterations(
@@ -177,7 +169,7 @@ public static class CreationalFunctions
         string[]? dsNames,
         int chunkSize,
         int iterations = 1,
-        int msgPerSec = 100)
+        int msgPerSec = DefaultTestMessagesPerSecond)
     {
         InitChunkSender(ref chunkSender);
         
@@ -189,9 +181,7 @@ public static class CreationalFunctions
             null, chunkSize, false, iterations,
             0, null,
             dsPatterns, dsNames,
-            new SerilogLoggerFactory(new LoggerConfiguration().MinimumLevel
-                .Is(LogEventLevel.Information).WriteTo
-                .Console().CreateLogger()).CreateLogger("DefaultLogger"));
+            NullLogger.Instance);
     }
     
     public static Sessions.Actions.Transactions.Transaction CreateTransactorWithLoop(
@@ -201,7 +191,7 @@ public static class CreationalFunctions
         string[]? dsPatterns,
         string[]? dsNames,
         int maxAmountOfMessages,
-        int msgPerSec = 100)
+        int msgPerSec = DefaultTestMessagesPerSecond)
     {
         infoSent = InitTransactor(ref transactor, dataToGet);
         
@@ -215,8 +205,6 @@ public static class CreationalFunctions
             null,
             null,
             dsPatterns, dsNames, 
-            new SerilogLoggerFactory(new LoggerConfiguration().MinimumLevel
-                .Is(LogEventLevel.Information).WriteTo
-                .Console().CreateLogger()).CreateLogger("DefaultLogger"));
+            NullLogger.Instance);
     }
 }

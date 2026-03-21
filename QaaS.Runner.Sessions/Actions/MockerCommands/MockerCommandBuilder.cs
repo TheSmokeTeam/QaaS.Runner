@@ -1,11 +1,15 @@
 ﻿using System.ComponentModel;
 using System.ComponentModel.DataAnnotations;
+using QaaS.Framework.Configurations;
 using QaaS.Framework.SDK.ContextObjects;
 using QaaS.Framework.SDK.Extensions;
 using Qaas.Mocker.CommunicationObjects.ConfigurationObjects.Command;
 using QaaS.Framework.SDK.Session.SessionDataObjects;
+using QaaS.Runner.Infrastructure;
+using QaaS.Runner.Sessions.Actions;
 using QaaS.Runner.Sessions.ConfigurationObjects;
 using QaaS.Runner.Sessions.Extensions;
+using QaaS.Runner.Sessions.RuntimeOverrides;
 
 namespace QaaS.Runner.Sessions.Actions.MockerCommands;
 
@@ -31,7 +35,7 @@ public class MockerCommandBuilder
 
     [Required]
     [Description("The command action to commit")]
-    internal CommandConfig? Command { get; set; }
+    internal MockerCommandConfig? Command { get; set; }
 
     [Description("The duration the runner will try to request the mocker server instances")]
     [DefaultValue(3000)]
@@ -98,29 +102,80 @@ public class MockerCommandBuilder
     /// <summary>
     /// Sets command-specific configuration. Exactly one supported command type must be configured.
     /// </summary>
-    public MockerCommandBuilder WithCommand(CommandConfig command)
+    public MockerCommandBuilder Configure(MockerCommandConfig command)
     {
         Command = command;
         return this;
     }
 
-    public MockerCommandBuilder CreateCommand(CommandConfig command)
+    /// <summary>
+    /// Compatibility alias for <see cref="Configure" />.
+    /// </summary>
+    public MockerCommandBuilder WithCommand(MockerCommandConfig command)
     {
-        return WithCommand(command);
+        return Configure(command);
     }
 
-    public CommandConfig? ReadCommand()
+    /// <summary>
+    /// Compatibility alias for <see cref="Configure" /> that matches the configuration CRUD pattern used by other builders.
+    /// </summary>
+    public MockerCommandBuilder CreateConfiguration(MockerCommandConfig command)
+    {
+        return Configure(command);
+    }
+
+    /// <summary>
+    /// Compatibility alias for <see cref="CreateConfiguration" />.
+    /// </summary>
+    public MockerCommandBuilder Create(MockerCommandConfig command)
+    {
+        return CreateConfiguration(command);
+    }
+
+    /// <summary>
+    /// Returns the currently configured mocker command configuration, if any.
+    /// </summary>
+    public MockerCommandConfig? ReadConfiguration()
     {
         return Command;
     }
 
-    public MockerCommandBuilder UpdateCommand(Func<CommandConfig, CommandConfig> update)
+    /// <summary>
+    /// Applies a computed partial update to the current mocker command configuration while preserving omitted fields.
+    /// </summary>
+    public MockerCommandBuilder UpdateConfiguration(Func<MockerCommandConfig, MockerCommandConfig> update)
     {
-        Command = update(Command ?? throw new InvalidOperationException("Command configuration is not set"));
+        var currentConfig = ReadConfiguration() ??
+                            throw new InvalidOperationException("Command configuration is not set");
+        return UpdateConfiguration(update(currentConfig));
+    }
+
+    /// <summary>
+    /// Updates the mocker command configuration by merging same-type values and replacing the current type when needed.
+    /// </summary>
+    public MockerCommandBuilder UpdateConfiguration(MockerCommandConfig command)
+    {
+        var currentConfig = ReadConfiguration() ??
+                            throw new InvalidOperationException("Command configuration is not set");
+        Command = ConfigurationUpdateExtensions.UpdateConfiguration(currentConfig, command);
         return this;
     }
 
-    public MockerCommandBuilder DeleteCommand()
+    /// <summary>
+    /// Updates the mocker command configuration from an object-shaped patch while preserving omitted fields.
+    /// </summary>
+    public MockerCommandBuilder UpdateConfiguration(object configuration)
+    {
+        var currentConfig = ReadConfiguration() ??
+                            throw new InvalidOperationException("Command configuration is not set");
+        Command = ConfigurationUpdateExtensions.UpdateConfiguration(currentConfig, configuration);
+        return this;
+    }
+
+    /// <summary>
+    /// Clears the configured mocker command.
+    /// </summary>
+    public MockerCommandBuilder DeleteConfiguration()
     {
         Command = null;
         return this;
@@ -130,7 +185,7 @@ public class MockerCommandBuilder
     /// <summary>
     /// Builds the configured mocker command type and writes recoverable build failures to <paramref name="actionFailures"/>.
     /// </summary>
-    internal MockerCommand? Build(InternalContext context, IList<ActionFailure> actionFailures, string sessionName)
+    internal StagedAction? Build(InternalContext context, IList<ActionFailure> actionFailures, string sessionName)
     {
         object? type = null;
         try
@@ -154,9 +209,12 @@ public class MockerCommandBuilder
             }
             var commandTypeName = type.GetType().Name;
             context.Logger.LogDebugWithMetaData("Started building MockerCommand of type {type}",
-                context.GetMetaDataFromContext(), new object?[] { commandTypeName });
+                context.GetMetaDataOrDefault(), new object?[] { commandTypeName });
 
-            return type switch
+            var overrideRequest = new MockerCommandOverrideRequest(Name!, Stage, type, Command, Redis!, ServerName!,
+                RequestDurationMs, RequestRetries, context.Logger);
+
+            return context.GetSessionActionOverrides()?.MockerCommand?.Invoke(overrideRequest) ?? type switch
             {
                 ChangeActionStub => new ChangeActionStubMockerCommand(Name!, Stage,
                     Command.ChangeActionStub!, Redis!, ServerName!,
@@ -173,7 +231,7 @@ public class MockerCommandBuilder
         catch (Exception e)
         {
             actionFailures.AppendActionFailure(e, sessionName, context.Logger, nameof(MockerCommand), Name!,
-                type?.GetType().ToString());
+                type?.GetType().Name);
         }
 
         return null;

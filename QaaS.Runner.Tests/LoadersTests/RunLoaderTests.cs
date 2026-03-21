@@ -49,6 +49,12 @@ namespace QaaS.Runner.Tests.LoadersTests
 
         private sealed class TestJfrogArtifactoryHelper(IEnumerable<string> files) : IJfrogArtifactoryHelper
         {
+            public Task<IReadOnlyList<string>> GetUrlsToAllFilesInArtifactoryFolderAsync(string artifactoryFolderUrl,
+                HttpClient httpClient, CancellationToken cancellationToken = default)
+            {
+                return Task.FromResult<IReadOnlyList<string>>(files.ToList());
+            }
+
             public IEnumerable<string> GetUrlsToAllFilesInArtifactoryFolder(string artifactoryFolderUrl,
                 HttpClient httpClient)
             {
@@ -63,6 +69,7 @@ namespace QaaS.Runner.Tests.LoadersTests
             {
                 ConfigurationFile = "test.yaml",
                 OverwriteFiles = new List<string>(),
+                OverwriteFolders = new List<string>(),
                 OverwriteArguments = new List<string>(),
                 PushReferences = new List<string>(),
                 SendLogs = false
@@ -88,6 +95,7 @@ namespace QaaS.Runner.Tests.LoadersTests
             {
                 ConfigurationFile = "test.yaml",
                 OverwriteFiles = new List<string> { "file1.yaml", "file2.yaml" },
+                OverwriteFolders = new List<string>(),
                 OverwriteArguments = new List<string>(),
                 PushReferences = new List<string>(),
                 SendLogs = false
@@ -95,11 +103,25 @@ namespace QaaS.Runner.Tests.LoadersTests
             yield return new TestCaseData(optionsWithOverwriteFiles, null, null)
                 .SetName("WithOverwriteFiles");
 
-            // Test Case 6: Build context with overwrite arguments
+            // Test Case 6: Build context with overwrite folders
+            var optionsWithOverwriteFolders = new RunOptions
+            {
+                ConfigurationFile = "test.yaml",
+                OverwriteFiles = new List<string>(),
+                OverwriteFolders = new List<string> { "folder1", "folder2" },
+                OverwriteArguments = new List<string>(),
+                PushReferences = new List<string>(),
+                SendLogs = false
+            };
+            yield return new TestCaseData(optionsWithOverwriteFolders, null, null)
+                .SetName("WithOverwriteFolders");
+
+            // Test Case 7: Build context with overwrite arguments
             var optionsWithOverwriteArgs = new RunOptions
             {
                 ConfigurationFile = "test.yaml",
                 OverwriteFiles = new List<string>(),
+                OverwriteFolders = new List<string>(),
                 OverwriteArguments = new List<string> { "arg1=value1", "arg2=value2" },
                 PushReferences = new List<string>(),
                 SendLogs = false
@@ -107,11 +129,12 @@ namespace QaaS.Runner.Tests.LoadersTests
             yield return new TestCaseData(optionsWithOverwriteArgs, null, null)
                 .SetName("WithOverwriteArguments");
 
-            // Test Case 7: Build context with push references
+            // Test Case 8: Build context with push references
             var optionsWithReferences = new RunOptions
             {
                 ConfigurationFile = "test.yaml",
                 OverwriteFiles = new List<string>(),
+                OverwriteFolders = new List<string>(),
                 OverwriteArguments = new List<string>(),
                 PushReferences = new List<string> { "Sessions", "ref1.yml", "ref2.yml" },
                 SendLogs = false
@@ -119,11 +142,12 @@ namespace QaaS.Runner.Tests.LoadersTests
             yield return new TestCaseData(optionsWithReferences, null, null)
                 .SetName("WithPushReferences");
 
-            // Test Case 8: Build context with all options enabled
+            // Test Case 9: Build context with all options enabled
             var allOptions = new RunOptions
             {
                 ConfigurationFile = "full-config.yaml",
                 OverwriteFiles = new List<string> { "overwrite1.yaml" },
+                OverwriteFolders = new List<string> { "overwrite-folder" },
                 OverwriteArguments = new List<string> { "arg=value" },
                 PushReferences = new List<string> { "Sessions", "ref1.yml", "ref2.yml" },
                 ResolveCasesLast = true,
@@ -133,11 +157,12 @@ namespace QaaS.Runner.Tests.LoadersTests
             yield return new TestCaseData(allOptions, "full-execution", "cases/full-case.yaml")
                 .SetName("FullOptionsEnabled");
 
-            // Test Case 9: Build context without environment variable resolution
+            // Test Case 10: Build context without environment variable resolution
             var noEnvResolutionOptions = new RunOptions
             {
                 ConfigurationFile = "no-env.yaml",
                 OverwriteFiles = new List<string>(),
+                OverwriteFolders = new List<string>(),
                 OverwriteArguments = new List<string>(),
                 PushReferences = new List<string>(),
                 DontResolveWithEnvironmentVariables = true,
@@ -184,6 +209,14 @@ namespace QaaS.Runner.Tests.LoadersTests
                 foreach (var overwriteFile in options.OverwriteFiles)
                 {
                     mockContextBuilder.Verify(cb => cb.WithOverwriteFile(overwriteFile), Times.Once);
+                }
+            }
+
+            if (options.OverwriteFolders != null && options.OverwriteFolders.Any())
+            {
+                foreach (var overwriteFolder in options.OverwriteFolders)
+                {
+                    mockContextBuilder.Verify(cb => cb.WithOverwriteFolder(overwriteFolder), Times.Once);
                 }
             }
 
@@ -319,6 +352,80 @@ namespace QaaS.Runner.Tests.LoadersTests
         }
 
         [Test]
+        public void GetLoadedContexts_WithIgnoredCaseNames_ExcludesIgnoredCases()
+        {
+            var relativeCasesDir = $"TestData\\RunLoaderIgnoreExact-{Guid.NewGuid():N}";
+            var absoluteCasesDir = Path.Combine(Environment.CurrentDirectory, relativeCasesDir);
+            Directory.CreateDirectory(absoluteCasesDir);
+
+            var keepCase = Path.Combine(absoluteCasesDir, "keep.yaml");
+            var ignoreCase = Path.Combine(absoluteCasesDir, "ignore.yaml");
+            File.WriteAllText(keepCase, "keep");
+            File.WriteAllText(ignoreCase, "ignore");
+
+            try
+            {
+                var options = new RunOptions
+                {
+                    ConfigurationFile = "test.yaml",
+                    SendLogs = false,
+                    CasesRootDirectory = relativeCasesDir,
+                    CasesNamesToIgnore = [Path.GetRelativePath(Environment.CurrentDirectory, ignoreCase)]
+                };
+
+                var loader = new TestRunLoader(options, "exec-ignore-exact");
+                var contexts =
+                    ((IEnumerable<InternalContext>)GetLoadedContextsMethodInfo.Invoke(loader, null)!).ToList();
+
+                Assert.That(contexts.Select(context => context.CaseName).ToArray(), Is.EqualTo(new[]
+                {
+                    Path.GetRelativePath(Environment.CurrentDirectory, keepCase)
+                }));
+            }
+            finally
+            {
+                Directory.Delete(absoluteCasesDir, true);
+            }
+        }
+
+        [Test]
+        public void GetLoadedContexts_WithIgnoredCasePatterns_ExcludesPatternMatches()
+        {
+            var relativeCasesDir = $"TestData\\RunLoaderIgnorePattern-{Guid.NewGuid():N}";
+            var absoluteCasesDir = Path.Combine(Environment.CurrentDirectory, relativeCasesDir);
+            Directory.CreateDirectory(Path.Combine(absoluteCasesDir, "nested"));
+
+            var keepCase = Path.Combine(absoluteCasesDir, "alpha.yaml");
+            var ignoreCase = Path.Combine(absoluteCasesDir, "nested", "skip-beta.yaml");
+            File.WriteAllText(keepCase, "keep");
+            File.WriteAllText(ignoreCase, "ignore");
+
+            try
+            {
+                var options = new RunOptions
+                {
+                    ConfigurationFile = "test.yaml",
+                    SendLogs = false,
+                    CasesRootDirectory = relativeCasesDir,
+                    CasesNamePatternsToIgnore = [@"skip-.*\.yaml$"]
+                };
+
+                var loader = new TestRunLoader(options, "exec-ignore-pattern");
+                var contexts =
+                    ((IEnumerable<InternalContext>)GetLoadedContextsMethodInfo.Invoke(loader, null)!).ToList();
+
+                Assert.That(contexts.Select(context => context.CaseName).ToArray(), Is.EqualTo(new[]
+                {
+                    Path.GetRelativePath(Environment.CurrentDirectory, keepCase)
+                }));
+            }
+            finally
+            {
+                Directory.Delete(absoluteCasesDir, true);
+            }
+        }
+
+        [Test]
         public void GetLoadedContexts_WithHttpCasesRootDirectory_UsesJfrogHelperResults()
         {
             var options = new RunOptions
@@ -370,6 +477,23 @@ namespace QaaS.Runner.Tests.LoadersTests
 
             Assert.That((bool)emptyResultsProperty.GetValue(runner)!, Is.True);
             Assert.That((bool)serveResultsProperty.GetValue(runner)!, Is.True);
+        }
+
+        [Test]
+        public void GetLoadedRunner_WithNoProcessExitFlag_DisablesProcessExitOnCompletion()
+        {
+            var options = new RunOptions
+            {
+                ConfigurationFile = "test.yaml",
+                SendLogs = false,
+                NoProcessExit = true
+            };
+
+            var loader = new TestRunLoader(options, "exec-6");
+
+            var runner = loader.GetLoadedRunner();
+
+            Assert.That(runner.ExitProcessOnCompletion, Is.False);
         }
     }
 }

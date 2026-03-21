@@ -18,6 +18,7 @@ namespace QaaS.Runner.Sessions.Tests.Actions.Transactions;
 [TestFixture]
 public class TransactionTests
 {
+    private const int DefaultTestMessagesPerSecond = 100_000;
     private static Mock<ITransactor> _transactor = null!;
     private static List<Data<object>> _infoSent = null!;
 
@@ -56,7 +57,7 @@ public class TransactionTests
         string[]? dsNames,
         int numberOfIterations,
         string dataToGet,
-        int msgPerSec = 100)
+        int msgPerSec = DefaultTestMessagesPerSecond)
     {
         _infoSent = CreationalFunctions.InitTransactor(ref _transactor!, dataToGet);
 
@@ -132,5 +133,24 @@ public class TransactionTests
                 .Order().ToList();
         CollectionAssert.AreEqual(expectedReceivedData, receivedData);
         CollectionAssert.AreEqual(expectedSentData, sentData);
+    }
+
+    [Test]
+    public void TestExportRunningCommunicationData_PreservesTransactionMetadataOnExportedOutputs()
+    {
+        const string sessionName = "test session";
+        var context = CreationalFunctions.CreateContext(sessionName, []);
+        var transaction = InitTransactorWithIterations([], [], 1, "test data");
+
+        transaction.ExportRunningCommunicationData(context, sessionName);
+
+        var inputRcd = context.InternalRunningSessions.RunningSessionsDict[sessionName].Inputs![0];
+        var outputRcd = context.InternalRunningSessions.RunningSessionsDict[sessionName].Outputs![0];
+
+        Assert.That(inputRcd.Name, Is.EqualTo("TestPub"));
+        Assert.That(outputRcd.Name, Is.EqualTo("TestPub"));
+        Assert.That(outputRcd.SerializationType, Is.EqualTo(transaction.GetType()
+            .GetMethod("GetOutputCommunicationSerializationType", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance)!
+            .Invoke(transaction, null)));
     }
 }

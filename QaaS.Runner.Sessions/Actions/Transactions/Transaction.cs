@@ -89,6 +89,10 @@ public class Transaction : StagedAction
                 "DataSource List")).SelectMany(ds =>
                 ds.Retrieve(ranSessions.Where(sessionData => sessionData != null).ToImmutableList()!));
         _iterableSerializableSaveIterator = new IterableSerializableDataIterator(_generatedData, _serializer);
+        Logger.LogDebug(
+            "Prepared transaction {ActionName}. DataSourceNames={DataSourceNames}, DataSourcePatterns={DataSourcePatterns}",
+            Name, _dataSourceNames == null ? "<none>" : string.Join(", ", _dataSourceNames),
+            _dataSourcePatterns == null ? "<none>" : string.Join(", ", _dataSourcePatterns));
     }
 
     internal override InternalCommunicationData<object> Act()
@@ -107,17 +111,18 @@ public class Transaction : StagedAction
         int iteration = 0;
         while (shouldAct)
         {
-            Logger.LogDebug("Acting transacting action {ActionName} in {ActingType} in iteration number {Iteration}",
-                Name, _loop ? "Loop" : "Iteration", iteration + 1);
+            Logger.LogDebug("Starting transaction {ActionName} iteration {Iteration}. Mode={Mode}",
+                Name, iteration + 1, _loop ? "Loop" : "FixedIterations");
             shouldAct = Transact(data) && (_loop || _iterations > ++iteration);
-            Logger.LogDebug("Finished transacting action {ActionName} in {ActingType} in iteration number {Iteration}" +
-                            " - sleeping for {SleepTimeMs} Milliseconds",
-                Name, _loop ? "Loop" : "Iteration", iteration, _sleepTimeMs);
+            Logger.LogDebug("Finished transaction {ActionName} iteration {Iteration}. Sleeping {SleepTimeMs} ms",
+                Name, iteration, _sleepTimeMs);
             Thread.Sleep((int)_sleepTimeMs);
         }
 
         _receivedRunningCommunicationData.Data.CompleteAdding();
         _sentRunningCommunicationData.Data.CompleteAdding();
+        Logger.LogDebug("Finished transaction {ActionName}. Inputs={InputCount}, Outputs={OutputCount}",
+            Name, data.Input?.Count ?? 0, data.Output?.Count ?? 0);
         return data;
     }
 
@@ -176,6 +181,12 @@ public class Transaction : StagedAction
 
     private DetailedData<object> GetDeserializedData(DetailedData<object> readData)
     {
+        if (_deserializerSpecificType is null &&
+            _deserializationType == QaaS.Framework.Serialization.SerializationType.Binary)
+        {
+            return readData;
+        }
+
         return new DetailedData<object>
         {
             Body = _deserializer!.Deserialize(readData.CastObjectData<byte[]>().Body, _deserializerSpecificType),
@@ -186,9 +197,14 @@ public class Transaction : StagedAction
 
     internal override void ExportRunningCommunicationData(InternalContext context, string sessionName)
     {
-        _receivedRunningCommunicationData = new RunningCommunicationData<object>();
-        context.InternalRunningSessions.RunningSessionsDict[sessionName].Inputs!.Add(_sentRunningCommunicationData);
-        context.InternalRunningSessions.RunningSessionsDict[sessionName].Outputs!
+        _receivedRunningCommunicationData = new RunningCommunicationData<object>
+        {
+            Name = Name,
+            SerializationType = GetOutputCommunicationSerializationType()
+        };
+        var runningSession = context.GetRunningSession(sessionName);
+        runningSession.Inputs!.Add(_sentRunningCommunicationData);
+        runningSession.Outputs!
             .Add(_receivedRunningCommunicationData);
     }
 

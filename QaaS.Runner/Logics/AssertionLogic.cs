@@ -17,19 +17,6 @@ namespace QaaS.Runner.Logics;
 public class AssertionLogic(IList<Assertion> assertions, InternalContext context) : ILogic
 {
     /// <summary>
-    /// Determines whether assertion execution should run for the requested execution type.
-    /// </summary>
-    /// <param name="executionType">The active execution pipeline mode.</param>
-    /// <returns>
-    /// <see langword="true" /> for <see cref="ExecutionType.Assert" /> and <see cref="ExecutionType.Run" />;
-    /// otherwise <see langword="false" />.
-    /// </returns>
-    public bool ShouldRun(ExecutionType executionType)
-    {
-        return executionType is ExecutionType.Assert or ExecutionType.Run;
-    }
-
-    /// <summary>
     /// Executes all assertions in parallel and appends their results to
     /// <see cref="ExecutionData.AssertionResults" />.
     /// </summary>
@@ -38,7 +25,9 @@ public class AssertionLogic(IList<Assertion> assertions, InternalContext context
     public ExecutionData Run(ExecutionData executionData)
     {
         context.Logger.LogInformation("Running {LogicType} Logic", "Assertions");
-        var metaData = context.GetMetaDataFromContext();
+        var metaData = context.GetMetaDataOrDefault();
+        var sessionDataSnapshot = executionData.SessionDatas.ToImmutableList();
+        var dataSourcesSnapshot = executionData.DataSources.ToImmutableList();
 
         var assertionResults = new ConcurrentBag<AssertionResult>();
 
@@ -49,8 +38,7 @@ public class AssertionLogic(IList<Assertion> assertions, InternalContext context
                 metaData, new object?[] { assertion.AssertionName, assertion.Name });
 
             // Execute the assertion
-            var result = assertion.Execute(executionData.SessionDatas.ToImmutableList(),
-                executionData.DataSources.ToImmutableList());
+            var result = assertion.Execute(sessionDataSnapshot, dataSourcesSnapshot);
 
             // Log debug with exit code after execution
             context.Logger.LogDebugWithMetaData("Assertion {AssertionName} completed with exit code: {ExitCode}",

@@ -1,5 +1,7 @@
 using System;
+using System.Collections;
 using System.Collections.Generic;
+using System.Reflection;
 using Moq;
 using NUnit.Framework;
 using QaaS.Framework.SDK.ContextObjects;
@@ -70,6 +72,46 @@ public class ProbeBuilderTests
     }
 
     [Test]
+    public void DeleteDataSourceName_Should_Remove_From_Array()
+    {
+        var builder = new ProbeBuilder()
+            .AddDataSourceName("DataSource1")
+            .AddDataSourceName("DataSource2");
+
+        builder.DeleteDataSourceName("DataSource1");
+
+        Assert.That(builder.DataSourceNames, Is.EquivalentTo(["DataSource2"]));
+    }
+
+    [Test]
+    public void DeleteDataSourcePattern_Should_Remove_From_Array()
+    {
+        var builder = new ProbeBuilder()
+            .AddDataSourcePattern(@"^\w+$")
+            .AddDataSourcePattern(@"^\d+$");
+
+        builder.DeleteDataSourcePattern(@"^\w+$");
+
+        Assert.That(builder.DataSourcePatterns, Is.EquivalentTo([@"^\d+$"]));
+    }
+
+    [Test]
+    public void AddDataSourceFilters_When_Collections_Are_Null_Initializes_Them()
+    {
+        var builder = new ProbeBuilder();
+        typeof(ProbeBuilder).GetProperty("DataSourceNames", BindingFlags.Instance | BindingFlags.NonPublic)!
+            .SetValue(builder, null);
+        typeof(ProbeBuilder).GetProperty("DataSourcePatterns", BindingFlags.Instance | BindingFlags.NonPublic)!
+            .SetValue(builder, null);
+
+        builder.AddDataSourceName("DataSource1")
+            .AddDataSourcePattern(@"^\w+$");
+
+        Assert.That(builder.DataSourceNames, Contains.Item("DataSource1"));
+        Assert.That(builder.DataSourcePatterns, Contains.Item(@"^\w+$"));
+    }
+
+    [Test]
     public void Configure_Should_Set_Configuration()
     {
         var config = new { Key1 = "Value1", Key2 = 42 };
@@ -83,24 +125,6 @@ public class ProbeBuilderTests
 
     [Test]
     public void Build_Successful_Should_Return_Probe()
-    {
-        var probes = new List<KeyValuePair<string, IProbe>>
-        {
-            new ("TestProbe", _mockProbe.Object)
-        };
-
-        var actionFailures = new List<ActionFailure>();
-        var builder = new ProbeBuilder()
-            .Named("TestProbe")
-            .HookNamed("TestHook");
-
-        var probe = builder.Build(_context, probes, actionFailures, "Session1");
-
-        Assert.That(probe, Is.Not.Null);
-    }
-
-    [Test]
-    public void Build_WithSessionScopedProbeKey_Should_Return_Probe()
     {
         var probes = new List<KeyValuePair<string, IProbe>>
         {
@@ -134,11 +158,75 @@ public class ProbeBuilderTests
     }
 
     [Test]
+    public void Build_WhenOnlyUnscopedProbeExists_Should_Add_Failure_And_Return_Null()
+    {
+        var probes = new List<KeyValuePair<string, IProbe>>
+        {
+            new("TestProbe", _mockProbe.Object)
+        };
+        var actionFailures = new List<ActionFailure>();
+        var builder = new ProbeBuilder()
+            .Named("TestProbe")
+            .HookNamed("SomeHook");
+
+        var probe = builder.Build(_context, probes, actionFailures, "Session1");
+
+        Assert.That(probe, Is.Null);
+        Assert.That(actionFailures.Count, Is.EqualTo(1));
+    }
+
+    [Test]
+    public void Build_When_Name_Is_Missing_Should_Add_Failure_And_Return_Null()
+    {
+        var probes = new List<KeyValuePair<string, IProbe>>();
+        var actionFailures = new List<ActionFailure>();
+        var builder = new ProbeBuilder()
+            .HookNamed("SomeHook");
+
+        var probe = builder.Build(_context, probes, actionFailures, "Session1");
+
+        Assert.That(probe, Is.Null);
+        Assert.That(actionFailures, Has.Count.EqualTo(1));
+        Assert.That(actionFailures[0].Reason.Message, Does.Contain("Probe Name is required"));
+    }
+
+    [Test]
     public void Read_Throws_NotSupportedException()
     {
         var builder = new ProbeBuilder();
         Assert.Throws<NotSupportedException>(() =>
             builder.Read(null!, typeof(ProbeBuilder), null!)
         );
+    }
+
+    [Test]
+    public void Write_SerializesProbeConfigurationIntoDictionaryLikePayload()
+    {
+        var builder = new ProbeBuilder()
+            .Named("SerializedProbe")
+            .HookNamed("ProbeHook")
+            .AtStage(3)
+            .Configure(new { Threshold = 42, Enabled = true });
+
+        object? serialized = null;
+
+        builder.Write(null!, (payload, _) => serialized = payload);
+
+        Assert.That(serialized, Is.Not.Null);
+        var serializedType = serialized!.GetType();
+        var probeConfiguration = serializedType.GetProperty("ProbeConfiguration")!.GetValue(serialized) as IDictionary;
+        Assert.Multiple(() =>
+        {
+            Assert.That(serializedType.GetProperty("Name")!.GetValue(serialized), Is.EqualTo("SerializedProbe"));
+            Assert.That(serializedType.GetProperty("Probe")!.GetValue(serialized), Is.EqualTo("ProbeHook"));
+            Assert.That(serializedType.GetProperty("Stage")!.GetValue(serialized), Is.EqualTo(3));
+        });
+
+        Assert.That(probeConfiguration, Is.Not.Null);
+        Assert.Multiple(() =>
+        {
+            Assert.That(probeConfiguration!["Threshold"], Is.EqualTo("42"));
+            Assert.That(probeConfiguration["Enabled"], Is.EqualTo("True"));
+        });
     }
 }

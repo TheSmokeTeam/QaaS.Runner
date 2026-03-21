@@ -74,9 +74,20 @@ public partial class SessionBuilder
         return Consumers ?? [];
     }
 
+    public ConsumerBuilder? ReadConsumer(string name)
+    {
+        return ReadByName(Consumers, name, consumer => consumer.Name);
+    }
+
     public SessionBuilder UpdateConsumer(string name, ConsumerBuilder consumerBuilder)
     {
         Consumers = UpdateByName(Consumers, name, consumerBuilder, consumer => consumer.Name);
+        return this;
+    }
+
+    public SessionBuilder UpdateConsumer(string name, Func<ConsumerBuilder, ConsumerBuilder> update)
+    {
+        Consumers = UpdateByName(Consumers, name, update, consumer => consumer.Name);
         return this;
     }
 
@@ -102,9 +113,20 @@ public partial class SessionBuilder
         return Publishers ?? [];
     }
 
+    public PublisherBuilder? ReadPublisher(string name)
+    {
+        return ReadByName(Publishers, name, publisher => publisher.Name);
+    }
+
     public SessionBuilder UpdatePublisher(string name, PublisherBuilder publisherBuilder)
     {
         Publishers = UpdateByName(Publishers, name, publisherBuilder, publisher => publisher.Name);
+        return this;
+    }
+
+    public SessionBuilder UpdatePublisher(string name, Func<PublisherBuilder, PublisherBuilder> update)
+    {
+        Publishers = UpdateByName(Publishers, name, update, publisher => publisher.Name);
         return this;
     }
 
@@ -130,9 +152,20 @@ public partial class SessionBuilder
         return Transactions ?? [];
     }
 
+    public TransactionBuilder? ReadTransaction(string name)
+    {
+        return ReadByName(Transactions, name, transaction => transaction.Name);
+    }
+
     public SessionBuilder UpdateTransaction(string name, TransactionBuilder transactionBuilder)
     {
         Transactions = UpdateByName(Transactions, name, transactionBuilder, transaction => transaction.Name);
+        return this;
+    }
+
+    public SessionBuilder UpdateTransaction(string name, Func<TransactionBuilder, TransactionBuilder> update)
+    {
+        Transactions = UpdateByName(Transactions, name, update, transaction => transaction.Name);
         return this;
     }
 
@@ -158,9 +191,20 @@ public partial class SessionBuilder
         return Probes ?? [];
     }
 
+    public ProbeBuilder? ReadProbe(string name)
+    {
+        return ReadByName(Probes, name, probe => probe.Name);
+    }
+
     public SessionBuilder UpdateProbe(string name, ProbeBuilder probeBuilder)
     {
         Probes = UpdateByName(Probes, name, probeBuilder, probe => probe.Name);
+        return this;
+    }
+
+    public SessionBuilder UpdateProbe(string name, Func<ProbeBuilder, ProbeBuilder> update)
+    {
+        Probes = UpdateByName(Probes, name, update, probe => probe.Name);
         return this;
     }
 
@@ -186,9 +230,20 @@ public partial class SessionBuilder
         return Collectors ?? [];
     }
 
+    public CollectorBuilder? ReadCollector(string name)
+    {
+        return ReadByName(Collectors, name, collector => collector.Name);
+    }
+
     public SessionBuilder UpdateCollector(string name, CollectorBuilder collectorBuilder)
     {
         Collectors = UpdateByName(Collectors, name, collectorBuilder, collector => collector.Name);
+        return this;
+    }
+
+    public SessionBuilder UpdateCollector(string name, Func<CollectorBuilder, CollectorBuilder> update)
+    {
+        Collectors = UpdateByName(Collectors, name, update, collector => collector.Name);
         return this;
     }
 
@@ -216,9 +271,20 @@ public partial class SessionBuilder
         return MockerCommands ?? [];
     }
 
+    public MockerCommandBuilder? ReadMockerCommand(string name)
+    {
+        return ReadByName(MockerCommands, name, command => command.Name);
+    }
+
     public SessionBuilder UpdateMockerCommand(string name, MockerCommandBuilder mockerCommandBuilder)
     {
         MockerCommands = UpdateByName(MockerCommands, name, mockerCommandBuilder, command => command.Name);
+        return this;
+    }
+
+    public SessionBuilder UpdateMockerCommand(string name, Func<MockerCommandBuilder, MockerCommandBuilder> update)
+    {
+        MockerCommands = UpdateByName(MockerCommands, name, update, command => command.Name);
         return this;
     }
 
@@ -242,6 +308,11 @@ public partial class SessionBuilder
     public IReadOnlyList<StageConfig> ReadStages()
     {
         return Stages;
+    }
+
+    public StageConfig? ReadStage(int stageNumber)
+    {
+        return Stages.FirstOrDefault(configuredStage => configuredStage.StageNumber == stageNumber);
     }
 
     public SessionBuilder UpdateStage(int stageNumber, StageConfig stage)
@@ -350,6 +421,28 @@ public partial class SessionBuilder
 
         values[index] = replacement;
         return values;
+    }
+
+    private static T[]? UpdateByName<T>(T[]? values, string name, Func<T, T> update, Func<T, string?> nameSelector)
+    {
+        if (values == null)
+        {
+            return values;
+        }
+
+        var index = Array.FindIndex(values, value => nameSelector(value) == name);
+        if (index < 0)
+        {
+            return values;
+        }
+
+        values[index] = update(values[index]);
+        return values;
+    }
+
+    private static T? ReadByName<T>(T[]? values, string name, Func<T, string?> nameSelector) where T : class
+    {
+        return values?.FirstOrDefault(value => nameSelector(value) == name);
     }
 
     private static T[]? DeleteByName<T>(T[]? values, string name, Func<T, string?> nameSelector)

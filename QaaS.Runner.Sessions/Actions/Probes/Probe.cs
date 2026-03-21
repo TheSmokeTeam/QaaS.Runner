@@ -15,14 +15,18 @@ public class Probe : StagedAction
 {
     private readonly string[]? _dataSourceNames;
     private readonly string[]? _dataSourcePatterns;
+    private readonly string _sessionName;
 
-    public Probe(string name, int stage, IProbe probeHook, string[] dataSourceNames, string[] dataSourcePatterns,
+    public Probe(string name, string sessionName, int stage, IProbe probeHook, string[] dataSourceNames,
+        string[] dataSourcePatterns,
         ILogger logger) : base(name, stage, null, logger)
     {
+        _sessionName = sessionName;
         ProbeHook = probeHook;
         _dataSourceNames = dataSourceNames;
         _dataSourcePatterns = dataSourcePatterns;
-        Logger.LogInformation("Initializing Probe {Name} of type {ProbeType}", Name, ProbeHook.GetType());
+        Logger.LogInformation("Initializing Probe {ProbeName} for session {SessionName} with Hook type {HookType}",
+            Name, _sessionName, ProbeHook.GetType().Name);
     }
 
     public List<DataSource> DataSources { get; set; } = [];
@@ -32,7 +36,7 @@ public class Probe : StagedAction
 
     internal override InternalCommunicationData<object> Act()
     {
-        Logger.LogDebug("Acting probe action {ActionName} ", Name);
+        Logger.LogDebug("Running probe {ActionName}", Name);
         ProbeHook.Run(SessionDataList.ToImmutableList(), DataSources.ToImmutableList());
         // probe doesn't initialize either input and output
         return new InternalCommunicationData<object>();
@@ -58,5 +62,7 @@ public class Probe : StagedAction
                 NameFilters.DataSource,
                 "DataSource List")).ToList();
         SessionDataList = ranSessions.Where(sessionData => sessionData != null).ToList()!;
+        Logger.LogDebug("Prepared probe {ActionName}. SessionCount={SessionCount}, DataSourceCount={DataSourceCount}",
+            Name, SessionDataList.Count, DataSources.Count);
     }
 }

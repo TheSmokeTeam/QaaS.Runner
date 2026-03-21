@@ -1,3 +1,4 @@
+using QaaS.Framework.Configurations;
 using QaaS.Framework.Policies;
 using QaaS.Framework.Protocols.ConfigurationObjects;
 using QaaS.Framework.Protocols.ConfigurationObjects.Elastic;
@@ -13,7 +14,10 @@ using QaaS.Framework.SDK.Extensions;
 using QaaS.Framework.SDK.Session;
 using QaaS.Framework.SDK.Session.SessionDataObjects;
 using QaaS.Framework.Serialization;
+using QaaS.Runner.Infrastructure;
+using QaaS.Runner.Sessions.Actions;
 using QaaS.Runner.Sessions.Extensions;
+using QaaS.Runner.Sessions.RuntimeOverrides;
 using InvalidOperationException = System.InvalidOperationException;
 
 namespace QaaS.Runner.Sessions.Actions.Consumers.Builders;
@@ -90,11 +94,25 @@ public partial class ConsumerBuilder
         return this;
     }
 
+    /// <summary>
+    /// Compatibility alias for <see cref="Configure" /> that matches the configuration CRUD pattern used by other builders.
+    /// </summary>
     public ConsumerBuilder CreateConfiguration(IReaderConfig config)
     {
         return Configure(config);
     }
 
+    /// <summary>
+    /// Compatibility alias for <see cref="CreateConfiguration" />.
+    /// </summary>
+    public ConsumerBuilder Create(IReaderConfig config)
+    {
+        return CreateConfiguration(config);
+    }
+
+    /// <summary>
+    /// Returns the currently configured reader source, if any.
+    /// </summary>
     public IReaderConfig? ReadConfiguration()
     {
         if (RabbitMq != null) return RabbitMq;
@@ -109,13 +127,39 @@ public partial class ConsumerBuilder
         return S3Bucket;
     }
 
+    /// <summary>
+    /// Applies a computed partial update to the current consumer configuration while preserving omitted fields.
+    /// </summary>
     public ConsumerBuilder UpdateConfiguration(Func<IReaderConfig, IReaderConfig> update)
     {
         var currentConfig = ReadConfiguration() ??
                             throw new InvalidOperationException("Consumer configuration is not set");
-        return Configure(update(currentConfig));
+        return UpdateConfiguration(update(currentConfig));
     }
 
+    /// <summary>
+    /// Updates the consumer configuration by merging same-type values and replacing the current type when needed.
+    /// </summary>
+    public ConsumerBuilder UpdateConfiguration(IReaderConfig config)
+    {
+        var currentConfig = ReadConfiguration() ??
+                            throw new InvalidOperationException("Consumer configuration is not set");
+        return Configure(ConfigurationUpdateExtensions.UpdateConfiguration(currentConfig, config));
+    }
+
+    /// <summary>
+    /// Updates the consumer configuration from an object-shaped patch while preserving omitted fields.
+    /// </summary>
+    public ConsumerBuilder UpdateConfiguration(object configuration)
+    {
+        var currentConfig = ReadConfiguration() ??
+                            throw new InvalidOperationException("Consumer configuration is not set");
+        return Configure(ConfigurationUpdateExtensions.UpdateConfiguration(currentConfig, configuration));
+    }
+
+    /// <summary>
+    /// Clears the configured reader source.
+    /// </summary>
     public ConsumerBuilder DeleteConfiguration()
     {
         return Reset();
@@ -136,6 +180,9 @@ public partial class ConsumerBuilder
         return this;
     }
 
+    /// <summary>
+    /// Replaces the current reader source with the provided configuration type.
+    /// </summary>
     public ConsumerBuilder Configure(IReaderConfig config)
     {
         Reset();
@@ -206,12 +253,21 @@ public partial class ConsumerBuilder
 
             type = allTypes.FirstOrDefault(configuredType => configuredType != null) ??
                    throw new InvalidOperationException($"Missing supported type in consumer {Name}");
+            var readerChunkMode = ProtocolChunkSupport.ResolveReaderMode(type);
+            if (readerChunkMode == ProtocolChunkMode.SingleOrChunk)
+            {
+                var propertyName = ProtocolChunkSupport.GetReaderConfigurationPropertyName(type);
+                throw new InvalidOperationException(
+                    $"The {propertyName} field is ambiguous because the configured protocol supports both single and chunk reading, but consumer configuration does not expose a chunk selection option.");
+            }
 
-            var (reader, chunkReader) = ReaderFactory.CreateReader(type, context.Logger, DataFilter);
+            var overrideRequest = new ConsumerOverrideRequest(Name!, type, context.Logger, DataFilter);
+            var (reader, chunkReader) = context.GetSessionActionOverrides()?.Consumer?.Invoke(overrideRequest)
+                                        ?? ReaderFactory.CreateReader(type, context.Logger, DataFilter);
             var consumerTypeName = reader?.GetType().Name ?? chunkReader?.GetType().Name ?? "Unknown";
             
             context.Logger.LogDebugWithMetaData("Started building Consumer of type {type}",
-                context.GetMetaDataFromContext(), new object?[] { consumerTypeName });
+                context.GetMetaDataOrDefault(), new object?[] { consumerTypeName });
 
             return reader != null
                 ? new Consumer(Name!, reader, timeout, Stage, policies, DataFilter, serializationType,

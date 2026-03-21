@@ -1,10 +1,13 @@
+using System.Collections;
 using System.Collections.Immutable;
 using System.ComponentModel;
 using System.ComponentModel.DataAnnotations;
+using System.Reflection;
 using System.Runtime.CompilerServices;
 using Autofac;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Logging.Abstractions;
 using QaaS.Framework.Configurations;
 using QaaS.Framework.Configurations.CustomAttributes;
 using QaaS.Framework.Configurations.CustomExceptions;
@@ -13,6 +16,7 @@ using QaaS.Framework.Executions;
 using QaaS.Framework.Providers;
 using QaaS.Framework.Providers.Modules;
 using QaaS.Framework.Providers.ObjectCreation;
+using QaaS.Framework.Providers.Providers;
 using QaaS.Framework.SDK;
 using QaaS.Framework.SDK.ContextObjects;
 using QaaS.Framework.SDK.DataSourceObjects;
@@ -27,6 +31,7 @@ using QaaS.Runner.Assertions;
 using QaaS.Runner.Assertions.AssertionObjects;
 using QaaS.Runner.Assertions.ConfigurationObjects;
 using QaaS.Runner.Extensions;
+using QaaS.Runner.Infrastructure;
 using QaaS.Runner.Sessions.Actions.Probes;
 using QaaS.Runner.Logics;
 using QaaS.Runner.Sessions.Session;
@@ -36,6 +41,7 @@ using QaaS.Runner.Storage.ConfigurationObjects;
 using ILogger = Microsoft.Extensions.Logging.ILogger;
 
 [assembly: InternalsVisibleTo("QaaS.Runner.Tests")]
+[assembly: InternalsVisibleTo("QaaS.Runner.Sessions.Tests")]
 
 namespace QaaS.Runner;
 
@@ -95,13 +101,14 @@ public class ExecutionBuilder() : BaseExecutionBuilder<InternalContext, Executio
     /// The metadata for the tests' run
     /// </summary>
     [Description("The metadata for the tests' run")]
-    public MetaDataConfig MetaData { get; internal set; } = new();
+    public MetaDataConfig? MetaData { get; internal set; }
 
     private ExecutionType Type { get; set; }
 
     private bool LoadedContext { get; }
 
-    private ILifetimeScope _scope = new ContainerBuilder().Build().BeginLifetimeScope();
+    private readonly Autofac.IContainer _container = new ContainerBuilder().Build();
+    private ILifetimeScope? _buildScope;
 
     private readonly List<ValidationResult> _validationResults = [];
 
@@ -117,6 +124,9 @@ public class ExecutionBuilder() : BaseExecutionBuilder<InternalContext, Executio
     private string? _configuredCaseName;
     private string? _configuredExecutionId;
     private Dictionary<string, object?> _globalDict = new();
+    private readonly IConfiguration? _templateSourceConfiguration;
+    private const BindingFlags ValidationBindingFlags =
+        BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance;
 
     internal ExecutionBuilder(InternalContext context, ExecutionType executionType, IList<string>? sessionNamesToRun,
         IList<string>? sessionCategoriesToRun, IList<string>? assertionNamesToRun,
@@ -126,6 +136,7 @@ public class ExecutionBuilder() : BaseExecutionBuilder<InternalContext, Executio
         Type = executionType;
 
         Context = context;
+        _templateSourceConfiguration = context.RootConfiguration;
         var blankRunBuilderFromContext = Bind.BindFromContext<ExecutionBuilder>(Context, _validationResults,
             new BinderOptions() { BindNonPublicProperties = true });
 
@@ -149,14 +160,36 @@ public class ExecutionBuilder() : BaseExecutionBuilder<InternalContext, Executio
     /// <inheritdoc />
     protected override IEnumerable<DataSource> BuildDataSources()
     {
+        return BuildDataSources(_buildScope ?? throw new InvalidOperationException(
+            "ExecutionBuilder scope is not initialized."));
+    }
+
+    private IEnumerable<DataSource> BuildDataSources(ILifetimeScope scope)
+    {
         var configuredDataSources = DataSources ?? [];
         var dataSources = configuredDataSources.Select(dataSourceBuilder => dataSourceBuilder.Register()).ToImmutableList();
+        var resolvedGenerators = scope.Resolve<IList<KeyValuePair<string, IGenerator>>>();
         var resolvedDataSources = configuredDataSources.Select(dataSourceBuilder =>
-            dataSourceBuilder.Build(Context,dataSources, _scope.Resolve<IList<KeyValuePair<string, IGenerator>>>()));
+        {
+            var configuredGenerator = dataSourceBuilder.Generator;
+
+            // Runner scopes generator hook instances by data source name so each source can keep
+            // its own generator configuration, even when multiple sources use the same hook type.
+            dataSourceBuilder.Generator = dataSourceBuilder.Name;
+
+            try
+            {
+                return dataSourceBuilder.Build(Context, dataSources, resolvedGenerators);
+            }
+            finally
+            {
+                dataSourceBuilder.Generator = configuredGenerator;
+            }
+        });
         return resolvedDataSources;
     }
 
-    private IEnumerable<ISession> BuildSessions()
+    private IEnumerable<ISession> BuildSessions(ILifetimeScope scope)
     {
         // Assigning session stage default as the index in Sessions list
         Sessions = Sessions is null ? [] : Sessions.Select((session, index) =>
@@ -170,7 +203,7 @@ public class ExecutionBuilder() : BaseExecutionBuilder<InternalContext, Executio
         {
             // Resolve hooks
             var hooks = session.Probes != null
-                ? _scope.Resolve<IList<KeyValuePair<string, IProbe>>>()
+                ? scope.Resolve<IList<KeyValuePair<string, IProbe>>>()
                 : new List<KeyValuePair<string, IProbe>>();
 
             return session.Build(Context, hooks);
@@ -179,19 +212,19 @@ public class ExecutionBuilder() : BaseExecutionBuilder<InternalContext, Executio
         return sessions;
     }
 
-    private IEnumerable<Assertion> BuildAssertions()
+    private IEnumerable<Assertion> BuildAssertions(ILifetimeScope scope)
     {
         if (Assertions is null) return [];
         var assertions = Assertions.Select(assertion =>
-            assertion.Build(_scope.Resolve<IList<KeyValuePair<string, IAssertion>>>(), Links));
+            assertion.Build(scope.Resolve<IList<KeyValuePair<string, IAssertion>>>(), Links));
         return assertions;
     }
 
     private IEnumerable<IReporter> BuildReports()
     {
         if (Assertions is null) return [];
-        var resolvedReports = Assertions.Select(assertionReport =>
-            assertionReport.Build(Context, DateTime.UtcNow));
+        var resolvedReports = Assertions.SelectMany(assertionReport =>
+            assertionReport.BuildReporters(Context, DateTime.UtcNow));
         return resolvedReports;
     }
 
@@ -382,9 +415,9 @@ public class ExecutionBuilder() : BaseExecutionBuilder<InternalContext, Executio
     /// <summary>
     ///     Loads the <see cref="ExecutionBuilder" /> scope with all context's dependencies
     /// </summary>
-    private void LoadContextScopeDependencies()
+    private ILifetimeScope LoadContextScopeDependencies()
     {
-        var contextScope = _scope.BeginLifetimeScope(containerBuilder =>
+        return _container.BeginLifetimeScope(containerBuilder =>
         {
             // Loads context into scope
             containerBuilder.RegisterInstance(Context).As<InternalContext>().SingleInstance();
@@ -416,8 +449,16 @@ public class ExecutionBuilder() : BaseExecutionBuilder<InternalContext, Executio
                 new HooksLoaderModule<IAssertion>(_validationResults)); // Loads all IAssertion hooks
             containerBuilder.RegisterModule(
                 new HooksLoaderModule<IGenerator>(_validationResults)); // Loads all IGenerator hooks
-            containerBuilder.RegisterModule(
-                new HooksLoaderModule<IProbe>(_validationResults)); // Loads all IProbe hooks
+            containerBuilder.Register<IComponentContext, IList<KeyValuePair<string, IProbe>>>(scope =>
+            {
+                var objectCreator = scope.Resolve<IByNameObjectCreator>();
+                return LoadProbeHooks(
+                    Context,
+                    scope.Resolve<IEnumerable<HookData<IProbe>>>(),
+                    new HookProvider<IProbe>(Context, objectCreator),
+                    objectCreator,
+                    _validationResults);
+            }).InstancePerLifetimeScope();
 
             // loads logics
             containerBuilder.RegisterType<DataSourceLogic>().As<DataSourceLogic>();
@@ -427,8 +468,6 @@ public class ExecutionBuilder() : BaseExecutionBuilder<InternalContext, Executio
             containerBuilder.RegisterType<ReportLogic>().As<ReportLogic>();
             containerBuilder.RegisterType<TemplateLogic>().As<TemplateLogic>();
         });
-
-        _scope = contextScope;
     }
 
     private IEnumerable<HookData<IProbe>> BuildProbeHookData()
@@ -450,6 +489,65 @@ public class ExecutionBuilder() : BaseExecutionBuilder<InternalContext, Executio
                 };
             }
         }
+    }
+
+    /// <summary>
+    /// Loads probe hooks while resolving each configured probe type only once.
+    /// Multiple sessions may use the same probe implementation with different scoped names and
+    /// configurations, so additional instances are created directly from the resolved type instead
+    /// of asking the generic hook provider to rediscover the same type and log it again.
+    /// </summary>
+    internal static IList<KeyValuePair<string, IProbe>> LoadProbeHooks(
+        Context context,
+        IEnumerable<HookData<IProbe>> probeHookData,
+        IHookProvider<IProbe> hookProvider,
+        IByNameObjectCreator objectCreator,
+        List<ValidationResult> validationResults)
+    {
+        context.Logger.LogDebug("Starting loading and validation of all hooks of type {HookType}",
+            typeof(IProbe).Name);
+
+        var resolvedProbeTypes = new Dictionary<string, Type>(StringComparer.Ordinal);
+        var loadedHooks = new List<KeyValuePair<string, IProbe>>();
+
+        foreach (var hookData in probeHookData)
+        {
+            IProbe hook;
+
+            try
+            {
+                if (!resolvedProbeTypes.TryGetValue(hookData.Type, out var resolvedProbeType))
+                {
+                    hook = hookProvider.GetSupportedInstanceByName(hookData.Type);
+                    resolvedProbeTypes[hookData.Type] = hook.GetType();
+                }
+                else
+                {
+                    hook = objectCreator.GetInstanceOfSubClassOfTByNameFromAssemblies<IProbe>(
+                        resolvedProbeType.FullName!,
+                        [resolvedProbeType.Assembly]);
+                    hook.Context = context;
+                }
+            }
+            catch (ArgumentException e)
+            {
+                context.Logger.LogCritical(
+                    "Encountered exception while loading {HookType} instance {InstanceName} - {Exception}",
+                    typeof(IProbe).Name, hookData.Type, e);
+                throw;
+            }
+
+            var configurationsValidationResults = (hook.LoadAndValidateConfiguration(
+                hookData.Configuration) ?? Enumerable.Empty<ValidationResult>()).ToList();
+            foreach (var validationResult in configurationsValidationResults)
+                validationResult.ErrorMessage = $"In Hook of {typeof(IProbe).Name} named {hookData.Name} of type" +
+                                                $" {hookData.Type} {validationResult.ErrorMessage}";
+
+            validationResults.AddRange(configurationsValidationResults);
+            loadedHooks.Add(new KeyValuePair<string, IProbe>(hookData.Name, hook));
+        }
+
+        return loadedHooks;
     }
 
     private void ValidateProbeDefinitions()
@@ -486,13 +584,25 @@ public class ExecutionBuilder() : BaseExecutionBuilder<InternalContext, Executio
     private void InitializeContext()
     {
         var existingContext = LoadedContext ? Context : null;
+        // Keep metadata available on the execution context for logging/runtime consumers, while
+        // configuration validation treats a missing YAML section as an empty metadata object and
+        // reports the required Team/System fields.
+        var metaData = MetaData ?? new MetaDataConfig();
 
-        var logger = _configuredLogger;
+        var logger = _configuredLogger ?? existingContext?.Logger ?? NullLogger.Instance;
         var caseName = _configuredCaseName ?? existingContext?.CaseName;
         var executionId = _configuredExecutionId ?? existingContext?.ExecutionId;
         var rootConfiguration = existingContext?.RootConfiguration ?? new ConfigurationBuilder().Build();
         var internalRunningSessions = existingContext?.InternalRunningSessions ??
                                       new RunningSessions(new Dictionary<string, RunningSessionData<object, object>>());
+
+        var internalGlobalDict = existingContext?.InternalGlobalDict != null
+            ? new Dictionary<string, object?>(existingContext.InternalGlobalDict)
+            : new Dictionary<string, object?>();
+        foreach (var (key, value) in _globalDict)
+        {
+            internalGlobalDict[key] = value;
+        }
 
         Context = new InternalContext()
         {
@@ -501,11 +611,14 @@ public class ExecutionBuilder() : BaseExecutionBuilder<InternalContext, Executio
             ExecutionId = executionId,
             RootConfiguration = rootConfiguration,
             InternalRunningSessions = internalRunningSessions,
-            InternalGlobalDict = _globalDict
+            InternalGlobalDict = internalGlobalDict
         };
 
         // saved context's metadata in globalDict
-        Context.InsertValueIntoGlobalDictionary(Context.GetMetaDataPath(), MetaData);
+        Context.InsertValueIntoGlobalDictionary(Context.GetMetaDataPath(), metaData);
+        Context.Logger.LogDebug(
+            "Initialized execution context. LoadedContext={LoadedContext}, ExecutionId={ExecutionId}, CaseName={CaseName}, GlobalKeys={GlobalKeyCount}",
+            LoadedContext, Context.ExecutionId, Context.CaseName, Context.InternalGlobalDict.Count);
     }
 
     /// <summary>
@@ -513,10 +626,72 @@ public class ExecutionBuilder() : BaseExecutionBuilder<InternalContext, Executio
     /// </summary>
     private void FilterConfigurationsBasedOnFlags()
     {
+        var sessionsBeforeFiltering = Sessions?.Length ?? 0;
+        var assertionsBeforeFiltering = Assertions?.Length ?? 0;
         Assertions = (Assertions ?? [])
             .FilterConfigurationByAssertion(_assertionNamesToRun, _assertionCategoriesToRun, Context);
         Sessions = (Sessions ?? []).FilterConfigurationBySessionsAndAssertions(Assertions, _sessionNamesToRun,
             _assertionNamesToRun, _sessionCategoriesToRun, _assertionCategoriesToRun, Context);
+        Context.Logger.LogDebug(
+            "Filtered execution configuration. Sessions: {SessionCountBefore} -> {SessionCountAfter}, Assertions: {AssertionCountBefore} -> {AssertionCountAfter}",
+            sessionsBeforeFiltering, Sessions.Length, assertionsBeforeFiltering, Assertions.Length);
+    }
+
+    private void DeduplicateValidationResults()
+    {
+        if (_validationResults.Count < 2)
+        {
+            return;
+        }
+
+        var distinctValidationResults = _validationResults
+            .GroupBy(result => new
+            {
+                Message = result.ErrorMessage ?? string.Empty,
+                MemberNames = string.Join("|", result.MemberNames.OrderBy(memberName => memberName,
+                    StringComparer.Ordinal))
+            })
+            .Select(group => group.First())
+            .ToList();
+
+        if (distinctValidationResults.Count == _validationResults.Count)
+        {
+            return;
+        }
+
+        _validationResults.Clear();
+        _validationResults.AddRange(distinctValidationResults);
+    }
+
+    private void StoreRenderedConfigurationTemplate()
+    {
+        var includedSessionNames = (Sessions ?? [])
+            .Where(session => !string.IsNullOrWhiteSpace(session.Name))
+            .Select(session => session.Name!)
+            .ToHashSet(StringComparer.Ordinal);
+        var assertionStatusesToReport = (Assertions ?? [])
+            .Where(assertion => !string.IsNullOrWhiteSpace(assertion.Name))
+            .ToDictionary(
+                assertion => assertion.Name!,
+                assertion => (IReadOnlyList<string>)assertion.StatusesToReport
+                    .Select(status => status.ToString())
+                    .ToList(),
+                StringComparer.Ordinal);
+        var renderedTemplate = ConfigurationTemplateRenderer.Render(
+            _templateSourceConfiguration ?? Context.RootConfiguration,
+            [
+                new KeyValuePair<string, object?>("Storages", Storages),
+                new KeyValuePair<string, object?>("DataSources", DataSources),
+                new KeyValuePair<string, object?>("Sessions", Sessions),
+                new KeyValuePair<string, object?>("Assertions", Assertions),
+                new KeyValuePair<string, object?>("Links", Links),
+                new KeyValuePair<string, object?>("MetaData", MetaData)
+            ],
+            Infrastructure.Constants.ConfigurationSectionNames,
+            includedSessionNames,
+            assertionStatusesToReport);
+
+        Context.SetRenderedConfigurationTemplate(renderedTemplate);
     }
 
     /// <inheritdoc />
@@ -530,48 +705,75 @@ public class ExecutionBuilder() : BaseExecutionBuilder<InternalContext, Executio
 
 
         // loads all hooks & logics validate them
-        LoadContextScopeDependencies();
+        var scope = LoadContextScopeDependencies();
+        _buildScope = scope;
 
-        // filter session assertion list based on names & categories
-        FilterConfigurationsBasedOnFlags();
-
-        // validate configuration
-        _ = ValidationUtils.TryValidateObjectRecursive(this, _validationResults);
-
-        if (_validationResults.Any())
+        try
         {
-            Context.Logger.LogCritical("Configurations are not valid. The validation results are: \n- " +
-                                       string.Join("\n- ", _validationResults.Select(result => result.ErrorMessage)));
-            throw new InvalidConfigurationsException("Configurations are not valid");
+            // filter session assertion list based on names & categories
+            FilterConfigurationsBasedOnFlags();
+            StoreRenderedConfigurationTemplate();
+
+            // validate configuration
+            ValidateConfiguredSections();
+            DeduplicateValidationResults();
+
+            if (_validationResults.Any())
+            {
+                Context.Logger.LogDebug("Validation produced {ValidationResultCount} result(s)", _validationResults.Count);
+                Context.Logger.LogCritical("Configurations are not valid. The validation results are: \n- " +
+                                           string.Join("\n- ", _validationResults.Select(result => result.ErrorMessage)));
+                throw new InvalidConfigurationsException("Configurations are not valid");
+            }
+
+            // builds every list of domain objects
+            // Materializing the builders once keeps component counts stable for logging and avoids
+            // rebuilding hook-backed objects when the lists are resolved into execution logics.
+            var builtDataSources = BuildDataSources(scope).ToList();
+            var builtSessions = BuildSessions(scope).ToList();
+            var builtStorages = BuildStorages().ToList();
+            var builtAssertions = BuildAssertions(scope).ToList();
+            var builtReports = BuildReports().ToList();
+            var dataSourceLogic =
+                scope.Resolve<DataSourceLogic>(
+                    new TypedParameter(typeof(IList<DataSource>), builtDataSources));
+            var sessionLogic =
+                scope.Resolve<SessionLogic>(
+                    new TypedParameter(typeof(List<ISession>), builtSessions));
+            var storageLogic =
+                scope.Resolve<StorageLogic>(new TypedParameter(typeof(IList<IStorage>), builtStorages),
+                    new TypedParameter(typeof(ExecutionType), Type));
+            var assertionLogic =
+                scope.Resolve<AssertionLogic>(
+                    new TypedParameter(typeof(IList<Assertion>), builtAssertions));
+            var reportLogic =
+                scope.Resolve<ReportLogic>(new TypedParameter(typeof(IList<IReporter>), builtReports));
+            var templateLogic = scope.Resolve<TemplateLogic>(new TypedParameter(typeof(Context), Context));
+
+            Context.Logger.LogDebug(
+                "Resolved execution components. DataSources={DataSourceCount}, Sessions={SessionCount}, Storages={StorageCount}, Assertions={AssertionCount}, Reporters={ReporterCount}",
+                builtDataSources.Count, builtSessions.Count, builtStorages.Count, builtAssertions.Count,
+                builtReports.Count);
+
+            Context.Logger.LogInformation(
+                "Finished building {Type} execution with executionId {ExecutionId} and case name {CaseName}", Type,
+                Context.ExecutionId, Context.CaseName);
+
+            // bind back context onto the executionBuilder object
+            return new Execution(Type, Context, scope)
+            {
+                AssertionLogic = assertionLogic, ReportLogic = reportLogic, SessionLogic = sessionLogic,
+                TemplateLogic = templateLogic, DataSourceLogic = dataSourceLogic, StorageLogic = storageLogic
+            };
         }
-
-
-        // builds every list of domain objects 
-        var dataSourceLogic =
-            _scope.Resolve<DataSourceLogic>(new TypedParameter(typeof(IList<DataSource>), BuildDataSources().ToList()));
-        var sessionLogic =
-            _scope.Resolve<SessionLogic>(
-                new TypedParameter(typeof(List<ISession>), BuildSessions().ToList()));
-        var storageLogic =
-            _scope.Resolve<StorageLogic>(new TypedParameter(typeof(IList<IStorage>), BuildStorages().ToList()),
-                new TypedParameter(typeof(ExecutionType), Type));
-        var assertionLogic =
-            _scope.Resolve<AssertionLogic>(new TypedParameter(typeof(IList<Assertion>), BuildAssertions().ToList()));
-        var reportLogic =
-            _scope.Resolve<ReportLogic>(new TypedParameter(typeof(IList<IReporter>), BuildReports().ToList()));
-        var templateLogic = _scope.Resolve<TemplateLogic>(new TypedParameter(typeof(Context), Context));
-
-
-        Context.Logger.LogInformation(
-            "Finished building {Type} execution with executionId {ExecutionId} and case name {CaseName}", Type,
-            Context.ExecutionId, Context.CaseName);
-
-        // bind back context onto the executionBuilder object
-        return new Execution(Type, Context)
+        catch
         {
-            AssertionLogic = assertionLogic, ReportLogic = reportLogic, SessionLogic = sessionLogic,
-            TemplateLogic = templateLogic, DataSourceLogic = dataSourceLogic, StorageLogic = storageLogic
-        };
+            Context.Logger.LogDebug("Execution build failed. Disposing Autofac scope for execution {ExecutionId}",
+                Context.ExecutionId);
+            scope.Dispose();
+            _buildScope = null;
+            throw;
+        }
     }
 
     private static T[]? UpdateByName<T>(T[]? items, string key, T replacement, Func<T, string?> keySelector)
@@ -625,5 +827,298 @@ public class ExecutionBuilder() : BaseExecutionBuilder<InternalContext, Executio
         }
 
         return items.Where((_, itemIndex) => itemIndex != index).ToArray();
+    }
+
+    private void ValidateConfiguredSections()
+    {
+        TryValidateConfiguredMembers(nameof(DataSources), nameof(Storages), nameof(Assertions), nameof(Links),
+            nameof(MetaData), nameof(Sessions));
+
+        ValidateCollection(DataSources, nameof(DataSources));
+        ValidateCollection(Storages, nameof(Storages));
+        ValidateCollection(Assertions, nameof(Assertions));
+        ValidateCollection(Links, nameof(Links));
+        ValidateCollection(Sessions, nameof(Sessions));
+
+        _ = TryValidateConfiguredObjectRecursive(MetaData ?? new MetaDataConfig(), _validationResults,
+            nameof(MetaData));
+    }
+
+    private void ValidateCollection<T>(IEnumerable<T>? items, string parentPath)
+    {
+        if (items == null)
+        {
+            return;
+        }
+
+        var index = 0;
+        foreach (var item in items)
+        {
+            if (item != null)
+            {
+                _ = TryValidateConfiguredObjectRecursive(item, _validationResults, $"{parentPath}:{index}");
+            }
+
+            index++;
+        }
+    }
+
+    private void TryValidateConfiguredMembers(params string[] propertyNames)
+    {
+        foreach (var propertyName in propertyNames.Distinct(StringComparer.Ordinal))
+        {
+            // ExecutionBuilder keeps configuration sections as mutable builder members, some of which are not writable
+            // through the public fluent surface. DataAnnotations can validate those members once we have the property
+            // metadata, but there is no framework API that says "validate exactly these named non-public members".
+            // Reflection is therefore limited to the runner's configuration boundary instead of recursing through the
+            // entire builder object graph the generic framework validator would otherwise inspect.
+            var property = GetType().GetProperty(propertyName, ValidationBindingFlags);
+            if (property == null || property.GetIndexParameters().Length > 0 ||
+                !TryGetPropertyValue(this, property, out var propertyValue))
+            {
+                continue;
+            }
+
+            var validationContext = new ValidationContext(this, null, null)
+            {
+                MemberName = property.Name
+            };
+
+            foreach (var validationAttribute in property.GetCustomAttributes<ValidationAttribute>())
+            {
+                var validationResult = validationAttribute.GetValidationResult(propertyValue, validationContext);
+                if (validationResult != ValidationResult.Success && validationResult != null)
+                {
+                    _validationResults.Add(validationResult);
+                }
+            }
+        }
+    }
+
+    private static bool TryValidateConfiguredObjectRecursive(object? obj, List<ValidationResult> results,
+        string parentPath = "")
+    {
+        if (obj == null)
+        {
+            return true;
+        }
+
+        if (IsTerminalType(obj.GetType()))
+        {
+            var terminalResults = new List<ValidationResult>();
+            _ = TryValidateCurrentObject(obj, terminalResults);
+            results.AddRange(PrefixValidationResults(terminalResults, parentPath));
+            return !terminalResults.Any();
+        }
+
+        var localResults = new List<ValidationResult>();
+        var isValid = TryValidateCurrentObject(obj, localResults);
+        results.AddRange(PrefixValidationResults(localResults, parentPath));
+
+        var properties = obj.GetType()
+            .GetProperties(ValidationBindingFlags)
+            .Where(property => property.GetIndexParameters().Length == 0 &&
+                               property.PropertyType != obj.GetType() &&
+                               ShouldInspectProperty(property));
+
+        foreach (var property in properties)
+        {
+            if (!TryGetPropertyValue(obj, property, out var value))
+            {
+                continue;
+            }
+
+            var propertyPath = $"{parentPath}{ConfigurationConstants.PathSeparator}{property.Name}";
+            if (value is IEnumerable enumerableValue && value is not string)
+            {
+                if (value is IDictionary dictionary)
+                {
+                    foreach (var key in dictionary.Keys)
+                    {
+                        var entry = dictionary[key];
+                        if (entry == null)
+                        {
+                            continue;
+                        }
+
+                        var entryPath = $"{propertyPath}{ConfigurationConstants.PathSeparator}{key}";
+                        if (!TryValidateConfiguredObjectRecursive(entry, results, entryPath))
+                        {
+                            isValid = false;
+                        }
+                    }
+                }
+                else
+                {
+                    var index = 0;
+                    foreach (var item in enumerableValue)
+                    {
+                        if (item != null &&
+                            !TryValidateConfiguredObjectRecursive(item, results,
+                                $"{propertyPath}{ConfigurationConstants.PathSeparator}{index}"))
+                        {
+                            isValid = false;
+                        }
+
+                        index++;
+                    }
+                }
+            }
+            else if (value != null && !IsTerminalType(value.GetType()) &&
+                     !TryValidateConfiguredObjectRecursive(value, results, propertyPath))
+            {
+                isValid = false;
+            }
+        }
+
+        return isValid;
+    }
+
+    private static bool TryValidateCurrentObject(object obj, List<ValidationResult> results)
+    {
+        var validationResults = new List<ValidationResult>();
+        var objectType = obj.GetType();
+
+        if (IsTerminalType(objectType))
+        {
+            var validationContext = new ValidationContext(obj, null, null)
+            {
+                MemberName = string.Empty
+            };
+
+            foreach (var validationAttribute in objectType.GetCustomAttributes<ValidationAttribute>())
+            {
+                var result = validationAttribute.GetValidationResult(obj, validationContext);
+                if (result != ValidationResult.Success && result != null)
+                {
+                    validationResults.Add(result);
+                }
+            }
+        }
+        else
+        {
+            _ = Validator.TryValidateObject(obj, new ValidationContext(obj), validationResults, true);
+            var objectValidationContext = new ValidationContext(obj, null, null)
+            {
+                MemberName = string.Empty
+            };
+
+            foreach (var validationAttribute in objectType.GetCustomAttributes<ValidationAttribute>())
+            {
+                var result = validationAttribute.GetValidationResult(obj, objectValidationContext);
+                if (result != ValidationResult.Success && result != null)
+                {
+                    validationResults.Add(result);
+                }
+            }
+
+            foreach (var property in objectType.GetProperties(ValidationBindingFlags)
+                         .Where(property => property.GetMethod?.IsPublic != true))
+            {
+                var validationAttributes = property.GetCustomAttributes<ValidationAttribute>().ToArray();
+                if (property.GetIndexParameters().Length > 0 || validationAttributes.Length == 0 ||
+                    !TryGetPropertyValue(obj, property, out var propertyValue))
+                {
+                    continue;
+                }
+
+                var validationContext = new ValidationContext(obj, null, null)
+                {
+                    MemberName = property.Name
+                };
+
+                foreach (var validationAttribute in validationAttributes)
+                {
+                    var result = validationAttribute.GetValidationResult(propertyValue, validationContext);
+                    if (result != ValidationResult.Success && result != null)
+                    {
+                        validationResults.Add(result);
+                    }
+                }
+            }
+        }
+
+        results.AddRange(DistinctValidationResults(validationResults));
+        return !validationResults.Any();
+    }
+
+    private static IEnumerable<ValidationResult> PrefixValidationResults(IEnumerable<ValidationResult> validationResults,
+        string parentPath)
+    {
+        var trimmedParentPath = parentPath.TrimStart(ConfigurationConstants.PathSeparator.ToCharArray());
+        var parentPrefix = trimmedParentPath.Length == 0 ? string.Empty : $"{trimmedParentPath} - ";
+
+        return validationResults.Select(result =>
+        {
+            result.ErrorMessage = $"{parentPrefix}{result.ErrorMessage}";
+            return result;
+        });
+    }
+
+    private static IEnumerable<ValidationResult> DistinctValidationResults(
+        IEnumerable<ValidationResult> validationResults)
+    {
+        return validationResults
+            .GroupBy(result => new
+            {
+                Message = result.ErrorMessage ?? string.Empty,
+                Members = string.Join("|", result.MemberNames.OrderBy(member => member, StringComparer.Ordinal))
+            })
+            .Select(group => group.First());
+    }
+
+    private static bool TryGetPropertyValue(object instance, PropertyInfo property, out object? value)
+    {
+        try
+        {
+            value = property.GetValue(instance);
+            return true;
+        }
+        catch (TargetInvocationException)
+        {
+            throw;
+        }
+        catch (Exception exception) when (exception is MethodAccessException or ArgumentException)
+        {
+            var getter = property.GetGetMethod(nonPublic: true);
+            if (getter == null)
+            {
+                value = null;
+                return false;
+            }
+
+            value = getter.Invoke(instance, null);
+            return true;
+        }
+    }
+
+    private static bool IsTerminalType(Type type)
+    {
+        var effectiveType = Nullable.GetUnderlyingType(type) ?? type;
+
+        return effectiveType.IsPrimitive
+               || effectiveType.IsEnum
+               || effectiveType == typeof(string)
+               || effectiveType == typeof(decimal)
+               || effectiveType == typeof(DateTime)
+               || effectiveType == typeof(DateTimeOffset)
+               || effectiveType == typeof(TimeSpan)
+               || effectiveType == typeof(Guid)
+               || effectiveType == typeof(Uri)
+               || effectiveType == typeof(Type)
+               || typeof(Delegate).IsAssignableFrom(effectiveType)
+               || typeof(MemberInfo).IsAssignableFrom(effectiveType)
+               || typeof(Assembly).IsAssignableFrom(effectiveType)
+               || effectiveType == typeof(IntPtr)
+               || effectiveType == typeof(UIntPtr)
+               || effectiveType.IsPointer
+               || effectiveType.IsByRef;
+    }
+
+    private static bool ShouldInspectProperty(PropertyInfo property)
+    {
+        return property.GetCustomAttributes<ValidationAttribute>().Any()
+               || property.GetCustomAttributes<DescriptionAttribute>().Any()
+               || property.GetCustomAttributes<DefaultValueAttribute>().Any();
     }
 }

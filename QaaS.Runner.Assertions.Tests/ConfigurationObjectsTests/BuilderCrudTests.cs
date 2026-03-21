@@ -28,7 +28,7 @@ public class BuilderCrudTests
                 Url = "https://kibana",
                 DataViewId = "view"
             }))
-            .Configure(new { key = "value" });
+            .CreateConfiguration(new { key = "value" });
 
         builder.UpdateSessionName("session-a", "session-updated")
             .UpdateSessionPattern("^session-.*$", "^updated-.*$")
@@ -39,7 +39,8 @@ public class BuilderCrudTests
                 Url = "https://prometheus",
                 Expressions = ["up"]
             }))
-            .UpdateConfiguration(new { changed = "yes" });
+            .UpdateConfiguration(new { changed = "yes" })
+            .UpdateConfiguration(new { nested = new { enabled = true } });
 
         Assert.That(builder.ReadSessionNames(), Is.EquivalentTo(["session-updated"]));
         Assert.That(builder.ReadSessionPatterns(), Is.EquivalentTo(["^updated-.*$"]));
@@ -47,7 +48,9 @@ public class BuilderCrudTests
         Assert.That(builder.ReadDataSourcePatterns(), Is.EquivalentTo(["^updated-source-.*$"]));
         Assert.That(builder.ReadLinks(), Has.Count.EqualTo(1));
         Assert.That(builder.ReadLinks()[0].Name, Is.EqualTo("link-updated"));
+        Assert.That(builder.ReadConfiguration()["key"], Is.EqualTo("value"));
         Assert.That(builder.ReadConfiguration()["changed"], Is.EqualTo("yes"));
+        Assert.That(builder.ReadConfiguration()["nested:enabled"], Is.EqualTo("True"));
 
         builder.DeleteSessionName("session-updated")
             .DeleteSessionPattern("^updated-.*$")
@@ -68,18 +71,49 @@ public class BuilderCrudTests
     public void LinkBuilder_ShouldSupportConfigurationCrud()
     {
         var builder = new LinkBuilder()
-            .Create(new KibanaLinkConfig { Url = "https://kibana", DataViewId = "view" });
+            .CreateConfiguration(new KibanaLinkConfig { Url = "https://kibana", DataViewId = "view" });
 
         builder.UpdateConfiguration(_ => new GrafanaLinkConfig
         {
             Url = "https://grafana",
             DashboardId = "dash"
         });
+        builder.UpdateConfiguration(new KibanaLinkConfig
+        {
+            Url = "https://kibana-updated",
+            DataViewId = "view-2"
+        });
 
-        Assert.That(builder.ReadConfiguration(), Is.TypeOf<GrafanaLinkConfig>());
+        Assert.That(builder.ReadConfiguration(), Is.TypeOf<KibanaLinkConfig>());
 
         builder.DeleteConfiguration();
         Assert.That(builder.ReadConfiguration(), Is.Null);
         Assert.Throws<InvalidOperationException>(() => builder.Build());
+    }
+
+    [Test]
+    public void LinkBuilder_UpdateConfiguration_WithConfiguration_MergesSameTypeAndPreservesExistingFields()
+    {
+        var builder = new LinkBuilder()
+            .CreateConfiguration(new KibanaLinkConfig
+            {
+                Url = "https://kibana",
+                DataViewId = "view",
+                TimestampField = "custom-timestamp"
+            });
+
+        builder.UpdateConfiguration(new KibanaLinkConfig
+        {
+            KqlQuery = "service.name : api"
+        });
+
+        var mergedConfiguration = (KibanaLinkConfig)builder.ReadConfiguration()!;
+        Assert.Multiple(() =>
+        {
+            Assert.That(mergedConfiguration.Url, Is.EqualTo("https://kibana"));
+            Assert.That(mergedConfiguration.DataViewId, Is.EqualTo("view"));
+            Assert.That(mergedConfiguration.TimestampField, Is.EqualTo("custom-timestamp"));
+            Assert.That(mergedConfiguration.KqlQuery, Is.EqualTo("service.name : api"));
+        });
     }
 }

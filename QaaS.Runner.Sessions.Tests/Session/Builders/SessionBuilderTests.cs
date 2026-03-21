@@ -230,7 +230,7 @@ public class SessionBuilderTests
         
         builder.AddMockerCommand(new MockerCommandBuilder()
             .Named("TestMockerCommand")
-            .WithCommand(new CommandConfig()));
+            .WithCommand(new MockerCommandConfig()));
 
         // Act
         var session = builder.Build(_context, probes);
@@ -274,6 +274,31 @@ public class SessionBuilderTests
 
         // Assert
         Assert.That(session, Is.Not.Null);
+    }
+
+    [Test]
+    public void Build_When_Action_Collections_Are_Null_Treats_Them_As_Empty_Collections()
+    {
+        var builder = new SessionBuilder()
+            .Named("TestSession")
+            .AtStage(1);
+
+        foreach (var propertyName in new[] { "Consumers", "Publishers", "Transactions", "Probes", "Collectors", "MockerCommands" })
+        {
+            typeof(SessionBuilder).GetProperty(propertyName, BindingFlags.Instance | BindingFlags.NonPublic)!
+                .SetValue(builder, null);
+        }
+
+        var session = builder.Build(_context, []);
+
+        Assert.That(session, Is.Not.Null);
+        foreach (var propertyName in new[] { "Consumers", "Publishers", "Transactions", "Probes", "Collectors", "MockerCommands" })
+        {
+            var propertyValue = typeof(SessionBuilder).GetProperty(propertyName, BindingFlags.Instance | BindingFlags.NonPublic)!
+                .GetValue(builder) as Array;
+            Assert.That(propertyValue, Is.Not.Null, propertyName);
+            Assert.That(propertyValue, Is.Empty, propertyName);
+        }
     }
 
     [Test]

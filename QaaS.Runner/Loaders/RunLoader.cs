@@ -1,4 +1,5 @@
 using System.IO.Abstractions;
+using System.Text.RegularExpressions;
 using Autofac;
 using Microsoft.Extensions.Configuration;
 using QaaS.Framework.Configurations;
@@ -8,13 +9,14 @@ using QaaS.Framework.SDK.Session.SessionDataObjects;
 using QaaS.Framework.SDK.Session.SessionDataObjects.RunningSessionsObjects;
 using QaaS.Runner.Artifactory;
 using QaaS.Runner.Options;
-using QaaS.Runner.WrappedExternals;
 using BaseOptions = QaaS.Runner.Options.BaseOptions;
 
 namespace QaaS.Runner.Loaders;
 
 /// <summary>
-///     Builds and loads a runner of type TRunner with ExecutionBuilders based on provided options and configuration.
+/// Loads a single run-like command (`run`, `act`, `assert`, or `template`) into execution builders.
+/// Unlike <see cref="ExecuteLoader{TRunner}" />, this loader does not orchestrate nested commands; it translates one
+/// configuration entry point plus optional case expansion into one runner instance.
 /// </summary>
 /// <typeparam name="TRunner">The runner type (must inherit from Runner).</typeparam>
 /// <typeparam name="TOptions">The options type (must inherit from BaseOptions).</typeparam>
@@ -28,12 +30,13 @@ public class RunLoader<TRunner, TOptions> : BaseLoader<TOptions, TRunner>
     private readonly ILifetimeScope _runScope;
 
     /// <summary>
-    /// Initializes new lifetime scope to load new Run with.
+    /// Creates the runner scope used later for setup/teardown services such as Allure cleanup/serving.
+    /// Context construction in this loader is done directly and does not rely on Autofac registrations.
     /// </summary>
     public RunLoader(TOptions options, string? executionId = null) : base(options,
         executionId)
     {
-        _runScope = InitializeScope();
+        _runScope = Bootstrap.CreateRunnerScope();
     }
 
     /// <summary>
@@ -52,6 +55,8 @@ public class RunLoader<TRunner, TOptions> : BaseLoader<TOptions, TRunner>
             new RunningSessions(new Dictionary<string, RunningSessionData<object, object>>()));
         foreach (var overwriteFile in Options.OverwriteFiles)
             contextBuilder.WithOverwriteFile(overwriteFile);
+        foreach (var overwriteFolder in Options.OverwriteFolders)
+            contextBuilder.WithOverwriteFolder(overwriteFolder);
         contextBuilder.SetCase(relativeCaseFilePath);
         foreach (var overwriteArgument in Options.OverwriteArguments)
             contextBuilder.WithOverwriteArgument(overwriteArgument);
@@ -66,7 +71,9 @@ public class RunLoader<TRunner, TOptions> : BaseLoader<TOptions, TRunner>
     {
         using var httpClient = new HttpClient();
         httpClient.Timeout = TimeSpan.FromSeconds(HttpClientTimeoutSeconds);
-        return _jfrogArtifactoryHelper.GetUrlsToAllFilesInArtifactoryFolder(casesDirectoryPath, httpClient)
+        return _jfrogArtifactoryHelper.GetUrlsToAllFilesInArtifactoryFolderAsync(casesDirectoryPath, httpClient)
+            .GetAwaiter()
+            .GetResult()
             .OrderBy(f => f)
             .Select(casePath => BuildContext(executionId, casePath))
             .ToList();
@@ -95,6 +102,7 @@ public class RunLoader<TRunner, TOptions> : BaseLoader<TOptions, TRunner>
             contexts = PathUtils.IsPathHttpUrl(Options.CasesRootDirectory)
                 ? GetContextsWithJfrogArtifactoryCases(ExecutionId, Options.CasesRootDirectory)
                 : GetContextsWithFileSystemCases(ExecutionId, Options.CasesRootDirectory);
+            contexts = FilterIgnoredCases(contexts).ToList();
 
             // If casesNamesToRun is 0 all cases would run.
             if (Options.CasesNamesToRun.Count <= 0) return contexts;
@@ -113,15 +121,26 @@ public class RunLoader<TRunner, TOptions> : BaseLoader<TOptions, TRunner>
         return contexts;
     }
 
-    private ILifetimeScope InitializeScope()
+    private IEnumerable<InternalContext> FilterIgnoredCases(IEnumerable<InternalContext> contexts)
     {
-        return new ContainerBuilder().Build().BeginLifetimeScope(scope =>
+        var ignoredCaseNames = new HashSet<string>(Options.CasesNamesToIgnore ?? [], StringComparer.Ordinal);
+        var ignoredCasePatterns = (Options.CasesNamePatternsToIgnore ?? [])
+            .Select(pattern => new Regex(pattern, RegexOptions.Compiled))
+            .ToArray();
+
+        return contexts.Where(context =>
         {
-            scope.RegisterInstance(new AllureWrapper()).SingleInstance();
-            scope.RegisterInstance(new RunningSessions(new Dictionary<string, RunningSessionData<object, object>>()))
-                .As<IInternalRunningSessions>();
-            // Must not be single instance so it builds a new configuration builder for every context
-            scope.RegisterType<ConfigurationBuilder>().As<IConfigurationBuilder>();
+            if (context.CaseName == null)
+            {
+                return true;
+            }
+
+            if (ignoredCaseNames.Contains(context.CaseName))
+            {
+                return false;
+            }
+
+            return ignoredCasePatterns.All(pattern => !pattern.IsMatch(context.CaseName));
         });
     }
 
@@ -144,11 +163,14 @@ public class RunLoader<TRunner, TOptions> : BaseLoader<TOptions, TRunner>
     {
         var executionBuilders = GetLoadedExecutionBuilders().ToList();
 
-        // Use Activator to create an instance of the configured implementation of TRunner
-        return (TRunner)Activator.CreateInstance(
-            typeof(TRunner), _runScope, executionBuilders, Logger, SerilogLogger,
+        var runner = Bootstrap.CreateRunner<TRunner>(
+            _runScope,
+            executionBuilders,
+            Logger,
+            SerilogLogger,
             Options is AssertableOptions assertableOptions && assertableOptions.EmptyAllureDirectory,
-            Options is AssertableOptions assertableOptions2 && assertableOptions2.AutoServeTestResults
-        )!;
+            Options is AssertableOptions assertableOptions2 && assertableOptions2.AutoServeTestResults);
+        runner.ExitProcessOnCompletion = !Options.NoProcessExit;
+        return runner;
     }
 }

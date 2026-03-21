@@ -7,12 +7,21 @@ using QaaS.Framework.SDK.DataSourceObjects;
 using QaaS.Framework.SDK.Hooks.Assertion;
 using QaaS.Framework.SDK.Session.SessionDataObjects;
 using QaaS.Runner.Assertions.AssertionObjects;
+using QaaS.Runner.Assertions.LinkBuilders;
 
 namespace QaaS.Runner.Assertions.Tests.AssertionObjectsTests;
 
 [TestFixture]
 public class AssertionExecutionTests
 {
+    private sealed class StaticLink(string linkName, string linkValue) : BaseLink(linkName)
+    {
+        protected override string BuildLink(IList<KeyValuePair<DateTime, DateTime>> startEndTimesKeyValuePairs)
+        {
+            return linkValue;
+        }
+    }
+
     private sealed class DelegateAssertionHook(
         Func<IImmutableList<SessionData>, IImmutableList<DataSource>, bool> execute,
         AssertionStatus? forcedStatus = null) : BaseAssertion<object>
@@ -104,6 +113,34 @@ public class AssertionExecutionTests
 
         Assert.That(result.Flaky.IsFlaky, Is.True);
         Assert.That(result.Flaky.FlakinessReasons, Has.Count.EqualTo(1));
+    }
+
+    [Test]
+    public void Execute_WhenDataSourcesAreNull_BuildsLinksAndUsesEmptyDataSourceList()
+    {
+        var assertion = CreateAssertion(new DelegateAssertionHook((_, dataSources) => dataSources.Count == 0),
+            sessionNames: ["session-1"]);
+        assertion.Links = [new StaticLink("grafana", "https://grafana.local/d/test")];
+        var session = new SessionData
+        {
+            Name = "session-1",
+            UtcStartTime = DateTime.UtcNow.AddSeconds(-1),
+            UtcEndTime = DateTime.UtcNow
+        };
+
+        var result = assertion.Execute(new List<SessionData?> { session }.ToImmutableList(), null);
+        var links = result.Links;
+        var link = links?.Single();
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(result.AssertionStatus, Is.EqualTo(AssertionStatus.Passed));
+            Assert.That(result.Assertion.DataSourceList, Is.Empty);
+            Assert.That(links, Is.Not.Null);
+            Assert.That(link, Is.Not.Null);
+            Assert.That(link!.Value.Key, Is.EqualTo("grafana"));
+            Assert.That(link.Value.Value, Is.EqualTo("https://grafana.local/d/test"));
+        });
     }
 
     private static Assertion CreateAssertion(IAssertion hook,

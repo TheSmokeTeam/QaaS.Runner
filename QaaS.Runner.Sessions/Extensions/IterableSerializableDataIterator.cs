@@ -30,24 +30,20 @@ public sealed class IterableSerializableDataIterator
     /// <returns> The iterable enumerable with its items serialized </returns>
     public IEnumerable<Data<object>> IterateEnumerable()
     {
-        // No serializer only adding to list
-        if (_serializer == null)
-            foreach (var item in _iterableData ?? [])
-            {
-                IteratedData.Add(item);
-                yield return item;
-            }
-        // Serializer was given, serialize data
-        else
-            foreach (var item in _iterableData ?? [])
-            {
-                IteratedData.Add(item);
-                yield return new Data<object>
-                {
-                    Body = _serializer!.Serialize(item.Body),
-                    MetaData = item.MetaData
-                };
-            }
+        foreach (var (_, serialized) in IterateWithOriginal())
+            yield return serialized;
+    }
+
+    /// <summary>
+    ///     Iterate over the iterable data while returning both the original value and the serialized value.
+    /// </summary>
+    public IEnumerable<(Data<object> Original, Data<object> Serialized)> IterateWithOriginal()
+    {
+        foreach (var item in _iterableData ?? [])
+        {
+            IteratedData.Add(item);
+            yield return (item, Serialize(item));
+        }
     }
 
     /// <summary>
@@ -71,4 +67,16 @@ public sealed class IterableSerializableDataIterator
     /// <param name="indexToFetch"> The index of the data you wish to fetch </param>
     public Data<object> GetDataBeforeSerialization(int indexToFetch)
         => IteratedData[indexToFetch % IteratedData.Count];
+
+    private Data<object> Serialize(Data<object> item)
+    {
+        if (_serializer == null)
+            return item;
+
+        return new Data<object>
+        {
+            Body = _serializer.Serialize(item.Body),
+            MetaData = item.MetaData
+        };
+    }
 }

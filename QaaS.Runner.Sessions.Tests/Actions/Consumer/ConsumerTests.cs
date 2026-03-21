@@ -2,13 +2,16 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Reflection;
 using System.Runtime.Serialization.Formatters.Binary;
+using Microsoft.Extensions.Logging;
 using Microsoft.VisualStudio.TestPlatform.ObjectModel.Adapter;
 using Moq;
 using NUnit.Framework;
 using QaaS.Framework.Policies;
 using QaaS.Framework.Protocols.Protocols;
 using QaaS.Framework.SDK.Session;
+using QaaS.Framework.SDK.Session.CommunicationDataObjects;
 using QaaS.Framework.SDK.Session.DataObjects;
 using QaaS.Framework.Serialization;
 using QaaS.Runner.Sessions.Actions.Consumers;
@@ -109,5 +112,118 @@ public class ConsumerTests
         // Arrange
         var receivedAmount = context.InternalRunningSessions.RunningSessionsDict[sessionName].Outputs![0].Data.Count;
         _reader.Verify(r => r.Read(It.IsAny<TimeSpan>()), Times.Exactly(receivedAmount));
+    }
+
+    [Test]
+    public void Constructor_WithNullReader_UsesConfiguredSerializationTypeForRunningData()
+    {
+        var consumer = new Sessions.Actions.Consumers.Consumer(
+            "TestConsumer",
+            null,
+            TimeSpan.FromMilliseconds(1),
+            1,
+            null,
+            new DataFilter(),
+            SerializationType.Json,
+            null,
+            Globals.Logger);
+
+        var runningData = (RunningCommunicationData<object>)typeof(BaseConsumer)
+            .GetField("RunningCommunicationData", BindingFlags.Instance | BindingFlags.NonPublic)!
+            .GetValue(consumer)!;
+
+        Assert.That(runningData.SerializationType, Is.EqualTo(SerializationType.Json));
+    }
+
+    [Test]
+    public void Constructor_WithNullChunkReader_UsesConfiguredSerializationTypeForRunningData()
+    {
+        var consumer = new ChunkConsumer(
+            "TestConsumer",
+            null,
+            TimeSpan.FromMilliseconds(1),
+            1,
+            null,
+            new DataFilter(),
+            SerializationType.Json,
+            null,
+            Globals.Logger);
+
+        var runningData = (RunningCommunicationData<object>)typeof(BaseConsumer)
+            .GetField("RunningCommunicationData", BindingFlags.Instance | BindingFlags.NonPublic)!
+            .GetValue(consumer)!;
+
+        Assert.That(runningData.SerializationType, Is.EqualTo(SerializationType.Json));
+    }
+
+    [Test]
+    public void Constructor_LogsStructuredInitializationMessage()
+    {
+        var logger = new CapturingLogger();
+
+        _ = new Sessions.Actions.Consumers.Consumer(
+            "TestConsumer",
+            new NamedReader(),
+            TimeSpan.FromMilliseconds(1),
+            1,
+            null,
+            new DataFilter(),
+            SerializationType.Json,
+            null,
+            logger);
+
+        Assert.That(logger.Messages,
+            Contains.Item("Initializing Consumer TestConsumer with Reader type NamedReader and Deserializer Json"));
+    }
+
+    private sealed class NamedReader : IReader
+    {
+        public void Connect()
+        {
+        }
+
+        public void Disconnect()
+        {
+        }
+
+        public SerializationType? GetSerializationType()
+        {
+            return SerializationType.Json;
+        }
+
+        public DetailedData<object>? Read(TimeSpan timeout)
+        {
+            return null;
+        }
+    }
+
+    private sealed class CapturingLogger : ILogger
+    {
+        public List<string> Messages { get; } = [];
+
+        public IDisposable BeginScope<TState>(TState state) where TState : notnull
+        {
+            return NoOpScope.Instance;
+        }
+
+        public bool IsEnabled(LogLevel logLevel)
+        {
+            return true;
+        }
+
+        public void Log<TState>(LogLevel logLevel, EventId eventId, TState state, Exception? exception,
+            Func<TState, Exception?, string> formatter)
+        {
+            Messages.Add(formatter(state, exception));
+        }
+
+        private sealed class NoOpScope : IDisposable
+        {
+            public static readonly NoOpScope Instance = new();
+
+            public void Dispose()
+            {
+            }
+        }
     }
 }

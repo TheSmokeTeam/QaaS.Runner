@@ -1,3 +1,4 @@
+using QaaS.Framework.Configurations;
 using QaaS.Framework.Policies;
 using QaaS.Framework.Protocols.ConfigurationObjects;
 using QaaS.Framework.Protocols.ConfigurationObjects.Elastic;
@@ -15,8 +16,11 @@ using QaaS.Framework.SDK.Extensions;
 using QaaS.Framework.SDK.Session;
 using QaaS.Framework.SDK.Session.SessionDataObjects;
 using QaaS.Framework.Serialization;
+using QaaS.Runner.Infrastructure;
+using QaaS.Runner.Sessions.Actions;
 using QaaS.Runner.Sessions.ConfigurationObjects;
 using QaaS.Runner.Sessions.Extensions;
+using QaaS.Runner.Sessions.RuntimeOverrides;
 using Parallel = QaaS.Runner.Sessions.ConfigurationObjects.Parallel;
 
 namespace QaaS.Runner.Sessions.Actions.Publishers.Builders;
@@ -197,11 +201,25 @@ public partial class PublisherBuilder
         return this;
     }
 
+    /// <summary>
+    /// Compatibility alias for <see cref="Configure" /> that matches the configuration CRUD pattern used by other builders.
+    /// </summary>
     public PublisherBuilder CreateConfiguration(ISenderConfig config)
     {
         return Configure(config);
     }
 
+    /// <summary>
+    /// Compatibility alias for <see cref="CreateConfiguration" />.
+    /// </summary>
+    public PublisherBuilder Create(ISenderConfig config)
+    {
+        return CreateConfiguration(config);
+    }
+
+    /// <summary>
+    /// Returns the currently configured sender source, if any.
+    /// </summary>
     public ISenderConfig? ReadConfiguration()
     {
         if (RabbitMq != null) return RabbitMq;
@@ -217,13 +235,39 @@ public partial class PublisherBuilder
         return MongoDbCollection;
     }
 
+    /// <summary>
+    /// Applies a computed partial update to the current publisher configuration while preserving omitted fields.
+    /// </summary>
     public PublisherBuilder UpdateConfiguration(Func<ISenderConfig, ISenderConfig> update)
     {
         var currentConfig = ReadConfiguration() ??
                             throw new InvalidOperationException("Publisher configuration is not set");
-        return Configure(update(currentConfig));
+        return UpdateConfiguration(update(currentConfig));
     }
 
+    /// <summary>
+    /// Updates the publisher configuration by merging same-type values and replacing the current type when needed.
+    /// </summary>
+    public PublisherBuilder UpdateConfiguration(ISenderConfig config)
+    {
+        var currentConfig = ReadConfiguration() ??
+                            throw new InvalidOperationException("Publisher configuration is not set");
+        return Configure(ConfigurationUpdateExtensions.UpdateConfiguration(currentConfig, config));
+    }
+
+    /// <summary>
+    /// Updates the publisher configuration from an object-shaped patch while preserving omitted fields.
+    /// </summary>
+    public PublisherBuilder UpdateConfiguration(object configuration)
+    {
+        var currentConfig = ReadConfiguration() ??
+                            throw new InvalidOperationException("Publisher configuration is not set");
+        return Configure(ConfigurationUpdateExtensions.UpdateConfiguration(currentConfig, configuration));
+    }
+
+    /// <summary>
+    /// Clears the configured sender source.
+    /// </summary>
     public PublisherBuilder DeleteConfiguration()
     {
         return Reset();
@@ -245,6 +289,9 @@ public partial class PublisherBuilder
         return this;
     }
 
+    /// <summary>
+    /// Replaces the current sender source with the provided configuration type.
+    /// </summary>
     public PublisherBuilder Configure(ISenderConfig config)
     {
         Reset();
@@ -315,12 +362,27 @@ public partial class PublisherBuilder
 
             type = allTypes.FirstOrDefault(configuredType => configuredType != null) ??
                    throw new InvalidOperationException($"Missing supported type in publisher {Name}");
+            var senderChunkMode = ProtocolChunkSupport.ResolveSenderMode(type);
+            var propertyName = ProtocolChunkSupport.GetSenderConfigurationPropertyName(type);
+            if (Chunk == null && senderChunkMode == ProtocolChunkMode.ChunkOnly)
+            {
+                throw new InvalidOperationException(
+                    $"The {nameof(Chunk)} field is required when {propertyName} is configured.");
+            }
+
+            if (Chunk != null && senderChunkMode == ProtocolChunkMode.SingleOnly)
+            {
+                throw new InvalidOperationException(
+                    $"The {nameof(Chunk)} field must be empty when {propertyName} is configured.");
+            }
             
-            var (sender, chunkSender) = SenderFactory.CreateSender(Chunk != null, type, context.Logger, DataFilter);
+            var overrideRequest = new PublisherOverrideRequest(Name!, type, Chunk != null, context.Logger, DataFilter);
+            var (sender, chunkSender) = context.GetSessionActionOverrides()?.Publisher?.Invoke(overrideRequest)
+                                       ?? SenderFactory.CreateSender(Chunk != null, type, context.Logger, DataFilter);
             var publisherTypeName = sender?.GetType().Name ?? chunkSender?.GetType().Name ?? "Unknown";
             
             context.Logger.LogDebugWithMetaData("Started building Publisher of type {type}",
-                context.GetMetaDataFromContext(), new object?[] { publisherTypeName });
+                context.GetMetaDataOrDefault(), new object?[] { publisherTypeName });
 
             return sender != null
                 ? new Publisher(Name!, sender, Stage, DataFilter, PolicyBuilder.BuildPolicies(Policies), Loop,
@@ -335,7 +397,7 @@ public partial class PublisherBuilder
         catch (Exception e)
         {
             actionFailures.AppendActionFailure(e, sessionName, context.Logger, nameof(Publisher), Name!,
-                type?.GetType().ToString()!);
+                type?.GetType().Name);
         }
 
         return null;

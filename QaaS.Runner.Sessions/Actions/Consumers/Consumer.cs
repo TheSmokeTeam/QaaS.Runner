@@ -18,7 +18,7 @@ public sealed class Consumer : BaseConsumer
     {
         _reader = reader;
         Logger.LogInformation(
-            "Initializing {Consumer} {ConsumerName} of type {ReaderType} and Deserializer type - {DeserializerType}",
+            "Initializing {Consumer} {ConsumerName} with Reader type {ReaderType} and Deserializer {DeserializerType}",
             GetType().Name, Name, _reader?.GetType().Name, SerializationType);
 
         RunningCommunicationData = new RunningCommunicationData<object>

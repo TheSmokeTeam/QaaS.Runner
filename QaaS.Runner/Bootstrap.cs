@@ -4,6 +4,7 @@ using CommandLine;
 using Microsoft.Extensions.Logging;
 using QaaS.Framework.Executions.CommandLineBuilders;
 using QaaS.Runner.Loaders;
+using QaaS.Runner.Modules;
 using QaaS.Runner.Options;
 using Serilog;
 using Serilog.Extensions.Logging;
@@ -17,8 +18,6 @@ namespace QaaS.Runner;
 /// </summary>
 public static class Bootstrap
 {
-
-    private static readonly ILifetimeScope DefaultScope = BuildParentContainer();
     private static readonly Lazy<bool> ShouldForceDisableSendLogs = new(() => !CanUseFrameworkDefaultLoggers());
 
     /// <summary>
@@ -50,19 +49,18 @@ public static class Bootstrap
     internal static TRunner GetRunner<TRunner>(IEnumerable<string>? args, string? executionId = null)
         where TRunner : Runner
     {
-        if (args == null)
+        var commandLineArgs = args?.ToArray() ?? [];
+        using var cliParser = ParserBuilder.BuildParser();
+
+        if (commandLineArgs.Length == 0)
         {
-            var (logger, serilogLogger) = GetDefaultLoggers();
-            return CreateRunner<TRunner>(DefaultScope, [], logger, serilogLogger);
+            var emptyArgsResult = ParseSupportedArguments(cliParser, []);
+            return WriteHelpAndCreateBootstrapHandledRunner<TRunner>(emptyArgsResult);
         }
 
-        // Build CLI parser and parse supported verbs
-        using var cliParser = ParserBuilder.BuildParser();
-        var cliParserResult = cliParser.ParseArguments<RunOptions,
-            ActOptions, AssertOptions, TemplateOptions, ExecuteOptions, int>(args);
+        var cliParserResult = ParseSupportedArguments(cliParser, commandLineArgs);
 
-        var runner = cliParserResult
-            .WithNotParsed(_ => Console.Out.WriteLine(HelpTextBuilder.BuildHelpText(cliParserResult)))
+        return cliParserResult
             .MapResult(
                 (TemplateOptions options) =>
                     new RunLoader<TRunner, TemplateOptions>(GetSafeLoggerOptions(options), executionId).GetLoadedRunner(),
@@ -73,42 +71,86 @@ public static class Bootstrap
                 (AssertOptions options) =>
                     new RunLoader<TRunner, AssertOptions>(GetSafeLoggerOptions(options), executionId).GetLoadedRunner(),
                 (ExecuteOptions options) => new ExecuteLoader<TRunner>(GetSafeLoggerOptions(options)).GetLoadedRunner(),
-                HandleParseError<TRunner>);
-
-        return runner;
+                errors => HandleParseError<TRunner>(cliParserResult, errors));
     }
 
     /// <summary>
-    /// Handles parsing errors and returns an empty <see cref="Runner" /> object
+    /// Handles the parser's "not parsed" channel, which CommandLineParser uses for help requests, version requests,
+    /// and actual parse failures alike.
+    /// Bootstrap still returns a <see cref="Runner" /> instance in all of those cases so callers can keep a simple
+    /// `Bootstrap.New(...).Run()` API. To make that safe, parse-only flows return a runner with a precomputed
+    /// bootstrap exit code; <see cref="Runner.RunAndGetExitCode" /> sees that sentinel and exits before setup,
+    /// building, execution, or teardown begin.
     /// </summary>
-    private static TRunner HandleParseError<TRunner>(IEnumerable<Error> errors) where TRunner : Runner
+    private static TRunner HandleParseError<TRunner>(ParserResult<object> cliParserResult,
+        IEnumerable<Error> errors) where TRunner : Runner
     {
-        var errorsArray = errors.ToArray();
-        var (logger, serilogLogger) = GetDefaultLoggers();
+        var parseErrors = errors.ToArray();
+        var (logger, serilogLogger, ownsSerilogLogger) = GetDefaultLoggers();
 
-        // If all errors are version requests handle the version request case
-        if (errorsArray.All(err => err.Tag is ErrorType.VersionRequestedError))
+        if (IsVersionOnlyRequest(parseErrors))
         {
             const string qaasFrameworkAssemblyName = "QaaS.Framework.Executions";
             logger.LogInformation($"\nQaaS Framework Versions:\n" +
                                                    $"{qaasFrameworkAssemblyName} {GetAssemblyVersionFromName(qaasFrameworkAssemblyName)}\n");
-            return CreateRunner<TRunner>(DefaultScope, [], logger, serilogLogger);
+            return CreateBootstrapHandledRunner<TRunner>(0, logger, serilogLogger, ownsSerilogLogger);
         }
 
-        // If all errors are help commands requested then the user asked for help and arguments are valid
-        if (errorsArray.All(err => err.Tag is ErrorType.HelpRequestedError or ErrorType.HelpVerbRequestedError))
-            return CreateRunner<TRunner>(DefaultScope, [], logger, serilogLogger);
+        if (IsHelpOnlyRequest(parseErrors))
+        {
+            return WriteHelpAndCreateBootstrapHandledRunner<TRunner>(cliParserResult, 0, logger, serilogLogger,
+                ownsSerilogLogger);
+        }
 
+        WriteHelpText(cliParserResult);
         logger.LogCritical("Failed to parse/process the command line arguments");
-        return CreateRunner<TRunner>(DefaultScope, [], logger, serilogLogger);
+        return CreateBootstrapHandledRunner<TRunner>(1, logger, serilogLogger,
+            ownsSerilogLogger);
     }
 
+    private static bool IsVersionOnlyRequest(IEnumerable<Error> errors)
+    {
+        return errors.All(error => error.Tag is ErrorType.VersionRequestedError);
+    }
+
+    private static bool IsHelpOnlyRequest(IEnumerable<Error> errors)
+    {
+        return errors.All(error => error.Tag is ErrorType.HelpRequestedError or ErrorType.HelpVerbRequestedError);
+    }
+
+    internal static TOptions GetSafeLoggerOptions<TOptions>(TOptions options, bool forceDisableSendLogs,
+        Func<TOptions, TOptions> disableSendLogs)
+    {
+        return forceDisableSendLogs ? disableSendLogs(options) : options;
+    }
+
+    private static RunOptions GetSafeLoggerOptions(RunOptions options) =>
+        GetSafeLoggerOptions(options, ShouldForceDisableSendLogs.Value,
+            currentOptions => currentOptions with { SendLogs = false });
+
+    private static ActOptions GetSafeLoggerOptions(ActOptions options) =>
+        GetSafeLoggerOptions(options, ShouldForceDisableSendLogs.Value,
+            currentOptions => currentOptions with { SendLogs = false });
+
+    private static AssertOptions GetSafeLoggerOptions(AssertOptions options) =>
+        GetSafeLoggerOptions(options, ShouldForceDisableSendLogs.Value,
+            currentOptions => currentOptions with { SendLogs = false });
+
+    private static TemplateOptions GetSafeLoggerOptions(TemplateOptions options) =>
+        GetSafeLoggerOptions(options, ShouldForceDisableSendLogs.Value,
+            currentOptions => currentOptions with { SendLogs = false });
+
+    private static ExecuteOptions GetSafeLoggerOptions(ExecuteOptions options) =>
+        GetSafeLoggerOptions(options, ShouldForceDisableSendLogs.Value,
+            currentOptions => currentOptions with { SendLogs = false });
+
     // Create a custom runner using activator to dynamically get a new instance of any implementation of TRunner
-    private static TRunner CreateRunner<TRunner>(ILifetimeScope scope, List<ExecutionBuilder> executionBuilders,
-        ILogger logger, Serilog.ILogger serilogLogger, bool emptyResults = false, bool serveResults = false)
+    internal static TRunner CreateRunner<TRunner>(ILifetimeScope scope, List<ExecutionBuilder> executionBuilders,
+        ILogger logger, Serilog.ILogger serilogLogger, bool emptyResults = false, bool serveResults = false,
+        bool disposeSerilogLogger = true)
         where TRunner : Runner
     {
-        return (TRunner)Activator.CreateInstance(
+        var runner = (TRunner)Activator.CreateInstance(
             typeof(TRunner),
             scope,
             executionBuilders,
@@ -117,6 +159,8 @@ public static class Bootstrap
             emptyResults,
             serveResults
         )!;
+        runner.WithSerilogLoggerDisposal(disposeSerilogLogger);
+        return runner;
     }
 
     private static string GetAssemblyVersionFromName(string assemblyName)
@@ -125,12 +169,13 @@ public static class Bootstrap
             .GetCustomAttribute<AssemblyInformationalVersionAttribute>()!.InformationalVersion;
     }
 
-    private static bool CanUseFrameworkDefaultLoggers()
+    internal static bool CanUseFrameworkDefaultLoggers(Func<ILogger> loggerAccessor,
+        Func<Serilog.ILogger> serilogLoggerAccessor)
     {
         try
         {
-            _ = Framework.Executions.Constants.DefaultLogger;
-            _ = Framework.Executions.Constants.DefaultSerilogLogger;
+            _ = loggerAccessor();
+            _ = serilogLoggerAccessor();
             return true;
         }
         catch (Exception exception) when (exception is TypeInitializationException or UriFormatException)
@@ -139,44 +184,104 @@ public static class Bootstrap
         }
     }
 
-    private static (ILogger logger, Serilog.ILogger serilogLogger) GetDefaultLoggers()
+    private static bool CanUseFrameworkDefaultLoggers()
     {
-        if (!ShouldForceDisableSendLogs.Value)
-            return (Framework.Executions.Constants.DefaultLogger, Framework.Executions.Constants.DefaultSerilogLogger);
+        return CanUseFrameworkDefaultLoggers(
+            () => Framework.Executions.Constants.DefaultLogger,
+            () => Framework.Executions.Constants.DefaultSerilogLogger);
+    }
+
+    internal static (ILogger logger, Serilog.ILogger serilogLogger, bool ownsSerilogLogger) GetDefaultLoggers(
+        bool forceDisableSendLogs)
+    {
+        if (!forceDisableSendLogs)
+            return (Framework.Executions.Constants.DefaultLogger, Framework.Executions.Constants.DefaultSerilogLogger,
+                false);
 
         var fallbackSerilogLogger = new LoggerConfiguration().WriteTo.Console().CreateLogger();
         return (new SerilogLoggerFactory(fallbackSerilogLogger).CreateLogger("BootstrapFallbackLogger"),
-            fallbackSerilogLogger);
+            fallbackSerilogLogger,
+            true);
     }
 
-    private static RunOptions GetSafeLoggerOptions(RunOptions options)
+    private static (ILogger logger, Serilog.ILogger serilogLogger, bool ownsSerilogLogger) GetDefaultLoggers()
     {
-        return ShouldForceDisableSendLogs.Value ? options with { SendLogs = false } : options;
+        return GetDefaultLoggers(ShouldForceDisableSendLogs.Value);
     }
 
-    private static ActOptions GetSafeLoggerOptions(ActOptions options)
-    {
-        return ShouldForceDisableSendLogs.Value ? options with { SendLogs = false } : options;
-    }
-
-    private static AssertOptions GetSafeLoggerOptions(AssertOptions options)
-    {
-        return ShouldForceDisableSendLogs.Value ? options with { SendLogs = false } : options;
-    }
-
-    private static TemplateOptions GetSafeLoggerOptions(TemplateOptions options)
-    {
-        return ShouldForceDisableSendLogs.Value ? options with { SendLogs = false } : options;
-    }
-
-    private static ExecuteOptions GetSafeLoggerOptions(ExecuteOptions options)
-    {
-        return ShouldForceDisableSendLogs.Value ? options with { SendLogs = false } : options;
-    }
-
-    private static ILifetimeScope BuildParentContainer()
+    /// <summary>
+    /// Creates the minimal lifetime scope a runner needs at runtime.
+    /// Both <see cref="RunLoader{TRunner,TOptions}" /> and <see cref="ExecuteLoader{TRunner}" /> build configuration
+    /// directly and only rely on Autofac later for runner lifecycle helpers such as Allure cleanup and serving.
+    /// Keeping that scope minimal avoids the older duplicated loader-specific scope initialization code.
+    /// </summary>
+    internal static ILifetimeScope CreateRunnerScope()
     {
         var containerBuilder = new ContainerBuilder();
+        containerBuilder.RegisterModule<AllureWrapperModule>();
         return containerBuilder.Build();
+    }
+
+    private static TRunner CreateDefaultRunner<TRunner>(
+        ILogger? logger = null,
+        Serilog.ILogger? serilogLogger = null,
+        bool? ownsSerilogLogger = null)
+        where TRunner : Runner
+    {
+        (ILogger logger, Serilog.ILogger serilogLogger, bool ownsSerilogLogger) resolvedLoggers;
+        if (logger != null && serilogLogger != null && ownsSerilogLogger.HasValue)
+        {
+            resolvedLoggers = (logger, serilogLogger, ownsSerilogLogger.Value);
+        }
+        else
+        {
+            resolvedLoggers = GetDefaultLoggers();
+        }
+
+        return CreateRunner<TRunner>(
+            CreateRunnerScope(),
+            [],
+            resolvedLoggers.logger,
+            resolvedLoggers.serilogLogger,
+            disposeSerilogLogger: resolvedLoggers.ownsSerilogLogger);
+    }
+
+    private static ParserResult<object> ParseSupportedArguments(Parser cliParser, IEnumerable<string> args)
+    {
+        return cliParser.ParseArguments<RunOptions, ActOptions, AssertOptions, TemplateOptions, ExecuteOptions, int>(
+            args);
+    }
+
+    private static void WriteHelpText(ParserResult<object> cliParserResult)
+    {
+        Console.Out.WriteLine(HelpTextBuilder.BuildHelpText(cliParserResult));
+    }
+
+    private static TRunner WriteHelpAndCreateBootstrapHandledRunner<TRunner>(
+        ParserResult<object> cliParserResult,
+        int exitCode = 0,
+        ILogger? logger = null,
+        Serilog.ILogger? serilogLogger = null,
+        bool? ownsSerilogLogger = null)
+        where TRunner : Runner
+    {
+        WriteHelpText(cliParserResult);
+        return CreateBootstrapHandledRunner<TRunner>(exitCode, logger, serilogLogger, ownsSerilogLogger);
+    }
+
+    /// <summary>
+    /// Creates a minimal runner with no execution builders whose only job is to carry the bootstrap decision.
+    /// It is still a real runner instance so disposal is uniform, but its preset bootstrap exit code makes
+    /// <see cref="Runner.RunAndGetExitCode" /> short-circuit before any execution lifecycle work begins.
+    /// </summary>
+    private static TRunner CreateBootstrapHandledRunner<TRunner>(
+        int exitCode,
+        ILogger? logger = null,
+        Serilog.ILogger? serilogLogger = null,
+        bool? ownsSerilogLogger = null)
+        where TRunner : Runner
+    {
+        return (TRunner)CreateDefaultRunner<TRunner>(logger, serilogLogger, ownsSerilogLogger)
+            .WithBootstrapHandledExitCode(exitCode);
     }
 }
