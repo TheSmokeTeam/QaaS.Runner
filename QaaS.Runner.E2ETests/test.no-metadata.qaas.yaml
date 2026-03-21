@@ -1,0 +1,51 @@
+anchors:
+  rabbitmq: &rabbitmq ${variables:rabbitmq}
+
+Storages:
+  - FileSystem:
+      Path: SessionDataStorage
+
+DataSources:
+  - Name: RabbitPayload
+    Generator: TestGenerator
+    GeneratorConfiguration:
+      Count: 1
+
+Sessions:
+  - Name: RabbitRoundTrip
+    SaveData: true
+    Probes:
+      - Name: SharedProbe
+        Probe: ScopedProbe
+        ProbeConfiguration:
+          Marker: rabbit-roundtrip-probe
+    Publishers:
+      - Name: PublishToRabbit
+        DataSourceNames: [ RabbitPayload ]
+        RabbitMq:
+          <<: *rabbitmq
+          ExchangeName: test
+        Serialize:
+          Serializer: Json
+    Consumers:
+      - Name: ConsumeFromRabbit
+        TimeoutMs: 20000
+        RabbitMq:
+          <<: *rabbitmq
+          ExchangeName: test
+        Deserialize:
+          Deserializer: Json
+          SpecificType:
+            AssemblyName: QaaS.Runner.E2ETests
+            TypeFullName: QaaS.Runner.E2ETests.MockJson
+  - Name: ProbeScopeCheck
+    Probes:
+      - Name: SharedProbe
+        Probe: ScopedProbe
+        ProbeConfiguration:
+          Marker: probe-scope-check
+
+Assertions:
+  - Name: RabbitRoundTripAssertion
+    Assertion: RabbitRoundTripAssertion
+    SessionNames: [ RabbitRoundTrip ]
