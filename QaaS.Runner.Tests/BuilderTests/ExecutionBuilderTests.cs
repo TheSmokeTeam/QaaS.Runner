@@ -370,7 +370,7 @@ public class ExecutionBuilderTests
     }
 
     [Test]
-    public void Build_WithLoadedContextWithoutMetadata_DoesNotThrow()
+    public void Build_WithLoadedContextWithoutMetadata_RecordsBothValidationErrorsOnce()
     {
         var context = CreateLoadedContext(new Dictionary<string, string?>
         {
@@ -378,7 +378,17 @@ public class ExecutionBuilderTests
         });
         var builder = new ExecutionBuilder(context, ExecutionType.Run, null, null, null, null);
 
-        Assert.DoesNotThrow(() => builder.Build());
+        Assert.Throws<InvalidConfigurationsException>(() => builder.Build());
+
+        var errorMessages = GetValidationErrorMessages(builder);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(errorMessages.Count(message => message == "MetaData - The Team field is required."),
+                Is.EqualTo(1));
+            Assert.That(errorMessages.Count(message => message == "MetaData - The System field is required."),
+                Is.EqualTo(1));
+        });
     }
 
     [Test]
@@ -393,13 +403,7 @@ public class ExecutionBuilderTests
 
         Assert.Throws<InvalidConfigurationsException>(() => builder.Build());
 
-        var validationResults = (IReadOnlyList<System.ComponentModel.DataAnnotations.ValidationResult>)typeof(ExecutionBuilder)
-            .GetField("_validationResults", BindingFlags.Instance | BindingFlags.NonPublic)!
-            .GetValue(builder)!;
-        var errorMessages = validationResults
-            .Select(result => result.ErrorMessage)
-            .Where(message => !string.IsNullOrWhiteSpace(message))
-            .ToList();
+        var errorMessages = GetValidationErrorMessages(builder);
 
         Assert.That(errorMessages.Count(message => message == "MetaData - The Team field is required."), Is.EqualTo(1));
     }
@@ -992,6 +996,18 @@ public class ExecutionBuilderTests
             InternalRunningSessions = new RunningSessions(new Dictionary<string, RunningSessionData<object, object>>()),
             InternalGlobalDict = new Dictionary<string, object?>()
         };
+    }
+
+    private static List<string> GetValidationErrorMessages(ExecutionBuilder builder)
+    {
+        var validationResults = (IReadOnlyList<System.ComponentModel.DataAnnotations.ValidationResult>)typeof(ExecutionBuilder)
+            .GetField("_validationResults", BindingFlags.Instance | BindingFlags.NonPublic)!
+            .GetValue(builder)!;
+
+        return validationResults
+            .Select(result => result.ErrorMessage)
+            .Where(message => !string.IsNullOrWhiteSpace(message))
+            .ToList()!;
     }
 
     private static InternalContext CreateLoadedContext(Dictionary<string, string?> values)

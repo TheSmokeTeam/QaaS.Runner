@@ -584,9 +584,9 @@ public class ExecutionBuilder() : BaseExecutionBuilder<InternalContext, Executio
     private void InitializeContext()
     {
         var existingContext = LoadedContext ? Context : null;
-        // Missing MetaData in YAML should behave like an empty section at runtime, but the builder
-        // keeps the property null so configuration validation does not fabricate required-field
-        // failures for a section that was never provided by the user.
+        // Keep metadata available on the execution context for logging/runtime consumers, while
+        // configuration validation treats a missing YAML section as an empty metadata object and
+        // reports the required Team/System fields.
         var metaData = MetaData ?? new MetaDataConfig();
 
         var logger = _configuredLogger ?? existingContext?.Logger ?? NullLogger.Instance;
@@ -840,10 +840,8 @@ public class ExecutionBuilder() : BaseExecutionBuilder<InternalContext, Executio
         ValidateCollection(Links, nameof(Links));
         ValidateCollection(Sessions, nameof(Sessions));
 
-        if (MetaData != null)
-        {
-            _ = TryValidateConfiguredObjectRecursive(MetaData, _validationResults, nameof(MetaData));
-        }
+        _ = TryValidateConfiguredObjectRecursive(MetaData ?? new MetaDataConfig(), _validationResults,
+            nameof(MetaData));
     }
 
     private void ValidateCollection<T>(IEnumerable<T>? items, string parentPath)
