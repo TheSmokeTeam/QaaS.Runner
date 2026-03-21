@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using NUnit.Framework;
 using QaaS.Framework.SDK.ContextObjects;
+using QaaS.Framework.Serialization;
 using Qaas.Mocker.CommunicationObjects.ConfigurationObjects.Command;
 using QaaS.Framework.SDK.Session.SessionDataObjects;
 using QaaS.Runner.Sessions.Actions.MockerCommands;
@@ -127,6 +128,40 @@ public class MockerCommandBuilderTests
 
         builder.DeleteConfiguration();
         Assert.That(builder.ReadConfiguration(), Is.Null);
+    }
+
+    [Test]
+    public void UpdateConfiguration_WithConfiguration_MergesSameTypeAndPreservesExistingFields()
+    {
+        var builder = new MockerCommandBuilder()
+            .CreateConfiguration(new MockerCommandConfig
+            {
+                Consume = new ConsumeCommandConfig
+                {
+                    InputDeserialize = new DeserializeConfig
+                    {
+                        Deserializer = SerializationType.Json
+                    }
+                }
+            });
+
+        builder.UpdateConfiguration(new MockerCommandConfig
+        {
+            Consume = new ConsumeCommandConfig
+            {
+                OutputDeserialize = new DeserializeConfig
+                {
+                    Deserializer = SerializationType.Binary
+                }
+            }
+        });
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(builder.ReadConfiguration()!.Consume, Is.Not.Null);
+            Assert.That(builder.ReadConfiguration()!.Consume!.InputDeserialize!.Deserializer, Is.EqualTo(SerializationType.Json));
+            Assert.That(builder.ReadConfiguration()!.Consume!.OutputDeserialize!.Deserializer, Is.EqualTo(SerializationType.Binary));
+        });
     }
 
     [Test]

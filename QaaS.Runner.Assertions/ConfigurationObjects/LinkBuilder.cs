@@ -1,6 +1,6 @@
 ﻿using System.ComponentModel;
 using System.Runtime.CompilerServices;
-using QaaS.Runner.Infrastructure;
+using QaaS.Framework.Configurations;
 using QaaS.Runner.Assertions.ConfigurationObjects.LinkConfigs;
 using QaaS.Runner.Assertions.LinkBuilders;
 
@@ -86,6 +86,16 @@ public class LinkBuilder
         var currentConfig = ReadConfiguration() ??
                             throw new InvalidOperationException("Link configuration is not set");
         return Configure(currentConfig.UpdateConfiguration(config));
+    }
+
+    /// <summary>
+    /// Updates the configured link config from an object-shaped patch while preserving omitted fields.
+    /// </summary>
+    public LinkBuilder UpdateConfiguration(object configuration)
+    {
+        var currentConfig = ReadConfiguration() ??
+                            throw new InvalidOperationException("Link configuration is not set");
+        return Configure(currentConfig.UpdateConfiguration(configuration));
     }
 
     /// <summary>

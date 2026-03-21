@@ -5,11 +5,11 @@ using System.Runtime.CompilerServices;
 using System.Text;
 using System.Text.Json;
 using Microsoft.Extensions.Configuration;
+using QaaS.Framework.Configurations;
 using QaaS.Framework.Configurations.ConfigurationBindingUtils;
 using QaaS.Framework.Configurations.CustomValidationAttributes;
 using QaaS.Framework.SDK.ContextObjects;
 using QaaS.Framework.SDK.Hooks.Assertion;
-using QaaS.Runner.Infrastructure;
 using YamlDotNet.Core;
 using YamlDotNet.Serialization;
 using Assertion = QaaS.Runner.Assertions.AssertionObjects.Assertion;
@@ -441,17 +441,42 @@ public class AssertionBuilder : IYamlConvertible
         return this;
     }
 
+    /// <summary>
+    /// Compatibility alias for <see cref="Configure" /> that matches the configuration CRUD pattern used by other builders.
+    /// </summary>
+    public AssertionBuilder CreateConfiguration(object configuration)
+    {
+        return Configure(configuration);
+    }
+
+    /// <summary>
+    /// Compatibility alias for <see cref="CreateConfiguration" />.
+    /// </summary>
+    public AssertionBuilder Create(object configuration)
+    {
+        return CreateConfiguration(configuration);
+    }
+
+    /// <summary>
+    /// Returns the currently configured assertion hook configuration.
+    /// </summary>
     public IConfiguration ReadConfiguration()
     {
         return AssertionConfiguration;
     }
 
+    /// <summary>
+    /// Merges the provided configuration object into the current assertion hook configuration.
+    /// </summary>
     public AssertionBuilder UpdateConfiguration(object configuration)
     {
         AssertionConfiguration = AssertionConfiguration.UpdateConfiguration(configuration);
         return this;
     }
 
+    /// <summary>
+    /// Clears the configured assertion hook configuration.
+    /// </summary>
     public AssertionBuilder DeleteConfiguration()
     {
         AssertionConfiguration = new ConfigurationBuilder().Build();

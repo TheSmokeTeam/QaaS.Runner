@@ -4,6 +4,7 @@ using System.Diagnostics.CodeAnalysis;
 using System.Text;
 using System.Text.Json;
 using Microsoft.Extensions.Configuration;
+using QaaS.Framework.Configurations;
 using QaaS.Framework.Configurations.ConfigurationBindingUtils;
 using QaaS.Framework.SDK.ContextObjects;
 using QaaS.Framework.SDK.Extensions;
@@ -223,6 +224,22 @@ public class ProbeBuilder : IYamlConvertible
     }
 
     /// <summary>
+    /// Compatibility alias for <see cref="Configure" /> that matches the configuration CRUD pattern used by other builders.
+    /// </summary>
+    public ProbeBuilder CreateConfiguration(object configuration)
+    {
+        return Configure(configuration);
+    }
+
+    /// <summary>
+    /// Compatibility alias for <see cref="CreateConfiguration" />.
+    /// </summary>
+    public ProbeBuilder Create(object configuration)
+    {
+        return CreateConfiguration(configuration);
+    }
+
+    /// <summary>
     /// Returns the currently configured probe configuration.
     /// </summary>
     public IConfiguration ReadConfiguration()
@@ -235,7 +252,7 @@ public class ProbeBuilder : IYamlConvertible
     /// </summary>
     public ProbeBuilder UpdateConfiguration(object configuration)
     {
-        ProbeConfiguration = ProbeConfiguration.UpdateConfiguration(configuration);
+        ProbeConfiguration = ConfigurationUpdateExtensions.UpdateConfiguration(ProbeConfiguration, configuration);
         return this;
     }
 

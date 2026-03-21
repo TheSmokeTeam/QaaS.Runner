@@ -1,5 +1,6 @@
 using System.ComponentModel;
 using System.ComponentModel.DataAnnotations;
+using QaaS.Framework.Configurations;
 using QaaS.Framework.Configurations.CustomValidationAttributes;
 using QaaS.Framework.Policies;
 using QaaS.Framework.Protocols.ConfigurationObjects;
@@ -10,7 +11,6 @@ using QaaS.Framework.SDK.ContextObjects;
 using QaaS.Framework.SDK.Session;
 using QaaS.Framework.SDK.Session.SessionDataObjects;
 using QaaS.Framework.Serialization;
-using QaaS.Runner.Infrastructure;
 using QaaS.Runner.Sessions.ConfigurationObjects;
 using QaaS.Runner.Sessions.Extensions;
 using QaaS.Runner.Sessions.RuntimeOverrides;
@@ -266,6 +266,14 @@ public class TransactionBuilder
     }
 
     /// <summary>
+    /// Compatibility alias for <see cref="CreateConfiguration" />.
+    /// </summary>
+    public TransactionBuilder Create(ITransactorConfig config)
+    {
+        return CreateConfiguration(config);
+    }
+
+    /// <summary>
     /// Returns the currently configured transactor source, if any.
     /// </summary>
     public ITransactorConfig? ReadConfiguration()
@@ -291,6 +299,16 @@ public class TransactionBuilder
         var currentConfig = ReadConfiguration() ??
                             throw new InvalidOperationException("Transaction configuration is not set");
         return Configure(currentConfig.UpdateConfiguration(config));
+    }
+
+    /// <summary>
+    /// Updates the transaction configuration from an object-shaped patch while preserving omitted fields.
+    /// </summary>
+    public TransactionBuilder UpdateConfiguration(object configuration)
+    {
+        var currentConfig = ReadConfiguration() ??
+                            throw new InvalidOperationException("Transaction configuration is not set");
+        return Configure(currentConfig.UpdateConfiguration(configuration));
     }
 
     /// <summary>

@@ -1,9 +1,9 @@
 ﻿using System.ComponentModel;
 using System.IO.Abstractions;
 using System.Runtime.CompilerServices;
+using QaaS.Framework.Configurations;
 using QaaS.Framework.Configurations.CommonConfigurationObjects;
 using QaaS.Framework.SDK.ContextObjects;
-using QaaS.Runner.Infrastructure;
 using QaaS.Runner.Storage.ConfigurationObjects;
 using QaaS.Runner.Storage.ConfigurationObjects.StorageConfigs;
 
@@ -86,6 +86,16 @@ public class StorageBuilder
         var currentConfig = ReadConfiguration() ??
                             throw new InvalidOperationException("Storage configuration is not set");
         return Configure(currentConfig.UpdateConfiguration(storageConfig));
+    }
+
+    /// <summary>
+    /// Updates the storage configuration from an object-shaped patch while preserving omitted fields.
+    /// </summary>
+    public StorageBuilder UpdateConfiguration(object configuration)
+    {
+        var currentConfig = ReadConfiguration() ??
+                            throw new InvalidOperationException("Storage configuration is not set");
+        return Configure(currentConfig.UpdateConfiguration(configuration));
     }
 
     /// <summary>

@@ -1,3 +1,4 @@
+using QaaS.Framework.Configurations;
 using QaaS.Framework.Policies;
 using QaaS.Framework.Protocols.ConfigurationObjects;
 using QaaS.Framework.Protocols.ConfigurationObjects.Elastic;
@@ -209,6 +210,14 @@ public partial class PublisherBuilder
     }
 
     /// <summary>
+    /// Compatibility alias for <see cref="CreateConfiguration" />.
+    /// </summary>
+    public PublisherBuilder Create(ISenderConfig config)
+    {
+        return CreateConfiguration(config);
+    }
+
+    /// <summary>
     /// Returns the currently configured sender source, if any.
     /// </summary>
     public ISenderConfig? ReadConfiguration()
@@ -243,7 +252,17 @@ public partial class PublisherBuilder
     {
         var currentConfig = ReadConfiguration() ??
                             throw new InvalidOperationException("Publisher configuration is not set");
-        return Configure(currentConfig.UpdateConfiguration(config));
+        return Configure(ConfigurationUpdateExtensions.UpdateConfiguration(currentConfig, config));
+    }
+
+    /// <summary>
+    /// Updates the publisher configuration from an object-shaped patch while preserving omitted fields.
+    /// </summary>
+    public PublisherBuilder UpdateConfiguration(object configuration)
+    {
+        var currentConfig = ReadConfiguration() ??
+                            throw new InvalidOperationException("Publisher configuration is not set");
+        return Configure(ConfigurationUpdateExtensions.UpdateConfiguration(currentConfig, configuration));
     }
 
     /// <summary>

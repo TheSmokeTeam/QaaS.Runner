@@ -28,7 +28,7 @@ public class BuilderCrudTests
                 Url = "https://kibana",
                 DataViewId = "view"
             }))
-            .Configure(new { key = "value" });
+            .CreateConfiguration(new { key = "value" });
 
         builder.UpdateSessionName("session-a", "session-updated")
             .UpdateSessionPattern("^session-.*$", "^updated-.*$")

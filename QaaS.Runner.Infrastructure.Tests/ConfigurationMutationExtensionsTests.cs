@@ -1,8 +1,6 @@
 using System;
-using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
-using System.Reflection;
 using Microsoft.Extensions.Configuration;
 using NUnit.Framework;
 
@@ -198,30 +196,38 @@ public class ConfigurationMutationExtensionsTests
     }
 
     [Test]
-    public void PrivateHelpers_CompareEnumerablesAndSkipIndexersAsExpected()
+    public void Wrapper_ForwardsToFrameworkUpdateBehavior()
     {
-        var getMergeableProperties = typeof(ConfigurationMutationExtensions)
-            .GetMethod("GetMergeableProperties", BindingFlags.NonPublic | BindingFlags.Static)!;
-        var areEquivalentEnumerables = typeof(ConfigurationMutationExtensions)
-            .GetMethod("AreEquivalentEnumerables", BindingFlags.NonPublic | BindingFlags.Static)!;
+        var updatedTyped = new FirstConfig
+        {
+            Name = "existing",
+            Tags = ["one"]
+        }.UpdateConfiguration(new FirstConfig
+        {
+            TimeoutSeconds = 5
+        });
 
-        var mergeableProperties = ((IEnumerable<PropertyInfo>)getMergeableProperties.Invoke(null, [typeof(IndexerConfig)])!)
-            .Select(property => property.Name)
-            .ToList();
-        var equalEnumerables = (bool)areEquivalentEnumerables.Invoke(null,
-            [new[] { "a", "b" }, new[] { "a", "b" }])!;
-        var differentEnumerables = (bool)areEquivalentEnumerables.Invoke(null,
-            [new[] { "a", "b" }, new[] { "a", "c" }])!;
-        var differentLengths = (bool)areEquivalentEnumerables.Invoke(null,
-            [new[] { "a" }, new[] { "a", "b" }])!;
+        var updatedRaw = new ConfigurationBuilder()
+            .AddInMemoryCollection(new Dictionary<string, string?>
+            {
+                ["Feature:Enabled"] = "true"
+            })
+            .Build()
+            .UpdateConfiguration(new
+            {
+                Feature = new
+                {
+                    Threshold = 3
+                }
+            });
 
         Assert.Multiple(() =>
         {
-            Assert.That(mergeableProperties, Does.Contain(nameof(IndexerConfig.Name)));
-            Assert.That(mergeableProperties, Does.Not.Contain("Item"));
-            Assert.That(equalEnumerables, Is.True);
-            Assert.That(differentEnumerables, Is.False);
-            Assert.That(differentLengths, Is.False);
+            Assert.That(updatedTyped.Name, Is.EqualTo("existing"));
+            Assert.That(updatedTyped.TimeoutSeconds, Is.EqualTo(5));
+            Assert.That(updatedTyped.Tags, Is.EqualTo(new[] { "one" }));
+            Assert.That(updatedRaw["Feature:Enabled"], Is.EqualTo("true"));
+            Assert.That(updatedRaw["Feature:Threshold"], Is.EqualTo("3"));
         });
     }
 
@@ -253,16 +259,4 @@ public class ConfigurationMutationExtensionsTests
         public int Count { get; set; }
     }
 
-    private sealed class IndexerConfig
-    {
-        public string Name { get; set; } = string.Empty;
-
-        public string this[int index]
-        {
-            get => index.ToString();
-            set
-            {
-            }
-        }
-    }
 }

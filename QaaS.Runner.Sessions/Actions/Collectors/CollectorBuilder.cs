@@ -1,5 +1,6 @@
 using System.ComponentModel;
 using System.ComponentModel.DataAnnotations;
+using QaaS.Framework.Configurations;
 using QaaS.Framework.Protocols.ConfigurationObjects;
 using QaaS.Framework.Protocols.ConfigurationObjects.Prometheus;
 using QaaS.Framework.Protocols.Protocols.Factories;
@@ -111,7 +112,17 @@ public class CollectorBuilder
     {
         var currentConfig = ReadConfiguration() ??
                             throw new InvalidOperationException("Collector configuration is not set");
-        return Configure(currentConfig.UpdateConfiguration(config));
+        return Configure(ConfigurationUpdateExtensions.UpdateConfiguration(currentConfig, config));
+    }
+
+    /// <summary>
+    /// Updates the collector configuration from an object-shaped patch while preserving omitted fields.
+    /// </summary>
+    public CollectorBuilder UpdateConfiguration(object configuration)
+    {
+        var currentConfig = ReadConfiguration() ??
+                            throw new InvalidOperationException("Collector configuration is not set");
+        return Configure(ConfigurationUpdateExtensions.UpdateConfiguration(currentConfig, configuration));
     }
 
     /// <summary>

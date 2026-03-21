@@ -1,5 +1,6 @@
 ﻿using System.ComponentModel;
 using System.ComponentModel.DataAnnotations;
+using QaaS.Framework.Configurations;
 using QaaS.Framework.SDK.ContextObjects;
 using QaaS.Framework.SDK.Extensions;
 using Qaas.Mocker.CommunicationObjects.ConfigurationObjects.Command;
@@ -124,6 +125,14 @@ public class MockerCommandBuilder
     }
 
     /// <summary>
+    /// Compatibility alias for <see cref="CreateConfiguration" />.
+    /// </summary>
+    public MockerCommandBuilder Create(MockerCommandConfig command)
+    {
+        return CreateConfiguration(command);
+    }
+
+    /// <summary>
     /// Returns the currently configured mocker command configuration, if any.
     /// </summary>
     public MockerCommandConfig? ReadConfiguration()
@@ -136,8 +145,9 @@ public class MockerCommandBuilder
     /// </summary>
     public MockerCommandBuilder UpdateConfiguration(Func<MockerCommandConfig, MockerCommandConfig> update)
     {
-        Command = update(ReadConfiguration() ?? throw new InvalidOperationException("Command configuration is not set"));
-        return this;
+        var currentConfig = ReadConfiguration() ??
+                            throw new InvalidOperationException("Command configuration is not set");
+        return UpdateConfiguration(update(currentConfig));
     }
 
     /// <summary>
@@ -147,7 +157,18 @@ public class MockerCommandBuilder
     {
         var currentConfig = ReadConfiguration() ??
                             throw new InvalidOperationException("Command configuration is not set");
-        Command = currentConfig.UpdateConfiguration(command);
+        Command = ConfigurationUpdateExtensions.UpdateConfiguration(currentConfig, command);
+        return this;
+    }
+
+    /// <summary>
+    /// Updates the mocker command configuration from an object-shaped patch while preserving omitted fields.
+    /// </summary>
+    public MockerCommandBuilder UpdateConfiguration(object configuration)
+    {
+        var currentConfig = ReadConfiguration() ??
+                            throw new InvalidOperationException("Command configuration is not set");
+        Command = ConfigurationUpdateExtensions.UpdateConfiguration(currentConfig, configuration);
         return this;
     }
 
