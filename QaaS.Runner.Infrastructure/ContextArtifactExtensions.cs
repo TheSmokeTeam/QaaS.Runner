@@ -14,6 +14,7 @@ public static class ContextArtifactExtensions
     private const string ScopedArtifactsKey = "Scoped";
     private const string RenderedTemplateKey = "RenderedTemplate";
     private const string SessionLogsKey = "SessionLogs";
+    private static readonly ConditionalWeakTable<Context, object> SessionLogStoreLocks = new();
 
     /// <summary>
     /// Saves the rendered runner configuration template for the current execution scope.
@@ -80,14 +81,23 @@ public static class ContextArtifactExtensions
 
     private static ConcurrentDictionary<string, ConcurrentQueue<string>> GetOrCreateSessionLogStore(Context context)
     {
-        if (TryGetSessionLogStore(context, GetSessionLogsPath(context), out var existingStore))
+        var sessionLogsPath = GetSessionLogsPath(context);
+        if (TryGetSessionLogStore(context, sessionLogsPath, out var existingStore))
         {
             return existingStore;
         }
 
-        var newStore = new ConcurrentDictionary<string, ConcurrentQueue<string>>(StringComparer.Ordinal);
-        context.InsertValueIntoGlobalDictionary(GetSessionLogsPath(context), newStore);
-        return newStore;
+        lock (SessionLogStoreLocks.GetValue(context, _ => new object()))
+        {
+            if (TryGetSessionLogStore(context, sessionLogsPath, out existingStore))
+            {
+                return existingStore;
+            }
+
+            var newStore = new ConcurrentDictionary<string, ConcurrentQueue<string>>(StringComparer.Ordinal);
+            context.InsertValueIntoGlobalDictionary(sessionLogsPath, newStore);
+            return newStore;
+        }
     }
 
     private static bool TryGetSessionLogStore(Context context, List<string> path,

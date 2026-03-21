@@ -1,6 +1,9 @@
 using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
+using System.Linq;
+using System.Threading;
+using System.Threading.Tasks;
 using QaaS.Framework.SDK.ContextObjects;
 using NUnit.Framework;
 
@@ -124,6 +127,37 @@ public class ContextArtifactExtensionsTests
             Assert.That(context.GetSessionLog("session-a"), Does.Contain("second-line"));
             Assert.That(storedStore, Is.SameAs(existingStore));
         });
+    }
+
+    [Test]
+    public async Task AppendSessionLog_WhenScopedStoreIsCreatedConcurrently_PreservesAllEntries()
+    {
+        const int concurrentWrites = 32;
+        var context = CreateContext(new Dictionary<string, object?>(), "exec-a", "case-a");
+        using var releaseWrites = new ManualResetEventSlim(false);
+
+        var appendTasks = Enumerable.Range(0, concurrentWrites)
+            .Select(index => Task.Run(() =>
+            {
+                releaseWrites.Wait();
+                context.AppendSessionLog("session-a", $"line-{index}");
+            }))
+            .ToArray();
+
+        releaseWrites.Set();
+        await Task.WhenAll(appendTasks);
+
+        var sessionLog = context.GetSessionLog("session-a");
+        var capturedLines = sessionLog?
+            .Split(Environment.NewLine, StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+            .OrderBy(line => line, StringComparer.Ordinal)
+            .ToArray();
+        var expectedLines = Enumerable.Range(0, concurrentWrites)
+            .Select(index => $"line-{index}")
+            .OrderBy(line => line, StringComparer.Ordinal)
+            .ToArray();
+
+        Assert.That(capturedLines, Is.EqualTo(expectedLines));
     }
 
     [Test]
