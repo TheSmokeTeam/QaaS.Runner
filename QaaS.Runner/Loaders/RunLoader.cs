@@ -2,6 +2,7 @@ using System.IO.Abstractions;
 using System.Text.RegularExpressions;
 using Autofac;
 using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Logging;
 using QaaS.Framework.Configurations;
 using QaaS.Framework.Executions.Loaders;
 using QaaS.Framework.SDK.ContextObjects;
@@ -26,8 +27,9 @@ public class RunLoader<TRunner, TOptions> : BaseLoader<TOptions, TRunner>
     private const uint HttpClientTimeoutSeconds = 100;
     private readonly IFileSystem _fileSystem = new FileSystem();
     private readonly IJfrogArtifactoryHelper _jfrogArtifactoryHelper = new JfrogArtifactoryHelper();
-
     private readonly ILifetimeScope _runScope;
+    private readonly Lazy<IReadOnlyList<IExecutionBuilderConfigurator>> _executionBuilderConfigurators;
+    private bool _missingConfigurationFileWarningLogged;
 
     /// <summary>
     /// Creates the runner scope used later for setup/teardown services such as Allure cleanup/serving.
@@ -37,6 +39,8 @@ public class RunLoader<TRunner, TOptions> : BaseLoader<TOptions, TRunner>
         executionId)
     {
         _runScope = Bootstrap.CreateRunnerScope();
+        _executionBuilderConfigurators = new Lazy<IReadOnlyList<IExecutionBuilderConfigurator>>(
+            DiscoverExecutionBuilderConfigurators);
     }
 
     /// <summary>
@@ -50,7 +54,8 @@ public class RunLoader<TRunner, TOptions> : BaseLoader<TOptions, TRunner>
             Constants.SupportedReferenceLists, Constants.SupportedUniqueIdsPathRegexes);
         contextBuilder.SetLogger(Logger);
         contextBuilder.SetExecutionId(executionId);
-        contextBuilder.SetConfigurationFile(Options.ConfigurationFile!);
+        if (ShouldLoadConfigurationFile())
+            contextBuilder.SetConfigurationFile(Options.ConfigurationFile!);
         contextBuilder.SetCurrentRunningSessions(
             new RunningSessions(new Dictionary<string, RunningSessionData<object, object>>()));
         foreach (var overwriteFile in Options.OverwriteFiles)
@@ -148,6 +153,15 @@ public class RunLoader<TRunner, TOptions> : BaseLoader<TOptions, TRunner>
     {
         var runBuilder = new ExecutionBuilder(context, Options.GetExecutionType(), Options.SessionNamesToRun,
             Options.SessionCategoriesToRun, Options.AssertionNamesToRun, Options.AssertionCategoriesToRun);
+
+        foreach (var configurator in _executionBuilderConfigurators.Value)
+        {
+            Logger.LogDebug(
+                "Applying runner execution configurator {ConfiguratorType}",
+                configurator.GetType().FullName);
+            configurator.Configure(runBuilder);
+        }
+
         return runBuilder;
     }
 
@@ -172,5 +186,37 @@ public class RunLoader<TRunner, TOptions> : BaseLoader<TOptions, TRunner>
             Options is AssertableOptions assertableOptions2 && assertableOptions2.AutoServeTestResults);
         runner.ExitProcessOnCompletion = !Options.NoProcessExit;
         return runner;
+    }
+
+    protected virtual IReadOnlyList<IExecutionBuilderConfigurator> DiscoverExecutionBuilderConfigurators()
+    {
+        return ExecutionBuilderConfiguratorLoader.Load(Logger);
+    }
+
+    private bool ShouldLoadConfigurationFile()
+    {
+        if (string.IsNullOrWhiteSpace(Options.ConfigurationFile))
+            return false;
+
+        if (PathUtils.IsPathHttpUrl(Options.ConfigurationFile))
+            return true;
+
+        var configurationFilePath = Path.Combine(Environment.CurrentDirectory, Options.ConfigurationFile);
+        if (File.Exists(configurationFilePath))
+            return true;
+
+        if (_executionBuilderConfigurators.Value.Count == 0)
+            return true;
+
+        if (!_missingConfigurationFileWarningLogged)
+        {
+            Logger.LogWarning(
+                "Configuration file {ConfigurationFile} was not found. Continuing with {ConfiguratorCount} discovered code configurator(s).",
+                Options.ConfigurationFile,
+                _executionBuilderConfigurators.Value.Count);
+            _missingConfigurationFileWarningLogged = true;
+        }
+
+        return false;
     }
 }
