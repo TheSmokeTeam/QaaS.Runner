@@ -26,6 +26,10 @@ public partial class SessionBuilder
         "The stage of the session. Sessions with the same stage runs together. stage defaultly gets the index of the session in session list ")]
     internal int? Stage { get; set; }
 
+    [Description(
+        "Optional stage number that decides when the runner waits for this session to complete. " +
+        "If omitted, the session becomes visible only after its own stage completes. " +
+        "If set, the runner defers waiting until the configured future stage is reached.")]
     internal int? RunUntilStage { get; set; }
 
     [Description("The category of the session, you can filter which categories to run using the -I flag")]
@@ -83,5 +87,8 @@ public partial class SessionBuilder
         "redis api to act specific actions")]
     internal MockerCommandBuilder[]? MockerCommands { get; set; } = [];
 
+    [Description(
+        "Optional per-stage configuration for the session's internal action stages. " +
+        "Use this to override timing around a specific stage number without changing the action order.")]
     internal StageConfig[] Stages { get; set; } = [];
 }
