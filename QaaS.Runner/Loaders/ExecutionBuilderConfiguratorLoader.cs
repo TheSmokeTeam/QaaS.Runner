@@ -7,14 +7,31 @@ internal static class ExecutionBuilderConfiguratorLoader
 {
     public static IReadOnlyList<IExecutionBuilderConfigurator> Load(ILogger logger)
     {
-        return GetCandidateAssemblies()
-            .SelectMany(GetLoadableTypes)
-            .Where(type => typeof(IExecutionBuilderConfigurator).IsAssignableFrom(type) &&
-                           type is { IsAbstract: false, IsInterface: false } &&
-                           (type.IsPublic || type.IsNestedPublic))
+        return Load(logger, Assembly.GetEntryAssembly(), GetCandidateAssemblies());
+    }
+
+    internal static IReadOnlyList<IExecutionBuilderConfigurator> Load(
+        ILogger logger,
+        Assembly? entryAssembly,
+        IEnumerable<Assembly> candidateAssemblies)
+    {
+        return Load(
+            logger,
+            entryAssembly,
+            candidateAssemblies.SelectMany(GetLoadableTypes));
+    }
+
+    internal static IReadOnlyList<IExecutionBuilderConfigurator> Load(
+        ILogger logger,
+        Assembly? entryAssembly,
+        IEnumerable<Type> candidateTypes)
+    {
+        return candidateTypes
+            .Where(type => IsConfiguratorCandidate(type, entryAssembly))
             .Distinct()
             .OrderBy(type => type.FullName, StringComparer.Ordinal)
-            .Select(type => CreateConfigurator(type, logger))
+            .Select(type => TryCreateConfigurator(type, entryAssembly, logger))
+            .OfType<IExecutionBuilderConfigurator>()
             .ToArray();
     }
 
@@ -70,20 +87,57 @@ internal static class ExecutionBuilderConfiguratorLoader
         }
     }
 
-    private static IExecutionBuilderConfigurator CreateConfigurator(Type configuratorType, ILogger logger)
+    private static bool IsConfiguratorCandidate(Type configuratorType, Assembly? entryAssembly)
     {
+        if (!typeof(IExecutionBuilderConfigurator).IsAssignableFrom(configuratorType) ||
+            configuratorType is { IsAbstract: true, IsInterface: true } ||
+            configuratorType.ContainsGenericParameters)
+        {
+            return false;
+        }
+
+        if (configuratorType.Assembly == entryAssembly)
+        {
+            return configuratorType.IsPublic ||
+                   configuratorType.IsNotPublic ||
+                   configuratorType.IsNestedPublic ||
+                   configuratorType.IsNestedAssembly ||
+                   configuratorType.IsNestedFamORAssem ||
+                   configuratorType.IsNestedFamANDAssem;
+        }
+
+        return configuratorType.IsPublic || configuratorType.IsNestedPublic;
+    }
+
+    private static IExecutionBuilderConfigurator? TryCreateConfigurator(
+        Type configuratorType,
+        Assembly? entryAssembly,
+        ILogger logger)
+    {
+        var allowNonPublicConstructor = configuratorType.Assembly == entryAssembly;
+
         try
         {
-            return (IExecutionBuilderConfigurator)(Activator.CreateInstance(configuratorType) ??
+            return (IExecutionBuilderConfigurator)(Activator.CreateInstance(
+                                                       configuratorType,
+                                                       allowNonPublicConstructor) ??
                                                    throw new InvalidOperationException(
                                                        $"Could not create runner execution configurator '{configuratorType.FullName}'."));
         }
         catch (Exception exception)
         {
-            logger.LogError(exception,
-                "Failed to create runner execution configurator {ConfiguratorType}",
+            if (configuratorType.Assembly == entryAssembly)
+            {
+                logger.LogError(exception,
+                    "Failed to create runner execution configurator {ConfiguratorType}",
+                    configuratorType.FullName);
+                throw;
+            }
+
+            logger.LogWarning(exception,
+                "Skipping runner execution configurator {ConfiguratorType} because it could not be created.",
                 configuratorType.FullName);
-            throw;
+            return null;
         }
     }
 }
