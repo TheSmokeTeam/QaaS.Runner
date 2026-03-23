@@ -4,6 +4,7 @@ This file is generated automatically from CI from git history.
 
 ## Unreleased
 
+- docs(changelog): add automated changelog
 - docs(runner): annotate public configuration functions
 
 ## 4.1.1-alpha.1 - 2026-03-22
