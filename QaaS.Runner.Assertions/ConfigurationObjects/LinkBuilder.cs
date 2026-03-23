@@ -1,4 +1,4 @@
-﻿using System.ComponentModel;
+using System.ComponentModel;
 using System.Runtime.CompilerServices;
 using QaaS.Framework.Configurations;
 using QaaS.Runner.Assertions.ConfigurationObjects.LinkConfigs;
@@ -26,8 +26,12 @@ public class LinkBuilder
     internal GrafanaLinkConfig? Grafana { get; set; }
 
     /// <summary>
-    /// Sets the display name used for the generated link.
+    /// Sets the name used for the current Runner link builder instance.
     /// </summary>
+    /// <remarks>
+    /// Use this method when working with the documented Runner link builder API surface in code. The change is stored on the current builder instance and is consumed by later build, validation, or execution steps.
+    /// </remarks>
+    /// <qaas-docs group="Configuration as Code" subgroup="Links" />
     public LinkBuilder Named(string name)
     {
         Name = name;
@@ -35,24 +39,36 @@ public class LinkBuilder
     }
 
     /// <summary>
-    /// Compatibility alias for <see cref="CreateConfiguration" />.
+    /// Sets the configuration currently stored on the Runner link builder instance.
     /// </summary>
+    /// <remarks>
+    /// Use this method when working with the documented Runner link builder API surface in code. The change is stored on the current builder instance and is consumed by later build, validation, or execution steps.
+    /// </remarks>
+    /// <qaas-docs group="Configuration as Code" subgroup="Links" />
     public LinkBuilder Create(ILinkConfig config)
     {
         return CreateConfiguration(config);
     }
 
     /// <summary>
-    /// Sets the configured link source.
+    /// Sets the configuration currently stored on the Runner link builder instance.
     /// </summary>
+    /// <remarks>
+    /// Use this method when working with the documented Runner link builder API surface in code. The change is stored on the current builder instance and is consumed by later build, validation, or execution steps.
+    /// </remarks>
+    /// <qaas-docs group="Configuration as Code" subgroup="Links" />
     public LinkBuilder CreateConfiguration(ILinkConfig config)
     {
         return Configure(config);
     }
 
     /// <summary>
-    /// Returns the currently configured link source, if any.
+    /// Returns the configuration currently stored on the Runner link builder instance.
     /// </summary>
+    /// <remarks>
+    /// Use this method when working with the documented Runner link builder API surface in code. Use it to inspect the current configured state without rebuilding the surrounding collection or runtime object graph.
+    /// </remarks>
+    /// <qaas-docs group="Configuration as Code" subgroup="Links" />
     public ILinkConfig? ReadConfiguration()
     {
         if (Kibana != null)
@@ -69,8 +85,12 @@ public class LinkBuilder
     }
 
     /// <summary>
-    /// Applies a computed partial update to the currently configured link config while preserving omitted fields.
+    /// Updates the configuration currently stored on the Runner link builder instance.
     /// </summary>
+    /// <remarks>
+    /// Use this method when working with the documented Runner link builder API surface in code. The change is stored on the current builder instance and is consumed by later build, validation, or execution steps.
+    /// </remarks>
+    /// <qaas-docs group="Configuration as Code" subgroup="Links" />
     public LinkBuilder UpdateConfiguration(Func<ILinkConfig, ILinkConfig> update)
     {
         var currentConfig = ReadConfiguration() ??
@@ -79,8 +99,12 @@ public class LinkBuilder
     }
 
     /// <summary>
-    /// Updates the configured link config by merging same-type values and replacing the current type when needed.
+    /// Updates the configuration currently stored on the Runner link builder instance.
     /// </summary>
+    /// <remarks>
+    /// Use this method when working with the documented Runner link builder API surface in code. The change is stored on the current builder instance and is consumed by later build, validation, or execution steps.
+    /// </remarks>
+    /// <qaas-docs group="Configuration as Code" subgroup="Links" />
     public LinkBuilder UpdateConfiguration(ILinkConfig config)
     {
         var currentConfig = ReadConfiguration() ??
@@ -89,8 +113,12 @@ public class LinkBuilder
     }
 
     /// <summary>
-    /// Updates the configured link config from an object-shaped patch while preserving omitted fields.
+    /// Updates the configuration currently stored on the Runner link builder instance.
     /// </summary>
+    /// <remarks>
+    /// Use this method when working with the documented Runner link builder API surface in code. The change is stored on the current builder instance and is consumed by later build, validation, or execution steps.
+    /// </remarks>
+    /// <qaas-docs group="Configuration as Code" subgroup="Links" />
     public LinkBuilder UpdateConfiguration(object configuration)
     {
         var currentConfig = ReadConfiguration() ??
@@ -99,8 +127,12 @@ public class LinkBuilder
     }
 
     /// <summary>
-    /// Clears the configured link source.
+    /// Clears the configuration currently stored on the Runner link builder instance.
     /// </summary>
+    /// <remarks>
+    /// Use this method when working with the documented Runner link builder API surface in code. The change is stored on the current builder instance and is consumed by later build, validation, or execution steps.
+    /// </remarks>
+    /// <qaas-docs group="Configuration as Code" subgroup="Links" />
     public LinkBuilder DeleteConfiguration()
     {
         return Reset();
@@ -115,8 +147,12 @@ public class LinkBuilder
     }
 
     /// <summary>
-    /// Replaces the current link source with the provided configuration type.
+    /// Sets the configuration currently stored on the Runner link builder instance.
     /// </summary>
+    /// <remarks>
+    /// Use this method when working with the documented Runner link builder API surface in code. The change is stored on the current builder instance and is consumed by later build, validation, or execution steps.
+    /// </remarks>
+    /// <qaas-docs group="Configuration as Code" subgroup="Links" />
     public LinkBuilder Configure(ILinkConfig config)
     {
         Reset();

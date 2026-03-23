@@ -77,54 +77,117 @@ public class TransactionBuilder
 
     [Description("Invokes a Grpc Method")] internal GrpcTransactorConfig? Grpc { get; set; }
 
+    /// <summary>
+    /// Sets the name used for the current Runner transaction builder instance.
+    /// </summary>
+    /// <remarks>
+    /// Use this method when working with the documented Runner transaction builder API surface in code. The change is stored on the current builder instance and is consumed by later build, validation, or execution steps.
+    /// </remarks>
+    /// <qaas-docs group="Configuration as Code" subgroup="Transactions" />
     public TransactionBuilder Named(string name)
     {
         Name = name;
         return this;
     }
 
+    /// <summary>
+    /// Sets the stage used by the current Runner transaction builder instance.
+    /// </summary>
+    /// <remarks>
+    /// Use this method when working with the documented Runner transaction builder API surface in code. The change is stored on the current builder instance and is consumed by later build, validation, or execution steps.
+    /// </remarks>
+    /// <qaas-docs group="Configuration as Code" subgroup="Transactions" />
     public TransactionBuilder AtStage(int stage)
     {
         Stage = stage;
         return this;
     }
 
+    /// <summary>
+    /// Configures timeout on the current Runner transaction builder instance.
+    /// </summary>
+    /// <remarks>
+    /// Use this method when working with the documented Runner transaction builder API surface in code. The change is stored on the current builder instance and is consumed by later build, validation, or execution steps.
+    /// </remarks>
+    /// <qaas-docs group="Configuration as Code" subgroup="Transactions" />
     public TransactionBuilder WithTimeout(int timeoutMs)
     {
         TimeoutMs = timeoutMs;
         return this;
     }
 
+    /// <summary>
+    /// Sets the input data filter used by the transaction.
+    /// </summary>
+    /// <remarks>
+    /// Use this method when working with the documented Runner transaction builder API surface in code. The change is stored on the current builder instance and is consumed by later build, validation, or execution steps.
+    /// </remarks>
+    /// <qaas-docs group="Configuration as Code" subgroup="Transactions" />
     public TransactionBuilder FilterInputData(DataFilter dataFilter)
     {
         InputDataFilter = dataFilter;
         return this;
     }
 
+    /// <summary>
+    /// Sets the output data filter used by the transaction.
+    /// </summary>
+    /// <remarks>
+    /// Use this method when working with the documented Runner transaction builder API surface in code. The change is stored on the current builder instance and is consumed by later build, validation, or execution steps.
+    /// </remarks>
+    /// <qaas-docs group="Configuration as Code" subgroup="Transactions" />
     public TransactionBuilder FilterOutputData(DataFilter dataFilter)
     {
         OutputDataFilter = dataFilter;
         return this;
     }
 
+    /// <summary>
+    /// Sets the deserializer configuration used by the current Runner transaction builder instance.
+    /// </summary>
+    /// <remarks>
+    /// Use this method when working with the documented Runner transaction builder API surface in code. The change is stored on the current builder instance and is consumed by later build, validation, or execution steps.
+    /// </remarks>
+    /// <qaas-docs group="Configuration as Code" subgroup="Transactions" />
     public TransactionBuilder WithDeserializer(DeserializeConfig deserializeConfig)
     {
         OutputDeserialize = deserializeConfig;
         return this;
     }
 
+    /// <summary>
+    /// Sets the serializer configuration used by the current Runner transaction builder instance.
+    /// </summary>
+    /// <remarks>
+    /// Use this method when working with the documented Runner transaction builder API surface in code. The change is stored on the current builder instance and is consumed by later build, validation, or execution steps.
+    /// </remarks>
+    /// <qaas-docs group="Configuration as Code" subgroup="Transactions" />
     public TransactionBuilder WithSerializer(SerializeConfig serializeConfig)
     {
         InputSerialize = serializeConfig;
         return this;
     }
 
+    /// <summary>
+    /// Sets how many iterations the transaction should execute.
+    /// </summary>
+    /// <remarks>
+    /// Use this method when working with the documented Runner transaction builder API surface in code. The change is stored on the current builder instance and is consumed by later build, validation, or execution steps.
+    /// </remarks>
+    /// <qaas-docs group="Configuration as Code" subgroup="Transactions" />
     public TransactionBuilder WithIterations(int iterations)
     {
         Iterations = iterations;
         return this;
     }
 
+    /// <summary>
+    /// Adds the supplied data source to the current Runner transaction builder instance.
+    /// </summary>
+    /// <remarks>
+    /// Use this method when working with the documented Runner transaction builder API surface in code. The change is stored on the current builder instance and is consumed by later build, validation, or execution steps.
+    /// </remarks>
+    /// <qaas-docs group="Configuration as Code" subgroup="Transactions" />
     public TransactionBuilder AddDataSource(string dataSourceName)
     {
         var dataSourceNamesList = DataSourceNames?.ToList() ?? [];
@@ -133,11 +196,25 @@ public class TransactionBuilder
         return this;
     }
 
+    /// <summary>
+    /// Creates or adds the configured data source entry on the current Runner transaction builder instance.
+    /// </summary>
+    /// <remarks>
+    /// Use this method when working with the documented Runner transaction builder API surface in code. The change is stored on the current builder instance and is consumed by later build, validation, or execution steps.
+    /// </remarks>
+    /// <qaas-docs group="Configuration as Code" subgroup="Transactions" />
     public TransactionBuilder CreateDataSource(string dataSourceName)
     {
         return AddDataSource(dataSourceName);
     }
 
+    /// <summary>
+    /// Adds the supplied data source pattern to the current Runner transaction builder instance.
+    /// </summary>
+    /// <remarks>
+    /// Use this method when working with the documented Runner transaction builder API surface in code. The change is stored on the current builder instance and is consumed by later build, validation, or execution steps.
+    /// </remarks>
+    /// <qaas-docs group="Configuration as Code" subgroup="Transactions" />
     public TransactionBuilder AddDataSourcePattern(string dataSourcePattern)
     {
         var dataSourcePatternsList = DataSourcePatterns?.ToList() ?? [];
@@ -146,23 +223,51 @@ public class TransactionBuilder
         return this;
     }
 
+    /// <summary>
+    /// Creates or adds the configured data source pattern entry on the current Runner transaction builder instance.
+    /// </summary>
+    /// <remarks>
+    /// Use this method when working with the documented Runner transaction builder API surface in code. The change is stored on the current builder instance and is consumed by later build, validation, or execution steps.
+    /// </remarks>
+    /// <qaas-docs group="Configuration as Code" subgroup="Transactions" />
     public TransactionBuilder CreateDataSourcePattern(string dataSourcePattern)
     {
         return AddDataSourcePattern(dataSourcePattern);
     }
 
+    /// <summary>
+    /// Marks the transaction to execute continuously in loop mode.
+    /// </summary>
+    /// <remarks>
+    /// Use this method when working with the documented Runner transaction builder API surface in code. The change is stored on the current builder instance and is consumed by later build, validation, or execution steps.
+    /// </remarks>
+    /// <qaas-docs group="Configuration as Code" subgroup="Transactions" />
     public TransactionBuilder InLoops()
     {
         Loop = true;
         return this;
     }
 
+    /// <summary>
+    /// Sets the delay applied between transaction iterations.
+    /// </summary>
+    /// <remarks>
+    /// Use this method when working with the documented Runner transaction builder API surface in code. The change is stored on the current builder instance and is consumed by later build, validation, or execution steps.
+    /// </remarks>
+    /// <qaas-docs group="Configuration as Code" subgroup="Transactions" />
     public TransactionBuilder WithSleep(ulong sleepTimeMs)
     {
         SleepTimeMs = sleepTimeMs;
         return this;
     }
 
+    /// <summary>
+    /// Adds the supplied policy to the current Runner transaction builder instance.
+    /// </summary>
+    /// <remarks>
+    /// Use this method when working with the documented Runner transaction builder API surface in code. The change is stored on the current builder instance and is consumed by later build, validation, or execution steps.
+    /// </remarks>
+    /// <qaas-docs group="Configuration as Code" subgroup="Transactions" />
     public TransactionBuilder AddPolicy(PolicyBuilder policy)
     {
         var policies = Policies.ToList();
@@ -171,16 +276,37 @@ public class TransactionBuilder
         return this;
     }
 
+    /// <summary>
+    /// Creates or adds the configured policy entry on the current Runner transaction builder instance.
+    /// </summary>
+    /// <remarks>
+    /// Use this method when working with the documented Runner transaction builder API surface in code. The change is stored on the current builder instance and is consumed by later build, validation, or execution steps.
+    /// </remarks>
+    /// <qaas-docs group="Configuration as Code" subgroup="Transactions" />
     public TransactionBuilder CreatePolicy(PolicyBuilder policy)
     {
         return AddPolicy(policy);
     }
 
+    /// <summary>
+    /// Returns the configured policies currently stored on the Runner transaction builder instance.
+    /// </summary>
+    /// <remarks>
+    /// Use this method when working with the documented Runner transaction builder API surface in code. Use it to inspect the current configured state without rebuilding the surrounding collection or runtime object graph.
+    /// </remarks>
+    /// <qaas-docs group="Configuration as Code" subgroup="Transactions" />
     public IReadOnlyList<PolicyBuilder> ReadPolicies()
     {
         return Policies;
     }
 
+    /// <summary>
+    /// Updates the configured policy at the specified index on the current Runner transaction builder instance.
+    /// </summary>
+    /// <remarks>
+    /// Use this method when working with the documented Runner transaction builder API surface in code. The change is stored on the current builder instance and is consumed by later build, validation, or execution steps.
+    /// </remarks>
+    /// <qaas-docs group="Configuration as Code" subgroup="Transactions" />
     public TransactionBuilder UpdatePolicyAt(int index, PolicyBuilder policy)
     {
         if (index < 0 || index >= Policies.Length)
@@ -192,6 +318,13 @@ public class TransactionBuilder
         return this;
     }
 
+    /// <summary>
+    /// Removes the configured policy at the specified index from the current Runner transaction builder instance.
+    /// </summary>
+    /// <remarks>
+    /// Use this method when working with the documented Runner transaction builder API surface in code. The change is stored on the current builder instance and is consumed by later build, validation, or execution steps.
+    /// </remarks>
+    /// <qaas-docs group="Configuration as Code" subgroup="Transactions" />
     public TransactionBuilder DeletePolicyAt(int index)
     {
         if (index < 0 || index >= Policies.Length)
@@ -203,11 +336,25 @@ public class TransactionBuilder
         return this;
     }
 
+    /// <summary>
+    /// Returns the configured data sources currently stored on the Runner transaction builder instance.
+    /// </summary>
+    /// <remarks>
+    /// Use this method when working with the documented Runner transaction builder API surface in code. Use it to inspect the current configured state without rebuilding the surrounding collection or runtime object graph.
+    /// </remarks>
+    /// <qaas-docs group="Configuration as Code" subgroup="Transactions" />
     public IReadOnlyList<string> ReadDataSources()
     {
         return DataSourceNames ?? [];
     }
 
+    /// <summary>
+    /// Updates the configured data source stored on the current Runner transaction builder instance.
+    /// </summary>
+    /// <remarks>
+    /// Use this method when working with the documented Runner transaction builder API surface in code. The change is stored on the current builder instance and is consumed by later build, validation, or execution steps.
+    /// </remarks>
+    /// <qaas-docs group="Configuration as Code" subgroup="Transactions" />
     public TransactionBuilder UpdateDataSource(string existingValue, string newValue)
     {
         if (DataSourceNames == null)
@@ -224,17 +371,38 @@ public class TransactionBuilder
         return this;
     }
 
+    /// <summary>
+    /// Removes the configured data source from the current Runner transaction builder instance.
+    /// </summary>
+    /// <remarks>
+    /// Use this method when working with the documented Runner transaction builder API surface in code. The change is stored on the current builder instance and is consumed by later build, validation, or execution steps.
+    /// </remarks>
+    /// <qaas-docs group="Configuration as Code" subgroup="Transactions" />
     public TransactionBuilder DeleteDataSource(string dataSourceName)
     {
         DataSourceNames = DataSourceNames?.Where(value => value != dataSourceName).ToArray();
         return this;
     }
 
+    /// <summary>
+    /// Returns the configured data source patterns currently stored on the Runner transaction builder instance.
+    /// </summary>
+    /// <remarks>
+    /// Use this method when working with the documented Runner transaction builder API surface in code. Use it to inspect the current configured state without rebuilding the surrounding collection or runtime object graph.
+    /// </remarks>
+    /// <qaas-docs group="Configuration as Code" subgroup="Transactions" />
     public IReadOnlyList<string> ReadDataSourcePatterns()
     {
         return DataSourcePatterns ?? [];
     }
 
+    /// <summary>
+    /// Updates the configured data source pattern stored on the current Runner transaction builder instance.
+    /// </summary>
+    /// <remarks>
+    /// Use this method when working with the documented Runner transaction builder API surface in code. The change is stored on the current builder instance and is consumed by later build, validation, or execution steps.
+    /// </remarks>
+    /// <qaas-docs group="Configuration as Code" subgroup="Transactions" />
     public TransactionBuilder UpdateDataSourcePattern(string existingValue, string newValue)
     {
         if (DataSourcePatterns == null)
@@ -251,6 +419,13 @@ public class TransactionBuilder
         return this;
     }
 
+    /// <summary>
+    /// Removes the configured data source pattern from the current Runner transaction builder instance.
+    /// </summary>
+    /// <remarks>
+    /// Use this method when working with the documented Runner transaction builder API surface in code. The change is stored on the current builder instance and is consumed by later build, validation, or execution steps.
+    /// </remarks>
+    /// <qaas-docs group="Configuration as Code" subgroup="Transactions" />
     public TransactionBuilder DeleteDataSourcePattern(string dataSourcePattern)
     {
         DataSourcePatterns = DataSourcePatterns?.Where(value => value != dataSourcePattern).ToArray();
@@ -258,32 +433,48 @@ public class TransactionBuilder
     }
 
     /// <summary>
-    /// Compatibility alias for <see cref="Configure" /> that matches the configuration CRUD pattern used by other builders.
+    /// Sets the configuration currently stored on the Runner transaction builder instance.
     /// </summary>
+    /// <remarks>
+    /// Use this method when working with the documented Runner transaction builder API surface in code. The change is stored on the current builder instance and is consumed by later build, validation, or execution steps.
+    /// </remarks>
+    /// <qaas-docs group="Configuration as Code" subgroup="Transactions" />
     public TransactionBuilder CreateConfiguration(ITransactorConfig config)
     {
         return Configure(config);
     }
 
     /// <summary>
-    /// Compatibility alias for <see cref="CreateConfiguration" />.
+    /// Sets the configuration currently stored on the Runner transaction builder instance.
     /// </summary>
+    /// <remarks>
+    /// Use this method when working with the documented Runner transaction builder API surface in code. The change is stored on the current builder instance and is consumed by later build, validation, or execution steps.
+    /// </remarks>
+    /// <qaas-docs group="Configuration as Code" subgroup="Transactions" />
     public TransactionBuilder Create(ITransactorConfig config)
     {
         return CreateConfiguration(config);
     }
 
     /// <summary>
-    /// Returns the currently configured transactor source, if any.
+    /// Returns the configuration currently stored on the Runner transaction builder instance.
     /// </summary>
+    /// <remarks>
+    /// Use this method when working with the documented Runner transaction builder API surface in code. Use it to inspect the current configured state without rebuilding the surrounding collection or runtime object graph.
+    /// </remarks>
+    /// <qaas-docs group="Configuration as Code" subgroup="Transactions" />
     public ITransactorConfig? ReadConfiguration()
     {
         return (ITransactorConfig?)Http ?? Grpc;
     }
 
     /// <summary>
-    /// Applies a computed partial update to the current transaction configuration while preserving omitted fields.
+    /// Updates the configuration currently stored on the Runner transaction builder instance.
     /// </summary>
+    /// <remarks>
+    /// Use this method when working with the documented Runner transaction builder API surface in code. The change is stored on the current builder instance and is consumed by later build, validation, or execution steps.
+    /// </remarks>
+    /// <qaas-docs group="Configuration as Code" subgroup="Transactions" />
     public TransactionBuilder UpdateConfiguration(Func<ITransactorConfig, ITransactorConfig> update)
     {
         var currentConfig = ReadConfiguration() ??
@@ -292,8 +483,12 @@ public class TransactionBuilder
     }
 
     /// <summary>
-    /// Updates the transaction configuration by merging same-type values and replacing the current type when needed.
+    /// Updates the configuration currently stored on the Runner transaction builder instance.
     /// </summary>
+    /// <remarks>
+    /// Use this method when working with the documented Runner transaction builder API surface in code. The change is stored on the current builder instance and is consumed by later build, validation, or execution steps.
+    /// </remarks>
+    /// <qaas-docs group="Configuration as Code" subgroup="Transactions" />
     public TransactionBuilder UpdateConfiguration(ITransactorConfig config)
     {
         var currentConfig = ReadConfiguration() ??
@@ -302,8 +497,12 @@ public class TransactionBuilder
     }
 
     /// <summary>
-    /// Updates the transaction configuration from an object-shaped patch while preserving omitted fields.
+    /// Updates the configuration currently stored on the Runner transaction builder instance.
     /// </summary>
+    /// <remarks>
+    /// Use this method when working with the documented Runner transaction builder API surface in code. The change is stored on the current builder instance and is consumed by later build, validation, or execution steps.
+    /// </remarks>
+    /// <qaas-docs group="Configuration as Code" subgroup="Transactions" />
     public TransactionBuilder UpdateConfiguration(object configuration)
     {
         var currentConfig = ReadConfiguration() ??
@@ -312,8 +511,12 @@ public class TransactionBuilder
     }
 
     /// <summary>
-    /// Clears the configured transactor source.
+    /// Clears the configuration currently stored on the Runner transaction builder instance.
     /// </summary>
+    /// <remarks>
+    /// Use this method when working with the documented Runner transaction builder API surface in code. The change is stored on the current builder instance and is consumed by later build, validation, or execution steps.
+    /// </remarks>
+    /// <qaas-docs group="Configuration as Code" subgroup="Transactions" />
     public TransactionBuilder DeleteConfiguration()
     {
         return Reset();
@@ -327,8 +530,12 @@ public class TransactionBuilder
     }
 
     /// <summary>
-    /// Replaces the current transactor source with the provided configuration type.
+    /// Sets the configuration currently stored on the Runner transaction builder instance.
     /// </summary>
+    /// <remarks>
+    /// Use this method when working with the documented Runner transaction builder API surface in code. The change is stored on the current builder instance and is consumed by later build, validation, or execution steps.
+    /// </remarks>
+    /// <qaas-docs group="Configuration as Code" subgroup="Transactions" />
     public TransactionBuilder Configure(ITransactorConfig config)
     {
         Reset();

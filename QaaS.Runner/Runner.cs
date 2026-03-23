@@ -61,8 +61,12 @@ public class Runner : IRunner, IDisposable
     }
 
     /// <summary>
-    /// Runs the configured lifecycle and applies the resulting exit code to the current process policy.
+    /// Runs the configured lifecycle and applies the resulting exit code policy.
     /// </summary>
+    /// <remarks>
+    /// Call this when the current process should honor Runner exit behavior. If the caller needs to inspect the exit code without terminating the process, prefer RunAndGetExitCode().
+    /// </remarks>
+    /// <qaas-docs group="Runtime" subgroup="Runner" />
     public void Run()
     {
         var exitCode = RunAndGetExitCode();
@@ -70,9 +74,12 @@ public class Runner : IRunner, IDisposable
     }
 
     /// <summary>
-    /// Runs the configured lifecycle and returns the resulting exit code without terminating the current process.
+    /// Runs the configured lifecycle and returns the resulting exit code to the caller.
     /// </summary>
-    /// <returns>The aggregated exit code from the runner's executions.</returns>
+    /// <remarks>
+    /// Call this when the caller wants to control how the resulting exit code is handled instead of letting Runner apply its default process policy.
+    /// </remarks>
+    /// <qaas-docs group="Runtime" subgroup="Runner" />
     public int RunAndGetExitCode()
     {
         // Help/version/parse-only flows still return a Runner for API compatibility, but should stop here
@@ -218,8 +225,12 @@ public class Runner : IRunner, IDisposable
     }
 
     /// <summary>
-    /// Disposes the runner scope exactly once.
+    /// Releases the resources owned by the current Runner instance.
     /// </summary>
+    /// <remarks>
+    /// Dispose should be called exactly once when the host is no longer needed so scopes, loggers, and other runtime resources are released deterministically.
+    /// </remarks>
+    /// <qaas-docs group="Runtime" subgroup="Runner" />
     public virtual void Dispose()
     {
         if (_disposed)
