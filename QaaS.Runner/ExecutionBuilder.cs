@@ -66,7 +66,7 @@ public class ExecutionBuilder() : BaseExecutionBuilder<InternalContext, Executio
     [Description("List of all sessions to run. Sessions contain the actions" +
                  " performed against the tested system and its underlying infrastructure in order to receive" +
                  " response data from the tested system to assert on.")]
-    public SessionBuilder[]? Sessions { get; internal set; } = [];
+    internal SessionBuilder[]? Sessions { get; set; } = [];
 
     /// <summary>
     /// External storages qaas inner objects can be stored in or retrieved from when
@@ -76,7 +76,7 @@ public class ExecutionBuilder() : BaseExecutionBuilder<InternalContext, Executio
         "External storages qaas inner objects can be stored in or retrieved from when using " +
         "the `qaas act` (to create and store) or `qaas assert` (to retrieve and use) commands")]
 
-    public StorageBuilder[]? Storages { get; internal set; } = [];
+    internal StorageBuilder[]? Storages { get; set; } = [];
 
     /// <summary>
     /// The list of assertions performed on the sessions' results in order to decide the test's status,
@@ -86,7 +86,7 @@ public class ExecutionBuilder() : BaseExecutionBuilder<InternalContext, Executio
     [Description(
         "The list of assertions performed on the sessions' results in order to decide the test's status," +
         " each assertion produces a different test result.")]
-    public AssertionBuilder[]? Assertions { get; internal set; } = [];
+    internal AssertionBuilder[]? Assertions { get; set; } = [];
 
     /// <summary>
     /// The links generated on test results, used to view observability data outputted by the tested application.
@@ -95,13 +95,13 @@ public class ExecutionBuilder() : BaseExecutionBuilder<InternalContext, Executio
     [Description(
         "The links generated on test results, used to view observability data outputted by the tested application. " +
         "These links are generated per test result to be relevant specifically to that test and the time it ran at")]
-    public LinkBuilder[]? Links { get; internal set; } = [];
+    internal LinkBuilder[]? Links { get; set; } = [];
 
     /// <summary>
     /// The metadata for the tests' run
     /// </summary>
     [Description("The metadata for the tests' run")]
-    public MetaDataConfig? MetaData { get; internal set; }
+    internal MetaDataConfig? MetaData { get; set; }
 
     private ExecutionType Type { get; set; }
 
@@ -368,6 +368,11 @@ public class ExecutionBuilder() : BaseExecutionBuilder<InternalContext, Executio
     public IReadOnlyList<LinkBuilder> ReadLinks()
     {
         return Links ?? [];
+    }
+
+    public MetaDataConfig? ReadMetaData()
+    {
+        return MetaData;
     }
 
     public ExecutionBuilder UpdateLinkAt(int index, LinkBuilder linkBuilder)

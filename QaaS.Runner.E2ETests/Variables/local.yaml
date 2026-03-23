@@ -4,4 +4,4 @@ variables:
     Port: 5672
     Username: guest
     Password: guest
-    RoutingKey: /
+    RoutingKey: SomeRoutingKey

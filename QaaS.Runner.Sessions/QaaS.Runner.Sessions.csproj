@@ -30,4 +30,9 @@
         <None Include="..\README.md" Pack="true" PackagePath="\" Link="README.md" />
     </ItemGroup>
 
+    <ItemGroup>
+        <InternalsVisibleTo Include="QaaS.Runner.Tests" />
+        <InternalsVisibleTo Include="QaaS.Runner.Sessions.Tests" />
+    </ItemGroup>
+
 </Project>

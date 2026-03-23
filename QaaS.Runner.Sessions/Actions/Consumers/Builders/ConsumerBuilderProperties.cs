@@ -33,7 +33,7 @@ public partial class ConsumerBuilder
     internal int Stage { get; set; } = (int)OrderedActions.Consumers;
 
     [Description("List of policies to use when communicating with this action's protocol")]
-    public PolicyBuilder[] Policies { get; set; } = [];
+    internal PolicyBuilder[] Policies { get; set; } = [];
 
     [Description("Consumes messages from a rabbitmq")]
     internal RabbitMqReaderConfig? RabbitMq { get; set; }
