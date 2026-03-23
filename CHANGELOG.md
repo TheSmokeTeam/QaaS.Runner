@@ -5,7 +5,16 @@ This file is generated automatically from CI from git history.
 ## Unreleased
 
 - docs(changelog): add automated changelog
+- refactor(config): expose runner configuration getters
+- docs(cli): fix runner push-reference wording
+- chore(deps): update framework executions to 1.2.7
+- chore(deps): update framework executions to 1.2.6
 - docs(runner): annotate public configuration functions
+- fix(configuration): internalize runner builder configs
+- fix(runner): support internal configurator discovery
+- chore: consume framework 1.2.5-alpha.4 and comm objects 2.0.2-alpha.4
+- feat(runner): support discovered code configurators
+- docs(schema): document runner session stage fields
 
 ## 4.1.1-alpha.1 - 2026-03-22
 
