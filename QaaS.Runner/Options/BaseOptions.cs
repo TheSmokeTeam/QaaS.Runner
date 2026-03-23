@@ -73,7 +73,7 @@ The syntax to add a reference is:
 `-p KeyWordToReplace Path/To/Reference.yaml PathToReferenceOverridingFiles.yaml`
 
 To add multiple references you can invoke the -p flag multiple times or
- use a single -p flag but have the references seperated by the KeyWordToReplace:
+ use a single -p flag but have the references separated by the KeyWordToReplace:
 `-p KeyWordToReplace1 Reference1.yaml -p KeyWordToReplace2 Reference2.yaml`
 Or
 `-p KeyWordToReplace1 Reference1.yaml KeyWordToReplace2 Reference2.yaml`

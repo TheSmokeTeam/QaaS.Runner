@@ -1,3 +1,5 @@
+using System.ComponentModel;
+
 namespace QaaS.Runner.Sessions.Session.Builders;
 
 public class StageConfig
@@ -9,7 +11,10 @@ public class StageConfig
         TimeoutAfter = timeoutAfter;
     }
 
-    internal int StageNumber { get; set; }
-    internal int? TimeoutBefore { get; set; }
-    internal int? TimeoutAfter { get; set; }
+    [Description("The internal session stage number this configuration applies to.")]
+    public int StageNumber { get; internal set; }
+    [Description("Optional time in milliseconds to wait before starting this internal session stage.")]
+    public int? TimeoutBefore { get; internal set; }
+    [Description("Optional time in milliseconds to wait after this internal session stage completes.")]
+    public int? TimeoutAfter { get; internal set; }
 }

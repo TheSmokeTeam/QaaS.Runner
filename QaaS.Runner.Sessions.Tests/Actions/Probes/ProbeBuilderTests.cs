@@ -99,9 +99,9 @@ public class ProbeBuilderTests
     public void AddDataSourceFilters_When_Collections_Are_Null_Initializes_Them()
     {
         var builder = new ProbeBuilder();
-        typeof(ProbeBuilder).GetProperty("DataSourceNames", BindingFlags.Instance | BindingFlags.NonPublic)!
+        typeof(ProbeBuilder).GetProperty("DataSourceNames", BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic)!
             .SetValue(builder, null);
-        typeof(ProbeBuilder).GetProperty("DataSourcePatterns", BindingFlags.Instance | BindingFlags.NonPublic)!
+        typeof(ProbeBuilder).GetProperty("DataSourcePatterns", BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic)!
             .SetValue(builder, null);
 
         builder.AddDataSourceName("DataSource1")

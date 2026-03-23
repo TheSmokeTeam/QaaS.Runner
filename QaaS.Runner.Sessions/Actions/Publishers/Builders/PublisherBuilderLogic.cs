@@ -27,36 +27,78 @@ namespace QaaS.Runner.Sessions.Actions.Publishers.Builders;
 
 public partial class PublisherBuilder
 {
+    /// <summary>
+    /// Sets the name used for the current Runner publisher builder instance.
+    /// </summary>
+    /// <remarks>
+    /// Use this method when working with the documented Runner publisher builder API surface in code. The change is stored on the current builder instance and is consumed by later build, validation, or execution steps.
+    /// </remarks>
+    /// <qaas-docs group="Configuration as Code" subgroup="Publishers" />
     public PublisherBuilder Named(string name)
     {
         Name = name;
         return this;
     }
 
+    /// <summary>
+    /// Sets the stage used by the current Runner publisher builder instance.
+    /// </summary>
+    /// <remarks>
+    /// Use this method when working with the documented Runner publisher builder API surface in code. The change is stored on the current builder instance and is consumed by later build, validation, or execution steps.
+    /// </remarks>
+    /// <qaas-docs group="Configuration as Code" subgroup="Publishers" />
     public PublisherBuilder AtStage(int stage)
     {
         Stage = stage;
         return this;
     }
 
+    /// <summary>
+    /// Sets the data filter used by the current Runner publisher builder instance.
+    /// </summary>
+    /// <remarks>
+    /// Use this method when working with the documented Runner publisher builder API surface in code. The change is stored on the current builder instance and is consumed by later build, validation, or execution steps.
+    /// </remarks>
+    /// <qaas-docs group="Configuration as Code" subgroup="Publishers" />
     public PublisherBuilder FilterData(DataFilter dataFilter)
     {
         DataFilter = dataFilter;
         return this;
     }
 
+    /// <summary>
+    /// Sets the serializer configuration used by the current Runner publisher builder instance.
+    /// </summary>
+    /// <remarks>
+    /// Use this method when working with the documented Runner publisher builder API surface in code. The change is stored on the current builder instance and is consumed by later build, validation, or execution steps.
+    /// </remarks>
+    /// <qaas-docs group="Configuration as Code" subgroup="Publishers" />
     public PublisherBuilder WithSerializer(SerializeConfig serializeConfig)
     {
         Serialize = serializeConfig;
         return this;
     }
 
+    /// <summary>
+    /// Sets how many iterations the transaction should execute.
+    /// </summary>
+    /// <remarks>
+    /// Use this method when working with the documented Runner publisher builder API surface in code. The change is stored on the current builder instance and is consumed by later build, validation, or execution steps.
+    /// </remarks>
+    /// <qaas-docs group="Configuration as Code" subgroup="Publishers" />
     public PublisherBuilder WithIterations(int iterations)
     {
         Iterations = iterations;
         return this;
     }
 
+    /// <summary>
+    /// Adds the supplied data source to the current Runner publisher builder instance.
+    /// </summary>
+    /// <remarks>
+    /// Use this method when working with the documented Runner publisher builder API surface in code. The change is stored on the current builder instance and is consumed by later build, validation, or execution steps.
+    /// </remarks>
+    /// <qaas-docs group="Configuration as Code" subgroup="Publishers" />
     public PublisherBuilder AddDataSource(string dataSourceName)
     {
         var dataSourceNamesList = DataSourceNames?.ToList() ?? [];
@@ -65,16 +107,37 @@ public partial class PublisherBuilder
         return this;
     }
 
+    /// <summary>
+    /// Creates or adds the configured data source entry on the current Runner publisher builder instance.
+    /// </summary>
+    /// <remarks>
+    /// Use this method when working with the documented Runner publisher builder API surface in code. The change is stored on the current builder instance and is consumed by later build, validation, or execution steps.
+    /// </remarks>
+    /// <qaas-docs group="Configuration as Code" subgroup="Publishers" />
     public PublisherBuilder CreateDataSource(string dataSourceName)
     {
         return AddDataSource(dataSourceName);
     }
 
+    /// <summary>
+    /// Returns the configured data sources currently stored on the Runner publisher builder instance.
+    /// </summary>
+    /// <remarks>
+    /// Use this method when working with the documented Runner publisher builder API surface in code. Use it to inspect the current configured state without rebuilding the surrounding collection or runtime object graph.
+    /// </remarks>
+    /// <qaas-docs group="Configuration as Code" subgroup="Publishers" />
     public IReadOnlyList<string> ReadDataSources()
     {
         return DataSourceNames ?? [];
     }
 
+    /// <summary>
+    /// Updates the configured data source stored on the current Runner publisher builder instance.
+    /// </summary>
+    /// <remarks>
+    /// Use this method when working with the documented Runner publisher builder API surface in code. The change is stored on the current builder instance and is consumed by later build, validation, or execution steps.
+    /// </remarks>
+    /// <qaas-docs group="Configuration as Code" subgroup="Publishers" />
     public PublisherBuilder UpdateDataSource(string existingValue, string newValue)
     {
         if (DataSourceNames == null)
@@ -91,12 +154,26 @@ public partial class PublisherBuilder
         return this;
     }
 
+    /// <summary>
+    /// Removes the configured data source from the current Runner publisher builder instance.
+    /// </summary>
+    /// <remarks>
+    /// Use this method when working with the documented Runner publisher builder API surface in code. The change is stored on the current builder instance and is consumed by later build, validation, or execution steps.
+    /// </remarks>
+    /// <qaas-docs group="Configuration as Code" subgroup="Publishers" />
     public PublisherBuilder DeleteDataSource(string dataSourceName)
     {
         DataSourceNames = DataSourceNames?.Where(value => value != dataSourceName).ToArray();
         return this;
     }
 
+    /// <summary>
+    /// Adds the supplied data source pattern to the current Runner publisher builder instance.
+    /// </summary>
+    /// <remarks>
+    /// Use this method when working with the documented Runner publisher builder API surface in code. The change is stored on the current builder instance and is consumed by later build, validation, or execution steps.
+    /// </remarks>
+    /// <qaas-docs group="Configuration as Code" subgroup="Publishers" />
     public PublisherBuilder AddDataSourcePattern(string dataSourcePattern)
     {
         var dataSourcePatternsList = DataSourcePatterns?.ToList() ?? [];
@@ -105,16 +182,37 @@ public partial class PublisherBuilder
         return this;
     }
 
+    /// <summary>
+    /// Creates or adds the configured data source pattern entry on the current Runner publisher builder instance.
+    /// </summary>
+    /// <remarks>
+    /// Use this method when working with the documented Runner publisher builder API surface in code. The change is stored on the current builder instance and is consumed by later build, validation, or execution steps.
+    /// </remarks>
+    /// <qaas-docs group="Configuration as Code" subgroup="Publishers" />
     public PublisherBuilder CreateDataSourcePattern(string dataSourcePattern)
     {
         return AddDataSourcePattern(dataSourcePattern);
     }
 
+    /// <summary>
+    /// Returns the configured data source patterns currently stored on the Runner publisher builder instance.
+    /// </summary>
+    /// <remarks>
+    /// Use this method when working with the documented Runner publisher builder API surface in code. Use it to inspect the current configured state without rebuilding the surrounding collection or runtime object graph.
+    /// </remarks>
+    /// <qaas-docs group="Configuration as Code" subgroup="Publishers" />
     public IReadOnlyList<string> ReadDataSourcePatterns()
     {
         return DataSourcePatterns ?? [];
     }
 
+    /// <summary>
+    /// Updates the configured data source pattern stored on the current Runner publisher builder instance.
+    /// </summary>
+    /// <remarks>
+    /// Use this method when working with the documented Runner publisher builder API surface in code. The change is stored on the current builder instance and is consumed by later build, validation, or execution steps.
+    /// </remarks>
+    /// <qaas-docs group="Configuration as Code" subgroup="Publishers" />
     public PublisherBuilder UpdateDataSourcePattern(string existingValue, string newValue)
     {
         if (DataSourcePatterns == null)
@@ -131,30 +229,65 @@ public partial class PublisherBuilder
         return this;
     }
 
+    /// <summary>
+    /// Removes the configured data source pattern from the current Runner publisher builder instance.
+    /// </summary>
+    /// <remarks>
+    /// Use this method when working with the documented Runner publisher builder API surface in code. The change is stored on the current builder instance and is consumed by later build, validation, or execution steps.
+    /// </remarks>
+    /// <qaas-docs group="Configuration as Code" subgroup="Publishers" />
     public PublisherBuilder DeleteDataSourcePattern(string dataSourcePattern)
     {
         DataSourcePatterns = DataSourcePatterns?.Where(value => value != dataSourcePattern).ToArray();
         return this;
     }
 
+    /// <summary>
+    /// Marks the transaction to execute continuously in loop mode.
+    /// </summary>
+    /// <remarks>
+    /// Use this method when working with the documented Runner publisher builder API surface in code. The change is stored on the current builder instance and is consumed by later build, validation, or execution steps.
+    /// </remarks>
+    /// <qaas-docs group="Configuration as Code" subgroup="Publishers" />
     public PublisherBuilder InLoops()
     {
         Loop = true;
         return this;
     }
 
+    /// <summary>
+    /// Sets the delay applied between transaction iterations.
+    /// </summary>
+    /// <remarks>
+    /// Use this method when working with the documented Runner publisher builder API surface in code. The change is stored on the current builder instance and is consumed by later build, validation, or execution steps.
+    /// </remarks>
+    /// <qaas-docs group="Configuration as Code" subgroup="Publishers" />
     public PublisherBuilder WithSleep(ulong sleepTimeMs)
     {
         SleepTimeMs = sleepTimeMs;
         return this;
     }
 
+    /// <summary>
+    /// Configures chunks on the current Runner publisher builder instance.
+    /// </summary>
+    /// <remarks>
+    /// Use this method when working with the documented Runner publisher builder API surface in code. The change is stored on the current builder instance and is consumed by later build, validation, or execution steps.
+    /// </remarks>
+    /// <qaas-docs group="Configuration as Code" subgroup="Publishers" />
     public PublisherBuilder WithChunks(Chunks chunks)
     {
         Chunk = chunks;
         return this;
     }
 
+    /// <summary>
+    /// Adds the supplied policy to the current Runner publisher builder instance.
+    /// </summary>
+    /// <remarks>
+    /// Use this method when working with the documented Runner publisher builder API surface in code. The change is stored on the current builder instance and is consumed by later build, validation, or execution steps.
+    /// </remarks>
+    /// <qaas-docs group="Configuration as Code" subgroup="Publishers" />
     public PublisherBuilder AddPolicy(PolicyBuilder policy)
     {
         var policiesList = Policies.ToList();
@@ -163,16 +296,37 @@ public partial class PublisherBuilder
         return this;
     }
 
+    /// <summary>
+    /// Creates or adds the configured policy entry on the current Runner publisher builder instance.
+    /// </summary>
+    /// <remarks>
+    /// Use this method when working with the documented Runner publisher builder API surface in code. The change is stored on the current builder instance and is consumed by later build, validation, or execution steps.
+    /// </remarks>
+    /// <qaas-docs group="Configuration as Code" subgroup="Publishers" />
     public PublisherBuilder CreatePolicy(PolicyBuilder policy)
     {
         return AddPolicy(policy);
     }
 
+    /// <summary>
+    /// Returns the configured policies currently stored on the Runner publisher builder instance.
+    /// </summary>
+    /// <remarks>
+    /// Use this method when working with the documented Runner publisher builder API surface in code. Use it to inspect the current configured state without rebuilding the surrounding collection or runtime object graph.
+    /// </remarks>
+    /// <qaas-docs group="Configuration as Code" subgroup="Publishers" />
     public IReadOnlyList<PolicyBuilder> ReadPolicies()
     {
         return Policies;
     }
 
+    /// <summary>
+    /// Updates the configured policy at the specified index on the current Runner publisher builder instance.
+    /// </summary>
+    /// <remarks>
+    /// Use this method when working with the documented Runner publisher builder API surface in code. The change is stored on the current builder instance and is consumed by later build, validation, or execution steps.
+    /// </remarks>
+    /// <qaas-docs group="Configuration as Code" subgroup="Publishers" />
     public PublisherBuilder UpdatePolicyAt(int index, PolicyBuilder policy)
     {
         if (index < 0 || index >= Policies.Length)
@@ -184,6 +338,13 @@ public partial class PublisherBuilder
         return this;
     }
 
+    /// <summary>
+    /// Removes the configured policy at the specified index from the current Runner publisher builder instance.
+    /// </summary>
+    /// <remarks>
+    /// Use this method when working with the documented Runner publisher builder API surface in code. The change is stored on the current builder instance and is consumed by later build, validation, or execution steps.
+    /// </remarks>
+    /// <qaas-docs group="Configuration as Code" subgroup="Publishers" />
     public PublisherBuilder DeletePolicyAt(int index)
     {
         if (index < 0 || index >= Policies.Length)
@@ -195,6 +356,13 @@ public partial class PublisherBuilder
         return this;
     }
 
+    /// <summary>
+    /// Configures parallelism on the current Runner publisher builder instance.
+    /// </summary>
+    /// <remarks>
+    /// Use this method when working with the documented Runner publisher builder API surface in code. The change is stored on the current builder instance and is consumed by later build, validation, or execution steps.
+    /// </remarks>
+    /// <qaas-docs group="Configuration as Code" subgroup="Publishers" />
     public PublisherBuilder WithParallelism(int parallelism)
     {
         Parallel = new Parallel { Parallelism = parallelism };
@@ -202,24 +370,36 @@ public partial class PublisherBuilder
     }
 
     /// <summary>
-    /// Compatibility alias for <see cref="Configure" /> that matches the configuration CRUD pattern used by other builders.
+    /// Sets the configuration currently stored on the Runner publisher builder instance.
     /// </summary>
+    /// <remarks>
+    /// Use this method when working with the documented Runner publisher builder API surface in code. The change is stored on the current builder instance and is consumed by later build, validation, or execution steps.
+    /// </remarks>
+    /// <qaas-docs group="Configuration as Code" subgroup="Publishers" />
     public PublisherBuilder CreateConfiguration(ISenderConfig config)
     {
         return Configure(config);
     }
 
     /// <summary>
-    /// Compatibility alias for <see cref="CreateConfiguration" />.
+    /// Sets the configuration currently stored on the Runner publisher builder instance.
     /// </summary>
+    /// <remarks>
+    /// Use this method when working with the documented Runner publisher builder API surface in code. The change is stored on the current builder instance and is consumed by later build, validation, or execution steps.
+    /// </remarks>
+    /// <qaas-docs group="Configuration as Code" subgroup="Publishers" />
     public PublisherBuilder Create(ISenderConfig config)
     {
         return CreateConfiguration(config);
     }
 
     /// <summary>
-    /// Returns the currently configured sender source, if any.
+    /// Returns the configuration currently stored on the Runner publisher builder instance.
     /// </summary>
+    /// <remarks>
+    /// Use this method when working with the documented Runner publisher builder API surface in code. Use it to inspect the current configured state without rebuilding the surrounding collection or runtime object graph.
+    /// </remarks>
+    /// <qaas-docs group="Configuration as Code" subgroup="Publishers" />
     public ISenderConfig? ReadConfiguration()
     {
         if (RabbitMq != null) return RabbitMq;
@@ -236,8 +416,12 @@ public partial class PublisherBuilder
     }
 
     /// <summary>
-    /// Applies a computed partial update to the current publisher configuration while preserving omitted fields.
+    /// Updates the configuration currently stored on the Runner publisher builder instance.
     /// </summary>
+    /// <remarks>
+    /// Use this method when working with the documented Runner publisher builder API surface in code. The change is stored on the current builder instance and is consumed by later build, validation, or execution steps.
+    /// </remarks>
+    /// <qaas-docs group="Configuration as Code" subgroup="Publishers" />
     public PublisherBuilder UpdateConfiguration(Func<ISenderConfig, ISenderConfig> update)
     {
         var currentConfig = ReadConfiguration() ??
@@ -246,8 +430,12 @@ public partial class PublisherBuilder
     }
 
     /// <summary>
-    /// Updates the publisher configuration by merging same-type values and replacing the current type when needed.
+    /// Updates the configuration currently stored on the Runner publisher builder instance.
     /// </summary>
+    /// <remarks>
+    /// Use this method when working with the documented Runner publisher builder API surface in code. The change is stored on the current builder instance and is consumed by later build, validation, or execution steps.
+    /// </remarks>
+    /// <qaas-docs group="Configuration as Code" subgroup="Publishers" />
     public PublisherBuilder UpdateConfiguration(ISenderConfig config)
     {
         var currentConfig = ReadConfiguration() ??
@@ -256,8 +444,12 @@ public partial class PublisherBuilder
     }
 
     /// <summary>
-    /// Updates the publisher configuration from an object-shaped patch while preserving omitted fields.
+    /// Updates the configuration currently stored on the Runner publisher builder instance.
     /// </summary>
+    /// <remarks>
+    /// Use this method when working with the documented Runner publisher builder API surface in code. The change is stored on the current builder instance and is consumed by later build, validation, or execution steps.
+    /// </remarks>
+    /// <qaas-docs group="Configuration as Code" subgroup="Publishers" />
     public PublisherBuilder UpdateConfiguration(object configuration)
     {
         var currentConfig = ReadConfiguration() ??
@@ -266,8 +458,12 @@ public partial class PublisherBuilder
     }
 
     /// <summary>
-    /// Clears the configured sender source.
+    /// Clears the configuration currently stored on the Runner publisher builder instance.
     /// </summary>
+    /// <remarks>
+    /// Use this method when working with the documented Runner publisher builder API surface in code. The change is stored on the current builder instance and is consumed by later build, validation, or execution steps.
+    /// </remarks>
+    /// <qaas-docs group="Configuration as Code" subgroup="Publishers" />
     public PublisherBuilder DeleteConfiguration()
     {
         return Reset();
@@ -290,8 +486,12 @@ public partial class PublisherBuilder
     }
 
     /// <summary>
-    /// Replaces the current sender source with the provided configuration type.
+    /// Sets the configuration currently stored on the Runner publisher builder instance.
     /// </summary>
+    /// <remarks>
+    /// Use this method when working with the documented Runner publisher builder API surface in code. The change is stored on the current builder instance and is consumed by later build, validation, or execution steps.
+    /// </remarks>
+    /// <qaas-docs group="Configuration as Code" subgroup="Publishers" />
     public PublisherBuilder Configure(ISenderConfig config)
     {
         Reset();

@@ -298,9 +298,9 @@ public class PublisherBuilderTests
         var builder = new PublisherBuilder()
             .Named("publisher-conflict");
 
-        typeof(PublisherBuilder).GetProperty("RabbitMq", BindingFlags.Instance | BindingFlags.NonPublic)!
+        typeof(PublisherBuilder).GetProperty("RabbitMq", BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic)!
             .SetValue(builder, new RabbitMqSenderConfig());
-        typeof(PublisherBuilder).GetProperty("KafkaTopic", BindingFlags.Instance | BindingFlags.NonPublic)!
+        typeof(PublisherBuilder).GetProperty("KafkaTopic", BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic)!
             .SetValue(builder, new KafkaTopicSenderConfig
             {
                 TopicName = "topic",

@@ -21,20 +21,24 @@ public static class Bootstrap
     private static readonly Lazy<bool> ShouldForceDisableSendLogs = new(() => !CanUseFrameworkDefaultLoggers());
 
     /// <summary>
-    /// Creates a new <see cref="Runner" /> instance using default <see cref="Runner" /> type
+    /// Creates a new Runner instance from the supplied bootstrap inputs.
     /// </summary>
-    /// <param name="args">Command-line arguments</param>
-    /// <returns>A <see cref="Runner" /> instance</returns>
+    /// <remarks>
+    /// This is the primary code-first entry point for bootstrapping the product from command-line style arguments so library startup and CLI startup stay aligned.
+    /// </remarks>
+    /// <qaas-docs group="Getting Started" subgroup="Bootstrap" />
     public static Runner New(IEnumerable<string>? args = null)
     {
         return GetRunner<Runner>(args);
     }
 
     /// <summary>
-    /// Creates new <see cref="Runner" /> instance filled with QaaS objects based on parsed command-line arguments
+    /// Creates a new Runner instance from the supplied bootstrap inputs.
     /// </summary>
-    /// <param name="args">Command-line arguments</param>
-    /// <returns>A <see cref="Runner" /> instance (or derived type)</returns>
+    /// <remarks>
+    /// This is the primary code-first entry point for bootstrapping the product from command-line style arguments so library startup and CLI startup stay aligned.
+    /// </remarks>
+    /// <qaas-docs group="Getting Started" subgroup="Bootstrap" />
     public static Runner New<TRunner>(IEnumerable<string>? args = null) where TRunner : Runner
     {
         return GetRunner<TRunner>(args);

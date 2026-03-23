@@ -18,7 +18,7 @@
 
     <ItemGroup>
         <PackageReference Include="morelinq" Version="4.4.0"/>
-        <PackageReference Include="QaaS.Mocker.CommunicationObjects" Version="2.0.2" />
+        <PackageReference Include="QaaS.Mocker.CommunicationObjects" Version="2.0.2-alpha.4" />
         <PackageReference Include="StackExchange.Redis" Version="2.12.1" />
     </ItemGroup>
 
@@ -28,6 +28,11 @@
 
     <ItemGroup>
         <None Include="..\README.md" Pack="true" PackagePath="\" Link="README.md" />
+    </ItemGroup>
+
+    <ItemGroup>
+        <InternalsVisibleTo Include="QaaS.Runner.Tests" />
+        <InternalsVisibleTo Include="QaaS.Runner.Sessions.Tests" />
     </ItemGroup>
 
 </Project>

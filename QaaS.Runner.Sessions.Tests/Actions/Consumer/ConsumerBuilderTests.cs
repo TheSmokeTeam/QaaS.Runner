@@ -911,9 +911,9 @@ public class ConsumerBuilderTests
             .WithTimeout(1000)
             .FilterData(new DataFilter());
 
-        typeof(ConsumerBuilder).GetProperty("RabbitMq", BindingFlags.Instance | BindingFlags.NonPublic)!
+        typeof(ConsumerBuilder).GetProperty("RabbitMq", BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic)!
             .SetValue(builder, new RabbitMqReaderConfig());
-        typeof(ConsumerBuilder).GetProperty("KafkaTopic", BindingFlags.Instance | BindingFlags.NonPublic)!
+        typeof(ConsumerBuilder).GetProperty("KafkaTopic", BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic)!
             .SetValue(builder, new KafkaTopicReaderConfig
             {
                 TopicName = "topic",

@@ -5,6 +5,7 @@ using NUnit.Framework;
 using Moq;
 using QaaS.Framework.Configurations;
 using QaaS.Framework.Configurations.References;
+using QaaS.Framework.SDK;
 using QaaS.Framework.SDK.ContextObjects;
 using QaaS.Framework.SDK.Session.SessionDataObjects;
 using QaaS.Runner.Loaders;
@@ -25,10 +26,15 @@ namespace QaaS.Runner.Tests.LoadersTests
 
         private sealed class TestRunLoader : RunLoader<Runner, RunOptions>
         {
+            private readonly IReadOnlyList<IExecutionBuilderConfigurator> _configurators;
             public List<(string? ExecutionId, string? RelativeCasePath)> BuildContextCalls { get; } = [];
 
-            public TestRunLoader(RunOptions options, string? executionId = null) : base(options, executionId)
+            public TestRunLoader(
+                RunOptions options,
+                string? executionId = null,
+                IReadOnlyList<IExecutionBuilderConfigurator>? configurators = null) : base(options, executionId)
             {
+                _configurators = configurators ?? [];
             }
 
             protected override InternalContext BuildContext(string? executionId, string? relativeCaseFilePath = null,
@@ -44,6 +50,41 @@ namespace QaaS.Runner.Tests.LoadersTests
                     InternalRunningSessions = new RunningSessions(
                         new Dictionary<string, RunningSessionData<object, object>>())
                 };
+            }
+
+            protected override IReadOnlyList<IExecutionBuilderConfigurator> DiscoverExecutionBuilderConfigurators()
+            {
+                return _configurators;
+            }
+        }
+
+        private sealed class ConfiguratorAwareRunLoader : RunLoader<Runner, RunOptions>
+        {
+            private readonly IReadOnlyList<IExecutionBuilderConfigurator> _configurators;
+
+            public ConfiguratorAwareRunLoader(
+                RunOptions options,
+                IReadOnlyList<IExecutionBuilderConfigurator>? configurators = null,
+                string? executionId = null) : base(options, executionId)
+            {
+                _configurators = configurators ?? [];
+            }
+
+            protected override IReadOnlyList<IExecutionBuilderConfigurator> DiscoverExecutionBuilderConfigurators()
+            {
+                return _configurators;
+            }
+        }
+
+        private sealed class MetadataConfigurator : IExecutionBuilderConfigurator
+        {
+            public void Configure(ExecutionBuilder executionBuilder)
+            {
+                executionBuilder.WithMetadata(new MetaDataConfig
+                {
+                    Team = "Smoke",
+                    System = "DummyApp"
+                });
             }
         }
 
@@ -472,8 +513,8 @@ namespace QaaS.Runner.Tests.LoadersTests
             Assert.That(runner, Is.Not.Null);
             Assert.That(runner.ExecutionBuilders, Has.Count.EqualTo(1));
 
-            var emptyResultsProperty = typeof(Runner).GetProperty("EmptyResults", BindingFlags.Instance | BindingFlags.NonPublic)!;
-            var serveResultsProperty = typeof(Runner).GetProperty("ServeResults", BindingFlags.Instance | BindingFlags.NonPublic)!;
+            var emptyResultsProperty = typeof(Runner).GetProperty("EmptyResults", BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic)!;
+            var serveResultsProperty = typeof(Runner).GetProperty("ServeResults", BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic)!;
 
             Assert.That((bool)emptyResultsProperty.GetValue(runner)!, Is.True);
             Assert.That((bool)serveResultsProperty.GetValue(runner)!, Is.True);
@@ -494,6 +535,81 @@ namespace QaaS.Runner.Tests.LoadersTests
             var runner = loader.GetLoadedRunner();
 
             Assert.That(runner.ExitProcessOnCompletion, Is.False);
+        }
+
+        [Test]
+        public void BuildContext_WhenConfigurationFileMissingAndCodeConfiguratorsExist_SkipsYamlLoading()
+        {
+            var loader = new ConfiguratorAwareRunLoader(new RunOptions
+            {
+                ConfigurationFile = $"missing-{Guid.NewGuid():N}.qaas.yaml",
+                SendLogs = false
+            }, [new MetadataConfigurator()]);
+
+            var mockContextBuilder = new Mock<IContextBuilder>();
+            var mockInternalContext = new Mock<InternalContext>();
+            mockContextBuilder.Setup(cb => cb.BuildInternal()).Returns(mockInternalContext.Object);
+
+            var result = (InternalContext?)BuildContextMethodInfo.Invoke(loader,
+                [null, null, mockContextBuilder.Object]);
+
+            Assert.That(result, Is.EqualTo(mockInternalContext.Object));
+            mockContextBuilder.Verify(cb => cb.SetConfigurationFile(It.IsAny<string>()), Times.Never);
+            mockContextBuilder.Verify(cb => cb.BuildInternal(), Times.Once);
+        }
+
+        [Test]
+        public void GetLoadedRunner_WithExecutionBuilderConfigurators_AppliesCodeConfiguration()
+        {
+            var options = new RunOptions
+            {
+                ConfigurationFile = "test.yaml",
+                SendLogs = false
+            };
+
+            var loader = new TestRunLoader(options, configurators: [new MetadataConfigurator()]);
+
+            var runner = loader.GetLoadedRunner();
+            var configuredBuilder = runner.ExecutionBuilders.Single();
+
+            Assert.Multiple(() =>
+            {
+                Assert.That(configuredBuilder.MetaData, Is.Not.Null);
+                Assert.That(configuredBuilder.MetaData!.Team, Is.EqualTo("Smoke"));
+                Assert.That(configuredBuilder.MetaData.System, Is.EqualTo("DummyApp"));
+            });
+        }
+
+        [Test]
+        public void GetLoadedRunner_WithEmptyConfigurationFileAndExecutionBuilderConfigurators_AppliesCodeConfiguration()
+        {
+            var tempDirectory = Path.Combine(Path.GetTempPath(), "QaaS.Runner.Tests", Guid.NewGuid().ToString("N"));
+            Directory.CreateDirectory(tempDirectory);
+            var configurationFilePath = Path.Combine(tempDirectory, "test.qaas.yaml");
+            File.WriteAllText(configurationFilePath, string.Empty);
+
+            try
+            {
+                var loader = new ConfiguratorAwareRunLoader(new RunOptions
+                {
+                    ConfigurationFile = configurationFilePath,
+                    SendLogs = false
+                }, [new MetadataConfigurator()]);
+
+                var runner = loader.GetLoadedRunner();
+                var configuredBuilder = runner.ExecutionBuilders.Single();
+
+                Assert.Multiple(() =>
+                {
+                    Assert.That(configuredBuilder.MetaData, Is.Not.Null);
+                    Assert.That(configuredBuilder.MetaData!.Team, Is.EqualTo("Smoke"));
+                    Assert.That(configuredBuilder.MetaData.System, Is.EqualTo("DummyApp"));
+                });
+            }
+            finally
+            {
+                Directory.Delete(tempDirectory, true);
+            }
         }
     }
 }

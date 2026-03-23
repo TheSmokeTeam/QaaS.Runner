@@ -285,7 +285,7 @@ public class SessionBuilderTests
 
         foreach (var propertyName in new[] { "Consumers", "Publishers", "Transactions", "Probes", "Collectors", "MockerCommands" })
         {
-            typeof(SessionBuilder).GetProperty(propertyName, BindingFlags.Instance | BindingFlags.NonPublic)!
+            typeof(SessionBuilder).GetProperty(propertyName, BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic)!
                 .SetValue(builder, null);
         }
 
@@ -294,7 +294,7 @@ public class SessionBuilderTests
         Assert.That(session, Is.Not.Null);
         foreach (var propertyName in new[] { "Consumers", "Publishers", "Transactions", "Probes", "Collectors", "MockerCommands" })
         {
-            var propertyValue = typeof(SessionBuilder).GetProperty(propertyName, BindingFlags.Instance | BindingFlags.NonPublic)!
+            var propertyValue = typeof(SessionBuilder).GetProperty(propertyName, BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic)!
                 .GetValue(builder) as Array;
             Assert.That(propertyValue, Is.Not.Null, propertyName);
             Assert.That(propertyValue, Is.Empty, propertyName);
@@ -319,10 +319,8 @@ public class SessionBuilderTests
         var stages = (Dictionary<int, global::QaaS.Runner.Sessions.Session.Stage>)stagesField.GetValue(session)!;
         var stageTwo = stages[2];
 
-        var sleepBeforeField = typeof(global::QaaS.Runner.Sessions.Session.Stage).GetProperty("SleepBeforeMilliseconds",
-            BindingFlags.Instance | BindingFlags.NonPublic)!;
-        var sleepAfterField = typeof(global::QaaS.Runner.Sessions.Session.Stage).GetProperty("SleepAfterMilliseconds",
-            BindingFlags.Instance | BindingFlags.NonPublic)!;
+        var sleepBeforeField = typeof(global::QaaS.Runner.Sessions.Session.Stage).GetProperty("SleepBeforeMilliseconds", BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic)!;
+        var sleepAfterField = typeof(global::QaaS.Runner.Sessions.Session.Stage).GetProperty("SleepAfterMilliseconds", BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic)!;
 
         Assert.That(sleepBeforeField.GetValue(stageTwo), Is.EqualTo(123));
         Assert.That(sleepAfterField.GetValue(stageTwo), Is.EqualTo(456));

@@ -1620,9 +1620,7 @@ public class SessionExecutionCoverageTests
 
     private static (string Name, object Value)[] GetYamlProperties(object value)
     {
-        return value.GetType()
-            .GetProperties(BindingFlags.Instance | BindingFlags.Public)
-            .Where(property => property.CanRead)
+        return GetYamlReflectionProperties(value.GetType())
             .Select(property => (
                 property.Name,
                 Value: property.GetValue(value)
@@ -1634,12 +1632,41 @@ public class SessionExecutionCoverageTests
 
     private static (string Name, object Value)[] GetPlaceholderYamlProperties(object value)
     {
-        return value.GetType()
-            .GetProperties(BindingFlags.Instance | BindingFlags.Public)
-            .Where(property => property.CanRead && property.CanWrite)
+        return GetYamlReflectionProperties(value.GetType())
+            .Where(property => property.CanWrite || HasAutoPropertyBackingField(property))
             .Select(property => (property.Name, Value: CreatePlaceholderValue(property.PropertyType)))
             .Where(property => property.Value != null)
             .ToArray()!;
+    }
+
+    private static IEnumerable<PropertyInfo> GetYamlReflectionProperties(Type type)
+    {
+        var seenNames = new HashSet<string>(StringComparer.Ordinal);
+        for (var currentType = type; currentType != null && currentType != typeof(object);
+             currentType = currentType.BaseType)
+        {
+            foreach (var property in currentType.GetProperties(BindingFlags.Instance | BindingFlags.Public |
+                                                               BindingFlags.NonPublic |
+                                                               BindingFlags.DeclaredOnly))
+            {
+                if (!seenNames.Add(property.Name) || !property.CanRead || property.GetIndexParameters().Length > 0)
+                {
+                    continue;
+                }
+
+                if (property.GetMethod?.IsPublic == true || property.CanWrite || HasAutoPropertyBackingField(property))
+                {
+                    yield return property;
+                }
+            }
+        }
+    }
+
+    private static bool HasAutoPropertyBackingField(PropertyInfo property)
+    {
+        const BindingFlags backingFieldFlags = BindingFlags.Instance | BindingFlags.NonPublic;
+        return property.DeclaringType?.GetField($"<{property.Name}>k__BackingField", backingFieldFlags) != null ||
+               property.DeclaringType?.GetField($"<{property.Name}>i__Field", backingFieldFlags) != null;
     }
 
     private static object? CreatePlaceholderValue(Type type)

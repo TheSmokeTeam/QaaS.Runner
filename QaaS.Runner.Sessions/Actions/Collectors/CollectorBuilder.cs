@@ -25,28 +25,28 @@ public class CollectorBuilder
     public string? Name { get; internal set; }
 
     [Description("How to filter the properties of each returned collected data")]
-    internal DataFilter DataFilter { get; set; } = new();
-
+    public DataFilter DataFilter { get; internal set; } = new();
     [Description("The collection range of the collector's action contains parameters for the start and end times " +
                  "of the collection range in relation to the start and end time of the collector's session.")]
-    internal CollectionRange CollectionRange { get; set; } = new();
-
+    public CollectionRange CollectionRange { get; internal set; } = new();
     [Range(uint.MinValue, uint.MaxValue)]
     [Description(
         "The check interval in milliseconds of the check that the current UTC time is past" +
         " the collection end time, so the collection action can happen.")]
     [DefaultValue(1000)]
-    internal uint EndTimeReachedCheckIntervalMs { get; set; } = 1000;
-
+    public uint EndTimeReachedCheckIntervalMs { get; internal set; } = 1000;
     [Description(
         "Collects messages from the prometheus `query_range` API and saves each of them as an item of a vector result's array." +
         " vector is a result type in prometheus that represents a set of time series data, every item of" +
         " its result array represents a single value at a certain time.")]
-    internal PrometheusFetcherConfig? Prometheus { get; set; }
-
+    public PrometheusFetcherConfig? Prometheus { get; internal set; }
     /// <summary>
-    /// Sets the collector name.
+    /// Sets the name used for the current Runner collector builder instance.
     /// </summary>
+    /// <remarks>
+    /// Use this method when working with the documented Runner collector builder API surface in code. The change is stored on the current builder instance and is consumed by later build, validation, or execution steps.
+    /// </remarks>
+    /// <qaas-docs group="Configuration as Code" subgroup="Collectors" />
     public CollectorBuilder Named(string name)
     {
         Name = name;
@@ -54,8 +54,12 @@ public class CollectorBuilder
     }
 
     /// <summary>
-    /// Sets the collector's data filter.
+    /// Sets the data filter used by the current Runner collector builder instance.
     /// </summary>
+    /// <remarks>
+    /// Use this method when working with the documented Runner collector builder API surface in code. The change is stored on the current builder instance and is consumed by later build, validation, or execution steps.
+    /// </remarks>
+    /// <qaas-docs group="Configuration as Code" subgroup="Collectors" />
     public CollectorBuilder FilterData(DataFilter dataFilter)
     {
         DataFilter = dataFilter;
@@ -63,8 +67,12 @@ public class CollectorBuilder
     }
 
     /// <summary>
-    /// Sets the relative time window used for collection.
+    /// Configures collect in range on the current Runner collector builder instance.
     /// </summary>
+    /// <remarks>
+    /// Use this method when working with the documented Runner collector builder API surface in code. The behavior exposed here is part of the public surface that the generated function documentation groups under 'Configuration as Code / Collectors'.
+    /// </remarks>
+    /// <qaas-docs group="Configuration as Code" subgroup="Collectors" />
     public CollectorBuilder CollectInRange(CollectionRange collectionRange)
     {
         CollectionRange = collectionRange;
@@ -72,32 +80,48 @@ public class CollectorBuilder
     }
 
     /// <summary>
-    /// Compatibility alias for <see cref="CreateConfiguration" />.
+    /// Sets the configuration currently stored on the Runner collector builder instance.
     /// </summary>
+    /// <remarks>
+    /// Use this method when working with the documented Runner collector builder API surface in code. The change is stored on the current builder instance and is consumed by later build, validation, or execution steps.
+    /// </remarks>
+    /// <qaas-docs group="Configuration as Code" subgroup="Collectors" />
     public CollectorBuilder Create(IFetcherConfig config)
     {
         return CreateConfiguration(config);
     }
 
     /// <summary>
-    /// Sets the configured collector fetcher source.
+    /// Sets the configuration currently stored on the Runner collector builder instance.
     /// </summary>
+    /// <remarks>
+    /// Use this method when working with the documented Runner collector builder API surface in code. The change is stored on the current builder instance and is consumed by later build, validation, or execution steps.
+    /// </remarks>
+    /// <qaas-docs group="Configuration as Code" subgroup="Collectors" />
     public CollectorBuilder CreateConfiguration(IFetcherConfig config)
     {
         return Configure(config);
     }
 
     /// <summary>
-    /// Returns the currently configured fetcher source, if any.
+    /// Returns the configuration currently stored on the Runner collector builder instance.
     /// </summary>
+    /// <remarks>
+    /// Use this method when working with the documented Runner collector builder API surface in code. Use it to inspect the current configured state without rebuilding the surrounding collection or runtime object graph.
+    /// </remarks>
+    /// <qaas-docs group="Configuration as Code" subgroup="Collectors" />
     public IFetcherConfig? ReadConfiguration()
     {
         return Prometheus;
     }
 
     /// <summary>
-    /// Applies a computed partial update to the current collector configuration while preserving omitted fields.
+    /// Updates the configuration currently stored on the Runner collector builder instance.
     /// </summary>
+    /// <remarks>
+    /// Use this method when working with the documented Runner collector builder API surface in code. The change is stored on the current builder instance and is consumed by later build, validation, or execution steps.
+    /// </remarks>
+    /// <qaas-docs group="Configuration as Code" subgroup="Collectors" />
     public CollectorBuilder UpdateConfiguration(Func<IFetcherConfig, IFetcherConfig> update)
     {
         var currentConfig = ReadConfiguration() ??
@@ -106,8 +130,12 @@ public class CollectorBuilder
     }
 
     /// <summary>
-    /// Updates the collector configuration by merging same-type values and replacing the current type when needed.
+    /// Updates the configuration currently stored on the Runner collector builder instance.
     /// </summary>
+    /// <remarks>
+    /// Use this method when working with the documented Runner collector builder API surface in code. The change is stored on the current builder instance and is consumed by later build, validation, or execution steps.
+    /// </remarks>
+    /// <qaas-docs group="Configuration as Code" subgroup="Collectors" />
     public CollectorBuilder UpdateConfiguration(IFetcherConfig config)
     {
         var currentConfig = ReadConfiguration() ??
@@ -116,8 +144,12 @@ public class CollectorBuilder
     }
 
     /// <summary>
-    /// Updates the collector configuration from an object-shaped patch while preserving omitted fields.
+    /// Updates the configuration currently stored on the Runner collector builder instance.
     /// </summary>
+    /// <remarks>
+    /// Use this method when working with the documented Runner collector builder API surface in code. The change is stored on the current builder instance and is consumed by later build, validation, or execution steps.
+    /// </remarks>
+    /// <qaas-docs group="Configuration as Code" subgroup="Collectors" />
     public CollectorBuilder UpdateConfiguration(object configuration)
     {
         var currentConfig = ReadConfiguration() ??
@@ -126,8 +158,12 @@ public class CollectorBuilder
     }
 
     /// <summary>
-    /// Clears the configured fetcher source.
+    /// Clears the configuration currently stored on the Runner collector builder instance.
     /// </summary>
+    /// <remarks>
+    /// Use this method when working with the documented Runner collector builder API surface in code. The change is stored on the current builder instance and is consumed by later build, validation, or execution steps.
+    /// </remarks>
+    /// <qaas-docs group="Configuration as Code" subgroup="Collectors" />
     public CollectorBuilder DeleteConfiguration()
     {
         return Reset();
@@ -140,8 +176,12 @@ public class CollectorBuilder
     }
 
     /// <summary>
-    /// Replaces the current collector fetcher source with the provided configuration type.
+    /// Sets the configuration currently stored on the Runner collector builder instance.
     /// </summary>
+    /// <remarks>
+    /// Use this method when working with the documented Runner collector builder API surface in code. The change is stored on the current builder instance and is consumed by later build, validation, or execution steps.
+    /// </remarks>
+    /// <qaas-docs group="Configuration as Code" subgroup="Collectors" />
     public CollectorBuilder Configure(IFetcherConfig config)
     {
         Reset();

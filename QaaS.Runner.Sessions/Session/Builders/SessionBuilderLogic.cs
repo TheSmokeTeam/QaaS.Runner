@@ -15,24 +15,52 @@ namespace QaaS.Runner.Sessions.Session.Builders;
 public partial class SessionBuilder
 {
     // metadata
+    /// <summary>
+    /// Sets the name used for the current Runner session builder instance.
+    /// </summary>
+    /// <remarks>
+    /// Use this method when working with the documented Runner session builder API surface in code. The change is stored on the current builder instance and is consumed by later build, validation, or execution steps.
+    /// </remarks>
+    /// <qaas-docs group="Configuration as Code" subgroup="Sessions" />
     public SessionBuilder Named(string name)
     {
         Name = name;
         return this;
     }
 
+    /// <summary>
+    /// Sets the timeout applied before the session runs.
+    /// </summary>
+    /// <remarks>
+    /// Use this method when working with the documented Runner session builder API surface in code. The change is stored on the current builder instance and is consumed by later build, validation, or execution steps.
+    /// </remarks>
+    /// <qaas-docs group="Configuration as Code" subgroup="Sessions" />
     public SessionBuilder WithTimeoutBefore(uint timeout)
     {
         TimeoutBeforeSessionMs = timeout;
         return this;
     }
 
+    /// <summary>
+    /// Sets the timeout applied after the session runs.
+    /// </summary>
+    /// <remarks>
+    /// Use this method when working with the documented Runner session builder API surface in code. The change is stored on the current builder instance and is consumed by later build, validation, or execution steps.
+    /// </remarks>
+    /// <qaas-docs group="Configuration as Code" subgroup="Sessions" />
     public SessionBuilder WithTimeoutAfter(uint timeout)
     {
         TimeoutAfterSessionMs = timeout;
         return this;
     }
 
+    /// <summary>
+    /// Sets the stage used by the current Runner session builder instance.
+    /// </summary>
+    /// <remarks>
+    /// Use this method when working with the documented Runner session builder API surface in code. The change is stored on the current builder instance and is consumed by later build, validation, or execution steps.
+    /// </remarks>
+    /// <qaas-docs group="Configuration as Code" subgroup="Sessions" />
     public SessionBuilder AtStage(int stage)
     {
         Stage = stage;
@@ -40,219 +68,492 @@ public partial class SessionBuilder
         return this;
     }
 
+    /// <summary>
+    /// Limits the session to run only until the specified stage.
+    /// </summary>
+    /// <remarks>
+    /// Use this method when working with the documented Runner session builder API surface in code. The change is stored on the current builder instance and is consumed by later build, validation, or execution steps.
+    /// </remarks>
+    /// <qaas-docs group="Configuration as Code" subgroup="Sessions" />
     public SessionBuilder RunSessionUntilStage(int stage)
     {
         RunUntilStage = stage;
         return this;
     }
 
+    /// <summary>
+    /// Disables data persistence for the configured session.
+    /// </summary>
+    /// <remarks>
+    /// Use this method when working with the documented Runner session builder API surface in code. The change is stored on the current builder instance and is consumed by later build, validation, or execution steps.
+    /// </remarks>
+    /// <qaas-docs group="Configuration as Code" subgroup="Sessions" />
     public SessionBuilder DiscardData()
     {
         SaveData = false;
         return this;
     }
 
+    /// <summary>
+    /// Sets the category used by the current Runner session builder instance.
+    /// </summary>
+    /// <remarks>
+    /// Use this method when working with the documented Runner session builder API surface in code. The change is stored on the current builder instance and is consumed by later build, validation, or execution steps.
+    /// </remarks>
+    /// <qaas-docs group="Configuration as Code" subgroup="Sessions" />
     public SessionBuilder WithinCategory(string category)
     {
         Category = category;
         return this;
     }
 
+    /// <summary>
+    /// Adds the supplied consumer to the current Runner session builder instance.
+    /// </summary>
+    /// <remarks>
+    /// Use this method when working with the documented Runner session builder API surface in code. The change is stored on the current builder instance and is consumed by later build, validation, or execution steps.
+    /// </remarks>
+    /// <qaas-docs group="Configuration as Code" subgroup="Sessions" />
     public SessionBuilder AddConsumer(ConsumerBuilder consumerBuilder)
     {
         Consumers = Consumers is null ? [consumerBuilder] : Consumers.Append(consumerBuilder).ToArray();
         return this;
     }
 
+    /// <summary>
+    /// Creates or adds the configured consumer entry on the current Runner session builder instance.
+    /// </summary>
+    /// <remarks>
+    /// Use this method when working with the documented Runner session builder API surface in code. The change is stored on the current builder instance and is consumed by later build, validation, or execution steps.
+    /// </remarks>
+    /// <qaas-docs group="Configuration as Code" subgroup="Sessions" />
     public SessionBuilder CreateConsumer(ConsumerBuilder consumerBuilder)
     {
         return AddConsumer(consumerBuilder);
     }
 
+    /// <summary>
+    /// Returns the configured consumers currently stored on the Runner session builder instance.
+    /// </summary>
+    /// <remarks>
+    /// Use this method when working with the documented Runner session builder API surface in code. Use it to inspect the current configured state without rebuilding the surrounding collection or runtime object graph.
+    /// </remarks>
+    /// <qaas-docs group="Configuration as Code" subgroup="Sessions" />
     public IReadOnlyList<ConsumerBuilder> ReadConsumers()
     {
         return Consumers ?? [];
     }
 
+    /// <summary>
+    /// Returns the configured consumer currently stored on the Runner session builder instance.
+    /// </summary>
+    /// <remarks>
+    /// Use this method when working with the documented Runner session builder API surface in code. Use it to inspect the current configured state without rebuilding the surrounding collection or runtime object graph.
+    /// </remarks>
+    /// <qaas-docs group="Configuration as Code" subgroup="Sessions" />
     public ConsumerBuilder? ReadConsumer(string name)
     {
         return ReadByName(Consumers, name, consumer => consumer.Name);
     }
 
+    /// <summary>
+    /// Updates the configured consumer stored on the current Runner session builder instance.
+    /// </summary>
+    /// <remarks>
+    /// Use this method when working with the documented Runner session builder API surface in code. The change is stored on the current builder instance and is consumed by later build, validation, or execution steps.
+    /// </remarks>
+    /// <qaas-docs group="Configuration as Code" subgroup="Sessions" />
     public SessionBuilder UpdateConsumer(string name, ConsumerBuilder consumerBuilder)
     {
         Consumers = UpdateByName(Consumers, name, consumerBuilder, consumer => consumer.Name);
         return this;
     }
 
+    /// <summary>
+    /// Updates the configured consumer stored on the current Runner session builder instance.
+    /// </summary>
+    /// <remarks>
+    /// Use this method when working with the documented Runner session builder API surface in code. The change is stored on the current builder instance and is consumed by later build, validation, or execution steps.
+    /// </remarks>
+    /// <qaas-docs group="Configuration as Code" subgroup="Sessions" />
     public SessionBuilder UpdateConsumer(string name, Func<ConsumerBuilder, ConsumerBuilder> update)
     {
         Consumers = UpdateByName(Consumers, name, update, consumer => consumer.Name);
         return this;
     }
 
+    /// <summary>
+    /// Removes the configured consumer from the current Runner session builder instance.
+    /// </summary>
+    /// <remarks>
+    /// Use this method when working with the documented Runner session builder API surface in code. The change is stored on the current builder instance and is consumed by later build, validation, or execution steps.
+    /// </remarks>
+    /// <qaas-docs group="Configuration as Code" subgroup="Sessions" />
     public SessionBuilder DeleteConsumer(string name)
     {
         Consumers = DeleteByName(Consumers, name, consumer => consumer.Name);
         return this;
     }
 
+    /// <summary>
+    /// Adds the supplied publisher to the current Runner session builder instance.
+    /// </summary>
+    /// <remarks>
+    /// Use this method when working with the documented Runner session builder API surface in code. The change is stored on the current builder instance and is consumed by later build, validation, or execution steps.
+    /// </remarks>
+    /// <qaas-docs group="Configuration as Code" subgroup="Sessions" />
     public SessionBuilder AddPublisher(PublisherBuilder publisherBuilder)
     {
         Publishers = Publishers is null ? [publisherBuilder] : Publishers.Append(publisherBuilder).ToArray();
         return this;
     }
 
+    /// <summary>
+    /// Creates or adds the configured publisher entry on the current Runner session builder instance.
+    /// </summary>
+    /// <remarks>
+    /// Use this method when working with the documented Runner session builder API surface in code. The change is stored on the current builder instance and is consumed by later build, validation, or execution steps.
+    /// </remarks>
+    /// <qaas-docs group="Configuration as Code" subgroup="Sessions" />
     public SessionBuilder CreatePublisher(PublisherBuilder publisherBuilder)
     {
         return AddPublisher(publisherBuilder);
     }
 
+    /// <summary>
+    /// Returns the configured publishers currently stored on the Runner session builder instance.
+    /// </summary>
+    /// <remarks>
+    /// Use this method when working with the documented Runner session builder API surface in code. Use it to inspect the current configured state without rebuilding the surrounding collection or runtime object graph.
+    /// </remarks>
+    /// <qaas-docs group="Configuration as Code" subgroup="Sessions" />
     public IReadOnlyList<PublisherBuilder> ReadPublishers()
     {
         return Publishers ?? [];
     }
 
+    /// <summary>
+    /// Returns the configured publisher currently stored on the Runner session builder instance.
+    /// </summary>
+    /// <remarks>
+    /// Use this method when working with the documented Runner session builder API surface in code. Use it to inspect the current configured state without rebuilding the surrounding collection or runtime object graph.
+    /// </remarks>
+    /// <qaas-docs group="Configuration as Code" subgroup="Sessions" />
     public PublisherBuilder? ReadPublisher(string name)
     {
         return ReadByName(Publishers, name, publisher => publisher.Name);
     }
 
+    /// <summary>
+    /// Updates the configured publisher stored on the current Runner session builder instance.
+    /// </summary>
+    /// <remarks>
+    /// Use this method when working with the documented Runner session builder API surface in code. The change is stored on the current builder instance and is consumed by later build, validation, or execution steps.
+    /// </remarks>
+    /// <qaas-docs group="Configuration as Code" subgroup="Sessions" />
     public SessionBuilder UpdatePublisher(string name, PublisherBuilder publisherBuilder)
     {
         Publishers = UpdateByName(Publishers, name, publisherBuilder, publisher => publisher.Name);
         return this;
     }
 
+    /// <summary>
+    /// Updates the configured publisher stored on the current Runner session builder instance.
+    /// </summary>
+    /// <remarks>
+    /// Use this method when working with the documented Runner session builder API surface in code. The change is stored on the current builder instance and is consumed by later build, validation, or execution steps.
+    /// </remarks>
+    /// <qaas-docs group="Configuration as Code" subgroup="Sessions" />
     public SessionBuilder UpdatePublisher(string name, Func<PublisherBuilder, PublisherBuilder> update)
     {
         Publishers = UpdateByName(Publishers, name, update, publisher => publisher.Name);
         return this;
     }
 
+    /// <summary>
+    /// Removes the configured publisher from the current Runner session builder instance.
+    /// </summary>
+    /// <remarks>
+    /// Use this method when working with the documented Runner session builder API surface in code. The change is stored on the current builder instance and is consumed by later build, validation, or execution steps.
+    /// </remarks>
+    /// <qaas-docs group="Configuration as Code" subgroup="Sessions" />
     public SessionBuilder DeletePublisher(string name)
     {
         Publishers = DeleteByName(Publishers, name, publisher => publisher.Name);
         return this;
     }
 
+    /// <summary>
+    /// Adds the supplied transaction to the current Runner session builder instance.
+    /// </summary>
+    /// <remarks>
+    /// Use this method when working with the documented Runner session builder API surface in code. The change is stored on the current builder instance and is consumed by later build, validation, or execution steps.
+    /// </remarks>
+    /// <qaas-docs group="Configuration as Code" subgroup="Sessions" />
     public SessionBuilder AddTransaction(TransactionBuilder transactionBuilder)
     {
         Transactions = Transactions is null ? [transactionBuilder] : Transactions.Append(transactionBuilder).ToArray();
         return this;
     }
 
+    /// <summary>
+    /// Creates or adds the configured transaction entry on the current Runner session builder instance.
+    /// </summary>
+    /// <remarks>
+    /// Use this method when working with the documented Runner session builder API surface in code. The change is stored on the current builder instance and is consumed by later build, validation, or execution steps.
+    /// </remarks>
+    /// <qaas-docs group="Configuration as Code" subgroup="Sessions" />
     public SessionBuilder CreateTransaction(TransactionBuilder transactionBuilder)
     {
         return AddTransaction(transactionBuilder);
     }
 
+    /// <summary>
+    /// Returns the configured transactions currently stored on the Runner session builder instance.
+    /// </summary>
+    /// <remarks>
+    /// Use this method when working with the documented Runner session builder API surface in code. Use it to inspect the current configured state without rebuilding the surrounding collection or runtime object graph.
+    /// </remarks>
+    /// <qaas-docs group="Configuration as Code" subgroup="Sessions" />
     public IReadOnlyList<TransactionBuilder> ReadTransactions()
     {
         return Transactions ?? [];
     }
 
+    /// <summary>
+    /// Returns the configured transaction currently stored on the Runner session builder instance.
+    /// </summary>
+    /// <remarks>
+    /// Use this method when working with the documented Runner session builder API surface in code. Use it to inspect the current configured state without rebuilding the surrounding collection or runtime object graph.
+    /// </remarks>
+    /// <qaas-docs group="Configuration as Code" subgroup="Sessions" />
     public TransactionBuilder? ReadTransaction(string name)
     {
         return ReadByName(Transactions, name, transaction => transaction.Name);
     }
 
+    /// <summary>
+    /// Updates the configured transaction stored on the current Runner session builder instance.
+    /// </summary>
+    /// <remarks>
+    /// Use this method when working with the documented Runner session builder API surface in code. The change is stored on the current builder instance and is consumed by later build, validation, or execution steps.
+    /// </remarks>
+    /// <qaas-docs group="Configuration as Code" subgroup="Sessions" />
     public SessionBuilder UpdateTransaction(string name, TransactionBuilder transactionBuilder)
     {
         Transactions = UpdateByName(Transactions, name, transactionBuilder, transaction => transaction.Name);
         return this;
     }
 
+    /// <summary>
+    /// Updates the configured transaction stored on the current Runner session builder instance.
+    /// </summary>
+    /// <remarks>
+    /// Use this method when working with the documented Runner session builder API surface in code. The change is stored on the current builder instance and is consumed by later build, validation, or execution steps.
+    /// </remarks>
+    /// <qaas-docs group="Configuration as Code" subgroup="Sessions" />
     public SessionBuilder UpdateTransaction(string name, Func<TransactionBuilder, TransactionBuilder> update)
     {
         Transactions = UpdateByName(Transactions, name, update, transaction => transaction.Name);
         return this;
     }
 
+    /// <summary>
+    /// Removes the configured transaction from the current Runner session builder instance.
+    /// </summary>
+    /// <remarks>
+    /// Use this method when working with the documented Runner session builder API surface in code. The change is stored on the current builder instance and is consumed by later build, validation, or execution steps.
+    /// </remarks>
+    /// <qaas-docs group="Configuration as Code" subgroup="Sessions" />
     public SessionBuilder DeleteTransaction(string name)
     {
         Transactions = DeleteByName(Transactions, name, transaction => transaction.Name);
         return this;
     }
 
+    /// <summary>
+    /// Adds the supplied probe to the current Runner session builder instance.
+    /// </summary>
+    /// <remarks>
+    /// Use this method when working with the documented Runner session builder API surface in code. The change is stored on the current builder instance and is consumed by later build, validation, or execution steps.
+    /// </remarks>
+    /// <qaas-docs group="Configuration as Code" subgroup="Sessions" />
     public SessionBuilder AddProbe(ProbeBuilder probeBuilder)
     {
         Probes = Probes is null ? [probeBuilder] : Probes.Append(probeBuilder).ToArray();
         return this;
     }
 
+    /// <summary>
+    /// Creates or adds the configured probe entry on the current Runner session builder instance.
+    /// </summary>
+    /// <remarks>
+    /// Use this method when working with the documented Runner session builder API surface in code. The change is stored on the current builder instance and is consumed by later build, validation, or execution steps.
+    /// </remarks>
+    /// <qaas-docs group="Configuration as Code" subgroup="Sessions" />
     public SessionBuilder CreateProbe(ProbeBuilder probeBuilder)
     {
         return AddProbe(probeBuilder);
     }
 
+    /// <summary>
+    /// Returns the configured probes currently stored on the Runner session builder instance.
+    /// </summary>
+    /// <remarks>
+    /// Use this method when working with the documented Runner session builder API surface in code. Use it to inspect the current configured state without rebuilding the surrounding collection or runtime object graph.
+    /// </remarks>
+    /// <qaas-docs group="Configuration as Code" subgroup="Sessions" />
     public IReadOnlyList<ProbeBuilder> ReadProbes()
     {
         return Probes ?? [];
     }
 
+    /// <summary>
+    /// Returns the configured probe currently stored on the Runner session builder instance.
+    /// </summary>
+    /// <remarks>
+    /// Use this method when working with the documented Runner session builder API surface in code. Use it to inspect the current configured state without rebuilding the surrounding collection or runtime object graph.
+    /// </remarks>
+    /// <qaas-docs group="Configuration as Code" subgroup="Sessions" />
     public ProbeBuilder? ReadProbe(string name)
     {
         return ReadByName(Probes, name, probe => probe.Name);
     }
 
+    /// <summary>
+    /// Updates the configured probe stored on the current Runner session builder instance.
+    /// </summary>
+    /// <remarks>
+    /// Use this method when working with the documented Runner session builder API surface in code. The change is stored on the current builder instance and is consumed by later build, validation, or execution steps.
+    /// </remarks>
+    /// <qaas-docs group="Configuration as Code" subgroup="Sessions" />
     public SessionBuilder UpdateProbe(string name, ProbeBuilder probeBuilder)
     {
         Probes = UpdateByName(Probes, name, probeBuilder, probe => probe.Name);
         return this;
     }
 
+    /// <summary>
+    /// Updates the configured probe stored on the current Runner session builder instance.
+    /// </summary>
+    /// <remarks>
+    /// Use this method when working with the documented Runner session builder API surface in code. The change is stored on the current builder instance and is consumed by later build, validation, or execution steps.
+    /// </remarks>
+    /// <qaas-docs group="Configuration as Code" subgroup="Sessions" />
     public SessionBuilder UpdateProbe(string name, Func<ProbeBuilder, ProbeBuilder> update)
     {
         Probes = UpdateByName(Probes, name, update, probe => probe.Name);
         return this;
     }
 
+    /// <summary>
+    /// Removes the configured probe from the current Runner session builder instance.
+    /// </summary>
+    /// <remarks>
+    /// Use this method when working with the documented Runner session builder API surface in code. The change is stored on the current builder instance and is consumed by later build, validation, or execution steps.
+    /// </remarks>
+    /// <qaas-docs group="Configuration as Code" subgroup="Sessions" />
     public SessionBuilder DeleteProbe(string name)
     {
         Probes = DeleteByName(Probes, name, probe => probe.Name);
         return this;
     }
 
+    /// <summary>
+    /// Adds the supplied collector to the current Runner session builder instance.
+    /// </summary>
+    /// <remarks>
+    /// Use this method when working with the documented Runner session builder API surface in code. The change is stored on the current builder instance and is consumed by later build, validation, or execution steps.
+    /// </remarks>
+    /// <qaas-docs group="Configuration as Code" subgroup="Sessions" />
     public SessionBuilder AddCollector(CollectorBuilder collectorBuilder)
     {
         Collectors = Collectors is null ? [collectorBuilder] : Collectors.Append(collectorBuilder).ToArray();
         return this;
     }
 
+    /// <summary>
+    /// Creates or adds the configured collector entry on the current Runner session builder instance.
+    /// </summary>
+    /// <remarks>
+    /// Use this method when working with the documented Runner session builder API surface in code. The change is stored on the current builder instance and is consumed by later build, validation, or execution steps.
+    /// </remarks>
+    /// <qaas-docs group="Configuration as Code" subgroup="Sessions" />
     public SessionBuilder CreateCollector(CollectorBuilder collectorBuilder)
     {
         return AddCollector(collectorBuilder);
     }
 
+    /// <summary>
+    /// Returns the configured collectors currently stored on the Runner session builder instance.
+    /// </summary>
+    /// <remarks>
+    /// Use this method when working with the documented Runner session builder API surface in code. Use it to inspect the current configured state without rebuilding the surrounding collection or runtime object graph.
+    /// </remarks>
+    /// <qaas-docs group="Configuration as Code" subgroup="Sessions" />
     public IReadOnlyList<CollectorBuilder> ReadCollectors()
     {
         return Collectors ?? [];
     }
 
+    /// <summary>
+    /// Returns the configured collector currently stored on the Runner session builder instance.
+    /// </summary>
+    /// <remarks>
+    /// Use this method when working with the documented Runner session builder API surface in code. Use it to inspect the current configured state without rebuilding the surrounding collection or runtime object graph.
+    /// </remarks>
+    /// <qaas-docs group="Configuration as Code" subgroup="Sessions" />
     public CollectorBuilder? ReadCollector(string name)
     {
         return ReadByName(Collectors, name, collector => collector.Name);
     }
 
+    /// <summary>
+    /// Updates the configured collector stored on the current Runner session builder instance.
+    /// </summary>
+    /// <remarks>
+    /// Use this method when working with the documented Runner session builder API surface in code. The change is stored on the current builder instance and is consumed by later build, validation, or execution steps.
+    /// </remarks>
+    /// <qaas-docs group="Configuration as Code" subgroup="Sessions" />
     public SessionBuilder UpdateCollector(string name, CollectorBuilder collectorBuilder)
     {
         Collectors = UpdateByName(Collectors, name, collectorBuilder, collector => collector.Name);
         return this;
     }
 
+    /// <summary>
+    /// Updates the configured collector stored on the current Runner session builder instance.
+    /// </summary>
+    /// <remarks>
+    /// Use this method when working with the documented Runner session builder API surface in code. The change is stored on the current builder instance and is consumed by later build, validation, or execution steps.
+    /// </remarks>
+    /// <qaas-docs group="Configuration as Code" subgroup="Sessions" />
     public SessionBuilder UpdateCollector(string name, Func<CollectorBuilder, CollectorBuilder> update)
     {
         Collectors = UpdateByName(Collectors, name, update, collector => collector.Name);
         return this;
     }
 
+    /// <summary>
+    /// Removes the configured collector from the current Runner session builder instance.
+    /// </summary>
+    /// <remarks>
+    /// Use this method when working with the documented Runner session builder API surface in code. The change is stored on the current builder instance and is consumed by later build, validation, or execution steps.
+    /// </remarks>
+    /// <qaas-docs group="Configuration as Code" subgroup="Sessions" />
     public SessionBuilder DeleteCollector(string name)
     {
         Collectors = DeleteByName(Collectors, name, collector => collector.Name);
         return this;
     }
 
+    /// <summary>
+    /// Adds the supplied mocker command to the current Runner session builder instance.
+    /// </summary>
+    /// <remarks>
+    /// Use this method when working with the documented Runner session builder API surface in code. The change is stored on the current builder instance and is consumed by later build, validation, or execution steps.
+    /// </remarks>
+    /// <qaas-docs group="Configuration as Code" subgroup="Sessions" />
     public SessionBuilder AddMockerCommand(MockerCommandBuilder mockerCommandBuilder)
     {
         MockerCommands = MockerCommands is null
@@ -261,60 +562,137 @@ public partial class SessionBuilder
         return this;
     }
 
+    /// <summary>
+    /// Creates or adds the configured mocker command entry on the current Runner session builder instance.
+    /// </summary>
+    /// <remarks>
+    /// Use this method when working with the documented Runner session builder API surface in code. The change is stored on the current builder instance and is consumed by later build, validation, or execution steps.
+    /// </remarks>
+    /// <qaas-docs group="Configuration as Code" subgroup="Sessions" />
     public SessionBuilder CreateMockerCommand(MockerCommandBuilder mockerCommandBuilder)
     {
         return AddMockerCommand(mockerCommandBuilder);
     }
 
+    /// <summary>
+    /// Returns the configured mocker commands currently stored on the Runner session builder instance.
+    /// </summary>
+    /// <remarks>
+    /// Use this method when working with the documented Runner session builder API surface in code. Use it to inspect the current configured state without rebuilding the surrounding collection or runtime object graph.
+    /// </remarks>
+    /// <qaas-docs group="Configuration as Code" subgroup="Sessions" />
     public IReadOnlyList<MockerCommandBuilder> ReadMockerCommands()
     {
         return MockerCommands ?? [];
     }
 
+    /// <summary>
+    /// Returns the configured mocker command currently stored on the Runner session builder instance.
+    /// </summary>
+    /// <remarks>
+    /// Use this method when working with the documented Runner session builder API surface in code. Use it to inspect the current configured state without rebuilding the surrounding collection or runtime object graph.
+    /// </remarks>
+    /// <qaas-docs group="Configuration as Code" subgroup="Sessions" />
     public MockerCommandBuilder? ReadMockerCommand(string name)
     {
         return ReadByName(MockerCommands, name, command => command.Name);
     }
 
+    /// <summary>
+    /// Updates the configured mocker command stored on the current Runner session builder instance.
+    /// </summary>
+    /// <remarks>
+    /// Use this method when working with the documented Runner session builder API surface in code. The change is stored on the current builder instance and is consumed by later build, validation, or execution steps.
+    /// </remarks>
+    /// <qaas-docs group="Configuration as Code" subgroup="Sessions" />
     public SessionBuilder UpdateMockerCommand(string name, MockerCommandBuilder mockerCommandBuilder)
     {
         MockerCommands = UpdateByName(MockerCommands, name, mockerCommandBuilder, command => command.Name);
         return this;
     }
 
+    /// <summary>
+    /// Updates the configured mocker command stored on the current Runner session builder instance.
+    /// </summary>
+    /// <remarks>
+    /// Use this method when working with the documented Runner session builder API surface in code. The change is stored on the current builder instance and is consumed by later build, validation, or execution steps.
+    /// </remarks>
+    /// <qaas-docs group="Configuration as Code" subgroup="Sessions" />
     public SessionBuilder UpdateMockerCommand(string name, Func<MockerCommandBuilder, MockerCommandBuilder> update)
     {
         MockerCommands = UpdateByName(MockerCommands, name, update, command => command.Name);
         return this;
     }
 
+    /// <summary>
+    /// Removes the configured mocker command from the current Runner session builder instance.
+    /// </summary>
+    /// <remarks>
+    /// Use this method when working with the documented Runner session builder API surface in code. The change is stored on the current builder instance and is consumed by later build, validation, or execution steps.
+    /// </remarks>
+    /// <qaas-docs group="Configuration as Code" subgroup="Sessions" />
     public SessionBuilder DeleteMockerCommand(string name)
     {
         MockerCommands = DeleteByName(MockerCommands, name, command => command.Name);
         return this;
     }
 
+    /// <summary>
+    /// Adds the supplied stage to the current Runner session builder instance.
+    /// </summary>
+    /// <remarks>
+    /// Use this method when working with the documented Runner session builder API surface in code. The change is stored on the current builder instance and is consumed by later build, validation, or execution steps.
+    /// </remarks>
+    /// <qaas-docs group="Configuration as Code" subgroup="Sessions" />
     public SessionBuilder AddStage(StageConfig stage)
     {
         Stages = Stages.Append(stage).ToArray();
         return this;
     }
 
+    /// <summary>
+    /// Creates or adds the configured stage entry on the current Runner session builder instance.
+    /// </summary>
+    /// <remarks>
+    /// Use this method when working with the documented Runner session builder API surface in code. The change is stored on the current builder instance and is consumed by later build, validation, or execution steps.
+    /// </remarks>
+    /// <qaas-docs group="Configuration as Code" subgroup="Sessions" />
     public SessionBuilder CreateStage(StageConfig stage)
     {
         return AddStage(stage);
     }
 
+    /// <summary>
+    /// Returns the configured stages currently stored on the Runner session builder instance.
+    /// </summary>
+    /// <remarks>
+    /// Use this method when working with the documented Runner session builder API surface in code. Use it to inspect the current configured state without rebuilding the surrounding collection or runtime object graph.
+    /// </remarks>
+    /// <qaas-docs group="Configuration as Code" subgroup="Sessions" />
     public IReadOnlyList<StageConfig> ReadStages()
     {
         return Stages;
     }
 
+    /// <summary>
+    /// Returns the configured stage currently stored on the Runner session builder instance.
+    /// </summary>
+    /// <remarks>
+    /// Use this method when working with the documented Runner session builder API surface in code. Use it to inspect the current configured state without rebuilding the surrounding collection or runtime object graph.
+    /// </remarks>
+    /// <qaas-docs group="Configuration as Code" subgroup="Sessions" />
     public StageConfig? ReadStage(int stageNumber)
     {
         return Stages.FirstOrDefault(configuredStage => configuredStage.StageNumber == stageNumber);
     }
 
+    /// <summary>
+    /// Updates the configured stage stored on the current Runner session builder instance.
+    /// </summary>
+    /// <remarks>
+    /// Use this method when working with the documented Runner session builder API surface in code. The change is stored on the current builder instance and is consumed by later build, validation, or execution steps.
+    /// </remarks>
+    /// <qaas-docs group="Configuration as Code" subgroup="Sessions" />
     public SessionBuilder UpdateStage(int stageNumber, StageConfig stage)
     {
         var existingIndex = Array.FindIndex(Stages, configuredStage => configuredStage.StageNumber == stageNumber);
@@ -327,6 +705,13 @@ public partial class SessionBuilder
         return this;
     }
 
+    /// <summary>
+    /// Removes the configured stage from the current Runner session builder instance.
+    /// </summary>
+    /// <remarks>
+    /// Use this method when working with the documented Runner session builder API surface in code. The change is stored on the current builder instance and is consumed by later build, validation, or execution steps.
+    /// </remarks>
+    /// <qaas-docs group="Configuration as Code" subgroup="Sessions" />
     public SessionBuilder DeleteStage(int stageNumber)
     {
         Stages = Stages.Where(configuredStage => configuredStage.StageNumber != stageNumber).ToArray();

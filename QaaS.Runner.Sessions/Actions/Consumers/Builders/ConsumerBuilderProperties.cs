@@ -23,49 +23,35 @@ public partial class ConsumerBuilder
     [Required]
     [Description("The consumption timeout in milliseconds" +
                  " (timeout is the time since last message was read by the consumer)")]
-    internal int? TimeoutMs { get; set; }
-
+    public int? TimeoutMs { get; internal set; }
     [Description("How to filter the properties of each returned consumed data")]
-    internal DataFilter DataFilter { get; set; } = new();
-
+    public DataFilter DataFilter { get; internal set; } = new();
     [Description("The stage in which the Consumer runs at")]
     [DefaultValue((int)OrderedActions.Consumers)]
-    internal int Stage { get; set; } = (int)OrderedActions.Consumers;
-
+    public int Stage { get; internal set; } = (int)OrderedActions.Consumers;
     [Description("List of policies to use when communicating with this action's protocol")]
-    public PolicyBuilder[] Policies { get; set; } = [];
-
+    public PolicyBuilder[] Policies { get; internal set; } = [];
     [Description("Consumes messages from a rabbitmq")]
-    internal RabbitMqReaderConfig? RabbitMq { get; set; }
-
+    public RabbitMqReaderConfig? RabbitMq { get; internal set; }
     [Description("Consumes messages from a kafka topic")]
-    internal KafkaTopicReaderConfig? KafkaTopic { get; set; }
-
+    public KafkaTopicReaderConfig? KafkaTopic { get; internal set; }
     [Description("Consume messages from an mssql database table")]
-    internal MsSqlReaderConfig? MsSqlTable { get; set; }
-
+    public MsSqlReaderConfig? MsSqlTable { get; internal set; }
     [Description("Consume messages from an oracle sql database table")]
-    internal OracleReaderConfig? OracleSqlTable { get; set; }
-
+    public OracleReaderConfig? OracleSqlTable { get; internal set; }
     [Description("Consume messages from a trino sql database table")]
-    internal TrinoReaderConfig? TrinoSqlTable { get; set; }
-
+    public TrinoReaderConfig? TrinoSqlTable { get; internal set; }
     [Description("Consume messages from an postgresql database table")]
-    internal PostgreSqlReaderConfig? PostgreSqlTable { get; set; }
-
+    public PostgreSqlReaderConfig? PostgreSqlTable { get; internal set; }
     [Description("Consumes messages from an s3 bucket")]
-    internal S3BucketReaderConfig? S3Bucket { get; set; }
-
+    public S3BucketReaderConfig? S3Bucket { get; internal set; }
     [Description("Consumes documents from elasticsearch indices by an index pattern")]
-    internal ElasticReaderConfig? ElasticIndices { get; set; }
-
+    public ElasticReaderConfig? ElasticIndices { get; internal set; }
     [Description("Consumes messages from socket communications in various protocols")]
-    internal SocketReaderConfig? Socket { get; set; }
-
+    public SocketReaderConfig? Socket { get; internal set; }
     [Description("Consumes messages from IbmMq queue")]
-    internal IbmMqReaderConfig? IbmMqQueue { get; set; }
-
+    public IbmMqReaderConfig? IbmMqQueue { get; internal set; }
     [DefaultValue(null)]
     [Description("Serializer to use to deserialize the consumed data")]
-    internal DeserializeConfig? Deserialize { get; set; }
+    public DeserializeConfig? Deserialize { get; internal set; }
 }
