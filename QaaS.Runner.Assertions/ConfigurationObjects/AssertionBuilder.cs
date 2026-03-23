@@ -38,61 +38,47 @@ public class AssertionBuilder : IYamlConvertible
 
     [Required]
     [Description("The name of the assertion to use")]
-    internal string? Assertion { get; set; }
-    
+    public string? Assertion { get; internal set; }
     [Required, Description("The name of the test as presented in the test report with this assertion's result, if none is " +
                            "given creates a name as the type of the assertion and guid")]
     public string? Name { get; internal set; }
 
     [Description("The category of the assersion. Can filter which categories to run using the -A flag")]
-    internal string? Category { get; set; }
-
+    public string? Category { get; internal set; }
     [RequiredIfAny(nameof(SessionNamePatterns), [null])]
     [Description("The names of session datas to give the assertion")]
-    internal string[]? SessionNames { get; set; } = [];
-
+    public string[]? SessionNames { get; internal set; } = [];
     [RequiredIfAny(nameof(SessionNames), [null])]
     [Description("Regex patterns of session names")]
-    internal string[]? SessionNamePatterns { get; set; } = [];
-
+    public string[]? SessionNamePatterns { get; internal set; } = [];
     [Description("Names of the pre defined data sources to pass to the assertion")]
-    internal string[] DataSourceNames { get; set; } = [];
-
+    public string[] DataSourceNames { get; internal set; } = [];
     [Description("Regex patterns of data sources")]
-    internal string[] DataSourcePatterns { get; set; } = [];
-
+    public string[] DataSourcePatterns { get; internal set; } = [];
     [Description("Whether to save the data of the session's belonging to this assertion in the test report")]
     [DefaultValue(true)]
-    internal bool SaveSessionData { get; set; } = true;
-
+    public bool SaveSessionData { get; internal set; } = true;
     [Description("Whether to save the session logs belonging to this assertion in the test report")]
     [DefaultValue(true)]
-    internal bool SaveLogs { get; set; } = true;
-
+    public bool SaveLogs { get; internal set; } = true;
     [Description("Whether to save the attachments of the assertion in the test report (true) or not (false)")]
     [DefaultValue(true)]
-    internal bool SaveAttachments { get; set; } = true;
-    
+    public bool SaveAttachments { get; internal set; } = true;
     [Description("Whether to save the configuration template in the test report (true) or not (false)")]
     [DefaultValue(true)]
-    internal bool SaveTemplate { get; set; } = true;
-
+    public bool SaveTemplate { get; internal set; } = true;
     [Description("Whether to display the assertion's message trace in the assertion results or not." +
                  " Should be set to false when the assertion trace is massive and displaying it can cause performance issues")]
     [DefaultValue(true)]
-    internal bool DisplayTrace { get; set; } = true;
-
+    public bool DisplayTrace { get; internal set; } = true;
     [Description("The severity of the assertion, can be used to set the severity of the test in the test report.")]
     [DefaultValue(AssertionSeverity.Normal)]
-    internal AssertionSeverity Severity { get; set; } = AssertionSeverity.Normal;
-
+    public AssertionSeverity Severity { get; internal set; } = AssertionSeverity.Normal;
     [Description("Implementation configuration for the assertion, " +
                  "the configuration given here is loaded into the provided assertion dynamically.")]
-    internal IConfiguration AssertionConfiguration { get; set; } = new ConfigurationBuilder().Build();
-
+    public IConfiguration AssertionConfiguration { get; internal set; } = new ConfigurationBuilder().Build();
     [Description("The assertion's specific links. Will be added with the general links.")]
-    internal List<LinkBuilder> Links { get; set; } = [];
-    
+    public List<LinkBuilder> Links { get; internal set; } = [];
     /// <summary>
     /// Defines which assertion statuses will appear in the final report.
     /// Statuses explicitly listed will be included in the report, while all others will be excluded.

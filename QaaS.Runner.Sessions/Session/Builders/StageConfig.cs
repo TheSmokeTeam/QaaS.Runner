@@ -12,11 +12,9 @@ public class StageConfig
     }
 
     [Description("The internal session stage number this configuration applies to.")]
-    internal int StageNumber { get; set; }
-
+    public int StageNumber { get; internal set; }
     [Description("Optional time in milliseconds to wait before starting this internal session stage.")]
-    internal int? TimeoutBefore { get; set; }
-
+    public int? TimeoutBefore { get; internal set; }
     [Description("Optional time in milliseconds to wait after this internal session stage completes.")]
-    internal int? TimeoutAfter { get; set; }
+    public int? TimeoutAfter { get; internal set; }
 }

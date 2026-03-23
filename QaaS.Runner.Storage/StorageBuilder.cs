@@ -20,14 +20,11 @@ public class StorageBuilder
                  "[`Indented` - Formats the json with indents, more readable but less memory efficient /" +
                  "`None` - Formats the json without indents, less readable but more memory efficient ]")]
     [DefaultValue(Formatting.Indented)]
-    internal Formatting JsonStorageFormat { get; set; } = Formatting.Indented;
-
+    public Formatting JsonStorageFormat { get; internal set; } = Formatting.Indented;
     [Description("Supports storage as a file system directory")]
-    internal FilesInFileSystemConfig? FileSystem { get; set; }
-
+    public FilesInFileSystemConfig? FileSystem { get; internal set; }
     [Description("Supports storage as an S3 bucket with a certain prefix")]
-    internal S3Config? S3 { get; set; }
-
+    public S3Config? S3 { get; internal set; }
     private StorageBuilder Reset()
     {
         FileSystem = null;

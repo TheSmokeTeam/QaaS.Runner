@@ -1,4 +1,4 @@
-﻿using System.ComponentModel;
+using System.ComponentModel;
 using System.ComponentModel.DataAnnotations;
 using System.Diagnostics.CodeAnalysis;
 using QaaS.Framework.Configurations.CustomValidationAttributes;
@@ -12,7 +12,6 @@ public record ExecuteConfigurations
     [MinLength(1)]
     [UniquePropertyInEnumerable(nameof(CommandConfig.Id))]
     [Description("The list of QaaS commands to execute in the order they will be executed")]
-    internal CommandConfig[]? Commands { get; set; }
-
+    public CommandConfig[]? Commands { get; internal set; }
     public IReadOnlyList<CommandConfig> ReadCommands() => Commands ?? [];
 }

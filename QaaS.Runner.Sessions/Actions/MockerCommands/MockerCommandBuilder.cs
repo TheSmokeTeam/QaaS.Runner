@@ -23,28 +23,22 @@ public class MockerCommandBuilder
     public string? Name { get; internal set; }
 
     [DefaultValue((int)OrderedActions.MockerCommands), Description("The stage in which the Mocker Command runs at")]
-    internal int Stage { get; set; } = (int)OrderedActions.MockerCommands;
-
+    public int Stage { get; internal set; } = (int)OrderedActions.MockerCommands;
     [Required]
     [Description("The name of the mocker server to interact with")]
-    internal string? ServerName { get; set; }
-
+    public string? ServerName { get; internal set; }
     [Required]
     [Description("The server controller redis API")]
-    internal RedisConfig? Redis { get; set; }
-
+    public RedisConfig? Redis { get; internal set; }
     [Required]
     [Description("The command action to commit")]
-    internal MockerCommandConfig? Command { get; set; }
-
+    public MockerCommandConfig? Command { get; internal set; }
     [Description("The duration the runner will try to request the mocker server instances")]
     [DefaultValue(3000)]
-    internal int RequestDurationMs { get; set; } = 3000;
-
+    public int RequestDurationMs { get; internal set; } = 3000;
     [Description("The amount of retries the runner will try to request the mocker server instances")]
     [DefaultValue(3)]
-    internal int RequestRetries { get; set; } = 3;
-
+    public int RequestRetries { get; internal set; } = 3;
     /// <summary>
     /// Sets the name used for the current Runner mocker command builder instance.
     /// </summary>

@@ -28,51 +28,39 @@ public class TransactionBuilder
     [Description(
         "The name of the data sources to publish the data of" +
         " in the order their data will be published")]
-    internal string[]? DataSourceNames { get; set; }
-
+    public string[]? DataSourceNames { get; internal set; }
     [RequiredIfAny(nameof(DataSourceNames), [null])]
     [Description("Patterns of the names of data sources to publish the data of off")]
-    internal string[]? DataSourcePatterns { get; set; }
-
+    public string[]? DataSourcePatterns { get; internal set; }
     [Description("How much iterations of the publishing action to execute")]
     [DefaultValue(1)]
     [Range(1, int.MaxValue)]
-    internal int Iterations { get; set; } = 1;
-
+    public int Iterations { get; internal set; } = 1;
     [Description("Whether to publish in loop")]
     [DefaultValue(false)]
-    internal bool Loop { get; set; }
-
+    public bool Loop { get; internal set; }
     [Range(ulong.MinValue, ulong.MaxValue),
      Description("The time to sleep in milliseconds in between iterations"), DefaultValue(0)]
-    internal ulong SleepTimeMs { get; set; } = 0;
-
+    public ulong SleepTimeMs { get; internal set; } = 0;
     [Required]
     [Description(
         "the consumption timeout in milliseconds (timeout is the time to wait for a response after sending a request)")]
-    internal int? TimeoutMs { get; set; }
-
+    public int? TimeoutMs { get; internal set; }
     [Description("How to filter the properties of each returned sent (input) data")]
-    internal DataFilter InputDataFilter { get; set; } = new();
-
+    public DataFilter InputDataFilter { get; internal set; } = new();
     [Description("How to filter the properties of each returned received (output) data")]
-    internal DataFilter OutputDataFilter { get; set; } = new();
-
+    public DataFilter OutputDataFilter { get; internal set; } = new();
     [Description("The stage in which the Transaction runs at")]
     [DefaultValue((int)OrderedActions.Transactions)]
-    internal int Stage { get; set; } = (int)OrderedActions.Transactions;
-
+    public int Stage { get; internal set; } = (int)OrderedActions.Transactions;
     [Description("List of policies to use when communicating with this action's protocol")]
-    internal PolicyBuilder[] Policies { get; set; } = [];
-
+    public PolicyBuilder[] Policies { get; internal set; } = [];
     [Description("The serializer to use to serialize the sent data")]
     [DefaultValue(null)]
-    internal SerializeConfig? InputSerialize { get; set; }
-
+    public SerializeConfig? InputSerialize { get; internal set; }
     [Description("The deserializer to use to deserialize the received data")]
     [DefaultValue(null)]
-    internal DeserializeConfig? OutputDeserialize { get; set; }
-
+    public DeserializeConfig? OutputDeserialize { get; internal set; }
     [Description("Sends an http request")] internal HttpTransactorConfig? Http { get; set; }
 
     [Description("Invokes a Grpc Method")] internal GrpcTransactorConfig? Grpc { get; set; }

@@ -31,75 +31,54 @@ public partial class PublisherBuilder
     [Description(
         "The name of the data sources to publish the data of" +
         " in the order their data will be published")]
-    internal string[]? DataSourceNames { get; set; }
-
+    public string[]? DataSourceNames { get; internal set; }
     [RequiredIfAny(nameof(DataSourceNames), [null])]
     [Description("Patterns of the names of data sources to publish the data of off")]
-    internal string[]? DataSourcePatterns { get; set; }
-
+    public string[]? DataSourcePatterns { get; internal set; }
     [Description("How to filter the properties of each returned published data")]
-    internal DataFilter DataFilter { get; set; } = new();
-
+    public DataFilter DataFilter { get; internal set; } = new();
     [Description("How much iterations of the publishing action to execute")]
     [DefaultValue(1)]
     [Range(1, int.MaxValue)]
-    internal int Iterations { get; set; } = 1;
-
+    public int Iterations { get; internal set; } = 1;
     [Description("Whether to publish in loop")]
     [DefaultValue(false)]
-    internal bool Loop { get; set; } = false;
-
+    public bool Loop { get; internal set; } = false;
     [Range(ulong.MinValue, ulong.MaxValue),
      Description("The time to sleep in milliseconds in between iterations"), DefaultValue(0)]
-    internal ulong SleepTimeMs { get; set; } = 0;
-
+    public ulong SleepTimeMs { get; internal set; } = 0;
     [Description("Whether to publish in a specified parallelism")]
-    internal Parallel? Parallel { get; set; }
-
+    public Parallel? Parallel { get; internal set; }
     [Description("Determines whether the publisher acts as a chunk publisher")]
-    internal Chunks? Chunk { get; set; }
-
+    public Chunks? Chunk { get; internal set; }
     [Description("The stage in which the Publisher runs at")]
     [DefaultValue((int)OrderedActions.Publishers)]
-    internal int Stage { get; set; } = (int)OrderedActions.Publishers;
-
+    public int Stage { get; internal set; } = (int)OrderedActions.Publishers;
     [Description("List of policies to use when communicating with this action's protocol")]
-    internal PolicyBuilder[] Policies { get; set; } = [];
-
+    public PolicyBuilder[] Policies { get; internal set; } = [];
     [Description("Publishes messages to a rabbitmq")]
-    internal RabbitMqSenderConfig? RabbitMq { get; set; }
-
+    public RabbitMqSenderConfig? RabbitMq { get; internal set; }
     [Description("Publishes messages to a kafka topic")]
-    internal KafkaTopicSenderConfig? KafkaTopic { get; set; }
-
+    public KafkaTopicSenderConfig? KafkaTopic { get; internal set; }
     [Description("Publishes messages to a redis cache")]
-    internal RedisSenderConfig? Redis { get; set; }
-
+    public RedisSenderConfig? Redis { get; internal set; }
     [Description("Publishes messages to a postgresql database table")]
-    internal PostgreSqlSenderConfig? PostgreSqlTable { get; set; }
-
+    public PostgreSqlSenderConfig? PostgreSqlTable { get; internal set; }
     [Description("Publishes messages to an oracle sql database table")]
-    internal OracleSenderConfig? OracleSqlTable { get; set; }
-
+    public OracleSenderConfig? OracleSqlTable { get; internal set; }
     [Description("Publishes messages to an S3 bucket")]
-    internal S3BucketSenderConfig? S3Bucket { get; set; }
-
+    public S3BucketSenderConfig? S3Bucket { get; internal set; }
     [Description("Publishes messages from a socket to an endpoint")]
-    internal SocketSenderConfig? Socket { get; set; }
-
+    public SocketSenderConfig? Socket { get; internal set; }
     [Description("Publishes documents to an elastic index")]
-    internal ElasticSenderConfig? ElasticIndex { get; set; }
-
+    public ElasticSenderConfig? ElasticIndex { get; internal set; }
     [Description("Publishes messages to an mssql database table")]
-    internal MsSqlSenderConfig? MsSqlTable { get; set; }
-
+    public MsSqlSenderConfig? MsSqlTable { get; internal set; }
     [Description("Publishes messages to an MongoDb collection")]
-    internal MongoDbCollectionSenderConfig? MongoDbCollection { get; set; }
-
+    public MongoDbCollectionSenderConfig? MongoDbCollection { get; internal set; }
     [Description("Publishes files to a remote machine using SFTP")]
-    internal SftpSenderConfig? Sftp { get; set; }
-
+    public SftpSenderConfig? Sftp { get; internal set; }
     [Description("The serializer to use to serialize the data to publish")]
     [DefaultValue(null)]
-    internal SerializeConfig? Serialize { get; set; }
+    public SerializeConfig? Serialize { get; internal set; }
 }

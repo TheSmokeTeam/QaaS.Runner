@@ -426,8 +426,7 @@ public class ConfigurationTemplateRendererTests
     [Test]
     public void ShouldSerializeProperty_ReturnsFalseForRecordEqualityContractAndTrueForRegularProperties()
     {
-        var equalityContract = typeof(RecordShape).GetProperty("EqualityContract",
-            BindingFlags.Instance | BindingFlags.NonPublic)!;
+        var equalityContract = typeof(RecordShape).GetProperty("EqualityContract", BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic)!;
         var regularProperty = typeof(RecordShape).GetProperty(nameof(RecordShape.Name))!;
 
         var shouldSerializeEqualityContract = (bool)InvokePrivate("ShouldSerializeProperty", equalityContract)!;

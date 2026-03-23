@@ -78,7 +78,7 @@ public class StorageBuilderCrudTests
 
     private static void SetInternalProperty(StorageBuilder builder, string propertyName, object? value)
     {
-        var property = typeof(StorageBuilder).GetProperty(propertyName, BindingFlags.Instance | BindingFlags.NonPublic)!;
+        var property = typeof(StorageBuilder).GetProperty(propertyName, BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic)!;
         property.SetValue(builder, value);
     }
 }

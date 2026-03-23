@@ -467,7 +467,7 @@ public class RunnerBehaviorTests
 
         Assert.That(executions, Has.Count.EqualTo(2));
 
-        var executionTypeProperty = typeof(Execution).GetProperty("Type", BindingFlags.Instance | BindingFlags.NonPublic);
+        var executionTypeProperty = typeof(Execution).GetProperty("Type", BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
         Assert.That(executions.Select(execution => executionTypeProperty!.GetValue(execution)),
             Is.All.EqualTo(ExecutionType.Template));
     }

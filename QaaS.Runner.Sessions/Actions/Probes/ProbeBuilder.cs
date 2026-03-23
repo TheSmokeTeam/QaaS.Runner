@@ -29,22 +29,17 @@ public class ProbeBuilder : IYamlConvertible
 
     [Required]
     [Description("The name of the probe to use")]
-    internal string? Probe { get; set; }
-
+    public string? Probe { get; internal set; }
     [Description("The stage in which the Probe runs at")]
     [DefaultValue((int)OrderedActions.Probes)]
-    internal int Stage { get; set; } = (int)OrderedActions.Probes;
-
+    public int Stage { get; internal set; } = (int)OrderedActions.Probes;
     [Description("Names of the pre defined data sources to pass to the probe")]
-    internal string[] DataSourceNames { get; set; } = [];
-
+    public string[] DataSourceNames { get; internal set; } = [];
     [Description("Regex patterns of data sources")]
-    internal string[] DataSourcePatterns { get; set; } = [];
-
+    public string[] DataSourcePatterns { get; internal set; } = [];
     [Description("Implementation configuration for the probe, " +
                  "the configuration given here is loaded into the provided probe dynamically.")]
-    internal IConfiguration ProbeConfiguration { get; set; } = new ConfigurationBuilder().Build();
-
+    public IConfiguration ProbeConfiguration { get; internal set; } = new ConfigurationBuilder().Build();
     /// <summary>
     /// Reads the serialized configuration for the current Runner probe builder instance.
     /// </summary>

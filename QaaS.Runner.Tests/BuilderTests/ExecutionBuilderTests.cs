@@ -69,10 +69,10 @@ public class ExecutionBuilderTests
             Assert.That(execution.DataSourceLogic, Is.Not.Null);
             Assert.That(execution.StorageLogic, Is.Not.Null);
             Assert.That(typeof(Execution)
-                .GetProperty("Type", BindingFlags.Instance | BindingFlags.NonPublic)!
+                .GetProperty("Type", BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic)!
                 .GetValue(execution), Is.EqualTo(ExecutionType.Run));
             Assert.That(typeof(Execution)
-                .GetProperty("Context", BindingFlags.Instance | BindingFlags.NonPublic)!
+                .GetProperty("Context", BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic)!
                 .GetValue(execution), Is.Not.Null);
         });
     }
@@ -433,10 +433,10 @@ public class ExecutionBuilderTests
         var publisher = session.ReadPublishers().Single();
         var consumer = session.ReadConsumers().Single();
         var publisherRabbitMq = (RabbitMqSenderConfig?)typeof(QaaS.Runner.Sessions.Actions.Publishers.Builders.PublisherBuilder)
-            .GetProperty("RabbitMq", BindingFlags.Instance | BindingFlags.NonPublic)!
+            .GetProperty("RabbitMq", BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic)!
             .GetValue(publisher);
         var consumerRabbitMq = (RabbitMqReaderConfig?)typeof(QaaS.Runner.Sessions.Actions.Consumers.Builders.ConsumerBuilder)
-            .GetProperty("RabbitMq", BindingFlags.Instance | BindingFlags.NonPublic)!
+            .GetProperty("RabbitMq", BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic)!
             .GetValue(consumer);
 
         Assert.Multiple(() =>
@@ -819,7 +819,7 @@ public class ExecutionBuilderTests
 
         var execution = builder.Build();
         var executionContext = (InternalContext)typeof(Execution)
-            .GetProperty("Context", BindingFlags.Instance | BindingFlags.NonPublic)!
+            .GetProperty("Context", BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic)!
             .GetValue(execution)!;
 
         Assert.Multiple(() =>

@@ -366,9 +366,9 @@ public class TransactionBuilderTests
             .WithTimeout(1000)
             .AddDataSource("source-a");
 
-        typeof(TransactionBuilder).GetProperty("Http", BindingFlags.Instance | BindingFlags.NonPublic)!
+        typeof(TransactionBuilder).GetProperty("Http", BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic)!
             .SetValue(builder, new HttpTransactorConfig { Method = HttpMethods.Get, BaseAddress = "https://test.com" });
-        typeof(TransactionBuilder).GetProperty("Grpc", BindingFlags.Instance | BindingFlags.NonPublic)!
+        typeof(TransactionBuilder).GetProperty("Grpc", BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic)!
             .SetValue(builder, new GrpcTransactorConfig());
 
         var result = builder.Build(_context, _actionFailures, _sessionName);

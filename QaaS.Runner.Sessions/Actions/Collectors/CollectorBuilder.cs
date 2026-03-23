@@ -25,25 +25,21 @@ public class CollectorBuilder
     public string? Name { get; internal set; }
 
     [Description("How to filter the properties of each returned collected data")]
-    internal DataFilter DataFilter { get; set; } = new();
-
+    public DataFilter DataFilter { get; internal set; } = new();
     [Description("The collection range of the collector's action contains parameters for the start and end times " +
                  "of the collection range in relation to the start and end time of the collector's session.")]
-    internal CollectionRange CollectionRange { get; set; } = new();
-
+    public CollectionRange CollectionRange { get; internal set; } = new();
     [Range(uint.MinValue, uint.MaxValue)]
     [Description(
         "The check interval in milliseconds of the check that the current UTC time is past" +
         " the collection end time, so the collection action can happen.")]
     [DefaultValue(1000)]
-    internal uint EndTimeReachedCheckIntervalMs { get; set; } = 1000;
-
+    public uint EndTimeReachedCheckIntervalMs { get; internal set; } = 1000;
     [Description(
         "Collects messages from the prometheus `query_range` API and saves each of them as an item of a vector result's array." +
         " vector is a result type in prometheus that represents a set of time series data, every item of" +
         " its result array represents a single value at a certain time.")]
-    internal PrometheusFetcherConfig? Prometheus { get; set; }
-
+    public PrometheusFetcherConfig? Prometheus { get; internal set; }
     /// <summary>
     /// Sets the name used for the current Runner collector builder instance.
     /// </summary>

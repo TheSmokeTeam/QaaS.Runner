@@ -513,8 +513,8 @@ namespace QaaS.Runner.Tests.LoadersTests
             Assert.That(runner, Is.Not.Null);
             Assert.That(runner.ExecutionBuilders, Has.Count.EqualTo(1));
 
-            var emptyResultsProperty = typeof(Runner).GetProperty("EmptyResults", BindingFlags.Instance | BindingFlags.NonPublic)!;
-            var serveResultsProperty = typeof(Runner).GetProperty("ServeResults", BindingFlags.Instance | BindingFlags.NonPublic)!;
+            var emptyResultsProperty = typeof(Runner).GetProperty("EmptyResults", BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic)!;
+            var serveResultsProperty = typeof(Runner).GetProperty("ServeResults", BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic)!;
 
             Assert.That((bool)emptyResultsProperty.GetValue(runner)!, Is.True);
             Assert.That((bool)serveResultsProperty.GetValue(runner)!, Is.True);

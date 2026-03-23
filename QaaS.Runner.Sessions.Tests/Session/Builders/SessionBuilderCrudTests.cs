@@ -189,11 +189,11 @@ public class SessionBuilderCrudTests
     public void UpdateByName_WhenCollectionIsNull_DoesNotThrowAndKeepsCollectionNull()
     {
         var builder = new SessionBuilder();
-        typeof(SessionBuilder).GetProperty("Consumers", BindingFlags.Instance | BindingFlags.NonPublic)!
+        typeof(SessionBuilder).GetProperty("Consumers", BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic)!
             .SetValue(builder, null);
 
         Assert.DoesNotThrow(() => builder.UpdateConsumer("missing", new ConsumerBuilder().Named("replacement")));
-        Assert.That(typeof(SessionBuilder).GetProperty("Consumers", BindingFlags.Instance | BindingFlags.NonPublic)!
+        Assert.That(typeof(SessionBuilder).GetProperty("Consumers", BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic)!
             .GetValue(builder), Is.Null);
     }
 
@@ -221,7 +221,7 @@ public class SessionBuilderCrudTests
                      "MockerCommands"
                  })
         {
-            typeof(SessionBuilder).GetProperty(propertyName, BindingFlags.Instance | BindingFlags.NonPublic)!
+            typeof(SessionBuilder).GetProperty(propertyName, BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic)!
                 .SetValue(builder, value);
         }
     }

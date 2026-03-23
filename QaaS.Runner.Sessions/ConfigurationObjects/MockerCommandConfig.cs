@@ -6,14 +6,11 @@ namespace QaaS.Runner.Sessions.ConfigurationObjects;
 public record MockerCommandConfig
 {
     [Description("Mocker 'ChangeActionStub' command properties")]
-    internal ChangeActionStub? ChangeActionStub { get; set; }
-
+    public ChangeActionStub? ChangeActionStub { get; internal set; }
     [Description("Mocker 'TriggerAction' command properties")]
-    internal TriggerAction? TriggerAction { get; set; }
-
+    public TriggerAction? TriggerAction { get; internal set; }
     [Description("Mocker 'Consume' command properties")]
-    internal ConsumeCommandConfig? Consume { get; set; }
-
+    public ConsumeCommandConfig? Consume { get; internal set; }
     public ChangeActionStub? ReadChangeActionStub() => ChangeActionStub;
 
     public TriggerAction? ReadTriggerAction() => TriggerAction;

@@ -17,14 +17,11 @@ public class LinkBuilder
     public string? Name { get; internal set; }
 
     [Description("Links the kibana's discovery filtered for the test's session times to each test result.")]
-    internal KibanaLinkConfig? Kibana { get; set; }
-
+    public KibanaLinkConfig? Kibana { get; internal set; }
     [Description("Links the prometheus' graph filtered for the test's session times to each test result.")]
-    internal PrometheusLinkConfig? Prometheus { get; set; }
-
+    public PrometheusLinkConfig? Prometheus { get; internal set; }
     [Description("Links the grafana dashboard filtered for the test's session times to each test result.")]
-    internal GrafanaLinkConfig? Grafana { get; set; }
-
+    public GrafanaLinkConfig? Grafana { get; internal set; }
     /// <summary>
     /// Sets the name used for the current Runner link builder instance.
     /// </summary>

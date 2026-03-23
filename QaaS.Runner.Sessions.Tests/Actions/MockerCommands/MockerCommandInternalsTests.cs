@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Collections.Concurrent;
 using System.Linq;
@@ -50,7 +50,7 @@ public class MockerCommandInternalsTests
 
         var instances = (IList<string>)GetField(typeof(MockerCommand), command, "_serverInstanceNames");
         var ioState = (InputOutputState?)typeof(MockerCommand)
-            .GetProperty("ServerInputOutputState", BindingFlags.Instance | BindingFlags.NonPublic)!
+            .GetProperty("ServerInputOutputState", BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic)!
             .GetValue(command);
 
         Assert.That(instances, Has.Count.EqualTo(1));
@@ -97,7 +97,7 @@ public class MockerCommandInternalsTests
 
         var instances = (IList<string>)GetField(typeof(MockerCommand), command, "_serverInstanceNames");
         var ioState = (InputOutputState?)typeof(MockerCommand)
-            .GetProperty("ServerInputOutputState", BindingFlags.Instance | BindingFlags.NonPublic)!
+            .GetProperty("ServerInputOutputState", BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic)!
             .GetValue(command);
 
         Assert.That(instances, Is.Empty);
@@ -121,7 +121,7 @@ public class MockerCommandInternalsTests
 
         var instances = (IList<string>)GetField(typeof(MockerCommand), command, "_serverInstanceNames");
         var ioState = (InputOutputState?)typeof(MockerCommand)
-            .GetProperty("ServerInputOutputState", BindingFlags.Instance | BindingFlags.NonPublic)!
+            .GetProperty("ServerInputOutputState", BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic)!
             .GetValue(command);
 
         Assert.That(instances, Is.Empty);
@@ -489,7 +489,7 @@ public class MockerCommandInternalsTests
     public void ConsumeMockerCommand_AdditionalDataExchange_WithOnlyInput_ReturnsOnlyInputData()
     {
         var consumeCommand = CreateUninitializedConsumeCommand();
-        typeof(MockerCommand).GetProperty("ServerInputOutputState", BindingFlags.Instance | BindingFlags.NonPublic)!
+        typeof(MockerCommand).GetProperty("ServerInputOutputState", BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic)!
             .SetValue(consumeCommand, InputOutputState.OnlyInput);
 
         var inputQueue = CommunicationMethods.CreateConsumerEndpointInput("server-a");
@@ -517,7 +517,7 @@ public class MockerCommandInternalsTests
     public void ConsumeMockerCommand_AdditionalDataExchange_WithOnlyOutput_ReturnsOnlyOutputData()
     {
         var consumeCommand = CreateUninitializedConsumeCommand();
-        typeof(MockerCommand).GetProperty("ServerInputOutputState", BindingFlags.Instance | BindingFlags.NonPublic)!
+        typeof(MockerCommand).GetProperty("ServerInputOutputState", BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic)!
             .SetValue(consumeCommand, InputOutputState.OnlyOutput);
 
         var outputQueue = CommunicationMethods.CreateConsumerEndpointOutput("server-a");
@@ -571,7 +571,7 @@ public class MockerCommandInternalsTests
     public void ConsumeMockerCommand_AdditionalDataExchange_NoInputOutput_ReturnsNullTuple()
     {
         var consumeCommand = CreateUninitializedConsumeCommand();
-        typeof(MockerCommand).GetProperty("ServerInputOutputState", BindingFlags.Instance | BindingFlags.NonPublic)!
+        typeof(MockerCommand).GetProperty("ServerInputOutputState", BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic)!
             .SetValue(consumeCommand, InputOutputState.NoInputOutput);
 
         var result =
@@ -818,7 +818,7 @@ public class MockerCommandInternalsTests
         SetField(typeof(MockerCommand), consumeCommand, "_serverInstanceNames", new List<string> { "instance-1" });
         SetField(typeof(MockerCommand), consumeCommand, "_successfulCommandResponseToServerInstanceNames",
             new List<string> { "instance-1" });
-        typeof(MockerCommand).GetProperty("ServerInputOutputState", BindingFlags.Instance | BindingFlags.NonPublic)!
+        typeof(MockerCommand).GetProperty("ServerInputOutputState", BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic)!
             .SetValue(consumeCommand, InputOutputState.BothInputOutput);
 
         SetField(typeof(ConsumeMockerCommand), consumeCommand, "_consumeConfig", new ConsumeCommandConfig
@@ -877,7 +877,7 @@ public class MockerCommandInternalsTests
     public void ConsumeMockerCommand_AdditionalDataExchange_WithOutputDeserializer_DeserializesOutputBody()
     {
         var consumeCommand = CreateUninitializedConsumeCommand();
-        typeof(MockerCommand).GetProperty("ServerInputOutputState", BindingFlags.Instance | BindingFlags.NonPublic)!
+        typeof(MockerCommand).GetProperty("ServerInputOutputState", BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic)!
             .SetValue(consumeCommand, InputOutputState.OnlyOutput);
 
         SetField(typeof(ConsumeMockerCommand), consumeCommand, "_consumeConfig", new ConsumeCommandConfig
