@@ -236,152 +236,341 @@ public class ExecutionBuilder() : BaseExecutionBuilder<InternalContext, Executio
         return resolvedStorages;
     }
 
+    /// <summary>
+    /// Replaces the global dictionary stored on the runner execution context.
+    /// </summary>
+    /// <remarks>
+    /// Use this method when working with the documented Runner execution builder API surface in code. The change is stored on the current builder instance and is consumed by later build, validation, or execution steps.
+    /// </remarks>
+    /// <qaas-docs group="Configuration as Code" subgroup="Executions" />
     public ExecutionBuilder WithGlobalDict(Dictionary<string, object?> globalDict)
     {
         _globalDict = globalDict;
         return this;
     }
 
+    /// <summary>
+    /// Adds the supplied session to the current Runner execution builder instance.
+    /// </summary>
+    /// <remarks>
+    /// Use this method when working with the documented Runner execution builder API surface in code. The change is stored on the current builder instance and is consumed by later build, validation, or execution steps.
+    /// </remarks>
+    /// <qaas-docs group="Configuration as Code" subgroup="Executions" />
     public ExecutionBuilder AddSession(SessionBuilder sessionBuilder)
     {
         Sessions = Sessions is null ? [sessionBuilder] : Sessions.Append(sessionBuilder).ToArray();
         return this;
     }
 
+    /// <summary>
+    /// Creates or adds the configured session entry on the current Runner execution builder instance.
+    /// </summary>
+    /// <remarks>
+    /// Use this method when working with the documented Runner execution builder API surface in code. The change is stored on the current builder instance and is consumed by later build, validation, or execution steps.
+    /// </remarks>
+    /// <qaas-docs group="Configuration as Code" subgroup="Executions" />
     public ExecutionBuilder CreateSession(SessionBuilder sessionBuilder)
     {
         return AddSession(sessionBuilder);
     }
 
+    /// <summary>
+    /// Returns the configured sessions currently stored on the Runner execution builder instance.
+    /// </summary>
+    /// <remarks>
+    /// Use this method when working with the documented Runner execution builder API surface in code. Use it to inspect the current configured state without rebuilding the surrounding collection or runtime object graph.
+    /// </remarks>
+    /// <qaas-docs group="Configuration as Code" subgroup="Executions" />
     public IReadOnlyList<SessionBuilder> ReadSessions()
     {
         return Sessions ?? [];
     }
 
+    /// <summary>
+    /// Updates the configured session stored on the current Runner execution builder instance.
+    /// </summary>
+    /// <remarks>
+    /// Use this method when working with the documented Runner execution builder API surface in code. The change is stored on the current builder instance and is consumed by later build, validation, or execution steps.
+    /// </remarks>
+    /// <qaas-docs group="Configuration as Code" subgroup="Executions" />
     public ExecutionBuilder UpdateSession(string sessionName, SessionBuilder sessionBuilder)
     {
         Sessions = UpdateByName(Sessions, sessionName, sessionBuilder, session => session.Name);
         return this;
     }
 
+    /// <summary>
+    /// Removes the configured session from the current Runner execution builder instance.
+    /// </summary>
+    /// <remarks>
+    /// Use this method when working with the documented Runner execution builder API surface in code. The change is stored on the current builder instance and is consumed by later build, validation, or execution steps.
+    /// </remarks>
+    /// <qaas-docs group="Configuration as Code" subgroup="Executions" />
     public ExecutionBuilder DeleteSession(string sessionName)
     {
         Sessions = DeleteByName(Sessions, sessionName, session => session.Name);
         return this;
     }
 
+    /// <summary>
+    /// Adds the supplied assertion to the current Runner execution builder instance.
+    /// </summary>
+    /// <remarks>
+    /// Use this method when working with the documented Runner execution builder API surface in code. The change is stored on the current builder instance and is consumed by later build, validation, or execution steps.
+    /// </remarks>
+    /// <qaas-docs group="Configuration as Code" subgroup="Executions" />
     public ExecutionBuilder AddAssertion(AssertionBuilder assertionBuilder)
     {
         Assertions = Assertions is null ? [assertionBuilder] : Assertions.Append(assertionBuilder).ToArray();
         return this;
     }
 
+    /// <summary>
+    /// Creates or adds the configured assertion entry on the current Runner execution builder instance.
+    /// </summary>
+    /// <remarks>
+    /// Use this method when working with the documented Runner execution builder API surface in code. The change is stored on the current builder instance and is consumed by later build, validation, or execution steps.
+    /// </remarks>
+    /// <qaas-docs group="Configuration as Code" subgroup="Executions" />
     public ExecutionBuilder CreateAssertion(AssertionBuilder assertionBuilder)
     {
         return AddAssertion(assertionBuilder);
     }
 
+    /// <summary>
+    /// Returns the configured assertions currently stored on the Runner execution builder instance.
+    /// </summary>
+    /// <remarks>
+    /// Use this method when working with the documented Runner execution builder API surface in code. Use it to inspect the current configured state without rebuilding the surrounding collection or runtime object graph.
+    /// </remarks>
+    /// <qaas-docs group="Configuration as Code" subgroup="Executions" />
     public IReadOnlyList<AssertionBuilder> ReadAssertions()
     {
         return Assertions ?? [];
     }
 
+    /// <summary>
+    /// Updates the configured assertion stored on the current Runner execution builder instance.
+    /// </summary>
+    /// <remarks>
+    /// Use this method when working with the documented Runner execution builder API surface in code. The change is stored on the current builder instance and is consumed by later build, validation, or execution steps.
+    /// </remarks>
+    /// <qaas-docs group="Configuration as Code" subgroup="Executions" />
     public ExecutionBuilder UpdateAssertion(string assertionName, AssertionBuilder assertionBuilder)
     {
         Assertions = UpdateByName(Assertions, assertionName, assertionBuilder, assertion => assertion.Name);
         return this;
     }
 
+    /// <summary>
+    /// Removes the configured assertion from the current Runner execution builder instance.
+    /// </summary>
+    /// <remarks>
+    /// Use this method when working with the documented Runner execution builder API surface in code. The change is stored on the current builder instance and is consumed by later build, validation, or execution steps.
+    /// </remarks>
+    /// <qaas-docs group="Configuration as Code" subgroup="Executions" />
     public ExecutionBuilder DeleteAssertion(string assertionName)
     {
         Assertions = DeleteByName(Assertions, assertionName, assertion => assertion.Name);
         return this;
     }
 
+    /// <summary>
+    /// Adds the supplied storage to the current Runner execution builder instance.
+    /// </summary>
+    /// <remarks>
+    /// Use this method when working with the documented Runner execution builder API surface in code. The change is stored on the current builder instance and is consumed by later build, validation, or execution steps.
+    /// </remarks>
+    /// <qaas-docs group="Configuration as Code" subgroup="Executions" />
     public ExecutionBuilder AddStorage(StorageBuilder storageBuilder)
     {
         Storages = Storages is null ? [storageBuilder] : Storages.Append(storageBuilder).ToArray();
         return this;
     }
 
+    /// <summary>
+    /// Creates or adds the configured storage entry on the current Runner execution builder instance.
+    /// </summary>
+    /// <remarks>
+    /// Use this method when working with the documented Runner execution builder API surface in code. The change is stored on the current builder instance and is consumed by later build, validation, or execution steps.
+    /// </remarks>
+    /// <qaas-docs group="Configuration as Code" subgroup="Executions" />
     public ExecutionBuilder CreateStorage(StorageBuilder storageBuilder)
     {
         return AddStorage(storageBuilder);
     }
 
+    /// <summary>
+    /// Returns the configured storages currently stored on the Runner execution builder instance.
+    /// </summary>
+    /// <remarks>
+    /// Use this method when working with the documented Runner execution builder API surface in code. Use it to inspect the current configured state without rebuilding the surrounding collection or runtime object graph.
+    /// </remarks>
+    /// <qaas-docs group="Configuration as Code" subgroup="Executions" />
     public IReadOnlyList<StorageBuilder> ReadStorages()
     {
         return Storages ?? [];
     }
 
+    /// <summary>
+    /// Updates the configured storage at the specified index on the current Runner execution builder instance.
+    /// </summary>
+    /// <remarks>
+    /// Use this method when working with the documented Runner execution builder API surface in code. The change is stored on the current builder instance and is consumed by later build, validation, or execution steps.
+    /// </remarks>
+    /// <qaas-docs group="Configuration as Code" subgroup="Executions" />
     public ExecutionBuilder UpdateStorageAt(int index, StorageBuilder storageBuilder)
     {
         Storages = UpdateAt(Storages, index, storageBuilder);
         return this;
     }
 
+    /// <summary>
+    /// Removes the configured storage at the specified index from the current Runner execution builder instance.
+    /// </summary>
+    /// <remarks>
+    /// Use this method when working with the documented Runner execution builder API surface in code. The change is stored on the current builder instance and is consumed by later build, validation, or execution steps.
+    /// </remarks>
+    /// <qaas-docs group="Configuration as Code" subgroup="Executions" />
     public ExecutionBuilder DeleteStorageAt(int index)
     {
         Storages = DeleteAt(Storages, index);
         return this;
     }
 
+    /// <summary>
+    /// Adds the supplied data source to the current Runner execution builder instance.
+    /// </summary>
+    /// <remarks>
+    /// Use this method when working with the documented Runner execution builder API surface in code. The change is stored on the current builder instance and is consumed by later build, validation, or execution steps.
+    /// </remarks>
+    /// <qaas-docs group="Configuration as Code" subgroup="Executions" />
     public ExecutionBuilder AddDataSource(DataSourceBuilder dataSourceBuilder)
     {
         DataSources = DataSources is null ? [dataSourceBuilder] : DataSources.Append(dataSourceBuilder).ToArray();
         return this;
     }
 
+    /// <summary>
+    /// Creates or adds the configured data source entry on the current Runner execution builder instance.
+    /// </summary>
+    /// <remarks>
+    /// Use this method when working with the documented Runner execution builder API surface in code. The change is stored on the current builder instance and is consumed by later build, validation, or execution steps.
+    /// </remarks>
+    /// <qaas-docs group="Configuration as Code" subgroup="Executions" />
     public ExecutionBuilder CreateDataSource(DataSourceBuilder dataSourceBuilder)
     {
         return AddDataSource(dataSourceBuilder);
     }
 
+    /// <summary>
+    /// Returns the configured data sources currently stored on the Runner execution builder instance.
+    /// </summary>
+    /// <remarks>
+    /// Use this method when working with the documented Runner execution builder API surface in code. Use it to inspect the current configured state without rebuilding the surrounding collection or runtime object graph.
+    /// </remarks>
+    /// <qaas-docs group="Configuration as Code" subgroup="Executions" />
     public IReadOnlyList<DataSourceBuilder> ReadDataSources()
     {
         return DataSources ?? [];
     }
 
+    /// <summary>
+    /// Updates the configured data source stored on the current Runner execution builder instance.
+    /// </summary>
+    /// <remarks>
+    /// Use this method when working with the documented Runner execution builder API surface in code. The change is stored on the current builder instance and is consumed by later build, validation, or execution steps.
+    /// </remarks>
+    /// <qaas-docs group="Configuration as Code" subgroup="Executions" />
     public ExecutionBuilder UpdateDataSource(string dataSourceName, DataSourceBuilder dataSourceBuilder)
     {
         DataSources = UpdateByName(DataSources, dataSourceName, dataSourceBuilder, source => source.Name);
         return this;
     }
 
+    /// <summary>
+    /// Removes the configured data source from the current Runner execution builder instance.
+    /// </summary>
+    /// <remarks>
+    /// Use this method when working with the documented Runner execution builder API surface in code. The change is stored on the current builder instance and is consumed by later build, validation, or execution steps.
+    /// </remarks>
+    /// <qaas-docs group="Configuration as Code" subgroup="Executions" />
     public ExecutionBuilder DeleteDataSource(string dataSourceName)
     {
         DataSources = DeleteByName(DataSources, dataSourceName, source => source.Name);
         return this;
     }
 
+    /// <summary>
+    /// Adds the supplied link to the current Runner execution builder instance.
+    /// </summary>
+    /// <remarks>
+    /// Use this method when working with the documented Runner execution builder API surface in code. The change is stored on the current builder instance and is consumed by later build, validation, or execution steps.
+    /// </remarks>
+    /// <qaas-docs group="Configuration as Code" subgroup="Executions" />
     public ExecutionBuilder AddLink(LinkBuilder linkBuilder)
     {
         Links = Links is null ? [linkBuilder] : Links.Append(linkBuilder).ToArray();
         return this;
     }
 
+    /// <summary>
+    /// Creates or adds the configured link entry on the current Runner execution builder instance.
+    /// </summary>
+    /// <remarks>
+    /// Use this method when working with the documented Runner execution builder API surface in code. The change is stored on the current builder instance and is consumed by later build, validation, or execution steps.
+    /// </remarks>
+    /// <qaas-docs group="Configuration as Code" subgroup="Executions" />
     public ExecutionBuilder CreateLink(LinkBuilder linkBuilder)
     {
         return AddLink(linkBuilder);
     }
 
+    /// <summary>
+    /// Returns the configured links currently stored on the Runner execution builder instance.
+    /// </summary>
+    /// <remarks>
+    /// Use this method when working with the documented Runner execution builder API surface in code. Use it to inspect the current configured state without rebuilding the surrounding collection or runtime object graph.
+    /// </remarks>
+    /// <qaas-docs group="Configuration as Code" subgroup="Executions" />
     public IReadOnlyList<LinkBuilder> ReadLinks()
     {
         return Links ?? [];
     }
 
+    /// <summary>
+    /// Updates the configured link at the specified index on the current Runner execution builder instance.
+    /// </summary>
+    /// <remarks>
+    /// Use this method when working with the documented Runner execution builder API surface in code. The change is stored on the current builder instance and is consumed by later build, validation, or execution steps.
+    /// </remarks>
+    /// <qaas-docs group="Configuration as Code" subgroup="Executions" />
     public ExecutionBuilder UpdateLinkAt(int index, LinkBuilder linkBuilder)
     {
         Links = UpdateAt(Links, index, linkBuilder);
         return this;
     }
 
+    /// <summary>
+    /// Removes the configured link at the specified index from the current Runner execution builder instance.
+    /// </summary>
+    /// <remarks>
+    /// Use this method when working with the documented Runner execution builder API surface in code. The change is stored on the current builder instance and is consumed by later build, validation, or execution steps.
+    /// </remarks>
+    /// <qaas-docs group="Configuration as Code" subgroup="Executions" />
     public ExecutionBuilder DeleteLinkAt(int index)
     {
         Links = DeleteAt(Links, index);
         return this;
     }
 
+    /// <summary>
+    /// Sets the execution type used when the runner execution is built.
+    /// </summary>
+    /// <remarks>
+    /// Use this method when working with the documented Runner execution builder API surface in code. The change is stored on the current builder instance and is consumed by later build, validation, or execution steps.
+    /// </remarks>
+    /// <qaas-docs group="Configuration as Code" subgroup="Executions" />
     public ExecutionBuilder ExecutionType(ExecutionType executionType)
     {
         Type = executionType;
@@ -394,18 +583,39 @@ public class ExecutionBuilder() : BaseExecutionBuilder<InternalContext, Executio
         return this;
     }
 
+    /// <summary>
+    /// Sets the case file applied by the context builder.
+    /// </summary>
+    /// <remarks>
+    /// Case files are used as the final scenario-specific overlay that shapes the runtime configuration for a specific execution.
+    /// </remarks>
+    /// <qaas-docs group="Configuration as Code" subgroup="Executions" />
     public ExecutionBuilder SetCase(string caseName)
     {
         _configuredCaseName = caseName;
         return this;
     }
 
+    /// <summary>
+    /// Sets the execution identifier stored on the built context.
+    /// </summary>
+    /// <remarks>
+    /// The execution identifier flows into the built context and can later be used by logging, reports, and storage integrations.
+    /// </remarks>
+    /// <qaas-docs group="Configuration as Code" subgroup="Executions" />
     public ExecutionBuilder SetExecutionId(string executionId)
     {
         _configuredExecutionId = executionId;
         return this;
     }
 
+    /// <summary>
+    /// Sets the metadata configuration stored on the execution.
+    /// </summary>
+    /// <remarks>
+    /// Use this method when working with the documented Runner execution builder API surface in code. The change is stored on the current builder instance and is consumed by later build, validation, or execution steps.
+    /// </remarks>
+    /// <qaas-docs group="Configuration as Code" subgroup="Executions" />
     public ExecutionBuilder WithMetadata(MetaDataConfig metaDataConfig)
     {
         MetaData = metaDataConfig;
@@ -694,7 +904,13 @@ public class ExecutionBuilder() : BaseExecutionBuilder<InternalContext, Executio
         Context.SetRenderedConfigurationTemplate(renderedTemplate);
     }
 
-    /// <inheritdoc />
+    /// <summary>
+    /// Builds the configured Runner execution builder output from the current state.
+    /// </summary>
+    /// <remarks>
+    /// Call this after the fluent configuration is complete. The method validates the accumulated state and materializes the runtime or immutable configuration object represented by the builder.
+    /// </remarks>
+    /// <qaas-docs group="Configuration as Code" subgroup="Executions" />
     public override Execution Build()
     {
         InitializeContext();

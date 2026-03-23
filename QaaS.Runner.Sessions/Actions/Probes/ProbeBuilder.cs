@@ -46,8 +46,12 @@ public class ProbeBuilder : IYamlConvertible
     internal IConfiguration ProbeConfiguration { get; set; } = new ConfigurationBuilder().Build();
 
     /// <summary>
-    /// Reads YAML configuration for a probe builder.
+    /// Reads the serialized configuration for the current Runner probe builder instance.
     /// </summary>
+    /// <remarks>
+    /// This method participates in the YAML serialization surface that backs configuration-as-code support.
+    /// </remarks>
+    /// <qaas-docs group="Configuration as Code" subgroup="Probes" />
     public void Read(IParser parser, Type expectedType, ObjectDeserializer nestedObjectDeserializer)
     {
         throw new NotSupportedException($"{nameof(Read)} doesn't support custom" +
@@ -55,8 +59,12 @@ public class ProbeBuilder : IYamlConvertible
     }
 
     /// <summary>
-    /// Writes the probe builder configuration to YAML.
+    /// Writes the current Runner probe builder configuration to the configured serializer output.
     /// </summary>
+    /// <remarks>
+    /// This method participates in the YAML serialization surface that backs configuration-as-code support.
+    /// </remarks>
+    /// <qaas-docs group="Configuration as Code" subgroup="Probes" />
     public void Write(IEmitter emitter, ObjectSerializer nestedObjectSerializer)
     {
         var probeConfiguration = ProbeConfiguration
@@ -71,8 +79,12 @@ public class ProbeBuilder : IYamlConvertible
     }
 
     /// <summary>
-    /// Sets the probe name.
+    /// Sets the name used for the current Runner probe builder instance.
     /// </summary>
+    /// <remarks>
+    /// Use this method when working with the documented Runner probe builder API surface in code. The change is stored on the current builder instance and is consumed by later build, validation, or execution steps.
+    /// </remarks>
+    /// <qaas-docs group="Configuration as Code" subgroup="Probes" />
     public ProbeBuilder Named(string name)
     {
         Name = name;
@@ -80,8 +92,12 @@ public class ProbeBuilder : IYamlConvertible
     }
 
     /// <summary>
-    /// Sets the stage in which the probe runs.
+    /// Sets the stage used by the current Runner probe builder instance.
     /// </summary>
+    /// <remarks>
+    /// Use this method when working with the documented Runner probe builder API surface in code. The change is stored on the current builder instance and is consumed by later build, validation, or execution steps.
+    /// </remarks>
+    /// <qaas-docs group="Configuration as Code" subgroup="Probes" />
     public ProbeBuilder AtStage(int stage)
     {
         Stage = stage;
@@ -89,8 +105,12 @@ public class ProbeBuilder : IYamlConvertible
     }
 
     /// <summary>
-    /// Sets the probe hook implementation name.
+    /// Sets the hook implementation name used by the current Runner probe builder instance.
     /// </summary>
+    /// <remarks>
+    /// Use this method when working with the documented Runner probe builder API surface in code. The change is stored on the current builder instance and is consumed by later build, validation, or execution steps.
+    /// </remarks>
+    /// <qaas-docs group="Configuration as Code" subgroup="Probes" />
     public ProbeBuilder HookNamed(string hookName)
     {
         Probe = hookName;
@@ -98,8 +118,12 @@ public class ProbeBuilder : IYamlConvertible
     }
 
     /// <summary>
-    /// Adds a data source name input to the probe.
+    /// Adds the supplied data source name to the current Runner probe builder instance.
     /// </summary>
+    /// <remarks>
+    /// Use this method when working with the documented Runner probe builder API surface in code. The change is stored on the current builder instance and is consumed by later build, validation, or execution steps.
+    /// </remarks>
+    /// <qaas-docs group="Configuration as Code" subgroup="Probes" />
     public ProbeBuilder AddDataSourceName(string dataSourceName)
     {
         var dataSourceNamesList = DataSourceNames?.ToList() ?? [];
@@ -109,24 +133,36 @@ public class ProbeBuilder : IYamlConvertible
     }
 
     /// <summary>
-    /// Compatibility alias for <see cref="AddDataSourceName" />.
+    /// Creates or adds the configured data source name entry on the current Runner probe builder instance.
     /// </summary>
+    /// <remarks>
+    /// Use this method when working with the documented Runner probe builder API surface in code. The change is stored on the current builder instance and is consumed by later build, validation, or execution steps.
+    /// </remarks>
+    /// <qaas-docs group="Configuration as Code" subgroup="Probes" />
     public ProbeBuilder CreateDataSourceName(string dataSourceName)
     {
         return AddDataSourceName(dataSourceName);
     }
 
     /// <summary>
-    /// Returns the configured probe data source names.
+    /// Returns the configured data source names currently stored on the Runner probe builder instance.
     /// </summary>
+    /// <remarks>
+    /// Use this method when working with the documented Runner probe builder API surface in code. Use it to inspect the current configured state without rebuilding the surrounding collection or runtime object graph.
+    /// </remarks>
+    /// <qaas-docs group="Configuration as Code" subgroup="Probes" />
     public IReadOnlyList<string> ReadDataSourceNames()
     {
         return DataSourceNames;
     }
 
     /// <summary>
-    /// Replaces one configured probe data source name with another.
+    /// Updates the configured data source name stored on the current Runner probe builder instance.
     /// </summary>
+    /// <remarks>
+    /// Use this method when working with the documented Runner probe builder API surface in code. The change is stored on the current builder instance and is consumed by later build, validation, or execution steps.
+    /// </remarks>
+    /// <qaas-docs group="Configuration as Code" subgroup="Probes" />
     public ProbeBuilder UpdateDataSourceName(string existingValue, string newValue)
     {
         var index = Array.IndexOf(DataSourceNames, existingValue);
@@ -139,8 +175,12 @@ public class ProbeBuilder : IYamlConvertible
     }
 
     /// <summary>
-    /// Removes a configured probe data source name.
+    /// Removes the configured data source name from the current Runner probe builder instance.
     /// </summary>
+    /// <remarks>
+    /// Use this method when working with the documented Runner probe builder API surface in code. The change is stored on the current builder instance and is consumed by later build, validation, or execution steps.
+    /// </remarks>
+    /// <qaas-docs group="Configuration as Code" subgroup="Probes" />
     public ProbeBuilder DeleteDataSourceName(string dataSourceName)
     {
         DataSourceNames = DataSourceNames.Where(value => value != dataSourceName).ToArray();
@@ -148,16 +188,24 @@ public class ProbeBuilder : IYamlConvertible
     }
 
     /// <summary>
-    /// Compatibility alias for <see cref="DeleteDataSourceName" />.
+    /// Configures remove data source name on the current Runner probe builder instance.
     /// </summary>
+    /// <remarks>
+    /// Use this method when working with the documented Runner probe builder API surface in code. The behavior exposed here is part of the public surface that the generated function documentation groups under 'Configuration as Code / Probes'.
+    /// </remarks>
+    /// <qaas-docs group="Configuration as Code" subgroup="Probes" />
     public ProbeBuilder RemoveDataSourceName(string dataSourceName)
     {
         return DeleteDataSourceName(dataSourceName);
     }
 
     /// <summary>
-    /// Adds a data source pattern input to the probe.
+    /// Adds the supplied data source pattern to the current Runner probe builder instance.
     /// </summary>
+    /// <remarks>
+    /// Use this method when working with the documented Runner probe builder API surface in code. The change is stored on the current builder instance and is consumed by later build, validation, or execution steps.
+    /// </remarks>
+    /// <qaas-docs group="Configuration as Code" subgroup="Probes" />
     public ProbeBuilder AddDataSourcePattern(string dataSourcePattern)
     {
         var dataSourcePatternsList = DataSourcePatterns?.ToList() ?? [];
@@ -167,24 +215,36 @@ public class ProbeBuilder : IYamlConvertible
     }
 
     /// <summary>
-    /// Compatibility alias for <see cref="AddDataSourcePattern" />.
+    /// Creates or adds the configured data source pattern entry on the current Runner probe builder instance.
     /// </summary>
+    /// <remarks>
+    /// Use this method when working with the documented Runner probe builder API surface in code. The change is stored on the current builder instance and is consumed by later build, validation, or execution steps.
+    /// </remarks>
+    /// <qaas-docs group="Configuration as Code" subgroup="Probes" />
     public ProbeBuilder CreateDataSourcePattern(string dataSourcePattern)
     {
         return AddDataSourcePattern(dataSourcePattern);
     }
 
     /// <summary>
-    /// Returns the configured probe data source patterns.
+    /// Returns the configured data source patterns currently stored on the Runner probe builder instance.
     /// </summary>
+    /// <remarks>
+    /// Use this method when working with the documented Runner probe builder API surface in code. Use it to inspect the current configured state without rebuilding the surrounding collection or runtime object graph.
+    /// </remarks>
+    /// <qaas-docs group="Configuration as Code" subgroup="Probes" />
     public IReadOnlyList<string> ReadDataSourcePatterns()
     {
         return DataSourcePatterns;
     }
 
     /// <summary>
-    /// Replaces one configured probe data source pattern with another.
+    /// Updates the configured data source pattern stored on the current Runner probe builder instance.
     /// </summary>
+    /// <remarks>
+    /// Use this method when working with the documented Runner probe builder API surface in code. The change is stored on the current builder instance and is consumed by later build, validation, or execution steps.
+    /// </remarks>
+    /// <qaas-docs group="Configuration as Code" subgroup="Probes" />
     public ProbeBuilder UpdateDataSourcePattern(string existingValue, string newValue)
     {
         var index = Array.IndexOf(DataSourcePatterns, existingValue);
@@ -197,8 +257,12 @@ public class ProbeBuilder : IYamlConvertible
     }
 
     /// <summary>
-    /// Removes a configured probe data source pattern.
+    /// Removes the configured data source pattern from the current Runner probe builder instance.
     /// </summary>
+    /// <remarks>
+    /// Use this method when working with the documented Runner probe builder API surface in code. The change is stored on the current builder instance and is consumed by later build, validation, or execution steps.
+    /// </remarks>
+    /// <qaas-docs group="Configuration as Code" subgroup="Probes" />
     public ProbeBuilder DeleteDataSourcePattern(string dataSourcePattern)
     {
         DataSourcePatterns = DataSourcePatterns.Where(value => value != dataSourcePattern).ToArray();
@@ -206,16 +270,24 @@ public class ProbeBuilder : IYamlConvertible
     }
 
     /// <summary>
-    /// Compatibility alias for <see cref="DeleteDataSourcePattern" />.
+    /// Configures remove data source pattern on the current Runner probe builder instance.
     /// </summary>
+    /// <remarks>
+    /// Use this method when working with the documented Runner probe builder API surface in code. The behavior exposed here is part of the public surface that the generated function documentation groups under 'Configuration as Code / Probes'.
+    /// </remarks>
+    /// <qaas-docs group="Configuration as Code" subgroup="Probes" />
     public ProbeBuilder RemoveDataSourcePattern(string dataSourcePattern)
     {
         return DeleteDataSourcePattern(dataSourcePattern);
     }
 
     /// <summary>
-    /// Replaces the current probe configuration with the provided configuration object.
+    /// Sets the configuration currently stored on the Runner probe builder instance.
     /// </summary>
+    /// <remarks>
+    /// Use this method when working with the documented Runner probe builder API surface in code. The change is stored on the current builder instance and is consumed by later build, validation, or execution steps.
+    /// </remarks>
+    /// <qaas-docs group="Configuration as Code" subgroup="Probes" />
     public ProbeBuilder Configure(object configuration)
     {
         var stream = new MemoryStream(Encoding.UTF8.GetBytes(JsonSerializer.Serialize(configuration)));
@@ -224,32 +296,48 @@ public class ProbeBuilder : IYamlConvertible
     }
 
     /// <summary>
-    /// Compatibility alias for <see cref="Configure" /> that matches the configuration CRUD pattern used by other builders.
+    /// Sets the configuration currently stored on the Runner probe builder instance.
     /// </summary>
+    /// <remarks>
+    /// Use this method when working with the documented Runner probe builder API surface in code. The change is stored on the current builder instance and is consumed by later build, validation, or execution steps.
+    /// </remarks>
+    /// <qaas-docs group="Configuration as Code" subgroup="Probes" />
     public ProbeBuilder CreateConfiguration(object configuration)
     {
         return Configure(configuration);
     }
 
     /// <summary>
-    /// Compatibility alias for <see cref="CreateConfiguration" />.
+    /// Sets the configuration currently stored on the Runner probe builder instance.
     /// </summary>
+    /// <remarks>
+    /// Use this method when working with the documented Runner probe builder API surface in code. The change is stored on the current builder instance and is consumed by later build, validation, or execution steps.
+    /// </remarks>
+    /// <qaas-docs group="Configuration as Code" subgroup="Probes" />
     public ProbeBuilder Create(object configuration)
     {
         return CreateConfiguration(configuration);
     }
 
     /// <summary>
-    /// Returns the currently configured probe configuration.
+    /// Returns the configuration currently stored on the Runner probe builder instance.
     /// </summary>
+    /// <remarks>
+    /// Use this method when working with the documented Runner probe builder API surface in code. Use it to inspect the current configured state without rebuilding the surrounding collection or runtime object graph.
+    /// </remarks>
+    /// <qaas-docs group="Configuration as Code" subgroup="Probes" />
     public IConfiguration ReadConfiguration()
     {
         return ProbeConfiguration;
     }
 
     /// <summary>
-    /// Merges the provided configuration object into the current probe configuration.
+    /// Updates the configuration currently stored on the Runner probe builder instance.
     /// </summary>
+    /// <remarks>
+    /// Use this method when working with the documented Runner probe builder API surface in code. The change is stored on the current builder instance and is consumed by later build, validation, or execution steps.
+    /// </remarks>
+    /// <qaas-docs group="Configuration as Code" subgroup="Probes" />
     public ProbeBuilder UpdateConfiguration(object configuration)
     {
         ProbeConfiguration = ConfigurationUpdateExtensions.UpdateConfiguration(ProbeConfiguration, configuration);
@@ -257,8 +345,12 @@ public class ProbeBuilder : IYamlConvertible
     }
 
     /// <summary>
-    /// Clears the configured probe configuration.
+    /// Clears the configuration currently stored on the Runner probe builder instance.
     /// </summary>
+    /// <remarks>
+    /// Use this method when working with the documented Runner probe builder API surface in code. The change is stored on the current builder instance and is consumed by later build, validation, or execution steps.
+    /// </remarks>
+    /// <qaas-docs group="Configuration as Code" subgroup="Probes" />
     public ProbeBuilder DeleteConfiguration()
     {
         ProbeConfiguration = new ConfigurationBuilder().Build();

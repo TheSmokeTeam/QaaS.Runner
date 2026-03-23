@@ -1,4 +1,4 @@
-﻿using System.ComponentModel;
+using System.ComponentModel;
 using System.IO.Abstractions;
 using System.Runtime.CompilerServices;
 using QaaS.Framework.Configurations;
@@ -38,6 +38,10 @@ public class StorageBuilder
     /// <summary>
     /// Sets the JSON formatting used by runtime storages.
     /// </summary>
+    /// <remarks>
+    /// Use this method when working with the documented Runner storage builder API surface in code. The change is stored on the current builder instance and is consumed by later build, validation, or execution steps.
+    /// </remarks>
+    /// <qaas-docs group="Configuration as Code" subgroup="Storages" />
     public StorageBuilder WithJsonStorageFormat(Formatting format)
     {
         JsonStorageFormat = format;
@@ -45,32 +49,48 @@ public class StorageBuilder
     }
 
     /// <summary>
-    /// Compatibility alias for <see cref="CreateConfiguration" />.
+    /// Sets the configuration currently stored on the Runner storage builder instance.
     /// </summary>
+    /// <remarks>
+    /// Use this method when working with the documented Runner storage builder API surface in code. The change is stored on the current builder instance and is consumed by later build, validation, or execution steps.
+    /// </remarks>
+    /// <qaas-docs group="Configuration as Code" subgroup="Storages" />
     public StorageBuilder Create(IStorageConfig storageConfig)
     {
         return CreateConfiguration(storageConfig);
     }
 
     /// <summary>
-    /// Sets the configured storage implementation source.
+    /// Sets the configuration currently stored on the Runner storage builder instance.
     /// </summary>
+    /// <remarks>
+    /// Use this method when working with the documented Runner storage builder API surface in code. The change is stored on the current builder instance and is consumed by later build, validation, or execution steps.
+    /// </remarks>
+    /// <qaas-docs group="Configuration as Code" subgroup="Storages" />
     public StorageBuilder CreateConfiguration(IStorageConfig storageConfig)
     {
         return Configure(storageConfig);
     }
 
     /// <summary>
-    /// Returns the currently configured storage source, if any.
+    /// Returns the configuration currently stored on the Runner storage builder instance.
     /// </summary>
+    /// <remarks>
+    /// Use this method when working with the documented Runner storage builder API surface in code. Use it to inspect the current configured state without rebuilding the surrounding collection or runtime object graph.
+    /// </remarks>
+    /// <qaas-docs group="Configuration as Code" subgroup="Storages" />
     public IStorageConfig? ReadConfiguration()
     {
         return (IStorageConfig?)S3 ?? FileSystem;
     }
 
     /// <summary>
-    /// Applies a computed partial update to the current storage configuration while preserving omitted fields.
+    /// Updates the configuration currently stored on the Runner storage builder instance.
     /// </summary>
+    /// <remarks>
+    /// Use this method when working with the documented Runner storage builder API surface in code. The change is stored on the current builder instance and is consumed by later build, validation, or execution steps.
+    /// </remarks>
+    /// <qaas-docs group="Configuration as Code" subgroup="Storages" />
     public StorageBuilder UpdateConfiguration(Func<IStorageConfig, IStorageConfig> update)
     {
         var currentConfig = ReadConfiguration() ??
@@ -79,8 +99,12 @@ public class StorageBuilder
     }
 
     /// <summary>
-    /// Updates the storage configuration by merging same-type values and replacing the current type when needed.
+    /// Updates the configuration currently stored on the Runner storage builder instance.
     /// </summary>
+    /// <remarks>
+    /// Use this method when working with the documented Runner storage builder API surface in code. The change is stored on the current builder instance and is consumed by later build, validation, or execution steps.
+    /// </remarks>
+    /// <qaas-docs group="Configuration as Code" subgroup="Storages" />
     public StorageBuilder UpdateConfiguration(IStorageConfig storageConfig)
     {
         var currentConfig = ReadConfiguration() ??
@@ -89,8 +113,12 @@ public class StorageBuilder
     }
 
     /// <summary>
-    /// Updates the storage configuration from an object-shaped patch while preserving omitted fields.
+    /// Updates the configuration currently stored on the Runner storage builder instance.
     /// </summary>
+    /// <remarks>
+    /// Use this method when working with the documented Runner storage builder API surface in code. The change is stored on the current builder instance and is consumed by later build, validation, or execution steps.
+    /// </remarks>
+    /// <qaas-docs group="Configuration as Code" subgroup="Storages" />
     public StorageBuilder UpdateConfiguration(object configuration)
     {
         var currentConfig = ReadConfiguration() ??
@@ -99,16 +127,24 @@ public class StorageBuilder
     }
 
     /// <summary>
-    /// Clears the configured storage source.
+    /// Clears the configuration currently stored on the Runner storage builder instance.
     /// </summary>
+    /// <remarks>
+    /// Use this method when working with the documented Runner storage builder API surface in code. The change is stored on the current builder instance and is consumed by later build, validation, or execution steps.
+    /// </remarks>
+    /// <qaas-docs group="Configuration as Code" subgroup="Storages" />
     public StorageBuilder DeleteConfiguration()
     {
         return Reset();
     }
 
     /// <summary>
-    /// Replaces the current storage source with the provided configuration type.
+    /// Sets the configuration currently stored on the Runner storage builder instance.
     /// </summary>
+    /// <remarks>
+    /// Use this method when working with the documented Runner storage builder API surface in code. The change is stored on the current builder instance and is consumed by later build, validation, or execution steps.
+    /// </remarks>
+    /// <qaas-docs group="Configuration as Code" subgroup="Storages" />
     public StorageBuilder Configure(IStorageConfig storageConfig)
     {
         Reset();
