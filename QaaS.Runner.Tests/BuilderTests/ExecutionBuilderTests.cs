@@ -50,6 +50,19 @@ public class ExecutionBuilderTests
     }
 
     [Test]
+    public void Build_WithInvalidConfiguration_IncludesExecutionContextInExceptionMessage()
+    {
+        var builder = CreateInvalidExecutionBuilder();
+
+        var exception = Assert.Throws<InvalidConfigurationsException>(() => builder.Build());
+
+        Assert.That(exception!.Message, Does.Contain("Runner execution configuration is invalid."));
+        Assert.That(exception.Message, Does.Contain("Execution type: Run"));
+        Assert.That(exception.Message, Does.Contain("Execution id: test"));
+        Assert.That(exception.Message, Does.Contain("Case: invalid"));
+    }
+
+    [Test]
     public void TestBuild_CallFunctionWithDifferentConfiguration_ShouldBuildValidExecution()
     {
         // Arrange

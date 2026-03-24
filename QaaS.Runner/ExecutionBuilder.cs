@@ -944,9 +944,21 @@ public class ExecutionBuilder() : BaseExecutionBuilder<InternalContext, Executio
             if (_validationResults.Any())
             {
                 Context.Logger.LogDebug("Validation produced {ValidationResultCount} result(s)", _validationResults.Count);
-                Context.Logger.LogCritical("Configurations are not valid. The validation results are: \n- " +
-                                           string.Join("\n- ", _validationResults.Select(result => result.ErrorMessage)));
-                throw new InvalidConfigurationsException("Configurations are not valid");
+                var validationMessage = RunnerDiagnosticMessageFormatter.Format(
+                    "Runner execution configuration is invalid.",
+                    [
+                        $"Execution type: {Type}",
+                        $"Execution id: {Context.ExecutionId ?? "<none>"}",
+                        $"Case: {Context.CaseName ?? "<none>"}"
+                    ],
+                    $"Validation issues ({_validationResults.Count})",
+                    _validationResults.Select(result => result.ErrorMessage),
+                    [
+                        "Fix the listed configuration paths in the effective runner configuration and retry.",
+                        "Issue paths use QaaS configuration syntax such as Sessions:0:Publishers:0:Name."
+                    ]);
+                Context.Logger.LogCritical("{ValidationMessage}", validationMessage);
+                throw new InvalidConfigurationsException(validationMessage);
             }
 
             // builds every list of domain objects

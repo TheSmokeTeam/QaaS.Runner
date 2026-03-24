@@ -1,6 +1,7 @@
 using System.Reflection;
 using Microsoft.Extensions.Logging;
 using NUnit.Framework;
+using QaaS.Framework.Configurations.CustomExceptions;
 using QaaS.Runner.ConfigurationObjects;
 using QaaS.Runner.Loaders;
 using QaaS.Runner.Options;
@@ -96,7 +97,8 @@ public class ExecuteLoaderTests
             });
 
             var ex = Assert.Throws<ArgumentException>(() => loader.GetLoadedRunner());
-            Assert.That(ex!.Message, Does.Contain("cannot be execute itself"));
+            Assert.That(ex!.Message, Does.Contain("Execute configurations cannot contain nested execute commands."));
+            Assert.That(ex.Message, Does.Contain("Command id: Loop"));
         }
         finally
         {
@@ -120,5 +122,46 @@ public class ExecuteLoaderTests
         var runner = loader.GetLoadedRunner();
 
         Assert.That(runner.ExitProcessOnCompletion, Is.False);
+    }
+
+    [Test]
+    public void GetCommandsToRun_WithMissingCommandIds_IncludesAvailableIdsInExceptionMessage()
+    {
+        var loader = new ExecuteLoader<Runner>(new ExecuteOptions
+        {
+            ConfigurationFile = "execute.yaml",
+            CommandIdsToRun = ["missing"],
+            SendLogs = false
+        });
+
+        var commandList = new List<CommandConfig>
+        {
+            new() { Id = "present-a", Command = "run a.qaas.yaml" },
+            new() { Id = "present-b", Command = "run b.qaas.yaml" }
+        };
+
+        var ex = Assert.Throws<TargetInvocationException>(() => GetCommandsToRunMethodInfo!.Invoke(loader, [commandList]));
+
+        Assert.That(ex!.InnerException, Is.TypeOf<InvalidOperationException>());
+        Assert.That(ex.InnerException!.Message,
+            Does.Contain("The command-ids-to-run filter contains command ids that do not exist in the execute configuration."));
+        Assert.That(ex.InnerException.Message, Does.Contain("Requested command ids not found: missing"));
+        Assert.That(ex.InnerException.Message, Does.Contain("Available command ids: present-a, present-b"));
+    }
+
+    [Test]
+    public void GetLoadedRunner_WhenExecuteConfigurationFileIsMissing_ThrowsCouldNotFindConfigurationException()
+    {
+        var missingPath = $"missing-execute-{Guid.NewGuid():N}.yaml";
+        var loader = new ExecuteLoader<Runner>(new ExecuteOptions
+        {
+            ConfigurationFile = missingPath,
+            SendLogs = false
+        });
+
+        var ex = Assert.Throws<CouldNotFindConfigurationException>(() => loader.GetLoadedRunner());
+
+        Assert.That(ex!.Message, Does.Contain("Execute configuration file was not found."));
+        Assert.That(ex.Message, Does.Contain($"Configured path: {missingPath}"));
     }
 }
