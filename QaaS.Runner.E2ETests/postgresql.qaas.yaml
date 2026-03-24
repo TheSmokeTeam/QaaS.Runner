@@ -1,0 +1,35 @@
+MetaData:
+  Team: Smoke
+  System: QaaS
+
+DataSources:
+  - Name: GeometryPayload
+    Generator: PostgreSqlGeometryGenerator
+    GeneratorConfiguration:
+      ConnectionString: ${variables:postgresConnectionString}
+      TableName: ${variables:postgresTableName}
+
+Sessions:
+  - Name: PostgreSqlGeometryRoundTrip
+    SaveData: true
+    Publishers:
+      - Name: PublishToPostgreSql
+        DataSourceNames: [ GeometryPayload ]
+        PostgreSqlTable:
+          ConnectionString: ${variables:postgresConnectionString}
+          TableName: ${variables:postgresTableName}
+    Consumers:
+      - Name: ConsumeFromPostgreSql
+        TimeoutMs: 10000
+        PostgreSqlTable:
+          ConnectionString: ${variables:postgresConnectionString}
+          TableName: ${variables:postgresTableName}
+          InsertionTimeField: created_at
+          IsInsertionTimeFieldTimeZoneTz: true
+          ReadFromRunStartTime: true
+          FilterSecondsBeforeRunStartTime: 1
+
+Assertions:
+  - Name: PostgreSqlGeometryRoundTripAssertion
+    Assertion: PostgreSqlGeometryRoundTripAssertion
+    SessionNames: [ PostgreSqlGeometryRoundTrip ]

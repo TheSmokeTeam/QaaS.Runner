@@ -1,0 +1,3 @@
+variables:
+  postgresConnectionString: Host=localhost;Port=55432;Database=qaas_postgis;Username=postgres;Password=postgres;SSL Mode=Disable
+  postgresTableName: public.runner_postgis_geometry_round_trip
