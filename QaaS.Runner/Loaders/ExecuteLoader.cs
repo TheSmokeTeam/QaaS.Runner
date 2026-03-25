@@ -142,22 +142,27 @@ public class ExecuteLoader<TRunner> : BaseLoader<ExecuteOptions, TRunner> where 
 
         var resolvedConfigurationFilePath = Path.GetFullPath(Path.Combine(Environment.CurrentDirectory,
             Options.ConfigurationFile!));
-        if (File.Exists(resolvedConfigurationFilePath))
-            return Options.ConfigurationFile!;
 
-        throw new CouldNotFindConfigurationException(
-            RunnerDiagnosticMessageFormatter.Format(
-                "Execute configuration file was not found.",
-                [
-                    $"Configured path: {Options.ConfigurationFile}",
-                    $"Resolved local path: {resolvedConfigurationFilePath}"
-                ],
-                null,
-                null,
-                [
-                    "Provide a valid execute YAML file and retry."
-                ]),
-            new FileNotFoundException("Could not find local execute configuration file.",
-                resolvedConfigurationFilePath));
+        try
+        {
+            using var _ = File.Open(resolvedConfigurationFilePath, FileMode.Open, FileAccess.Read, FileShare.Read);
+            return Options.ConfigurationFile!;
+        }
+        catch (Exception exception) when (exception is FileNotFoundException or DirectoryNotFoundException)
+        {
+            throw new CouldNotFindConfigurationException(
+                RunnerDiagnosticMessageFormatter.Format(
+                    "Execute configuration file was not found.",
+                    [
+                        $"Configured path: {Options.ConfigurationFile}",
+                        $"Resolved local path: {resolvedConfigurationFilePath}"
+                    ],
+                    null,
+                    null,
+                    [
+                        "Provide a valid execute YAML file and retry."
+                    ]),
+                exception);
+        }
     }
 }

@@ -198,4 +198,26 @@ public class ExecuteLoaderTests
         Assert.That(ex!.Message, Does.Contain("Execute configuration file was not found."));
         Assert.That(ex.Message, Does.Contain($"Configured path: {missingPath}"));
     }
+
+    [Test]
+    public void GetLoadedRunner_WhenExecuteConfigurationPathIsUnreadable_PreservesAccessFailure()
+    {
+        var configurationDirectoryPath = Path.Combine(Path.GetTempPath(), $"qaas-execute-dir-{Guid.NewGuid():N}");
+        Directory.CreateDirectory(configurationDirectoryPath);
+
+        try
+        {
+            var loader = new ExecuteLoader<Runner>(new ExecuteOptions
+            {
+                ConfigurationFile = configurationDirectoryPath,
+                SendLogs = false
+            });
+
+            Assert.Throws<UnauthorizedAccessException>(() => loader.GetLoadedRunner());
+        }
+        finally
+        {
+            Directory.Delete(configurationDirectoryPath);
+        }
+    }
 }

@@ -237,37 +237,44 @@ public class RunLoader<TRunner, TOptions> : BaseLoader<TOptions, TRunner>
             return true;
 
         var resolvedConfigurationFilePath = ResolveLocalPath(Options.ConfigurationFile);
-        if (_fileSystem.File.Exists(resolvedConfigurationFilePath))
-            return true;
 
-        if (_executionBuilderConfigurators.Value.Count == 0)
-            throw new CouldNotFindConfigurationException(
-                RunnerDiagnosticMessageFormatter.Format(
-                    "Configuration file was not found and QaaS cannot continue.",
-                    [
-                        $"Configured path: {Options.ConfigurationFile}",
-                        $"Resolved local path: {resolvedConfigurationFilePath}",
-                        "Discovered code configurators: 0"
-                    ],
-                    null,
-                    null,
-                    [
-                        "Provide a valid .qaas.yaml file.",
-                        "Or register at least one IExecutionBuilderConfigurator so QaaS can build the execution in code."
-                    ]),
-                new FileNotFoundException("Could not find local configuration file.", resolvedConfigurationFilePath));
-
-        if (!_missingConfigurationFileWarningLogged)
+        try
         {
-            Logger.LogWarning(
-                "Configuration file {ConfigurationFile} was not found at {ResolvedConfigurationFilePath}. Continuing because {ConfiguratorCount} code configurator(s) were discovered and can build the execution in code.",
-                Options.ConfigurationFile,
-                resolvedConfigurationFilePath,
-                _executionBuilderConfigurators.Value.Count);
-            _missingConfigurationFileWarningLogged = true;
+            using var _ = _fileSystem.File.Open(resolvedConfigurationFilePath, FileMode.Open, FileAccess.Read,
+                FileShare.Read);
+            return true;
         }
+        catch (Exception exception) when (exception is FileNotFoundException or DirectoryNotFoundException)
+        {
+            if (_executionBuilderConfigurators.Value.Count == 0)
+                throw new CouldNotFindConfigurationException(
+                    RunnerDiagnosticMessageFormatter.Format(
+                        "Configuration file was not found and QaaS cannot continue.",
+                        [
+                            $"Configured path: {Options.ConfigurationFile}",
+                            $"Resolved local path: {resolvedConfigurationFilePath}",
+                            "Discovered code configurators: 0"
+                        ],
+                        null,
+                        null,
+                        [
+                            "Provide a valid .qaas.yaml file.",
+                            "Or register at least one IExecutionBuilderConfigurator so QaaS can build the execution in code."
+                        ]),
+                    exception);
 
-        return false;
+            if (!_missingConfigurationFileWarningLogged)
+            {
+                Logger.LogWarning(
+                    "Configuration file {ConfigurationFile} was not found at {ResolvedConfigurationFilePath}. Continuing because {ConfiguratorCount} code configurator(s) were discovered and can build the execution in code.",
+                    Options.ConfigurationFile,
+                    resolvedConfigurationFilePath,
+                    _executionBuilderConfigurators.Value.Count);
+                _missingConfigurationFileWarningLogged = true;
+            }
+
+            return false;
+        }
     }
 
     private string ResolveLocalPath(string configuredPath)

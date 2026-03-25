@@ -623,6 +623,34 @@ namespace QaaS.Runner.Tests.LoadersTests
         }
 
         [Test]
+        public void BuildContext_WhenConfigurationFilePathIsUnreadableAndCodeConfiguratorsExist_PreservesAccessFailure()
+        {
+            var configurationDirectoryPath = Path.Combine(Path.GetTempPath(), $"qaas-run-dir-{Guid.NewGuid():N}");
+            Directory.CreateDirectory(configurationDirectoryPath);
+
+            try
+            {
+                var loader = new ConfiguratorAwareRunLoader(new RunOptions
+                {
+                    ConfigurationFile = configurationDirectoryPath,
+                    SendLogs = false
+                }, [new MetadataConfigurator()]);
+
+                var mockContextBuilder = new Mock<IContextBuilder>();
+
+                var ex = Assert.Throws<TargetInvocationException>(() =>
+                    BuildContextMethodInfo.Invoke(loader, [null, null, mockContextBuilder.Object]));
+
+                Assert.That(ex!.InnerException, Is.TypeOf<UnauthorizedAccessException>());
+                mockContextBuilder.Verify(cb => cb.BuildInternal(), Times.Never);
+            }
+            finally
+            {
+                Directory.Delete(configurationDirectoryPath);
+            }
+        }
+
+        [Test]
         public void GetLoadedContexts_WithMissingCasesDirectory_ThrowsDirectoryNotFoundException()
         {
             var options = new RunOptions
