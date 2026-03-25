@@ -29,30 +29,15 @@ env:
   FILTERED_COVERAGE_RESULTS_PATH: ${{ github.workspace }}\CoverageReport\Cobertura.xml
 
 jobs:
-  build-test-deploy:
-    name: Build, Test & Deploy
+  changelog:
+    name: Changelog
+    if: startsWith(github.ref, 'refs/tags/')
     runs-on: windows-latest
     steps:
       - name: Checkout
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
-
-      - name: Install dotnet
-        uses: actions/setup-dotnet@v4
-        with:
-          dotnet-version: 10.0.x
-
-      - name: Detect tag
-        id: stable_tag
-        shell: bash
-        run: |
-          if [[ "${GITHUB_REF}" == refs/tags/* ]]; then
-            echo "is_stable_tag=true" >> "$GITHUB_OUTPUT"
-            echo "tag=${GITHUB_REF#refs/tags/}" >> "$GITHUB_OUTPUT"
-          else
-            echo "is_stable_tag=false" >> "$GITHUB_OUTPUT"
-          fi
 
       - name: Update changelog
         shell: bash
@@ -62,7 +47,7 @@ jobs:
             local date="$2"
             local revision="$3"
 
-            echo "## $title${date:+ - $date}"
+            echo "## $title - $date"
             echo
 
             local has_changes=false
@@ -89,28 +74,55 @@ jobs:
           {
             echo "# Changelog"
             echo
-            echo "This file is generated automatically from CI from git history."
+            echo "This file is generated automatically from CI from stable git tags."
             echo
 
-            mapfile -t tag_names < <(git for-each-ref --sort=-version:refname --format='%(refname:strip=2)' refs/tags)
-            mapfile -t tag_dates < <(git for-each-ref --sort=-version:refname --format='%(creatordate:short)' refs/tags)
+            mapfile -t stable_tags < <(
+              git for-each-ref --sort=-version:refname --format='%(refname:strip=2)' refs/tags |
+              grep -E '^[0-9]+\.[0-9]+\.[0-9]+$'
+            )
 
-            if [[ ${#tag_names[@]} -gt 0 ]]; then
-              render_section "Unreleased" "" "${tag_names[0]}..HEAD"
-            else
-              render_section "Unreleased" "" "HEAD"
+            if [[ ${#stable_tags[@]} -eq 0 ]]; then
+              echo "No stable tags found."
+              exit 0
             fi
 
-            for ((index=0; index<${#tag_names[@]}; index++)); do
-              current_tag="${tag_names[index]}"
-              current_date="${tag_dates[index]}"
-              if (( index + 1 < ${#tag_names[@]} )); then
-                render_section "$current_tag" "$current_date" "${tag_names[index + 1]}..$current_tag"
+            for ((index=0; index<${#stable_tags[@]}; index++)); do
+              current_tag="${stable_tags[index]}"
+              current_date="$(git log -1 --format=%cs "$current_tag")"
+
+              if (( index + 1 < ${#stable_tags[@]} )); then
+                render_section "$current_tag" "$current_date" "${stable_tags[index + 1]}..$current_tag"
               else
                 render_section "$current_tag" "$current_date" "$current_tag"
               fi
             done
           } > CHANGELOG.md
+  build-test-deploy:
+    name: Build, Test & Deploy
+    runs-on: windows-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Install dotnet
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.x
+
+      - name: Detect tag
+        id: stable_tag
+        shell: bash
+        run: |
+          if [[ "${GITHUB_REF}" == refs/tags/* ]]; then
+            echo "is_stable_tag=true" >> "$GITHUB_OUTPUT"
+            echo "tag=${GITHUB_REF#refs/tags/}" >> "$GITHUB_OUTPUT"
+          else
+            echo "is_stable_tag=false" >> "$GITHUB_OUTPUT"
+          fi
+
 
       - name: Install coverage tools
         shell: pwsh
@@ -307,21 +319,6 @@ jobs:
           if-no-files-found: error
           retention-days: 7
 
-      - name: Commit changelog updates
-        if: github.event_name == 'push' && startsWith(github.ref, 'refs/heads/') && github.actor != 'github-actions[bot]'
-        shell: pwsh
-        run: |
-          git diff --quiet -- CHANGELOG.md
-          if ($LASTEXITCODE -eq 0) {
-            Write-Host "CHANGELOG.md is already up to date."
-            exit 0
-          }
-
-          git config user.name "qaas-changelog-bot"
-          git config user.email "qaas-changelog-bot@example.local"
-          git add CHANGELOG.md
-          git commit -m "docs(changelog): update changelog [skip ci]"
-          git push origin HEAD:${{ github.ref_name }}
 
       - name: Pack project
         if: steps.stable_tag.outputs.is_stable_tag == 'true'
@@ -394,4 +391,3 @@ jobs:
           path: ${{ env.RESTORED_PACKAGES_PATH }}
           if-no-files-found: error
           retention-days: 7
-
