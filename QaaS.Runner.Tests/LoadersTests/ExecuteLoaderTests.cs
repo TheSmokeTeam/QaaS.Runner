@@ -110,6 +110,40 @@ public class ExecuteLoaderTests
     }
 
     [Test]
+    public void GetLoadedRunner_WhenExecuteConfigurationYamlIsMalformed_ThrowsIndicativeInvalidConfigurationsException()
+    {
+        var executablePath = Path.Combine(Path.GetTempPath(), $"qaas-executable-{Guid.NewGuid():N}.yaml");
+        File.WriteAllText(executablePath,
+            """
+            Commands:
+              - Id: broken
+                Command: [broken
+            """);
+
+        try
+        {
+            var loader = new ExecuteLoader<Runner>(new ExecuteOptions
+            {
+                ConfigurationFile = executablePath,
+                SendLogs = false
+            });
+
+            var ex = Assert.Throws<InvalidConfigurationsException>(() => loader.GetLoadedRunner());
+
+            Assert.That(ex!.Message, Does.Contain("YAML configuration file is invalid and QaaS cannot continue."));
+            Assert.That(ex.Message, Does.Contain($"Resolved local path: {executablePath}"));
+            Assert.That(ex.Message, Does.Contain("Parser detail: While parsing a flow sequence"));
+        }
+        finally
+        {
+            if (File.Exists(executablePath))
+            {
+                File.Delete(executablePath);
+            }
+        }
+    }
+
+    [Test]
     public void GetLoadedRunner_WithNoProcessExitFlag_DisablesProcessExitOnCompletion()
     {
         var loader = new ExecuteLoader<Runner>(new ExecuteOptions

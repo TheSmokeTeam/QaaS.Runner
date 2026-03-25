@@ -550,6 +550,37 @@ namespace QaaS.Runner.Tests.LoadersTests
         }
 
         [Test]
+        public void GetLoadedRunner_WhenConfigurationYamlIsMalformed_ThrowsIndicativeInvalidConfigurationsException()
+        {
+            var configurationFilePath = Path.Combine(Path.GetTempPath(), $"qaas-run-{Guid.NewGuid():N}.qaas.yaml");
+            File.WriteAllText(configurationFilePath,
+                """
+                MetaData:
+                  Team: Smoke
+                  System: [broken
+                """);
+
+            try
+            {
+                var loader = new RunLoader<Runner, RunOptions>(new RunOptions
+                {
+                    ConfigurationFile = configurationFilePath,
+                    SendLogs = false
+                });
+
+                var ex = Assert.Throws<InvalidConfigurationsException>(() => loader.GetLoadedRunner());
+
+                Assert.That(ex!.Message, Does.Contain("YAML configuration file is invalid and QaaS cannot continue."));
+                Assert.That(ex.Message, Does.Contain($"Resolved local path: {configurationFilePath}"));
+                Assert.That(ex.Message, Does.Contain("Parser detail: While parsing a flow sequence"));
+            }
+            finally
+            {
+                DeleteIfExists(configurationFilePath);
+            }
+        }
+
+        [Test]
         public void BuildContext_WhenConfigurationFileMissingAndCodeConfiguratorsExist_SkipsYamlLoading()
         {
             var loader = new ConfiguratorAwareRunLoader(new RunOptions
