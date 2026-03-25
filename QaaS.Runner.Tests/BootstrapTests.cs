@@ -122,10 +122,10 @@ public class BootstrapTests
     [Test]
     public void New_WithNullArgs_WritesHelpWithNoArgsGuidance()
     {
-        var output = CaptureConsoleOut(() =>
+        var output = CaptureConsoleOut(out var exitCode, () =>
         {
             var runner = Bootstrap.New(null);
-            Assert.DoesNotThrow(() => runner.Run());
+            Assert.That(runner.RunAndGetExitCode(), Is.EqualTo(0));
         });
 
         Assert.Multiple(() =>
@@ -133,6 +133,7 @@ public class BootstrapTests
             Assert.That(output, Does.Contain("Usage:"));
             Assert.That(output, Does.Contain("Empty arguments only work for code-only hosts"));
             Assert.That(output, Does.Contain("dotnet run -- run <config-file>"));
+            Assert.That(exitCode, Is.EqualTo(0));
         });
     }
 
@@ -155,21 +156,23 @@ public class BootstrapTests
         Assert.That(normalizedArguments, Is.EqualTo(new[] { "run", "test.qaas.yaml" }));
     }
 
-    private static string CaptureConsoleOut(Action action)
+    private static string CaptureConsoleOut(out int exitCode, Action action)
     {
         var originalOut = Console.Out;
+        var originalExitCode = Environment.ExitCode;
         var writer = new StringWriter();
 
         try
         {
             Console.SetOut(writer);
             action();
+            exitCode = Environment.ExitCode;
             return writer.ToString();
         }
         finally
         {
             Console.SetOut(originalOut);
-            Environment.ExitCode = 0;
+            Environment.ExitCode = originalExitCode;
         }
     }
 
