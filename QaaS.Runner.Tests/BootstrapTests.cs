@@ -77,8 +77,8 @@ public class BootstrapTests
 
         Assert.Multiple(() =>
         {
-            Assert.That(logger, Is.SameAs(QaaS.Framework.Executions.Constants.DefaultLogger));
-            Assert.That(serilogLogger, Is.SameAs(QaaS.Framework.Executions.Constants.DefaultSerilogLogger));
+            Assert.That(logger, Is.SameAs(QaaS.Framework.Executions.ExecutionLogging.DefaultLogger));
+            Assert.That(serilogLogger, Is.SameAs(QaaS.Framework.Executions.ExecutionLogging.DefaultSerilogLogger));
             Assert.That(ownsSerilogLogger, Is.False);
         });
     }
@@ -117,6 +117,38 @@ public class BootstrapTests
             currentOptions with { SendLogs = false });
 
         Assert.That(safeOptions.SendLogs, Is.False);
+    }
+
+    [Test]
+    public void NormalizeArguments_WhenNoArgsAndDefaultConfigurationExists_AssumesRunWithDefaultConfiguration()
+    {
+        var tempDirectory = Path.Combine(Path.GetTempPath(), "QaaS.Runner.Tests", Guid.NewGuid().ToString("N"));
+
+        var normalizedArguments = Bootstrap.NormalizeArguments(
+            [],
+            tempDirectory,
+            path => path == Path.Combine(tempDirectory, Constants.DefaultQaasConfigurationFileName));
+
+        Assert.That(normalizedArguments, Is.EqualTo(new[] { "run", Constants.DefaultQaasConfigurationFileName }));
+    }
+
+    [Test]
+    public void NormalizeArguments_WhenNoArgsAndDefaultConfigurationMissing_PreservesEmptyArgs()
+    {
+        var normalizedArguments = Bootstrap.NormalizeArguments(
+            [],
+            @"C:\missing",
+            _ => false);
+
+        Assert.That(normalizedArguments, Is.Empty);
+    }
+
+    [Test]
+    public void NormalizeArguments_WhenConfigurationPathIsPassedWithoutVerb_AssumesRunMode()
+    {
+        var normalizedArguments = Bootstrap.NormalizeArguments(["test.qaas.yaml"]);
+
+        Assert.That(normalizedArguments, Is.EqualTo(new[] { "run", "test.qaas.yaml" }));
     }
 
     private static IEnumerable<TestCaseData> GetRunnerTestCases()
