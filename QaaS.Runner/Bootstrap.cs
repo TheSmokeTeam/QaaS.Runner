@@ -83,12 +83,12 @@ public static class Bootstrap
     /// </summary>
     internal static string[] NormalizeArguments(
         IEnumerable<string> args,
-        string? currentDirectory = null,
+        string? appBaseDirectory = null,
         Func<string, bool>? fileExists = null)
     {
         var arguments = args.ToArray();
         if (arguments.Length == 0)
-            return TryGetImplicitDefaultRunArguments(currentDirectory, fileExists) ?? arguments;
+            return TryGetImplicitDefaultRunArguments(appBaseDirectory, fileExists) ?? arguments;
 
         if (!ShouldAssumeRunMode(arguments))
             return arguments;
@@ -141,14 +141,14 @@ public static class Bootstrap
     }
 
     private static string[]? TryGetImplicitDefaultRunArguments(
-        string? currentDirectory,
+        string? appBaseDirectory,
         Func<string, bool>? fileExists)
     {
-        var resolvedCurrentDirectory = currentDirectory ?? Environment.CurrentDirectory;
+        var resolvedAppBaseDirectory = appBaseDirectory ?? AppContext.BaseDirectory;
         var resolvedDefaultConfigurationPath =
-            Path.GetFullPath(Path.Combine(resolvedCurrentDirectory, Constants.DefaultQaasConfigurationFileName));
+            Path.GetFullPath(Path.Combine(resolvedAppBaseDirectory, Constants.DefaultQaasConfigurationFileName));
         var configurationFileExists = (fileExists ?? File.Exists)(resolvedDefaultConfigurationPath);
-        return configurationFileExists ? ["run", Constants.DefaultQaasConfigurationFileName] : null;
+        return configurationFileExists ? ["run", resolvedDefaultConfigurationPath] : null;
     }
 
     private static bool ShouldAssumeRunMode(IReadOnlyList<string> arguments)

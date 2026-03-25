@@ -123,13 +123,14 @@ public class BootstrapTests
     public void NormalizeArguments_WhenNoArgsAndDefaultConfigurationExists_AssumesRunWithDefaultConfiguration()
     {
         var tempDirectory = Path.Combine(Path.GetTempPath(), "QaaS.Runner.Tests", Guid.NewGuid().ToString("N"));
+        var expectedConfigurationPath = Path.GetFullPath(Path.Combine(tempDirectory, Constants.DefaultQaasConfigurationFileName));
 
         var normalizedArguments = Bootstrap.NormalizeArguments(
             [],
             tempDirectory,
-            path => path == Path.Combine(tempDirectory, Constants.DefaultQaasConfigurationFileName));
+            path => path == expectedConfigurationPath);
 
-        Assert.That(normalizedArguments, Is.EqualTo(new[] { "run", Constants.DefaultQaasConfigurationFileName }));
+        Assert.That(normalizedArguments, Is.EqualTo(new[] { "run", expectedConfigurationPath }));
     }
 
     [Test]
