@@ -4,6 +4,7 @@ using Autofac;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 using QaaS.Framework.Configurations;
+using QaaS.Framework.Configurations.CustomExceptions;
 using QaaS.Framework.Executions.Loaders;
 using QaaS.Framework.SDK.ContextObjects;
 using QaaS.Framework.SDK.Session.SessionDataObjects;
@@ -54,7 +55,8 @@ public class RunLoader<TRunner, TOptions> : BaseLoader<TOptions, TRunner>
             Constants.SupportedReferenceLists, Constants.SupportedUniqueIdsPathRegexes);
         contextBuilder.SetLogger(Logger);
         contextBuilder.SetExecutionId(executionId);
-        if (ShouldLoadConfigurationFile())
+        var shouldLoadConfigurationFile = ShouldLoadConfigurationFile();
+        if (shouldLoadConfigurationFile)
             contextBuilder.SetConfigurationFile(Options.ConfigurationFile!);
         contextBuilder.SetCurrentRunningSessions(
             new RunningSessions(new Dictionary<string, RunningSessionData<object, object>>()));
@@ -69,7 +71,18 @@ public class RunLoader<TRunner, TOptions> : BaseLoader<TOptions, TRunner>
             contextBuilder.WithReferenceResolution(referenceConfig);
         if (Options.ResolveCasesLast) contextBuilder.ResolveCaseLast();
         if (!Options.DontResolveWithEnvironmentVariables) contextBuilder.WithEnvironmentVariableResolution();
-        return contextBuilder.BuildInternal();
+
+        try
+        {
+            return contextBuilder.BuildInternal();
+        }
+        catch (Exception exception) when (shouldLoadConfigurationFile &&
+                                         RunnerYamlConfigurationExceptionFactory.ShouldWrap(exception))
+        {
+            throw RunnerYamlConfigurationExceptionFactory.CreateLocalFileLoadException(
+                Options.ConfigurationFile!,
+                exception);
+        }
     }
 
     private List<InternalContext> GetContextsWithJfrogArtifactoryCases(string? executionId, string casesDirectoryPath)
@@ -86,7 +99,21 @@ public class RunLoader<TRunner, TOptions> : BaseLoader<TOptions, TRunner>
 
     private List<InternalContext> GetContextsWithFileSystemCases(string? executionId, string casesDirectoryPath)
     {
-        return _fileSystem.Directory.GetFiles(Path.Combine(Environment.CurrentDirectory, casesDirectoryPath),
+        var resolvedCasesDirectoryPath = ResolveLocalPath(casesDirectoryPath);
+        if (!_fileSystem.Directory.Exists(resolvedCasesDirectoryPath))
+            throw new DirectoryNotFoundException(RunnerDiagnosticMessageFormatter.Format(
+                "Cases root directory was not found.",
+                [
+                    $"Configured cases root directory: {casesDirectoryPath}",
+                    $"Resolved local path: {resolvedCasesDirectoryPath}"
+                ],
+                null,
+                null,
+                [
+                    "Set a valid cases directory path or remove the cases-root setting and retry."
+                ]));
+
+        return _fileSystem.Directory.GetFiles(resolvedCasesDirectoryPath,
                 "*", SearchOption.AllDirectories)
             .OrderBy(f => f)
             .Select(caseFile =>
@@ -115,10 +142,18 @@ public class RunLoader<TRunner, TOptions> : BaseLoader<TOptions, TRunner>
             var notFoundGivenCases =
                 Options.CasesNamesToRun.Except(contexts.Select(context => context.CaseName!)).ToList();
             if (notFoundGivenCases.Count > 0)
-                throw new InvalidOperationException(
-                    "Found none existing cases names given by test-cases-to-run flag: " +
-                    string.Join(",", notFoundGivenCases) + ".\nAll existing cases names: " +
-                    string.Join(", ", contexts.Select(context => context.CaseName!)));
+                throw new InvalidOperationException(RunnerDiagnosticMessageFormatter.Format(
+                    "The test-cases-to-run filter contains case names that were not discovered.",
+                    [
+                        $"Cases root directory: {Options.CasesRootDirectory}",
+                        $"Requested case names not found: {RunnerDiagnosticMessageFormatter.SummarizeValues(notFoundGivenCases)}",
+                        $"Discovered case names: {RunnerDiagnosticMessageFormatter.SummarizeValues(contexts.Select(context => context.CaseName))}"
+                    ],
+                    null,
+                    null,
+                    [
+                        "Update the test-cases-to-run values or the cases directory contents and retry."
+                    ]));
 
             contexts = contexts.Where(context => Options.CasesNamesToRun.Contains(context.CaseName!)).ToList();
         }
@@ -201,22 +236,49 @@ public class RunLoader<TRunner, TOptions> : BaseLoader<TOptions, TRunner>
         if (PathUtils.IsPathHttpUrl(Options.ConfigurationFile))
             return true;
 
-        var configurationFilePath = Path.Combine(Environment.CurrentDirectory, Options.ConfigurationFile);
-        if (File.Exists(configurationFilePath))
-            return true;
+        var resolvedConfigurationFilePath = ResolveLocalPath(Options.ConfigurationFile);
 
-        if (_executionBuilderConfigurators.Value.Count == 0)
-            return true;
-
-        if (!_missingConfigurationFileWarningLogged)
+        try
         {
-            Logger.LogWarning(
-                "Configuration file {ConfigurationFile} was not found. Continuing with {ConfiguratorCount} discovered code configurator(s).",
-                Options.ConfigurationFile,
-                _executionBuilderConfigurators.Value.Count);
-            _missingConfigurationFileWarningLogged = true;
+            using var _ = _fileSystem.File.Open(resolvedConfigurationFilePath, FileMode.Open, FileAccess.Read,
+                FileShare.Read);
+            return true;
         }
+        catch (Exception exception) when (exception is FileNotFoundException or DirectoryNotFoundException)
+        {
+            if (_executionBuilderConfigurators.Value.Count == 0)
+                throw new CouldNotFindConfigurationException(
+                    RunnerDiagnosticMessageFormatter.Format(
+                        "Configuration file was not found and QaaS cannot continue.",
+                        [
+                            $"Configured path: {Options.ConfigurationFile}",
+                            $"Resolved local path: {resolvedConfigurationFilePath}",
+                            "Discovered code configurators: 0"
+                        ],
+                        null,
+                        null,
+                        [
+                            "Provide a valid .qaas.yaml file.",
+                            "Or register at least one IExecutionBuilderConfigurator so QaaS can build the execution in code."
+                        ]),
+                    exception);
 
-        return false;
+            if (!_missingConfigurationFileWarningLogged)
+            {
+                Logger.LogWarning(
+                    "Configuration file {ConfigurationFile} was not found at {ResolvedConfigurationFilePath}. Continuing because {ConfiguratorCount} code configurator(s) were discovered and can build the execution in code.",
+                    Options.ConfigurationFile,
+                    resolvedConfigurationFilePath,
+                    _executionBuilderConfigurators.Value.Count);
+                _missingConfigurationFileWarningLogged = true;
+            }
+
+            return false;
+        }
+    }
+
+    private string ResolveLocalPath(string configuredPath)
+    {
+        return _fileSystem.Path.GetFullPath(_fileSystem.Path.Combine(Environment.CurrentDirectory, configuredPath));
     }
 }

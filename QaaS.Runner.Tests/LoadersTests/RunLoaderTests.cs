@@ -4,6 +4,7 @@ using Microsoft.Extensions.Logging;
 using NUnit.Framework;
 using Moq;
 using QaaS.Framework.Configurations;
+using QaaS.Framework.Configurations.CustomExceptions;
 using QaaS.Framework.Configurations.References;
 using QaaS.Framework.SDK;
 using QaaS.Framework.SDK.ContextObjects;
@@ -218,92 +219,100 @@ namespace QaaS.Runner.Tests.LoadersTests
             RunOptions options, string? executionId, string? caseFilePath)
         {
             // Arrange
+            var createdConfigurationFilePath = EnsureConfigurationFileExists(options.ConfigurationFile);
 
-            // Create mock context builder using Moq
-            var mockContextBuilder = new Mock<IContextBuilder>();
-            var mockInternalContext = new Mock<InternalContext>();
-
-            // Set up the context builder to return our mock
-            var loader = new RunLoader<Runner, RunOptions>(options, executionId);
-
-            // Mock the BuildInternal method to return our mock context
-            mockContextBuilder.Setup(cb => cb.BuildInternal()).Returns(mockInternalContext.Object);
-
-            // Act
-            var result = (InternalContext?)BuildContextMethodInfo.Invoke(loader,
-                [executionId, caseFilePath, mockContextBuilder.Object]);
-
-            // Assert
-            Assert.That(result, Is.EqualTo(mockInternalContext.Object));
-
-            // Verify all expected method calls were made
-            mockContextBuilder.Verify(cb => cb.SetLogger(It.IsAny<ILogger>()), Times.Once);
-            mockContextBuilder.Verify(cb => cb.SetExecutionId(executionId), Times.Once);
-            mockContextBuilder.Verify(cb => cb.SetConfigurationFile(options.ConfigurationFile), Times.Once);
-
-            // Verify session setup
-            mockContextBuilder.Verify(cb => cb.SetCurrentRunningSessions(It.IsAny<RunningSessions>()), Times.Once);
-
-            // Verify overwrite files
-            if (options.OverwriteFiles != null && options.OverwriteFiles.Any())
+            try
             {
-                foreach (var overwriteFile in options.OverwriteFiles)
+                // Create mock context builder using Moq
+                var mockContextBuilder = new Mock<IContextBuilder>();
+                var mockInternalContext = new Mock<InternalContext>();
+
+                // Set up the context builder to return our mock
+                var loader = new RunLoader<Runner, RunOptions>(options, executionId);
+
+                // Mock the BuildInternal method to return our mock context
+                mockContextBuilder.Setup(cb => cb.BuildInternal()).Returns(mockInternalContext.Object);
+
+                // Act
+                var result = (InternalContext?)BuildContextMethodInfo.Invoke(loader,
+                    [executionId, caseFilePath, mockContextBuilder.Object]);
+
+                // Assert
+                Assert.That(result, Is.EqualTo(mockInternalContext.Object));
+
+                // Verify all expected method calls were made
+                mockContextBuilder.Verify(cb => cb.SetLogger(It.IsAny<ILogger>()), Times.Once);
+                mockContextBuilder.Verify(cb => cb.SetExecutionId(executionId), Times.Once);
+                mockContextBuilder.Verify(cb => cb.SetConfigurationFile(options.ConfigurationFile), Times.Once);
+
+                // Verify session setup
+                mockContextBuilder.Verify(cb => cb.SetCurrentRunningSessions(It.IsAny<RunningSessions>()), Times.Once);
+
+                // Verify overwrite files
+                if (options.OverwriteFiles != null && options.OverwriteFiles.Any())
                 {
-                    mockContextBuilder.Verify(cb => cb.WithOverwriteFile(overwriteFile), Times.Once);
+                    foreach (var overwriteFile in options.OverwriteFiles)
+                    {
+                        mockContextBuilder.Verify(cb => cb.WithOverwriteFile(overwriteFile), Times.Once);
+                    }
                 }
-            }
 
-            if (options.OverwriteFolders != null && options.OverwriteFolders.Any())
-            {
-                foreach (var overwriteFolder in options.OverwriteFolders)
+                if (options.OverwriteFolders != null && options.OverwriteFolders.Any())
                 {
-                    mockContextBuilder.Verify(cb => cb.WithOverwriteFolder(overwriteFolder), Times.Once);
+                    foreach (var overwriteFolder in options.OverwriteFolders)
+                    {
+                        mockContextBuilder.Verify(cb => cb.WithOverwriteFolder(overwriteFolder), Times.Once);
+                    }
                 }
-            }
 
-            // Verify case setting
-            if (caseFilePath != null)
-            {
-                mockContextBuilder.Verify(cb => cb.SetCase(caseFilePath), Times.Once);
-            }
-            else
-            {
-                mockContextBuilder.Verify(cb => cb.SetCase(null), Times.Once);
-            }
-
-            // Verify overwrite arguments
-            if (options.OverwriteArguments != null && options.OverwriteArguments.Any())
-            {
-                foreach (var overwriteArg in options.OverwriteArguments)
+                // Verify case setting
+                if (caseFilePath != null)
                 {
-                    mockContextBuilder.Verify(cb => cb.WithOverwriteArgument(overwriteArg), Times.Once);
+                    mockContextBuilder.Verify(cb => cb.SetCase(caseFilePath), Times.Once);
                 }
-            }
+                else
+                {
+                    mockContextBuilder.Verify(cb => cb.SetCase(null), Times.Once);
+                }
 
-            // Verify reference resolutions
-            if (options.PushReferences != null && options.PushReferences.Any())
-            {
-                mockContextBuilder.Verify(cb => cb.WithReferenceResolution(It.IsAny<ReferenceConfig>()),
-                    Times.Once);
-            }
+                // Verify overwrite arguments
+                if (options.OverwriteArguments != null && options.OverwriteArguments.Any())
+                {
+                    foreach (var overwriteArg in options.OverwriteArguments)
+                    {
+                        mockContextBuilder.Verify(cb => cb.WithOverwriteArgument(overwriteArg), Times.Once);
+                    }
+                }
 
-            // Verify case resolution flags
-            if (options.ResolveCasesLast)
-            {
-                mockContextBuilder.Verify(cb => cb.ResolveCaseLast(), Times.Once);
-            }
+                // Verify reference resolutions
+                if (options.PushReferences != null && options.PushReferences.Any())
+                {
+                    mockContextBuilder.Verify(cb => cb.WithReferenceResolution(It.IsAny<ReferenceConfig>()),
+                        Times.Once);
+                }
 
-            if (!options.DontResolveWithEnvironmentVariables)
-            {
-                mockContextBuilder.Verify(cb => cb.WithEnvironmentVariableResolution(), Times.Once);
-            }
-            else
-            {
-                mockContextBuilder.Verify(cb => cb.WithEnvironmentVariableResolution(), Times.Never);
-            }
+                // Verify case resolution flags
+                if (options.ResolveCasesLast)
+                {
+                    mockContextBuilder.Verify(cb => cb.ResolveCaseLast(), Times.Once);
+                }
 
-            // Verify final build call
-            mockContextBuilder.Verify(cb => cb.BuildInternal(), Times.Once);
+                if (!options.DontResolveWithEnvironmentVariables)
+                {
+                    mockContextBuilder.Verify(cb => cb.WithEnvironmentVariableResolution(), Times.Once);
+                }
+                else
+                {
+                    mockContextBuilder.Verify(cb => cb.WithEnvironmentVariableResolution(), Times.Never);
+                }
+
+                // Verify final build call
+                mockContextBuilder.Verify(cb => cb.BuildInternal(), Times.Once);
+            }
+            finally
+            {
+                DeleteIfExists(createdConfigurationFilePath);
+            }
         }
 
         [Test]
@@ -384,7 +393,10 @@ namespace QaaS.Runner.Tests.LoadersTests
 
                 var ex = Assert.Throws<TargetInvocationException>(() => GetLoadedContextsMethodInfo.Invoke(loader, null));
                 Assert.That(ex!.InnerException, Is.TypeOf<InvalidOperationException>());
-                Assert.That(ex.InnerException!.Message, Does.Contain("Found none existing cases names"));
+                Assert.That(ex.InnerException!.Message,
+                    Does.Contain("The test-cases-to-run filter contains case names that were not discovered."));
+                Assert.That(ex.InnerException.Message, Does.Contain("Requested case names not found: missing-case.yaml"));
+                Assert.That(ex.InnerException.Message, Does.Contain("Discovered case names:"));
             }
             finally
             {
@@ -538,6 +550,37 @@ namespace QaaS.Runner.Tests.LoadersTests
         }
 
         [Test]
+        public void GetLoadedRunner_WhenConfigurationYamlIsMalformed_ThrowsIndicativeInvalidConfigurationsException()
+        {
+            var configurationFilePath = Path.Combine(Path.GetTempPath(), $"qaas-run-{Guid.NewGuid():N}.qaas.yaml");
+            File.WriteAllText(configurationFilePath,
+                """
+                MetaData:
+                  Team: Smoke
+                  System: [broken
+                """);
+
+            try
+            {
+                var loader = new RunLoader<Runner, RunOptions>(new RunOptions
+                {
+                    ConfigurationFile = configurationFilePath,
+                    SendLogs = false
+                });
+
+                var ex = Assert.Throws<InvalidConfigurationsException>(() => loader.GetLoadedRunner());
+
+                Assert.That(ex!.Message, Does.Contain("YAML configuration file is invalid and QaaS cannot continue."));
+                Assert.That(ex.Message, Does.Contain($"Resolved local path: {configurationFilePath}"));
+                Assert.That(ex.Message, Does.Contain("Parser detail: While parsing a flow sequence"));
+            }
+            finally
+            {
+                DeleteIfExists(configurationFilePath);
+            }
+        }
+
+        [Test]
         public void BuildContext_WhenConfigurationFileMissingAndCodeConfiguratorsExist_SkipsYamlLoading()
         {
             var loader = new ConfiguratorAwareRunLoader(new RunOptions
@@ -556,6 +599,74 @@ namespace QaaS.Runner.Tests.LoadersTests
             Assert.That(result, Is.EqualTo(mockInternalContext.Object));
             mockContextBuilder.Verify(cb => cb.SetConfigurationFile(It.IsAny<string>()), Times.Never);
             mockContextBuilder.Verify(cb => cb.BuildInternal(), Times.Once);
+        }
+
+        [Test]
+        public void BuildContext_WhenConfigurationFileMissingAndNoConfigurators_ThrowsCouldNotFindConfigurationException()
+        {
+            var missingConfigurationFile = $"missing-{Guid.NewGuid():N}.qaas.yaml";
+            var loader = new ConfiguratorAwareRunLoader(new RunOptions
+            {
+                ConfigurationFile = missingConfigurationFile,
+                SendLogs = false
+            });
+
+            var mockContextBuilder = new Mock<IContextBuilder>();
+
+            var ex = Assert.Throws<TargetInvocationException>(() =>
+                BuildContextMethodInfo.Invoke(loader, [null, null, mockContextBuilder.Object]));
+
+            Assert.That(ex!.InnerException, Is.TypeOf<CouldNotFindConfigurationException>());
+            Assert.That(ex.InnerException!.Message, Does.Contain("Configuration file was not found and QaaS cannot continue."));
+            Assert.That(ex.InnerException.Message, Does.Contain($"Configured path: {missingConfigurationFile}"));
+            Assert.That(ex.InnerException.Message, Does.Contain("Discovered code configurators: 0"));
+        }
+
+        [Test]
+        public void BuildContext_WhenConfigurationFilePathIsUnreadableAndCodeConfiguratorsExist_PreservesAccessFailure()
+        {
+            var configurationDirectoryPath = Path.Combine(Path.GetTempPath(), $"qaas-run-dir-{Guid.NewGuid():N}");
+            Directory.CreateDirectory(configurationDirectoryPath);
+
+            try
+            {
+                var loader = new ConfiguratorAwareRunLoader(new RunOptions
+                {
+                    ConfigurationFile = configurationDirectoryPath,
+                    SendLogs = false
+                }, [new MetadataConfigurator()]);
+
+                var mockContextBuilder = new Mock<IContextBuilder>();
+
+                var ex = Assert.Throws<TargetInvocationException>(() =>
+                    BuildContextMethodInfo.Invoke(loader, [null, null, mockContextBuilder.Object]));
+
+                Assert.That(ex!.InnerException, Is.TypeOf<UnauthorizedAccessException>());
+                mockContextBuilder.Verify(cb => cb.BuildInternal(), Times.Never);
+            }
+            finally
+            {
+                Directory.Delete(configurationDirectoryPath);
+            }
+        }
+
+        [Test]
+        public void GetLoadedContexts_WithMissingCasesDirectory_ThrowsDirectoryNotFoundException()
+        {
+            var options = new RunOptions
+            {
+                ConfigurationFile = "test.yaml",
+                SendLogs = false,
+                CasesRootDirectory = $"missing-cases-{Guid.NewGuid():N}"
+            };
+
+            var loader = new TestRunLoader(options, "exec-missing-cases");
+
+            var ex = Assert.Throws<TargetInvocationException>(() => GetLoadedContextsMethodInfo.Invoke(loader, null));
+
+            Assert.That(ex!.InnerException, Is.TypeOf<DirectoryNotFoundException>());
+            Assert.That(ex.InnerException!.Message, Does.Contain("Cases root directory was not found."));
+            Assert.That(ex.InnerException.Message, Does.Contain("Configured cases root directory:"));
         }
 
         [Test]
@@ -609,6 +720,32 @@ namespace QaaS.Runner.Tests.LoadersTests
             finally
             {
                 Directory.Delete(tempDirectory, true);
+            }
+        }
+
+        private static string? EnsureConfigurationFileExists(string? configurationFile)
+        {
+            if (string.IsNullOrWhiteSpace(configurationFile) || PathUtils.IsPathHttpUrl(configurationFile))
+            {
+                return null;
+            }
+
+            var resolvedPath = Path.GetFullPath(Path.Combine(Environment.CurrentDirectory, configurationFile));
+            var directoryPath = Path.GetDirectoryName(resolvedPath);
+            if (!string.IsNullOrWhiteSpace(directoryPath))
+            {
+                Directory.CreateDirectory(directoryPath);
+            }
+
+            File.WriteAllText(resolvedPath, string.Empty);
+            return resolvedPath;
+        }
+
+        private static void DeleteIfExists(string? filePath)
+        {
+            if (!string.IsNullOrWhiteSpace(filePath) && File.Exists(filePath))
+            {
+                File.Delete(filePath);
             }
         }
     }

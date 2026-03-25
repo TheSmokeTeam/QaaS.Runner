@@ -53,7 +53,7 @@ public static class Bootstrap
     internal static TRunner GetRunner<TRunner>(IEnumerable<string>? args, string? executionId = null)
         where TRunner : Runner
     {
-        var commandLineArgs = args?.ToArray() ?? [];
+        var commandLineArgs = NormalizeArguments(args ?? []);
         using var cliParser = ParserBuilder.BuildParser();
 
         if (commandLineArgs.Length == 0)
@@ -76,6 +76,26 @@ public static class Bootstrap
                     new RunLoader<TRunner, AssertOptions>(GetSafeLoggerOptions(options), executionId).GetLoadedRunner(),
                 (ExecuteOptions options) => new ExecuteLoader<TRunner>(GetSafeLoggerOptions(options)).GetLoadedRunner(),
                 errors => HandleParseError<TRunner>(cliParserResult, errors));
+    }
+
+    /// <summary>
+    /// Normalizes bootstrap arguments so embedded hosts can omit the explicit `run` verb when the intent is obvious.
+    /// </summary>
+    internal static string[] NormalizeArguments(
+        IEnumerable<string> args,
+        string? appBaseDirectory = null,
+        Func<string, bool>? fileExists = null)
+    {
+        var arguments = args.ToArray();
+        _ = appBaseDirectory;
+        _ = fileExists;
+        if (arguments.Length == 0)
+            return arguments;
+
+        if (!ShouldAssumeRunMode(arguments))
+            return arguments;
+
+        return ["run", .. arguments];
     }
 
     /// <summary>
@@ -120,6 +140,58 @@ public static class Bootstrap
     private static bool IsHelpOnlyRequest(IEnumerable<Error> errors)
     {
         return errors.All(error => error.Tag is ErrorType.HelpRequestedError or ErrorType.HelpVerbRequestedError);
+    }
+
+    private static bool ShouldAssumeRunMode(IReadOnlyList<string> arguments)
+    {
+        var firstArgument = arguments[0];
+        if (IsExecutionModeAlias(firstArgument) ||
+            IsHelpOption(firstArgument) ||
+            IsVersionOption(firstArgument) ||
+            IsOption(firstArgument))
+        {
+            return false;
+        }
+
+        return LooksLikeConfigurationPath(firstArgument);
+    }
+
+    private static bool IsExecutionModeAlias(string argument)
+    {
+        return string.Equals(argument, "run", StringComparison.OrdinalIgnoreCase) ||
+               string.Equals(argument, "act", StringComparison.OrdinalIgnoreCase) ||
+               string.Equals(argument, "assert", StringComparison.OrdinalIgnoreCase) ||
+               string.Equals(argument, "template", StringComparison.OrdinalIgnoreCase) ||
+               string.Equals(argument, "execute", StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static bool IsHelpOption(string argument)
+    {
+        return string.Equals(argument, "--help", StringComparison.OrdinalIgnoreCase) ||
+               string.Equals(argument, "-h", StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static bool IsVersionOption(string argument)
+    {
+        return string.Equals(argument, "--version", StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static bool LooksLikeConfigurationPath(string argument)
+    {
+        if (Path.IsPathRooted(argument))
+            return true;
+
+        if (argument.IndexOfAny(['\\', '/']) >= 0)
+            return true;
+
+        var extension = Path.GetExtension(argument);
+        return extension.Equals(".yaml", StringComparison.OrdinalIgnoreCase) ||
+               extension.Equals(".yml", StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static bool IsOption(string argument)
+    {
+        return argument.StartsWith("-", StringComparison.Ordinal);
     }
 
     internal static TOptions GetSafeLoggerOptions<TOptions>(TOptions options, bool forceDisableSendLogs,
@@ -191,15 +263,15 @@ public static class Bootstrap
     private static bool CanUseFrameworkDefaultLoggers()
     {
         return CanUseFrameworkDefaultLoggers(
-            () => Framework.Executions.Constants.DefaultLogger,
-            () => Framework.Executions.Constants.DefaultSerilogLogger);
+            () => Framework.Executions.ExecutionLogging.DefaultLogger,
+            () => Framework.Executions.ExecutionLogging.DefaultSerilogLogger);
     }
 
     internal static (ILogger logger, Serilog.ILogger serilogLogger, bool ownsSerilogLogger) GetDefaultLoggers(
         bool forceDisableSendLogs)
     {
         if (!forceDisableSendLogs)
-            return (Framework.Executions.Constants.DefaultLogger, Framework.Executions.Constants.DefaultSerilogLogger,
+            return (Framework.Executions.ExecutionLogging.DefaultLogger, Framework.Executions.ExecutionLogging.DefaultSerilogLogger,
                 false);
 
         var fallbackSerilogLogger = new LoggerConfiguration().WriteTo.Console().CreateLogger();
@@ -258,7 +330,21 @@ public static class Bootstrap
 
     private static void WriteHelpText(ParserResult<object> cliParserResult)
     {
-        Console.Out.WriteLine(HelpTextBuilder.BuildHelpText(cliParserResult));
+        Console.Out.WriteLine(BuildHelpTextWithGuidance(cliParserResult));
+    }
+
+    private static string BuildHelpTextWithGuidance(ParserResult<object> cliParserResult)
+    {
+        return string.Join(
+                   Environment.NewLine,
+                   [
+                       HelpTextBuilder.BuildHelpText(cliParserResult).ToString().TrimEnd(),
+                       string.Empty,
+                       "No-args guidance:",
+                       "  Empty arguments only work for code-only hosts that choose a no-args path in Program.cs.",
+                       "  If a YAML file is part of the scenario, pass it explicitly: dotnet run -- run <config-file>."
+                   ]) +
+               Environment.NewLine;
     }
 
     private static TRunner WriteHelpAndCreateBootstrapHandledRunner<TRunner>(

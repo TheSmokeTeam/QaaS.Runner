@@ -77,8 +77,8 @@ public class BootstrapTests
 
         Assert.Multiple(() =>
         {
-            Assert.That(logger, Is.SameAs(QaaS.Framework.Executions.Constants.DefaultLogger));
-            Assert.That(serilogLogger, Is.SameAs(QaaS.Framework.Executions.Constants.DefaultSerilogLogger));
+            Assert.That(logger, Is.SameAs(QaaS.Framework.Executions.ExecutionLogging.DefaultLogger));
+            Assert.That(serilogLogger, Is.SameAs(QaaS.Framework.Executions.ExecutionLogging.DefaultSerilogLogger));
             Assert.That(ownsSerilogLogger, Is.False);
         });
     }
@@ -117,6 +117,63 @@ public class BootstrapTests
             currentOptions with { SendLogs = false });
 
         Assert.That(safeOptions.SendLogs, Is.False);
+    }
+
+    [Test]
+    public void New_WithNullArgs_WritesHelpWithNoArgsGuidance()
+    {
+        var output = CaptureConsoleOut(out var exitCode, () =>
+        {
+            var runner = Bootstrap.New(null);
+            Assert.That(runner.RunAndGetExitCode(), Is.EqualTo(0));
+        });
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(output, Does.Contain("Usage:"));
+            Assert.That(output, Does.Contain("Empty arguments only work for code-only hosts"));
+            Assert.That(output, Does.Contain("dotnet run -- run <config-file>"));
+            Assert.That(exitCode, Is.EqualTo(0));
+        });
+    }
+
+    [Test]
+    public void NormalizeArguments_WhenNoArgsAndDefaultConfigurationExists_PreservesEmptyArgs()
+    {
+        var normalizedArguments = Bootstrap.NormalizeArguments(
+            [],
+            @"C:\temp",
+            _ => true);
+
+        Assert.That(normalizedArguments, Is.Empty);
+    }
+
+    [Test]
+    public void NormalizeArguments_WhenConfigurationPathIsPassedWithoutVerb_AssumesRunMode()
+    {
+        var normalizedArguments = Bootstrap.NormalizeArguments(["test.qaas.yaml"]);
+
+        Assert.That(normalizedArguments, Is.EqualTo(new[] { "run", "test.qaas.yaml" }));
+    }
+
+    private static string CaptureConsoleOut(out int exitCode, Action action)
+    {
+        var originalOut = Console.Out;
+        var originalExitCode = Environment.ExitCode;
+        var writer = new StringWriter();
+
+        try
+        {
+            Console.SetOut(writer);
+            action();
+            exitCode = Environment.ExitCode;
+            return writer.ToString();
+        }
+        finally
+        {
+            Console.SetOut(originalOut);
+            Environment.ExitCode = originalExitCode;
+        }
     }
 
     private static IEnumerable<TestCaseData> GetRunnerTestCases()
