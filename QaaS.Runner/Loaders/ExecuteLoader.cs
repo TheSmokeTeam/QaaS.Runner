@@ -82,11 +82,21 @@ public class ExecuteLoader<TRunner> : BaseLoader<ExecuteOptions, TRunner> where 
     {
         var executeConfigurationPath = GetExecuteConfigurationPathOrThrow();
 
-        // Load executable YAML configuration
-        var executableYaml = new ConfigurationBuilder()
-            .AddYaml(executeConfigurationPath)
-            .EnrichedBuild(addEnvironmentVariables: true)
-            .LoadAndValidateConfiguration<ExecuteConfigurations>();
+        ExecuteConfigurations executableYaml;
+        try
+        {
+            // Load executable YAML configuration
+            executableYaml = new ConfigurationBuilder()
+                .AddYaml(executeConfigurationPath)
+                .EnrichedBuild(addEnvironmentVariables: true)
+                .LoadAndValidateConfiguration<ExecuteConfigurations>();
+        }
+        catch (Exception exception) when (RunnerYamlConfigurationExceptionFactory.ShouldWrap(exception))
+        {
+            throw RunnerYamlConfigurationExceptionFactory.CreateLocalFileLoadException(
+                executeConfigurationPath,
+                exception);
+        }
 
         // Filter commands based on command-ids-to-run
         var commandsToRun = GetCommandsToRun(executableYaml.Commands!.ToList());

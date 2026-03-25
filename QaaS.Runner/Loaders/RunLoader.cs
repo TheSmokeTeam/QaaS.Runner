@@ -55,7 +55,8 @@ public class RunLoader<TRunner, TOptions> : BaseLoader<TOptions, TRunner>
             Constants.SupportedReferenceLists, Constants.SupportedUniqueIdsPathRegexes);
         contextBuilder.SetLogger(Logger);
         contextBuilder.SetExecutionId(executionId);
-        if (ShouldLoadConfigurationFile())
+        var shouldLoadConfigurationFile = ShouldLoadConfigurationFile();
+        if (shouldLoadConfigurationFile)
             contextBuilder.SetConfigurationFile(Options.ConfigurationFile!);
         contextBuilder.SetCurrentRunningSessions(
             new RunningSessions(new Dictionary<string, RunningSessionData<object, object>>()));
@@ -70,7 +71,18 @@ public class RunLoader<TRunner, TOptions> : BaseLoader<TOptions, TRunner>
             contextBuilder.WithReferenceResolution(referenceConfig);
         if (Options.ResolveCasesLast) contextBuilder.ResolveCaseLast();
         if (!Options.DontResolveWithEnvironmentVariables) contextBuilder.WithEnvironmentVariableResolution();
-        return contextBuilder.BuildInternal();
+
+        try
+        {
+            return contextBuilder.BuildInternal();
+        }
+        catch (Exception exception) when (shouldLoadConfigurationFile &&
+                                         RunnerYamlConfigurationExceptionFactory.ShouldWrap(exception))
+        {
+            throw RunnerYamlConfigurationExceptionFactory.CreateLocalFileLoadException(
+                Options.ConfigurationFile!,
+                exception);
+        }
     }
 
     private List<InternalContext> GetContextsWithJfrogArtifactoryCases(string? executionId, string casesDirectoryPath)
