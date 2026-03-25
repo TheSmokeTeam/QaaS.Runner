@@ -4,6 +4,7 @@ This file is generated automatically from CI from git history.
 
 ## Unreleased
 
+- fix(bootstrap): resolve implicit config from app base dir
 - fix(runner): restore yaml diagnostics for malformed configs
 - fix(bootstrap): infer run mode for code-first hosts
 - test(loaders): cover malformed yaml diagnostics
