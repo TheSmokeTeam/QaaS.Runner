@@ -120,26 +120,29 @@ public class BootstrapTests
     }
 
     [Test]
-    public void NormalizeArguments_WhenNoArgsAndDefaultConfigurationExists_AssumesRunWithDefaultConfiguration()
+    public void New_WithNullArgs_WritesHelpWithNoArgsGuidance()
     {
-        var tempDirectory = Path.Combine(Path.GetTempPath(), "QaaS.Runner.Tests", Guid.NewGuid().ToString("N"));
-        var expectedConfigurationPath = Path.GetFullPath(Path.Combine(tempDirectory, Constants.DefaultQaasConfigurationFileName));
+        var output = CaptureConsoleOut(() =>
+        {
+            var runner = Bootstrap.New(null);
+            Assert.DoesNotThrow(() => runner.Run());
+        });
 
-        var normalizedArguments = Bootstrap.NormalizeArguments(
-            [],
-            tempDirectory,
-            path => path == expectedConfigurationPath);
-
-        Assert.That(normalizedArguments, Is.EqualTo(new[] { "run", expectedConfigurationPath }));
+        Assert.Multiple(() =>
+        {
+            Assert.That(output, Does.Contain("Usage:"));
+            Assert.That(output, Does.Contain("Empty arguments only work for code-only hosts"));
+            Assert.That(output, Does.Contain("dotnet run -- run <config-file>"));
+        });
     }
 
     [Test]
-    public void NormalizeArguments_WhenNoArgsAndDefaultConfigurationMissing_PreservesEmptyArgs()
+    public void NormalizeArguments_WhenNoArgsAndDefaultConfigurationExists_PreservesEmptyArgs()
     {
         var normalizedArguments = Bootstrap.NormalizeArguments(
             [],
-            @"C:\missing",
-            _ => false);
+            @"C:\temp",
+            _ => true);
 
         Assert.That(normalizedArguments, Is.Empty);
     }
@@ -150,6 +153,24 @@ public class BootstrapTests
         var normalizedArguments = Bootstrap.NormalizeArguments(["test.qaas.yaml"]);
 
         Assert.That(normalizedArguments, Is.EqualTo(new[] { "run", "test.qaas.yaml" }));
+    }
+
+    private static string CaptureConsoleOut(Action action)
+    {
+        var originalOut = Console.Out;
+        var writer = new StringWriter();
+
+        try
+        {
+            Console.SetOut(writer);
+            action();
+            return writer.ToString();
+        }
+        finally
+        {
+            Console.SetOut(originalOut);
+            Environment.ExitCode = 0;
+        }
     }
 
     private static IEnumerable<TestCaseData> GetRunnerTestCases()

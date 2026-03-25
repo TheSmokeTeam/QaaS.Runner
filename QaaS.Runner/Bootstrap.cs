@@ -87,8 +87,10 @@ public static class Bootstrap
         Func<string, bool>? fileExists = null)
     {
         var arguments = args.ToArray();
+        _ = appBaseDirectory;
+        _ = fileExists;
         if (arguments.Length == 0)
-            return TryGetImplicitDefaultRunArguments(appBaseDirectory, fileExists) ?? arguments;
+            return arguments;
 
         if (!ShouldAssumeRunMode(arguments))
             return arguments;
@@ -138,17 +140,6 @@ public static class Bootstrap
     private static bool IsHelpOnlyRequest(IEnumerable<Error> errors)
     {
         return errors.All(error => error.Tag is ErrorType.HelpRequestedError or ErrorType.HelpVerbRequestedError);
-    }
-
-    private static string[]? TryGetImplicitDefaultRunArguments(
-        string? appBaseDirectory,
-        Func<string, bool>? fileExists)
-    {
-        var resolvedAppBaseDirectory = appBaseDirectory ?? AppContext.BaseDirectory;
-        var resolvedDefaultConfigurationPath =
-            Path.GetFullPath(Path.Combine(resolvedAppBaseDirectory, Constants.DefaultQaasConfigurationFileName));
-        var configurationFileExists = (fileExists ?? File.Exists)(resolvedDefaultConfigurationPath);
-        return configurationFileExists ? ["run", resolvedDefaultConfigurationPath] : null;
     }
 
     private static bool ShouldAssumeRunMode(IReadOnlyList<string> arguments)
@@ -339,7 +330,21 @@ public static class Bootstrap
 
     private static void WriteHelpText(ParserResult<object> cliParserResult)
     {
-        Console.Out.WriteLine(HelpTextBuilder.BuildHelpText(cliParserResult));
+        Console.Out.WriteLine(BuildHelpTextWithGuidance(cliParserResult));
+    }
+
+    private static string BuildHelpTextWithGuidance(ParserResult<object> cliParserResult)
+    {
+        return string.Join(
+                   Environment.NewLine,
+                   [
+                       HelpTextBuilder.BuildHelpText(cliParserResult).ToString().TrimEnd(),
+                       string.Empty,
+                       "No-args guidance:",
+                       "  Empty arguments only work for code-only hosts that choose a no-args path in Program.cs.",
+                       "  If a YAML file is part of the scenario, pass it explicitly: dotnet run -- run <config-file>."
+                   ]) +
+               Environment.NewLine;
     }
 
     private static TRunner WriteHelpAndCreateBootstrapHandledRunner<TRunner>(
