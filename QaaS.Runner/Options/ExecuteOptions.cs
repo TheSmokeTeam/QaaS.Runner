@@ -18,13 +18,33 @@ public record ExecuteOptions : LoggerOptions
             "Path to a yaml configuration file that contains a list of QaaS commands to execute in sequential order.")]
     public string? ConfigurationFile { get; init; }
 
-    [Option('s', "serve-results", Default = false,
+    [Option('s', "serve-results",
+        MetaValue = "folder",
         HelpText = @"
-If flag is enabled will automatically serve the test results in a human readable manner using allure after executing all commands.
-when any of the commands written in the executable configuration file use this flag it will not do anything, this is the deciding flag.
+Serves Allure output after executing all commands.
+If the flag is provided without a value it serves the default raw results folder 'allure-results'.
+Provide a folder name such as 'allure-report' to open a generated report directory, which is useful for Allure 3 flows.
+When any of the commands written in the executable configuration file use this flag it will not do anything, this is the deciding flag.
 Uses a locally installed allure CLI tool, if allure CLI is not installed and added to path the serve will fail.
 ")]
-    public bool AutoServeTestResults { get; set; } = false;
+    public string? ServeResultsFolder { get; set; }
+
+    public bool AutoServeTestResults
+    {
+        get => !string.IsNullOrWhiteSpace(ServeResultsFolder);
+        set => ServeResultsFolder = value
+            ? string.IsNullOrWhiteSpace(ServeResultsFolder)
+                ? AssertableOptions.DefaultServeResultsFolder
+                : ServeResultsFolder.Trim()
+            : null;
+    }
+
+    public string GetServeResultsFolderOrDefault()
+    {
+        return string.IsNullOrWhiteSpace(ServeResultsFolder)
+            ? AssertableOptions.DefaultServeResultsFolder
+            : ServeResultsFolder.Trim();
+    }
 
     [Option('e', "empty-allure-directory", Default = false,
         HelpText = "If flag is enabled will automatically empty the allure results directory before running.")]

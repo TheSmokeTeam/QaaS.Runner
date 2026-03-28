@@ -211,14 +211,18 @@ public class RunLoader<TRunner, TOptions> : BaseLoader<TOptions, TRunner>
     public override TRunner GetLoadedRunner()
     {
         var executionBuilders = GetLoadedExecutionBuilders().ToList();
+        var serveResultsFolder = Options is AssertableOptions assertableOptions && assertableOptions.AutoServeTestResults
+            ? assertableOptions.GetServeResultsFolderOrDefault()
+            : null;
 
         var runner = Bootstrap.CreateRunner<TRunner>(
             _runScope,
             executionBuilders,
             Logger,
             SerilogLogger,
-            Options is AssertableOptions assertableOptions && assertableOptions.EmptyAllureDirectory,
-            Options is AssertableOptions assertableOptions2 && assertableOptions2.AutoServeTestResults);
+            Options is AssertableOptions emptyResultsOptions && emptyResultsOptions.EmptyAllureDirectory,
+            serveResultsFolder is not null);
+        runner.WithServeResultsFolder(serveResultsFolder);
         runner.ExitProcessOnCompletion = !Options.NoProcessExit;
         return runner;
     }

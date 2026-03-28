@@ -142,6 +142,37 @@ public class AllureWrapperTests
     }
 
     [Test]
+    public void TestServeTestResults_WithCustomFolder_GeneratesIntoRequestedDirectoryWhenMissing()
+    {
+        _wrapper.GeneratedReportDirectory = Path.Combine(_workingDirectory, "custom-report");
+
+        _wrapper.ServeTestResults(resultsDirectoryName: "custom-report");
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(_wrapper.StartInfos, Has.Count.EqualTo(2));
+            Assert.That(_wrapper.StartInfos[0].Arguments, Does.Contain($"-o \"{_wrapper.GeneratedReportDirectory}\""));
+            Assert.That(_wrapper.StartInfos[1].Arguments, Does.Contain($"open \"{_wrapper.GeneratedReportDirectory}\""));
+        });
+    }
+
+    [Test]
+    public void TestServeTestResults_WithExistingCustomFolder_OpensWithoutGenerating()
+    {
+        var existingReportDirectory = Path.Combine(_workingDirectory, "existing-report");
+        Directory.CreateDirectory(existingReportDirectory);
+
+        _wrapper.ServeTestResults(resultsDirectoryName: "existing-report");
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(_wrapper.StartInfos, Has.Count.EqualTo(1));
+            Assert.That(_wrapper.StartInfos[0].Arguments, Does.Not.Contain(" generate"));
+            Assert.That(_wrapper.StartInfos[0].Arguments, Does.Contain($"open \"{existingReportDirectory}\""));
+        });
+    }
+
+    [Test]
     public void TestMethodExistence_ShouldHaveExpectedMethods()
     {
         var cleanMethod = typeof(AllureWrapper).GetMethod("CleanTestResultsDirectory",
@@ -155,6 +186,7 @@ public class AllureWrapperTests
             Assert.That(cleanMethod!.ReturnType, Is.EqualTo(typeof(void)));
             Assert.That(serveMethod, Is.Not.Null);
             Assert.That(serveMethod!.ReturnType, Is.EqualTo(typeof(void)));
+            Assert.That(serveMethod!.GetParameters(), Has.Length.EqualTo(2));
         });
     }
 
