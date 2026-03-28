@@ -12,6 +12,7 @@ DataSources:
 Assertions:
   - Name: GeneratedFileSetAssertion
     Assertion: GeneratedFileSetAssertion
+    DataSourceNames: [ FileSystemPayloads ]
     AssertionConfiguration:
       DataSourceName: FileSystemPayloads
       ExpectedCount: 3

@@ -75,7 +75,7 @@ public sealed class GeneratedFileSetAssertion : BaseAssertion<GeneratedFileSetAs
             .OrderBy(key => key, StringComparer.Ordinal)
             .ToArray();
         var actualBodies = generatedData
-            .Select(data => DecodeBody(data.Body))
+            .Select(data => DecodeBody(data.Body).Trim())
             .OrderBy(body => body, StringComparer.Ordinal)
             .ToArray();
         var expectedStorageKeys = Configuration.ExpectedStorageKeys
