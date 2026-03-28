@@ -9,10 +9,10 @@ using QaaS.Runner.Sessions.ConfigurationObjects;
 namespace QaaS.Runner.Sessions.RuntimeOverrides;
 
 internal sealed record ConsumerOverrideRequest(string ActionName, IReaderConfig Configuration, ILogger Logger,
-    DataFilter DataFilter);
+    DataFilter DataFilter, string TimeZoneId);
 
 internal sealed record PublisherOverrideRequest(string ActionName, ISenderConfig Configuration, bool UseChunks,
-    ILogger Logger, DataFilter DataFilter);
+    ILogger Logger, DataFilter DataFilter, string TimeZoneId);
 
 internal sealed record TransactionOverrideRequest(string ActionName, ITransactorConfig Configuration, ILogger Logger,
     TimeSpan Timeout);

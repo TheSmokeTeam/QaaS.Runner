@@ -440,14 +440,10 @@ public class PublisherBuilderTests
         var publisherBuilder = new PublisherBuilder();
         publisherBuilder.Configure(senderConfiguration);
 
-        var buildMethod = publisherBuilder.GetType()
-            .GetMethod("Build", BindingFlags.NonPublic | BindingFlags.Public | BindingFlags.Instance);
-
         var actionFailures = new List<ActionFailure>();
-        var parameters = new object[] { Globals.GetContextWithMetadata(), actionFailures, "Test" };
 
         // Act
-        var publisher = buildMethod!.Invoke(publisherBuilder, parameters);
+        var publisher = publisherBuilder.Build(Globals.GetContextWithMetadata(), actionFailures, "Test");
 
         // Extract sender and chunkSender fields safely
         var sender = GetFieldValue(publisher, "_sender");
@@ -469,9 +465,6 @@ public class PublisherBuilderTests
         // Arrange
         var publisherBuilder = new PublisherBuilder().WithChunks(new Chunks { ChunkSize = 1 })
             .Configure(senderConfiguration).Named("Test");
-
-        var buildMethod = publisherBuilder.GetType()
-            .GetMethod("Build", BindingFlags.NonPublic | BindingFlags.Public | BindingFlags.Instance);
 
         var actionFailures = new List<ActionFailure>();
 

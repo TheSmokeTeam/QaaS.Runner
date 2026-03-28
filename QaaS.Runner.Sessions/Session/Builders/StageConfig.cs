@@ -2,8 +2,26 @@ using System.ComponentModel;
 
 namespace QaaS.Runner.Sessions.Session.Builders;
 
+/// <summary>
+/// Configures stage-level timing around a session stage.
+/// </summary>
 public class StageConfig
 {
+    /// <summary>
+    /// Creates an empty stage configuration for configuration binding scenarios.
+    /// </summary>
+    /// <remarks>
+    /// The runner binds YAML and configuration objects through reflection-based construction. A
+    /// parameterless constructor keeps that binding path compatible without changing the public API
+    /// used by existing callers that already construct stages with explicit values.
+    /// </remarks>
+    public StageConfig()
+    {
+    }
+
+    /// <summary>
+    /// Creates a stage configuration with an explicit stage number and optional delays.
+    /// </summary>
     public StageConfig(int stageNumber, int? timeoutBefore = null, int? timeoutAfter = null)
     {
         StageNumber = stageNumber;

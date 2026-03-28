@@ -541,6 +541,19 @@ public partial class PublisherBuilder
     /// </summary>
     internal BasePublisher? Build(InternalContext context, IList<ActionFailure> actionFailures, string sessionName)
     {
+        return BuildWithTimeZone(context, actionFailures, sessionName, TimeZoneInfoResolver.DefaultTimeZoneId);
+    }
+
+    /// <summary>
+    /// Builds a concrete publisher action from the configured sender/chunk sender pair.
+    /// Any construction failure is written to <paramref name="actionFailures"/> and returns null.
+    /// </summary>
+    internal BasePublisher? BuildWithTimeZone(
+        InternalContext context,
+        IList<ActionFailure> actionFailures,
+        string sessionName,
+        string timeZoneId)
+    {
         ISenderConfig? type = null;
         try
         {
@@ -576,9 +589,20 @@ public partial class PublisherBuilder
                     $"The {nameof(Chunk)} field must be empty when {propertyName} is configured.");
             }
             
-            var overrideRequest = new PublisherOverrideRequest(Name!, type, Chunk != null, context.Logger, DataFilter);
+            var overrideRequest = new PublisherOverrideRequest(
+                Name!,
+                type,
+                Chunk != null,
+                context.Logger,
+                DataFilter,
+                timeZoneId);
             var (sender, chunkSender) = context.GetSessionActionOverrides()?.Publisher?.Invoke(overrideRequest)
-                                       ?? SenderFactory.CreateSender(Chunk != null, type, context.Logger, DataFilter);
+                                       ?? ProtocolFactoryCompatibility.CreateSender(
+                                           Chunk != null,
+                                           type,
+                                           context.Logger,
+                                           DataFilter,
+                                           timeZoneId);
             var publisherTypeName = sender?.GetType().Name ?? chunkSender?.GetType().Name ?? "Unknown";
             
             context.Logger.LogDebugWithMetaData("Started building Publisher of type {type}",

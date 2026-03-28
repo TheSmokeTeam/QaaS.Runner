@@ -53,14 +53,22 @@ public class AllureWrapper
     /// <summary>
     ///     Automatically serves the test results in a human-readable manner
     /// </summary>
-    public virtual void ServeTestResults(string allureRunnablePath = DefaultAllureRunnablePath)
+    public virtual void ServeTestResults(string allureRunnablePath = DefaultAllureRunnablePath,
+        string? resultsDirectoryName = null)
     {
         var resolvedAllureRunnablePath = ResolveAllureRunnablePath(allureRunnablePath);
-        var generatedReportDirectory = ResolveReportDirectory();
+        var serveTargetDirectory = ResolveServeTargetDirectory(resultsDirectoryName);
+        var openTargetDirectory = serveTargetDirectory;
 
-        RunProcess(CreateGenerateProcessStartInfo(resolvedAllureRunnablePath, generatedReportDirectory));
-        CopyGeneratedHistoryToResultsDirectory(generatedReportDirectory);
-        RunProcess(CreateOpenProcessStartInfo(resolvedAllureRunnablePath, generatedReportDirectory));
+        if (ShouldGenerateReportBeforeOpen(serveTargetDirectory))
+        {
+            var generatedReportDirectory = ResolveGeneratedReportDirectory(serveTargetDirectory);
+            RunProcess(CreateGenerateProcessStartInfo(resolvedAllureRunnablePath, generatedReportDirectory));
+            CopyGeneratedHistoryToResultsDirectory(generatedReportDirectory);
+            openTargetDirectory = generatedReportDirectory;
+        }
+
+        RunProcess(CreateOpenProcessStartInfo(resolvedAllureRunnablePath, openTargetDirectory));
     }
 
     /// <summary>
@@ -100,9 +108,9 @@ public class AllureWrapper
     ///     Builds the shell command used to launch <c>allure open</c> against the generated report directory.
     /// </summary>
     protected virtual ProcessStartInfo CreateOpenProcessStartInfo(string allureRunnablePath,
-        string generatedReportDirectory)
+        string reportDirectory)
     {
-        return CreateAllureProcessStartInfo(allureRunnablePath, $"open {QuoteForShell(generatedReportDirectory)}");
+        return CreateAllureProcessStartInfo(allureRunnablePath, $"open {QuoteForShell(reportDirectory)}");
     }
 
     /// <summary>
@@ -190,6 +198,34 @@ public class AllureWrapper
     }
 
     /// <summary>
+    ///     Resolves the directory the user asked QaaS to serve.
+    /// </summary>
+    protected virtual string ResolveServeTargetDirectory(string? resultsDirectoryName)
+    {
+        return string.IsNullOrWhiteSpace(resultsDirectoryName)
+            ? ResolveResultsDirectory()
+            : Path.GetFullPath(resultsDirectoryName, ResolveWorkingDirectory());
+    }
+
+    /// <summary>
+    ///     Determines whether QaaS should generate a report before opening the requested directory.
+    /// </summary>
+    protected virtual bool ShouldGenerateReportBeforeOpen(string serveTargetDirectory)
+    {
+        return PathsEqual(serveTargetDirectory, ResolveResultsDirectory()) || !Directory.Exists(serveTargetDirectory);
+    }
+
+    /// <summary>
+    ///     Resolves the directory that should receive generated report output when report generation is required.
+    /// </summary>
+    protected virtual string ResolveGeneratedReportDirectory(string serveTargetDirectory)
+    {
+        return PathsEqual(serveTargetDirectory, ResolveResultsDirectory())
+            ? ResolveReportDirectory()
+            : serveTargetDirectory;
+    }
+
+    /// <summary>
     ///     Normalizes the configured Allure executable path by falling back to the default command when needed.
     /// </summary>
     /// <param name="allureRunnablePath">The caller-provided Allure executable path.</param>
@@ -199,6 +235,21 @@ public class AllureWrapper
         return string.IsNullOrWhiteSpace(allureRunnablePath)
             ? DefaultAllureRunnablePath
             : allureRunnablePath;
+    }
+
+    /// <summary>
+    ///     Compares two paths using the platform-specific case-sensitivity rules.
+    /// </summary>
+    private static bool PathsEqual(string leftPath, string rightPath)
+    {
+        var comparison = RuntimeInformation.IsOSPlatform(OSPlatform.Windows)
+            ? StringComparison.OrdinalIgnoreCase
+            : StringComparison.Ordinal;
+
+        return string.Equals(
+            Path.GetFullPath(leftPath),
+            Path.GetFullPath(rightPath),
+            comparison);
     }
 
     /// <summary>

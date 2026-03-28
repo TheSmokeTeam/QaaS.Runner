@@ -156,6 +156,42 @@ public class BootstrapTests
         Assert.That(normalizedArguments, Is.EqualTo(new[] { "run", "test.qaas.yaml" }));
     }
 
+    [Test]
+    public void NormalizeArguments_WhenServeResultsFlagIsBare_UsesDefaultResultsFolder()
+    {
+        var normalizedArguments = Bootstrap.NormalizeArguments(["run", "test.qaas.yaml", "-s"]);
+
+        Assert.That(normalizedArguments,
+            Is.EqualTo(new[] { "run", "test.qaas.yaml", "--serve-results", AssertableOptions.DefaultServeResultsFolder }));
+    }
+
+    [Test]
+    public void NormalizeArguments_WhenServeResultsFlagHasFolder_KeepsRequestedFolder()
+    {
+        var normalizedArguments =
+            Bootstrap.NormalizeArguments(["run", "test.qaas.yaml", "-s", "allure-report"]);
+
+        Assert.That(normalizedArguments,
+            Is.EqualTo(new[] { "run", "test.qaas.yaml", "--serve-results", "allure-report" }));
+    }
+
+    [Test]
+    public void NormalizeArguments_WhenServeResultsFlagIsExplicitlyFalse_RemovesServeResults()
+    {
+        var normalizedArguments = Bootstrap.NormalizeArguments(["run", "test.qaas.yaml", "--serve-results=false"]);
+
+        Assert.That(normalizedArguments, Is.EqualTo(new[] { "run", "test.qaas.yaml" }));
+    }
+
+    [Test]
+    public void NormalizeArguments_WhenServeResultsPrecedesConfigurationFile_PreservesConfigurationFileAsPositional()
+    {
+        var normalizedArguments = Bootstrap.NormalizeArguments(["run", "-s", "test.qaas.yaml"]);
+
+        Assert.That(normalizedArguments,
+            Is.EqualTo(new[] { "run", "--serve-results", AssertableOptions.DefaultServeResultsFolder, "test.qaas.yaml" }));
+    }
+
     private static string CaptureConsoleOut(out int exitCode, Action action)
     {
         var originalOut = Console.Out;

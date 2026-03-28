@@ -92,10 +92,10 @@ public static class Bootstrap
         if (arguments.Length == 0)
             return arguments;
 
-        if (!ShouldAssumeRunMode(arguments))
-            return arguments;
+        if (ShouldAssumeRunMode(arguments))
+            arguments = ["run", .. arguments];
 
-        return ["run", .. arguments];
+        return NormalizeServeResultsArguments(arguments);
     }
 
     /// <summary>
@@ -192,6 +192,100 @@ public static class Bootstrap
     private static bool IsOption(string argument)
     {
         return argument.StartsWith("-", StringComparison.Ordinal);
+    }
+
+    private static string[] NormalizeServeResultsArguments(IReadOnlyList<string> arguments)
+    {
+        var normalized = new List<string>(arguments.Count + 1);
+
+        for (var index = 0; index < arguments.Count; index++)
+        {
+            var argument = arguments[index];
+            if (!TryParseServeResultsOption(argument, out var inlineValue))
+            {
+                normalized.Add(argument);
+                continue;
+            }
+
+            if (inlineValue is not null)
+            {
+                AppendServeResultsTokens(normalized, inlineValue);
+                continue;
+            }
+
+            if (index + 1 >= arguments.Count || IsOption(arguments[index + 1]))
+            {
+                AppendServeResultsTokens(normalized, null);
+                continue;
+            }
+
+            var nextArgument = arguments[index + 1];
+            if (IsBooleanTrue(nextArgument))
+            {
+                AppendServeResultsTokens(normalized, null);
+                index++;
+                continue;
+            }
+
+            if (IsBooleanFalse(nextArgument))
+            {
+                index++;
+                continue;
+            }
+
+            if (LooksLikeConfigurationPath(nextArgument))
+            {
+                AppendServeResultsTokens(normalized, null);
+                continue;
+            }
+
+            normalized.Add("--serve-results");
+            normalized.Add(nextArgument);
+            index++;
+        }
+
+        return normalized.ToArray();
+    }
+
+    private static bool TryParseServeResultsOption(string argument, out string? inlineValue)
+    {
+        if (string.Equals(argument, "-s", StringComparison.OrdinalIgnoreCase) ||
+            string.Equals(argument, "--serve-results", StringComparison.OrdinalIgnoreCase))
+        {
+            inlineValue = null;
+            return true;
+        }
+
+        const string longOptionPrefix = "--serve-results=";
+        if (argument.StartsWith(longOptionPrefix, StringComparison.OrdinalIgnoreCase))
+        {
+            inlineValue = argument[longOptionPrefix.Length..];
+            return true;
+        }
+
+        inlineValue = null;
+        return false;
+    }
+
+    private static void AppendServeResultsTokens(ICollection<string> normalizedArguments, string? folder)
+    {
+        if (IsBooleanFalse(folder))
+            return;
+
+        normalizedArguments.Add("--serve-results");
+        normalizedArguments.Add(IsBooleanTrue(folder) || string.IsNullOrWhiteSpace(folder)
+            ? AssertableOptions.DefaultServeResultsFolder
+            : folder.Trim());
+    }
+
+    private static bool IsBooleanTrue(string? value)
+    {
+        return string.Equals(value, bool.TrueString, StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static bool IsBooleanFalse(string? value)
+    {
+        return string.Equals(value, bool.FalseString, StringComparison.OrdinalIgnoreCase);
     }
 
     internal static TOptions GetSafeLoggerOptions<TOptions>(TOptions options, bool forceDisableSendLogs,

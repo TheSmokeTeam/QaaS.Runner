@@ -464,6 +464,31 @@ public class ExecutionBuilderTests
     }
 
     [Test]
+    public void Constructor_WithConfiguredStages_BindsStageDefinitionsFromLoadedContext()
+    {
+        var context = CreateLoadedContext(new Dictionary<string, string?>
+        {
+            ["MetaData:Team"] = "Smoke",
+            ["MetaData:System"] = "QaaS",
+            ["Sessions:0:Name"] = "stage-session",
+            ["Sessions:0:Stages:0:StageNumber"] = "1",
+            ["Sessions:0:Stages:0:TimeoutBefore"] = "25",
+            ["Sessions:0:Stages:0:TimeoutAfter"] = "50"
+        });
+
+        var builder = new ExecutionBuilder(context, ExecutionType.Template, null, null, null, null);
+        var session = builder.ReadSessions().Single();
+        var stage = session.ReadStages().Single();
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(stage.StageNumber, Is.EqualTo(1));
+            Assert.That(stage.TimeoutBefore, Is.EqualTo(25));
+            Assert.That(stage.TimeoutAfter, Is.EqualTo(50));
+        });
+    }
+
+    [Test]
     public void Build_WithInvalidNestedRabbitMqTargets_ThrowsInvalidConfigurationsException()
     {
         var directRabbitMqValidationResults = new List<System.ComponentModel.DataAnnotations.ValidationResult>();

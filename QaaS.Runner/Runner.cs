@@ -2,6 +2,7 @@ using System.Runtime.ExceptionServices;
 using Autofac;
 using Microsoft.Extensions.Logging;
 using QaaS.Framework.Executions;
+using QaaS.Runner.Options;
 using QaaS.Runner.WrappedExternals;
 using ILogger = Microsoft.Extensions.Logging.ILogger;
 
@@ -21,6 +22,7 @@ public class Runner : IRunner, IDisposable
     private Serilog.ILogger SerilogLogger { get; set; }
     private bool EmptyResults { get; set; }
     private bool ServeResults { get; set; }
+    private string ServeResultsFolder { get; set; } = AssertableOptions.DefaultServeResultsFolder;
     private bool DisposeSerilogLogger { get; set; } = true;
     private int? BootstrapHandledExitCode { get; set; }
 
@@ -131,7 +133,7 @@ public class Runner : IRunner, IDisposable
 
         if (ServeResults)
         {
-            Logger.LogInformation("Serving test results after execution");
+            Logger.LogInformation("Serving test results after execution from {ServeResultsFolder}", ServeResultsFolder);
             ServeResultsInAllure();
         }
         else
@@ -155,7 +157,7 @@ public class Runner : IRunner, IDisposable
     /// </summary>
     protected virtual void ServeResultsInAllure()
     {
-        Scope.Resolve<AllureWrapper>().ServeTestResults();
+        Scope.Resolve<AllureWrapper>().ServeTestResults(resultsDirectoryName: ServeResultsFolder);
     }
 
     /// <summary>
@@ -266,6 +268,19 @@ public class Runner : IRunner, IDisposable
     }
 
     /// <summary>
+    /// Controls which Allure folder should be served when result serving is enabled.
+    /// </summary>
+    /// <param name="serveResultsFolder">The folder to serve or open after execution.</param>
+    /// <returns>The current runner instance for fluent configuration.</returns>
+    internal Runner WithServeResultsFolder(string? serveResultsFolder)
+    {
+        if (!string.IsNullOrWhiteSpace(serveResultsFolder))
+            ServeResultsFolder = serveResultsFolder.Trim();
+
+        return this;
+    }
+
+    /// <summary>
     /// Applies the post-run completion policy to the resolved exit code.
     /// </summary>
     /// <param name="exitCode">The exit code produced by the runner lifecycle.</param>
@@ -288,8 +303,8 @@ public class Runner : IRunner, IDisposable
     private void LogRunStart()
     {
         Logger.LogInformation(
-            "Starting runner with {ExecutionCount} execution builders. EmptyResults={EmptyResults}, ServeResults={ServeResults}, ExitProcessOnCompletion={ExitProcessOnCompletion}",
-            ExecutionBuilders.Count, EmptyResults, ServeResults, ExitProcessOnCompletion);
+            "Starting runner with {ExecutionCount} execution builders. EmptyResults={EmptyResults}, ServeResults={ServeResults}, ServeResultsFolder={ServeResultsFolder}, ExitProcessOnCompletion={ExitProcessOnCompletion}",
+            ExecutionBuilders.Count, EmptyResults, ServeResults, ServeResultsFolder, ExitProcessOnCompletion);
     }
 
     /// <summary>

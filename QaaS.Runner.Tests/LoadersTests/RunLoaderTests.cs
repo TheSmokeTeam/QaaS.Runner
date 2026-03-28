@@ -527,9 +527,35 @@ namespace QaaS.Runner.Tests.LoadersTests
 
             var emptyResultsProperty = typeof(Runner).GetProperty("EmptyResults", BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic)!;
             var serveResultsProperty = typeof(Runner).GetProperty("ServeResults", BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic)!;
+            var serveResultsFolderProperty = typeof(Runner).GetProperty("ServeResultsFolder", BindingFlags.Instance | BindingFlags.NonPublic)!;
 
             Assert.That((bool)emptyResultsProperty.GetValue(runner)!, Is.True);
             Assert.That((bool)serveResultsProperty.GetValue(runner)!, Is.True);
+            Assert.That((string)serveResultsFolderProperty.GetValue(runner)!,
+                Is.EqualTo(AssertableOptions.DefaultServeResultsFolder));
+        }
+
+        [Test]
+        public void GetLoadedRunner_WithCustomServeResultsFolder_PassesFolderToRunner()
+        {
+            var options = new RunOptions
+            {
+                ConfigurationFile = "test.yaml",
+                SendLogs = false,
+                ServeResultsFolder = "allure-report"
+            };
+
+            var loader = new TestRunLoader(options, "exec-custom-serve-folder");
+
+            var runner = loader.GetLoadedRunner();
+            var serveResultsProperty = typeof(Runner).GetProperty("ServeResults", BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic)!;
+            var serveResultsFolderProperty = typeof(Runner).GetProperty("ServeResultsFolder", BindingFlags.Instance | BindingFlags.NonPublic)!;
+
+            Assert.Multiple(() =>
+            {
+                Assert.That((bool)serveResultsProperty.GetValue(runner)!, Is.True);
+                Assert.That((string)serveResultsFolderProperty.GetValue(runner)!, Is.EqualTo("allure-report"));
+            });
         }
 
         [Test]
