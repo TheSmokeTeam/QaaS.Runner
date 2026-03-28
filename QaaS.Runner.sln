@@ -22,8 +22,6 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "QaaS.Runner.Tests", "QaaS.R
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "QaaS.Runner.Sessions.Tests", "QaaS.Runner.Sessions.Tests\QaaS.Runner.Sessions.Tests.csproj", "{6D6CEE13-1C0C-4924-BCD3-8C351FC87A5C}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "QaaS.Runner.TemplateSweep", "QaaS.Runner.TemplateSweep\QaaS.Runner.TemplateSweep.csproj", "{D93108D0-8766-4FC5-B6EF-364A94A75A31}"
-EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -166,18 +164,6 @@ Global
 		{6D6CEE13-1C0C-4924-BCD3-8C351FC87A5C}.Release|x64.Build.0 = Release|Any CPU
 		{6D6CEE13-1C0C-4924-BCD3-8C351FC87A5C}.Release|x86.ActiveCfg = Release|Any CPU
 		{6D6CEE13-1C0C-4924-BCD3-8C351FC87A5C}.Release|x86.Build.0 = Release|Any CPU
-		{D93108D0-8766-4FC5-B6EF-364A94A75A31}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
-		{D93108D0-8766-4FC5-B6EF-364A94A75A31}.Debug|Any CPU.Build.0 = Debug|Any CPU
-		{D93108D0-8766-4FC5-B6EF-364A94A75A31}.Debug|x64.ActiveCfg = Debug|Any CPU
-		{D93108D0-8766-4FC5-B6EF-364A94A75A31}.Debug|x64.Build.0 = Debug|Any CPU
-		{D93108D0-8766-4FC5-B6EF-364A94A75A31}.Debug|x86.ActiveCfg = Debug|Any CPU
-		{D93108D0-8766-4FC5-B6EF-364A94A75A31}.Debug|x86.Build.0 = Debug|Any CPU
-		{D93108D0-8766-4FC5-B6EF-364A94A75A31}.Release|Any CPU.ActiveCfg = Release|Any CPU
-		{D93108D0-8766-4FC5-B6EF-364A94A75A31}.Release|Any CPU.Build.0 = Release|Any CPU
-		{D93108D0-8766-4FC5-B6EF-364A94A75A31}.Release|x64.ActiveCfg = Release|Any CPU
-		{D93108D0-8766-4FC5-B6EF-364A94A75A31}.Release|x64.Build.0 = Release|Any CPU
-		{D93108D0-8766-4FC5-B6EF-364A94A75A31}.Release|x86.ActiveCfg = Release|Any CPU
-		{D93108D0-8766-4FC5-B6EF-364A94A75A31}.Release|x86.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
