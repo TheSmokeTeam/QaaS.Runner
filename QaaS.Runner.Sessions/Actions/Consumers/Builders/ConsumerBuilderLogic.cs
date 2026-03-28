@@ -330,6 +330,18 @@ public partial class ConsumerBuilder
     /// </summary>
     internal BaseConsumer? Build(InternalContext context, IList<ActionFailure> actionFailures, string sessionName)
     {
+        return BuildWithTimeZone(context, actionFailures, sessionName, TimeZoneInfoResolver.DefaultTimeZoneId);
+    }
+
+    /// <summary>
+    /// Builds a concrete consumer action and degrades to an action failure instead of throwing on invalid setup.
+    /// </summary>
+    internal BaseConsumer? BuildWithTimeZone(
+        InternalContext context,
+        IList<ActionFailure> actionFailures,
+        string sessionName,
+        string timeZoneId)
+    {
         IReaderConfig? type = null;
         try
         {
@@ -363,9 +375,13 @@ public partial class ConsumerBuilder
                     $"The {propertyName} field is ambiguous because the configured protocol supports both single and chunk reading, but consumer configuration does not expose a chunk selection option.");
             }
 
-            var overrideRequest = new ConsumerOverrideRequest(Name!, type, context.Logger, DataFilter);
+            var overrideRequest = new ConsumerOverrideRequest(Name!, type, context.Logger, DataFilter, timeZoneId);
             var (reader, chunkReader) = context.GetSessionActionOverrides()?.Consumer?.Invoke(overrideRequest)
-                                        ?? ReaderFactory.CreateReader(type, context.Logger, DataFilter);
+                                        ?? ProtocolFactoryCompatibility.CreateReader(
+                                            type,
+                                            context.Logger,
+                                            DataFilter,
+                                            timeZoneId);
             var consumerTypeName = reader?.GetType().Name ?? chunkReader?.GetType().Name ?? "Unknown";
             
             context.Logger.LogDebugWithMetaData("Started building Consumer of type {type}",

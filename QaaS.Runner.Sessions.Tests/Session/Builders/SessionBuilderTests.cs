@@ -9,13 +9,18 @@ using QaaS.Framework.Protocols.ConfigurationObjects.Http;
 using QaaS.Framework.Protocols.ConfigurationObjects.Prometheus;
 using QaaS.Framework.Protocols.ConfigurationObjects.RabbitMq;
 using QaaS.Framework.Protocols.ConfigurationObjects.Socket;
+using QaaS.Framework.Protocols.ConfigurationObjects.Sql;
+using QaaS.Framework.Protocols.Protocols;
 using QaaS.Framework.SDK.ContextObjects;
 using QaaS.Framework.SDK.Hooks.Probe;
+using QaaS.Framework.SDK.Session;
+using QaaS.Framework.SDK.Session.DataObjects;
 using QaaS.Runner.Sessions.Actions.Collectors;
 using QaaS.Runner.Sessions.Actions.MockerCommands;
 using QaaS.Runner.Sessions.Actions.Probes;
 using QaaS.Runner.Sessions.Actions.Transactions.Builders;
 using QaaS.Runner.Sessions.ConfigurationObjects;
+using QaaS.Runner.Sessions.RuntimeOverrides;
 using QaaS.Runner.Sessions.Session.Builders;
 using QaaS.Runner.Sessions.Tests.Actions.Utils;
 using ConsumerBuilder = QaaS.Runner.Sessions.Actions.Consumers.Builders.ConsumerBuilder;
@@ -112,6 +117,15 @@ public class SessionBuilderTests
         builder.WithinCategory("TestCategory");
 
         Assert.That(builder.Category, Is.EqualTo("TestCategory"));
+    }
+
+    [Test]
+    public void WithTimeZone_Should_Set_TimeZoneId()
+    {
+        var builder = new SessionBuilder();
+        builder.WithTimeZone("Europe/London");
+
+        Assert.That(builder.TimeZoneId, Is.EqualTo("Europe/London"));
     }
 
     [Test]
@@ -324,5 +338,61 @@ public class SessionBuilderTests
 
         Assert.That(sleepBeforeField.GetValue(stageTwo), Is.EqualTo(123));
         Assert.That(sleepAfterField.GetValue(stageTwo), Is.EqualTo(456));
+    }
+
+    [Test]
+    public void Build_WhenSessionTimeZoneIsConfigured_ForwardsItToProtocolOverrides()
+    {
+        const string timeZoneId = "Europe/London";
+        string? capturedConsumerTimeZone = null;
+        string? capturedPublisherTimeZone = null;
+        var chunkReader = new Mock<IChunkReader>();
+        chunkReader.Setup(reader => reader.ReadChunk(It.IsAny<TimeSpan>()))
+            .Returns(Array.Empty<DetailedData<object>>());
+        var sender = new Mock<ISender>();
+        sender.Setup(mock => mock.Send(It.IsAny<Data<object>>()))
+            .Returns(new DetailedData<object>());
+
+        _context.SetSessionActionOverrides(new SessionActionOverrides
+        {
+            Consumer = request =>
+            {
+                capturedConsumerTimeZone = request.TimeZoneId;
+                return (null, chunkReader.Object);
+            },
+            Publisher = request =>
+            {
+                capturedPublisherTimeZone = request.TimeZoneId;
+                return (sender.Object, null);
+            }
+        });
+
+        var builder = new SessionBuilder()
+            .Named("TestSession")
+            .AtStage(1)
+            .WithTimeZone(timeZoneId)
+            .AddConsumer(new ConsumerBuilder()
+                .Named("sql-consumer")
+                .WithTimeout(100)
+                .Configure(new MsSqlReaderConfig
+                {
+                    ConnectionString = "Server=localhost",
+                    TableName = "events",
+                    InsertionTimeField = "created_at"
+                }))
+            .AddPublisher(new PublisherBuilder()
+                .Named("sql-publisher")
+                .Configure(new RabbitMqSenderConfig
+                {
+                    Host = "https://test.com"
+                }));
+
+        _ = builder.Build(_context, []);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(capturedConsumerTimeZone, Is.EqualTo(timeZoneId));
+            Assert.That(capturedPublisherTimeZone, Is.EqualTo(timeZoneId));
+        });
     }
 }

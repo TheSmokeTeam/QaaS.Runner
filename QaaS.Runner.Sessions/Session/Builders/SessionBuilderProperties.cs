@@ -2,13 +2,13 @@ using System.ComponentModel;
 using System.ComponentModel.DataAnnotations;
 using System.Runtime.CompilerServices;
 using QaaS.Framework.Configurations.CustomValidationAttributes;
+using QaaS.Runner.Infrastructure;
 using QaaS.Runner.Sessions.Actions.Collectors;
 using QaaS.Runner.Sessions.Actions.Consumers.Builders;
 using QaaS.Runner.Sessions.Actions.MockerCommands;
 using QaaS.Runner.Sessions.Actions.Probes;
 using QaaS.Runner.Sessions.Actions.Publishers.Builders;
 using QaaS.Runner.Sessions.Actions.Transactions.Builders;
-
 [assembly: InternalsVisibleTo("QaaS.Runner")]
 [assembly: InternalsVisibleTo("QaaS.Runner.Tests")]
 
@@ -36,6 +36,11 @@ public partial class SessionBuilder
                  " if false any data is discarded after its iterated over and the SessionData as a whole is not saved.")]
     [DefaultValue(true)]
     public bool SaveData { get; internal set; } = true;
+    [Description(
+        "The time zone id used when offset-based date conversions need daylight-saving rules. " +
+        "Defaults to " + TimeZoneInfoResolver.DefaultTimeZoneId + ".")]
+    [DefaultValue(TimeZoneInfoResolver.DefaultTimeZoneId)]
+    public string TimeZoneId { get; internal set; } = TimeZoneInfoResolver.DefaultTimeZoneId;
     [Range(uint.MinValue, uint.MaxValue)]
     [Description("The time in milliseconds to wait before the session starts")]
     [DefaultValue(0)]

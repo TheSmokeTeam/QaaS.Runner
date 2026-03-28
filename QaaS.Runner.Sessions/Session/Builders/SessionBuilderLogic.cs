@@ -108,6 +108,19 @@ public partial class SessionBuilder
     }
 
     /// <summary>
+    /// Sets the time zone id used for daylight-saving-aware offset conversions in this session.
+    /// </summary>
+    /// <remarks>
+    /// Use this when session actions that rely on offset-based date conversion should resolve daylight-saving rules from a specific time zone.
+    /// </remarks>
+    /// <qaas-docs group="Configuration as Code" subgroup="Sessions" />
+    public SessionBuilder WithTimeZone(string timeZoneId)
+    {
+        TimeZoneId = timeZoneId;
+        return this;
+    }
+
+    /// <summary>
     /// Adds the supplied consumer to the current Runner session builder instance.
     /// </summary>
     /// <remarks>
@@ -725,13 +738,15 @@ public partial class SessionBuilder
     {
         var actionFailures = new List<ActionFailure>();
 
-        var publishers = (Publishers ??= []).Select(publisher => publisher.Build(context, actionFailures, Name!))
+        var publishers = (Publishers ??= [])
+            .Select(publisher => publisher.BuildWithTimeZone(context, actionFailures, Name!, TimeZoneId))
             .Where(publisher => publisher != null).ToArray();
 
         var transactions = (Transactions ??= []).Select(transaction => transaction.Build(context, actionFailures, Name!))
             .Where(transaction => transaction != null).ToArray();
 
-        var consumers = (Consumers ??= []).Select(consumer => consumer.Build(context, actionFailures, Name!))
+        var consumers = (Consumers ??= [])
+            .Select(consumer => consumer.BuildWithTimeZone(context, actionFailures, Name!, TimeZoneId))
             .Where(consumer => consumer != null).ToArray();
 
         var probes = (Probes ??= []).Select(probe => probe.Build(context, probeHooks, actionFailures, Name!))
