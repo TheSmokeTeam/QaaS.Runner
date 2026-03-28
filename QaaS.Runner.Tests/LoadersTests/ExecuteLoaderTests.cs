@@ -159,6 +159,27 @@ public class ExecuteLoaderTests
     }
 
     [Test]
+    public void GetLoadedRunner_WithCustomServeResultsFolder_PassesFolderToRunner()
+    {
+        var loader = new ExecuteLoader<Runner>(new ExecuteOptions
+        {
+            ConfigurationFile = "TestData/executable.yaml",
+            SendLogs = false,
+            ServeResultsFolder = "allure-report"
+        });
+
+        var runner = loader.GetLoadedRunner();
+        var serveResultsProperty = typeof(Runner).GetProperty("ServeResults", BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic)!;
+        var serveResultsFolderProperty = typeof(Runner).GetProperty("ServeResultsFolder", BindingFlags.Instance | BindingFlags.NonPublic)!;
+
+        Assert.Multiple(() =>
+        {
+            Assert.That((bool)serveResultsProperty.GetValue(runner)!, Is.True);
+            Assert.That((string)serveResultsFolderProperty.GetValue(runner)!, Is.EqualTo("allure-report"));
+        });
+    }
+
+    [Test]
     public void GetCommandsToRun_WithMissingCommandIds_IncludesAvailableIdsInExceptionMessage()
     {
         var loader = new ExecuteLoader<Runner>(new ExecuteOptions

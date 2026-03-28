@@ -132,15 +132,18 @@ public class RunnerBehaviorTests
     {
         public bool CleanCalled { get; private set; }
         public bool ServeCalled { get; private set; }
+        public string? ServedResultsDirectoryName { get; private set; }
 
         public override void CleanTestResultsDirectory()
         {
             CleanCalled = true;
         }
 
-        public override void ServeTestResults(string allureRunnablePath = DefaultAllureRunnablePath)
+        public override void ServeTestResults(string allureRunnablePath = DefaultAllureRunnablePath,
+            string? resultsDirectoryName = null)
         {
             ServeCalled = true;
+            ServedResultsDirectoryName = resultsDirectoryName;
         }
     }
 
@@ -416,10 +419,15 @@ public class RunnerBehaviorTests
         using var scope = BuildScope(allureWrapper);
         var runner = new ExposedRunner(scope, [], Globals.Logger, new Mock<Serilog.ILogger>().Object,
             serveResults: true);
+        runner.WithServeResultsFolder("allure-report");
 
         runner.InvokeTeardown();
 
-        Assert.That(allureWrapper.ServeCalled, Is.True);
+        Assert.Multiple(() =>
+        {
+            Assert.That(allureWrapper.ServeCalled, Is.True);
+            Assert.That(allureWrapper.ServedResultsDirectoryName, Is.EqualTo("allure-report"));
+        });
     }
 
     [Test]

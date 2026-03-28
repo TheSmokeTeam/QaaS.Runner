@@ -131,6 +131,7 @@ public class ExecuteLoader<TRunner> : BaseLoader<ExecuteOptions, TRunner> where 
             SerilogLogger,
             Options.EmptyAllureDirectory,
             Options.AutoServeTestResults);
+        runner.WithServeResultsFolder(Options.AutoServeTestResults ? Options.GetServeResultsFolderOrDefault() : null);
         runner.ExitProcessOnCompletion = !Options.NoProcessExit;
         return runner;
     }

@@ -26,6 +26,7 @@ public class RunnableOptionsTests
         Assert.Multiple(() =>
         {
             Assert.That(options.AutoServeTestResults, Is.False);
+            Assert.That(options.ServeResultsFolder, Is.Null);
             Assert.That(options.EmptyAllureDirectory, Is.False);
         });
     }
@@ -38,9 +39,41 @@ public class RunnableOptionsTests
         Assert.Multiple(() =>
         {
             Assert.That(options.AutoServeTestResults, Is.False);
+            Assert.That(options.ServeResultsFolder, Is.Null);
             Assert.That(options.EmptyAllureDirectory, Is.False);
             Assert.That(options.NoProcessExit, Is.False);
             Assert.That(options.CommandIdsToRun, Is.Empty);
+        });
+    }
+
+    [Test]
+    public void AssertableOptions_WhenAutoServeIsEnabled_UsesDefaultResultsFolder()
+    {
+        var options = new RunOptions
+        {
+            AutoServeTestResults = true
+        };
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(options.AutoServeTestResults, Is.True);
+            Assert.That(options.ServeResultsFolder, Is.EqualTo(AssertableOptions.DefaultServeResultsFolder));
+            Assert.That(options.GetServeResultsFolderOrDefault(), Is.EqualTo(AssertableOptions.DefaultServeResultsFolder));
+        });
+    }
+
+    [Test]
+    public void ExecuteOptions_WhenCustomServeResultsFolderIsProvided_PreservesIt()
+    {
+        var options = new ExecuteOptions
+        {
+            ServeResultsFolder = "allure-report"
+        };
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(options.AutoServeTestResults, Is.True);
+            Assert.That(options.GetServeResultsFolderOrDefault(), Is.EqualTo("allure-report"));
         });
     }
 }
