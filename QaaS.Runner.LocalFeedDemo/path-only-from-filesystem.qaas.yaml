@@ -1,0 +1,21 @@
+MetaData:
+  Team: Smoke
+  System: LocalFeedDemo
+
+DataSources:
+  - Name: FileSystemPayloads
+    Generator: QaaS.Common.Generators.FromExternalSourceGenerators.FromFileSystem
+    GeneratorConfiguration:
+      FileSystem:
+        Path: TestData
+
+Assertions:
+  - Name: GeneratedFileSetAssertion
+    Assertion: GeneratedFileSetAssertion
+    AssertionConfiguration:
+      DataSourceName: FileSystemPayloads
+      ExpectedCount: 3
+      ExpectedStorageKeys:
+        - 001-first.json
+        - 010-third.json
+        - 2-second.json
