@@ -1,0 +1,20 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\QaaS.Runner\QaaS.Runner.csproj" />
+    <PackageReference Include="QaaS.Common.Assertions" Version="3.2.0" />
+    <PackageReference Include="QaaS.Common.Generators" Version="3.2.0" />
+    <PackageReference Include="QaaS.Common.Processors" Version="1.2.0" />
+    <PackageReference Include="QaaS.Common.Probes" Version="1.2.0" />
+    <PackageReference Include="QaaS.Mocker" Version="2.1.0" />
+    <PackageReference Include="YamlDotNet" Version="16.3.0" />
+  </ItemGroup>
+
+</Project>
