@@ -327,7 +327,10 @@ jobs:
             --no-restore --no-build `
             --configuration ${{ env.CONFIGURATION }} `
             --include-symbols `
-            -p:DebugType=portable `
+            -p:DebugType=embedded `
+            -p:EmbedAllSources=true `
+            -p:EmbedUntrackedSources=true `
+            -p:PublishRepositoryUrl=true `
             -p:SymbolPackageFormat=snupkg `
             -p:PackageVersion=${{ steps.stable_tag.outputs.tag }} `
             --output ${{ env.PACKAGE_OUTPUT_DIRECTORY }}
