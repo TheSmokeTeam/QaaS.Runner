@@ -1,9 +1,9 @@
 using System.Collections.Concurrent;
 using System.Collections.Immutable;
 using QaaS.Framework.SDK.DataSourceObjects;
-using QaaS.Framework.SDK.ContextObjects;
 using QaaS.Framework.SDK.Hooks.Probe;
 using QaaS.Framework.SDK.Session.SessionDataObjects;
+using QaaS.Runner.Sessions.Actions.Probes;
 
 namespace QaaS.Runner.Tests.TestObjects;
 
@@ -69,7 +69,7 @@ public class ScopeAwareTestProbe : BaseProbe<ProbeMarkerConfig>
 {
     public override void Run(IImmutableList<SessionData> sessionDataList, IImmutableList<DataSource> dataSourceList)
     {
-        var descriptor = ProbeExecutionContext.GetCurrent(Context);
+        var descriptor = ProbeExecutionScope.GetCurrent();
         ProbeRunRecorder.RecordScope(descriptor.SessionName, descriptor.ProbeName);
     }
 }

@@ -1,10 +1,10 @@
+using QaaS.Runner.Sessions.Actions.Probes;
+using QaaS.Runner.Tests.TestObjects;
 using Microsoft.Extensions.Logging.Abstractions;
 using NUnit.Framework;
 using QaaS.Framework.SDK.ContextObjects;
 using QaaS.Framework.SDK.Session.SessionDataObjects;
 using QaaS.Framework.SDK.Session.SessionDataObjects.RunningSessionsObjects;
-using QaaS.Runner.Sessions.Actions.Probes;
-using QaaS.Runner.Tests.TestObjects;
 
 namespace QaaS.Runner.Tests.Extensions;
 
@@ -47,6 +47,6 @@ public class ProbeExecutionContextTests
         {
             ("recovery-session", "restore-queues")
         }));
-        Assert.That(ProbeExecutionContext.TryGetCurrent(probeHook.Context, out _), Is.False);
+        Assert.That(ProbeExecutionScope.TryGetCurrent(out _), Is.False);
     }
 }

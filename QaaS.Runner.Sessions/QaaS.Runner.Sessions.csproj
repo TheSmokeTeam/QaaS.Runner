@@ -24,7 +24,6 @@
 
     <ItemGroup>
         <ProjectReference Include="..\QaaS.Runner.Infrastructure\QaaS.Runner.Infrastructure.csproj"/>
-        <ProjectReference Include="..\..\QaaS.Framework\QaaS.Framework.SDK\QaaS.Framework.SDK.csproj" />
     </ItemGroup>
 
     <ItemGroup>
