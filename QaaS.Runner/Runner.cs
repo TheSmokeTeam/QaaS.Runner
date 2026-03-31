@@ -33,6 +33,11 @@ public class Runner : IRunner, IDisposable
     public bool ExitProcessOnCompletion { get; set; } = true;
 
     /// <summary>
+    /// Controls whether the root <c>variables</c> configuration section is projected into the shared runner global dictionary under <c>Variables</c> while executions are built.
+    /// </summary>
+    public virtual bool LoadVariablesIntoGlobalDict { get; set; } = true;
+
+    /// <summary>
     /// Gets the exit code produced by the most recent successful runner execution.
     /// </summary>
     public int? LastExitCode { get; private set; }
@@ -194,6 +199,7 @@ public class Runner : IRunner, IDisposable
         // This is mutable per-run state rather than a container-managed dependency, so pushing it through
         // Autofac would add indirection without improving lifetime management.
         ExecutionBuilders.ForEach(builder => builder.WithGlobalDict(globalDict));
+        ExecutionBuilders.ForEach(builder => builder.WithVariablesLoadedIntoGlobalDict(LoadVariablesIntoGlobalDict));
 
         // The logger is also assigned directly because execution builders are plain mutable configuration objects,
         // not services resolved from the Autofac scope.

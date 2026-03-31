@@ -119,6 +119,7 @@ public class ExecutionBuilder() : BaseExecutionBuilder<InternalContext, Executio
     private string? _configuredCaseName;
     private string? _configuredExecutionId;
     private Dictionary<string, object?> _globalDict = new();
+    private bool _loadVariablesIntoGlobalDict = true;
     private readonly IConfiguration? _templateSourceConfiguration;
     private const BindingFlags ValidationBindingFlags =
         BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance;
@@ -241,6 +242,15 @@ public class ExecutionBuilder() : BaseExecutionBuilder<InternalContext, Executio
     public ExecutionBuilder WithGlobalDict(Dictionary<string, object?> globalDict)
     {
         _globalDict = globalDict;
+        return this;
+    }
+
+    /// <summary>
+    /// Controls whether the root <c>variables</c> configuration section is copied into the runtime global dictionary under <c>Variables</c> during build.
+    /// </summary>
+    internal ExecutionBuilder WithVariablesLoadedIntoGlobalDict(bool loadVariablesIntoGlobalDict)
+    {
+        _loadVariablesIntoGlobalDict = loadVariablesIntoGlobalDict;
         return this;
     }
 
@@ -893,9 +903,25 @@ public class ExecutionBuilder() : BaseExecutionBuilder<InternalContext, Executio
 
         // saved context's metadata in globalDict
         Context.InsertValueIntoGlobalDictionary(Context.GetMetaDataPath(), metaData);
+        LoadVariablesIntoGlobalDictionary(rootConfiguration);
         Context.Logger.LogDebug(
             "Initialized execution context. LoadedContext={LoadedContext}, ExecutionId={ExecutionId}, CaseName={CaseName}, GlobalKeys={GlobalKeyCount}",
             LoadedContext, Context.ExecutionId, Context.CaseName, Context.InternalGlobalDict.Count);
+    }
+
+    private void LoadVariablesIntoGlobalDictionary(IConfiguration rootConfiguration)
+    {
+        if (!_loadVariablesIntoGlobalDict)
+            return;
+
+        var variablesSection = rootConfiguration.GetSection("variables");
+        if (!variablesSection.Exists())
+            return;
+
+        Context.LoadConfigurationSectionIntoGlobalDictionary("variables", ["Variables"]);
+
+        if (Context.InternalGlobalDict.TryGetValue("Variables", out var loadedVariables))
+            _globalDict["Variables"] = loadedVariables;
     }
 
     /// <summary>

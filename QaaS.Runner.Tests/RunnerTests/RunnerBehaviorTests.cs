@@ -33,6 +33,17 @@ public class RunnerBehaviorTests
         public int InvokeStartExecutions(List<Execution> executions) => base.StartExecutions(executions);
     }
 
+    private sealed class VariablesDisabledByOverrideRunner(
+        ILifetimeScope scope,
+        List<ExecutionBuilder> executionBuilders,
+        Microsoft.Extensions.Logging.ILogger logger,
+        Serilog.ILogger serilogLogger) : Runner(scope, executionBuilders, logger, serilogLogger)
+    {
+        public override bool LoadVariablesIntoGlobalDict { get; set; } = false;
+
+        public List<Execution> InvokeBuildExecutions() => base.BuildExecutions();
+    }
+
     private sealed class BaseExitRunner(
         ILifetimeScope scope,
         List<ExecutionBuilder> executionBuilders,
@@ -537,6 +548,63 @@ public class RunnerBehaviorTests
     }
 
     [Test]
+    public void BuildExecutions_LoadsVariablesSectionIntoSharedGlobalDictionaryByDefault()
+    {
+        using var scope = BuildScope();
+        var configuration = new ConfigurationBuilder()
+            .AddInMemoryCollection(new Dictionary<string, string?>
+            {
+                ["variables:rabbitmq:host"] = "localhost",
+                ["variables:rabbitmq:port"] = "5672"
+            })
+            .Build();
+        var builders = new List<ExecutionBuilder>
+        {
+            CreateTemplateExecutionBuilder("case-1", configuration),
+            CreateTemplateExecutionBuilder("case-2", configuration)
+        };
+
+        var runner = new ExposedRunner(scope, builders, Globals.Logger, new Mock<Serilog.ILogger>().Object);
+        runner.InvokeBuildExecutions();
+
+        var globalDictField = typeof(ExecutionBuilder).GetField("_globalDict", BindingFlags.Instance | BindingFlags.NonPublic)!;
+        var sharedGlobalDict = (Dictionary<string, object?>)globalDictField.GetValue(builders[0])!;
+        var variables = (Dictionary<string, object?>)sharedGlobalDict["Variables"]!;
+        var rabbitMq = (Dictionary<string, object?>)variables["rabbitmq"]!;
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(sharedGlobalDict, Contains.Key("Variables"));
+            Assert.That(rabbitMq["host"], Is.EqualTo("localhost"));
+            Assert.That(rabbitMq["port"], Is.EqualTo("5672"));
+        });
+    }
+
+    [Test]
+    public void BuildExecutions_WhenVariablesLoadingIsDisabled_DoesNotPopulateVariablesGlobalPath()
+    {
+        using var scope = BuildScope();
+        var configuration = new ConfigurationBuilder()
+            .AddInMemoryCollection(new Dictionary<string, string?>
+            {
+                ["variables:rabbitmq:host"] = "localhost"
+            })
+            .Build();
+        var builders = new List<ExecutionBuilder>
+        {
+            CreateTemplateExecutionBuilder("case-1", configuration)
+        };
+
+        var runner = new VariablesDisabledByOverrideRunner(scope, builders, Globals.Logger, new Mock<Serilog.ILogger>().Object);
+        runner.InvokeBuildExecutions();
+
+        var globalDictField = typeof(ExecutionBuilder).GetField("_globalDict", BindingFlags.Instance | BindingFlags.NonPublic)!;
+        var sharedGlobalDict = (Dictionary<string, object?>)globalDictField.GetValue(builders[0])!;
+
+        Assert.That(sharedGlobalDict, Does.Not.ContainKey("Variables"));
+    }
+
+    [Test]
     public void StartExecutions_WithNoExecutions_ReturnsZero()
     {
         using var scope = BuildScope();
@@ -832,10 +900,23 @@ public class RunnerBehaviorTests
         return markerFile;
     }
 
-    private static ExecutionBuilder CreateTemplateExecutionBuilder(string caseName)
+    private static ExecutionBuilder CreateTemplateExecutionBuilder(string caseName, IConfiguration? rootConfiguration = null)
     {
-        return new ExecutionBuilder()
-            .ExecutionType(ExecutionType.Template)
+        var context = new InternalContext
+        {
+            Logger = Globals.Logger,
+            CaseName = caseName,
+            ExecutionId = $"exec-{caseName}",
+            RootConfiguration = rootConfiguration ?? new ConfigurationBuilder().Build(),
+            InternalRunningSessions = new RunningSessions(new Dictionary<string, RunningSessionData<object, object>>())
+        };
+        context.InsertValueIntoGlobalDictionary(context.GetMetaDataPath(), new MetaDataConfig
+        {
+            Team = "Smoke",
+            System = "QaaS"
+        });
+
+        return new ExecutionBuilder(context, ExecutionType.Template, null, null, null, null)
             .SetExecutionId($"exec-{caseName}")
             .SetCase(caseName)
             .WithMetadata(new MetaDataConfig
