@@ -23,7 +23,7 @@ public class StorageBuilderTests
     public void Build_WithFileSystemConfiguration_ReturnsFileSystemStorageAndSetsContext()
     {
         var builder = new StorageBuilder()
-            .CreateConfiguration(new FilesInFileSystemConfig { Path = "some/path" });
+            .Configure(new FilesInFileSystemConfig { Path = "some/path" });
 
         var storage = InvokeBuild(builder, Globals.Context);
 
@@ -35,7 +35,7 @@ public class StorageBuilderTests
     public void Build_WithS3Configuration_ReturnsS3StorageAndSetsContext()
     {
         var builder = new StorageBuilder()
-            .CreateConfiguration(new S3Config());
+            .Configure(new S3Config());
 
         var storage = InvokeBuild(builder, Globals.Context);
 
@@ -47,7 +47,7 @@ public class StorageBuilderTests
     public void Configure_WhenCalledMultipleTimes_ResetsPreviousConfiguration()
     {
         var builder = new StorageBuilder()
-            .CreateConfiguration(new S3Config())
+            .Configure(new S3Config())
             .Configure(new FilesInFileSystemConfig { Path = "some/path" });
 
         var storage = InvokeBuild(builder, Globals.Context);
@@ -90,3 +90,4 @@ public class StorageBuilderTests
         return (IStorage)buildMethod!.Invoke(builder, [context])!;
     }
 }
+

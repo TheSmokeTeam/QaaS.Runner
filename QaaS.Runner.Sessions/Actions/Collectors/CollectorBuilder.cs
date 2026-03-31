@@ -40,6 +40,20 @@ public class CollectorBuilder
         " vector is a result type in prometheus that represents a set of time series data, every item of" +
         " its result array represents a single value at a certain time.")]
     public PrometheusFetcherConfig? Prometheus { get; internal set; }
+    public IFetcherConfig? Configuration
+    {
+        get => Prometheus;
+        internal set
+        {
+            if (value == null)
+            {
+                Reset();
+                return;
+            }
+
+            Configure(value);
+        }
+    }
     /// <summary>
     /// Sets the name used for the current Runner collector builder instance.
     /// </summary>
@@ -86,37 +100,8 @@ public class CollectorBuilder
     /// Use this method when working with the documented Runner collector builder API surface in code. The change is stored on the current builder instance and is consumed by later build, validation, or execution steps.
     /// </remarks>
     /// <qaas-docs group="Configuration as Code" subgroup="Collectors" />
-    public CollectorBuilder Create(IFetcherConfig config)
-    {
-        return CreateConfiguration(config);
-    }
-
     /// <summary>
-    /// Sets the configuration currently stored on the Runner collector builder instance.
-    /// </summary>
-    /// <remarks>
-    /// Use this method when working with the documented Runner collector builder API surface in code. The change is stored on the current builder instance and is consumed by later build, validation, or execution steps.
-    /// </remarks>
-    /// <qaas-docs group="Configuration as Code" subgroup="Collectors" />
-    public CollectorBuilder CreateConfiguration(IFetcherConfig config)
-    {
-        return Configure(config);
-    }
-
-    /// <summary>
-    /// Returns the configuration currently stored on the Runner collector builder instance.
-    /// </summary>
-    /// <remarks>
-    /// Use this method when working with the documented Runner collector builder API surface in code. Use it to inspect the current configured state without rebuilding the surrounding collection or runtime object graph.
-    /// </remarks>
-    /// <qaas-docs group="Configuration as Code" subgroup="Collectors" />
-    public IFetcherConfig? ReadConfiguration()
-    {
-        return Prometheus;
-    }
-
-    /// <summary>
-    /// Updates the configuration currently stored on the Runner collector builder instance.
+     /// Updates the configuration currently stored on the Runner collector builder instance.
     /// </summary>
     /// <remarks>
     /// Use this method when working with the documented Runner collector builder API surface in code. The change is stored on the current builder instance and is consumed by later build, validation, or execution steps.
@@ -124,7 +109,7 @@ public class CollectorBuilder
     /// <qaas-docs group="Configuration as Code" subgroup="Collectors" />
     public CollectorBuilder UpdateConfiguration(Func<IFetcherConfig, IFetcherConfig> update)
     {
-        var currentConfig = ReadConfiguration() ??
+        var currentConfig = Configuration ??
                             throw new InvalidOperationException("Collector configuration is not set");
         return UpdateConfiguration(update(currentConfig));
     }
@@ -138,7 +123,7 @@ public class CollectorBuilder
     /// <qaas-docs group="Configuration as Code" subgroup="Collectors" />
     public CollectorBuilder UpdateConfiguration(IFetcherConfig config)
     {
-        var currentConfig = ReadConfiguration() ??
+        var currentConfig = Configuration ??
                             throw new InvalidOperationException("Collector configuration is not set");
         return Configure(ConfigurationUpdateExtensions.UpdateConfiguration(currentConfig, config));
     }
@@ -152,7 +137,7 @@ public class CollectorBuilder
     /// <qaas-docs group="Configuration as Code" subgroup="Collectors" />
     public CollectorBuilder UpdateConfiguration(object configuration)
     {
-        var currentConfig = ReadConfiguration() ??
+        var currentConfig = Configuration ??
                             throw new InvalidOperationException("Collector configuration is not set");
         return Configure(ConfigurationUpdateExtensions.UpdateConfiguration(currentConfig, configuration));
     }
@@ -198,8 +183,12 @@ public class CollectorBuilder
     }
 
     /// <summary>
-    /// Creates a runtime collector action and captures failures into <paramref name="actionFailures"/> instead of throwing.
+    /// Returns the configuration currently stored on the Runner collector builder instance.
     /// </summary>
+    /// <remarks>
+    /// Use this method when working with the documented Runner collector builder API surface in code. Use it to inspect the current configured state without rebuilding the surrounding collection or runtime object graph.
+    /// </remarks>
+    /// <qaas-docs group="Configuration as Code" subgroup="Collectors" />
     internal Collector? Build(InternalContext context, IList<ActionFailure> actionFailures, string sessionName)
     {
         IFetcherConfig? type = null;

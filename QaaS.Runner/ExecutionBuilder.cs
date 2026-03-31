@@ -119,6 +119,7 @@ public class ExecutionBuilder() : BaseExecutionBuilder<InternalContext, Executio
     private string? _configuredCaseName;
     private string? _configuredExecutionId;
     private Dictionary<string, object?> _globalDict = new();
+    private bool _loadVariablesIntoGlobalDict = true;
     private readonly IConfiguration? _templateSourceConfiguration;
     private const BindingFlags ValidationBindingFlags =
         BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance;
@@ -245,13 +246,22 @@ public class ExecutionBuilder() : BaseExecutionBuilder<InternalContext, Executio
     }
 
     /// <summary>
+    /// Controls whether the root <c>variables</c> configuration section is copied into the runtime global dictionary under <c>Variables</c> during build.
+    /// </summary>
+    internal ExecutionBuilder WithVariablesLoadedIntoGlobalDict(bool loadVariablesIntoGlobalDict)
+    {
+        _loadVariablesIntoGlobalDict = loadVariablesIntoGlobalDict;
+        return this;
+    }
+
+    /// <summary>
     /// Adds the supplied session to the current Runner execution builder instance.
     /// </summary>
     /// <remarks>
     /// Use this method when working with the documented Runner execution builder API surface in code. The change is stored on the current builder instance and is consumed by later build, validation, or execution steps.
     /// </remarks>
     /// <qaas-docs group="Configuration as Code" subgroup="Executions" />
-    public ExecutionBuilder AddSession(SessionBuilder sessionBuilder)
+    internal ExecutionBuilder AddSession(SessionBuilder sessionBuilder)
     {
         Sessions = Sessions is null ? [sessionBuilder] : Sessions.Append(sessionBuilder).ToArray();
         return this;
@@ -279,6 +289,18 @@ public class ExecutionBuilder() : BaseExecutionBuilder<InternalContext, Executio
     public IReadOnlyList<SessionBuilder> ReadSessions()
     {
         return Sessions ?? [];
+    }
+
+    /// <summary>
+    /// Returns the configured session currently stored on the Runner execution builder instance.
+    /// </summary>
+    /// <remarks>
+    /// Use this method when working with the documented Runner execution builder API surface in code. Use it to inspect the current configured state without rebuilding the surrounding collection or runtime object graph.
+    /// </remarks>
+    /// <qaas-docs group="Configuration as Code" subgroup="Executions" />
+    public SessionBuilder? ReadSession(string sessionName)
+    {
+        return ReadByName(Sessions, sessionName, session => session.Name);
     }
 
     /// <summary>
@@ -314,7 +336,7 @@ public class ExecutionBuilder() : BaseExecutionBuilder<InternalContext, Executio
     /// Use this method when working with the documented Runner execution builder API surface in code. The change is stored on the current builder instance and is consumed by later build, validation, or execution steps.
     /// </remarks>
     /// <qaas-docs group="Configuration as Code" subgroup="Executions" />
-    public ExecutionBuilder AddAssertion(AssertionBuilder assertionBuilder)
+    internal ExecutionBuilder AddAssertion(AssertionBuilder assertionBuilder)
     {
         Assertions = Assertions is null ? [assertionBuilder] : Assertions.Append(assertionBuilder).ToArray();
         return this;
@@ -342,6 +364,18 @@ public class ExecutionBuilder() : BaseExecutionBuilder<InternalContext, Executio
     public IReadOnlyList<AssertionBuilder> ReadAssertions()
     {
         return Assertions ?? [];
+    }
+
+    /// <summary>
+    /// Returns the configured assertion currently stored on the Runner execution builder instance.
+    /// </summary>
+    /// <remarks>
+    /// Use this method when working with the documented Runner execution builder API surface in code. Use it to inspect the current configured state without rebuilding the surrounding collection or runtime object graph.
+    /// </remarks>
+    /// <qaas-docs group="Configuration as Code" subgroup="Executions" />
+    public AssertionBuilder? ReadAssertion(string assertionName)
+    {
+        return ReadByName(Assertions, assertionName, assertion => assertion.Name);
     }
 
     /// <summary>
@@ -377,7 +411,7 @@ public class ExecutionBuilder() : BaseExecutionBuilder<InternalContext, Executio
     /// Use this method when working with the documented Runner execution builder API surface in code. The change is stored on the current builder instance and is consumed by later build, validation, or execution steps.
     /// </remarks>
     /// <qaas-docs group="Configuration as Code" subgroup="Executions" />
-    public ExecutionBuilder AddStorage(StorageBuilder storageBuilder)
+    internal ExecutionBuilder AddStorage(StorageBuilder storageBuilder)
     {
         Storages = Storages is null ? [storageBuilder] : Storages.Append(storageBuilder).ToArray();
         return this;
@@ -405,6 +439,18 @@ public class ExecutionBuilder() : BaseExecutionBuilder<InternalContext, Executio
     public IReadOnlyList<StorageBuilder> ReadStorages()
     {
         return Storages ?? [];
+    }
+
+    /// <summary>
+    /// Returns the configured storage currently stored at the specified index on the Runner execution builder instance.
+    /// </summary>
+    /// <remarks>
+    /// Use this method when working with the documented Runner execution builder API surface in code. Use it to inspect the current configured state without rebuilding the surrounding collection or runtime object graph.
+    /// </remarks>
+    /// <qaas-docs group="Configuration as Code" subgroup="Executions" />
+    public StorageBuilder? ReadStorageAt(int index)
+    {
+        return ReadAt(Storages, index);
     }
 
     /// <summary>
@@ -440,7 +486,7 @@ public class ExecutionBuilder() : BaseExecutionBuilder<InternalContext, Executio
     /// Use this method when working with the documented Runner execution builder API surface in code. The change is stored on the current builder instance and is consumed by later build, validation, or execution steps.
     /// </remarks>
     /// <qaas-docs group="Configuration as Code" subgroup="Executions" />
-    public ExecutionBuilder AddDataSource(DataSourceBuilder dataSourceBuilder)
+    internal ExecutionBuilder AddDataSource(DataSourceBuilder dataSourceBuilder)
     {
         DataSources = DataSources is null ? [dataSourceBuilder] : DataSources.Append(dataSourceBuilder).ToArray();
         return this;
@@ -468,6 +514,18 @@ public class ExecutionBuilder() : BaseExecutionBuilder<InternalContext, Executio
     public IReadOnlyList<DataSourceBuilder> ReadDataSources()
     {
         return DataSources ?? [];
+    }
+
+    /// <summary>
+    /// Returns the configured data source currently stored on the Runner execution builder instance.
+    /// </summary>
+    /// <remarks>
+    /// Use this method when working with the documented Runner execution builder API surface in code. Use it to inspect the current configured state without rebuilding the surrounding collection or runtime object graph.
+    /// </remarks>
+    /// <qaas-docs group="Configuration as Code" subgroup="Executions" />
+    public DataSourceBuilder? ReadDataSource(string dataSourceName)
+    {
+        return ReadByName(DataSources, dataSourceName, dataSource => dataSource.Name);
     }
 
     /// <summary>
@@ -503,7 +561,7 @@ public class ExecutionBuilder() : BaseExecutionBuilder<InternalContext, Executio
     /// Use this method when working with the documented Runner execution builder API surface in code. The change is stored on the current builder instance and is consumed by later build, validation, or execution steps.
     /// </remarks>
     /// <qaas-docs group="Configuration as Code" subgroup="Executions" />
-    public ExecutionBuilder AddLink(LinkBuilder linkBuilder)
+    internal ExecutionBuilder AddLink(LinkBuilder linkBuilder)
     {
         Links = Links is null ? [linkBuilder] : Links.Append(linkBuilder).ToArray();
         return this;
@@ -531,6 +589,18 @@ public class ExecutionBuilder() : BaseExecutionBuilder<InternalContext, Executio
     public IReadOnlyList<LinkBuilder> ReadLinks()
     {
         return Links ?? [];
+    }
+
+    /// <summary>
+    /// Returns the configured link currently stored at the specified index on the Runner execution builder instance.
+    /// </summary>
+    /// <remarks>
+    /// Use this method when working with the documented Runner execution builder API surface in code. Use it to inspect the current configured state without rebuilding the surrounding collection or runtime object graph.
+    /// </remarks>
+    /// <qaas-docs group="Configuration as Code" subgroup="Executions" />
+    public LinkBuilder? ReadLinkAt(int index)
+    {
+        return ReadAt(Links, index);
     }
 
     /// <summary>
@@ -754,6 +824,8 @@ public class ExecutionBuilder() : BaseExecutionBuilder<InternalContext, Executio
                 throw;
             }
 
+            var (sessionName, probeName) = ProbeBuilder.ParseScopedHookName(hookData.Name);
+            using var probeExecutionScope = ProbeExecutionScope.Enter(sessionName, probeName);
             var configurationsValidationResults = (hook.LoadAndValidateConfiguration(
                 hookData.Configuration) ?? Enumerable.Empty<ValidationResult>()).ToList();
             foreach (var validationResult in configurationsValidationResults)
@@ -833,9 +905,46 @@ public class ExecutionBuilder() : BaseExecutionBuilder<InternalContext, Executio
 
         // saved context's metadata in globalDict
         Context.InsertValueIntoGlobalDictionary(Context.GetMetaDataPath(), metaData);
+        LoadVariablesIntoGlobalDictionary(rootConfiguration);
         Context.Logger.LogDebug(
             "Initialized execution context. LoadedContext={LoadedContext}, ExecutionId={ExecutionId}, CaseName={CaseName}, GlobalKeys={GlobalKeyCount}",
             LoadedContext, Context.ExecutionId, Context.CaseName, Context.InternalGlobalDict.Count);
+    }
+
+    private void LoadVariablesIntoGlobalDictionary(IConfiguration rootConfiguration)
+    {
+        if (!_loadVariablesIntoGlobalDict)
+            return;
+
+        var variablesSection = rootConfiguration.GetSection("variables");
+        if (!variablesSection.Exists())
+            return;
+
+        var loadedVariables = ConvertConfigurationSectionToGlobalValue(variablesSection);
+        Context.InsertValueIntoGlobalDictionary(["Variables"], loadedVariables);
+        _globalDict["Variables"] = loadedVariables;
+    }
+
+    private static object? ConvertConfigurationSectionToGlobalValue(IConfigurationSection configurationSection)
+    {
+        var children = configurationSection.GetChildren().ToList();
+        if (children.Count == 0)
+        {
+            return configurationSection.Value;
+        }
+
+        if (children.All(child => int.TryParse(child.Key, out _)))
+        {
+            return children
+                .OrderBy(child => int.Parse(child.Key))
+                .Select(ConvertConfigurationSectionToGlobalValue)
+                .ToList();
+        }
+
+        return children.ToDictionary(
+            child => child.Key,
+            ConvertConfigurationSectionToGlobalValue,
+            StringComparer.Ordinal);
     }
 
     /// <summary>
@@ -1028,9 +1137,24 @@ public class ExecutionBuilder() : BaseExecutionBuilder<InternalContext, Executio
         return items;
     }
 
+    private static T? ReadByName<T>(T[]? items, string key, Func<T, string?> keySelector) where T : class
+    {
+        return items?.FirstOrDefault(item => keySelector(item) == key);
+    }
+
     private static T[]? DeleteByName<T>(T[]? items, string key, Func<T, string?> keySelector)
     {
         return items?.Where(item => keySelector(item) != key).ToArray();
+    }
+
+    private static T? ReadAt<T>(T[]? items, int index) where T : class
+    {
+        if (items == null || index < 0 || index >= items.Length)
+        {
+            return null;
+        }
+
+        return items[index];
     }
 
     private static T[]? UpdateAt<T>(T[]? items, int index, T replacement)

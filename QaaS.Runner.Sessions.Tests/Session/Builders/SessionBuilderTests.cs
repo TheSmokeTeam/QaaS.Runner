@@ -132,7 +132,7 @@ public class SessionBuilderTests
     public void AddConsumer_Should_Add_ConsumerBuilder()
     {
         var builder = new SessionBuilder();
-        builder.AddConsumer(_mockConsumerBuilder.Object);
+        builder.CreateConsumer(_mockConsumerBuilder.Object);
 
         Assert.That(builder.Consumers, Contains.Item(_mockConsumerBuilder.Object));
     }
@@ -141,7 +141,7 @@ public class SessionBuilderTests
     public void AddPublisher_Should_Add_PublisherBuilder()
     {
         var builder = new SessionBuilder();
-        builder.AddPublisher(_mockPublisherBuilder.Object);
+        builder.CreatePublisher(_mockPublisherBuilder.Object);
 
         Assert.That(builder.Publishers, Contains.Item(_mockPublisherBuilder.Object));
     }
@@ -150,7 +150,7 @@ public class SessionBuilderTests
     public void AddTransaction_Should_Add_TransactionBuilder()
     {
         var builder = new SessionBuilder();
-        builder.AddTransaction(_mockTransactionBuilder.Object);
+        builder.CreateTransaction(_mockTransactionBuilder.Object);
 
         Assert.That(builder.Transactions, Contains.Item(_mockTransactionBuilder.Object));
     }
@@ -159,7 +159,7 @@ public class SessionBuilderTests
     public void AddProbe_Should_Add_ProbeBuilder()
     {
         var builder = new SessionBuilder();
-        builder.AddProbe(_mockProbeBuilder.Object);
+        builder.CreateProbe(_mockProbeBuilder.Object);
 
         Assert.That(builder.Probes, Contains.Item(_mockProbeBuilder.Object));
     }
@@ -168,7 +168,7 @@ public class SessionBuilderTests
     public void AddCollector_Should_Add_CollectorBuilder()
     {
         var builder = new SessionBuilder();
-        builder.AddCollector(_mockCollectorBuilder.Object);
+        builder.CreateCollector(_mockCollectorBuilder.Object);
 
         Assert.That(builder.Collectors, Contains.Item(_mockCollectorBuilder.Object));
     }
@@ -177,7 +177,7 @@ public class SessionBuilderTests
     public void AddMockerCommand_Should_Add_MockerCommandBuilder()
     {
         var builder = new SessionBuilder();
-        builder.AddMockerCommand(_mockMockerCommandBuilder.Object);
+        builder.CreateMockerCommand(_mockMockerCommandBuilder.Object);
 
         Assert.That(builder.MockerCommands, Contains.Item(_mockMockerCommandBuilder.Object));
     }
@@ -187,7 +187,7 @@ public class SessionBuilderTests
     {
         var builder = new SessionBuilder();
         var stageConfig = new StageConfig(1, 0, 0);
-        builder.AddStage(stageConfig);
+        builder.CreateStage(stageConfig);
 
         Assert.That(builder.Stages, Contains.Item(stageConfig));
     }
@@ -204,10 +204,10 @@ public class SessionBuilderTests
             .DiscardData()
             .WithinCategory("TestCategory");
 
-        builder.AddConsumer(
+        builder.CreateConsumer(
             new ConsumerBuilder()
                 .Named("TestConsumer")
-                .AddPolicy(new PolicyBuilder().Configure(new CountPolicyConfig()))
+                .CreatePolicy(new PolicyBuilder().Configure(new CountPolicyConfig()))
                 .Configure(new SocketReaderConfig
                 {
                     Host = "https:test",
@@ -215,13 +215,13 @@ public class SessionBuilderTests
                     ProtocolType = ProtocolType.IP
                 }));
         
-        builder.AddPublisher(
+        builder.CreatePublisher(
             new PublisherBuilder()
                 .Named("TestPublisher")
-                .AddPolicy(new PolicyBuilder().Configure(new CountPolicyConfig()))
+                .CreatePolicy(new PolicyBuilder().Configure(new CountPolicyConfig()))
                 .Configure(new RabbitMqSenderConfig { Host = "https://test.com" }));
         
-        builder.AddTransaction(new TransactionBuilder()
+        builder.CreateTransaction(new TransactionBuilder()
             .Named("TestTransaction")
             .Configure(new HttpTransactorConfig
             {
@@ -234,17 +234,17 @@ public class SessionBuilderTests
             new ("TestProbe", _mockProbe.Object)
         };
         
-        builder.AddProbe(new ProbeBuilder()
+        builder.CreateProbe(new ProbeBuilder()
             .Named("TestProbe")
             .HookNamed("TestHook"));
         
-        builder.AddCollector(new CollectorBuilder()
+        builder.CreateCollector(new CollectorBuilder()
             .Named("TestCollector")
             .Configure(new PrometheusFetcherConfig { Url = "https://promql:8080", Expression = "sum ()" }));
         
-        builder.AddMockerCommand(new MockerCommandBuilder()
+        builder.CreateMockerCommand(new MockerCommandBuilder()
             .Named("TestMockerCommand")
-            .WithCommand(new MockerCommandConfig()));
+            .Configure(new MockerCommandConfig()));
 
         // Act
         var session = builder.Build(_context, probes);
@@ -321,8 +321,8 @@ public class SessionBuilderTests
         var builder = new SessionBuilder()
             .Named("TestSession")
             .AtStage(1)
-            .AddStage(new StageConfig(stageNumber: 2, timeoutBefore: 123, timeoutAfter: 456))
-            .AddPublisher(new PublisherBuilder()
+            .CreateStage(new StageConfig(stageNumber: 2, timeoutBefore: 123, timeoutAfter: 456))
+            .CreatePublisher(new PublisherBuilder()
                 .Named("publisher-stage-2")
                 .AtStage(2)
                 .Configure(new RabbitMqSenderConfig { Host = "https://test.com" }));
@@ -371,7 +371,7 @@ public class SessionBuilderTests
             .Named("TestSession")
             .AtStage(1)
             .WithTimeZone(timeZoneId)
-            .AddConsumer(new ConsumerBuilder()
+            .CreateConsumer(new ConsumerBuilder()
                 .Named("sql-consumer")
                 .WithTimeout(100)
                 .Configure(new MsSqlReaderConfig
@@ -380,7 +380,7 @@ public class SessionBuilderTests
                     TableName = "events",
                     InsertionTimeField = "created_at"
                 }))
-            .AddPublisher(new PublisherBuilder()
+            .CreatePublisher(new PublisherBuilder()
                 .Named("sql-publisher")
                 .Configure(new RabbitMqSenderConfig
                 {
@@ -396,3 +396,4 @@ public class SessionBuilderTests
         });
     }
 }
+

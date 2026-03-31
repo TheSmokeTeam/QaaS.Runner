@@ -163,7 +163,7 @@ public class CollectorBuilderTests
 
         var builder = new CollectorBuilder()
             .Named("TestCollector")
-            .CreateConfiguration(new PrometheusFetcherConfig { Url = "https://promql:8080", Expression = "sum ()" });
+            .Configure(new PrometheusFetcherConfig { Url = "https://promql:8080", Expression = "sum ()" });
 
         var result = builder.Build(context, _actionFailures, _sessionName);
         var fetcherField = typeof(global::QaaS.Runner.Sessions.Actions.Collectors.Collector)
@@ -183,7 +183,7 @@ public class CollectorBuilderTests
         });
         var builder = new CollectorBuilder()
             .Named("TestCollector")
-            .CreateConfiguration(new PrometheusFetcherConfig { Url = "https://promql:8080", Expression = "sum ()" });
+            .Configure(new PrometheusFetcherConfig { Url = "https://promql:8080", Expression = "sum ()" });
 
         var result = builder.Build(context, _actionFailures, _sessionName);
 
@@ -192,3 +192,4 @@ public class CollectorBuilderTests
         Assert.That(_actionFailures[0].Reason.Message, Does.Contain("override failed"));
     }
 }
+

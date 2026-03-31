@@ -19,12 +19,21 @@ Sessions:
   - Name: RabbitRoundTrip
     SaveData: true
     Probes:
+      - Name: EnsureRabbitExchange
+        Stage: 0
+        Probe: EnsureRabbitMqExchanges
+        ProbeConfiguration:
+          <<: *rabbitmq
+          Exchanges:
+            - Name: test
+              Type: Direct
       - Name: SharedProbe
         Probe: ScopedProbe
         ProbeConfiguration:
           Marker: rabbit-roundtrip-probe
     Publishers:
       - Name: PublishToRabbit
+        Stage: 2
         DataSourceNames: [ RabbitPayload ]
         RabbitMq:
           <<: *rabbitmq
@@ -33,6 +42,7 @@ Sessions:
           Serializer: Json
     Consumers:
       - Name: ConsumeFromRabbit
+        Stage: 1
         TimeoutMs: 20000
         RabbitMq:
           <<: *rabbitmq

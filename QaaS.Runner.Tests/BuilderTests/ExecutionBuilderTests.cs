@@ -94,7 +94,7 @@ public class ExecutionBuilderTests
     public void Build_WithSessionWithoutConfiguredStage_AssignsIndexAsDefaultStage()
     {
         var builder = new ExecutionBuilder()
-            .AddSession(new SessionBuilder
+            .CreateSession(new SessionBuilder
             {
                 Name = "session-without-stage",
                 Stage = null,
@@ -179,7 +179,7 @@ public class ExecutionBuilderTests
     {
         const string sharedProbeName = "shared-probe";
         var builder = new ExecutionBuilder()
-            .AddSession(new SessionBuilder
+            .CreateSession(new SessionBuilder
             {
                 Name = "session-1",
                 Stage = 0,
@@ -191,7 +191,7 @@ public class ExecutionBuilderTests
                         .Configure(new ProbeMarkerConfig { Marker = "first-config" })
                 ]
             })
-            .AddSession(new SessionBuilder
+            .CreateSession(new SessionBuilder
             {
                 Name = "session-2",
                 Stage = 1,
@@ -226,7 +226,7 @@ public class ExecutionBuilderTests
         const string sharedProbeName = "SharedProbe";
         var logger = new CapturingLogger();
         var builder = new ExecutionBuilder()
-            .AddSession(new SessionBuilder
+            .CreateSession(new SessionBuilder
             {
                 Name = "session-a",
                 Stage = 0,
@@ -238,7 +238,7 @@ public class ExecutionBuilderTests
                         .Configure(new ProbeMarkerConfig { Marker = "first-config" })
                 ]
             })
-            .AddSession(new SessionBuilder
+            .CreateSession(new SessionBuilder
             {
                 Name = "session-b",
                 Stage = 1,
@@ -280,7 +280,7 @@ public class ExecutionBuilderTests
     public void Start_WithProbeNamesThatWouldCollideWithoutScopedKeys_UsesDistinctProbeConfigurations()
     {
         var builder = new ExecutionBuilder()
-            .AddSession(new SessionBuilder
+            .CreateSession(new SessionBuilder
             {
                 Name = "ab",
                 Stage = 0,
@@ -292,7 +292,7 @@ public class ExecutionBuilderTests
                         .Configure(new ProbeMarkerConfig { Marker = "first-collision-config" })
                 ]
             })
-            .AddSession(new SessionBuilder
+            .CreateSession(new SessionBuilder
             {
                 Name = "a",
                 Stage = 1,
@@ -325,7 +325,7 @@ public class ExecutionBuilderTests
     public void Build_WithProbeMissingName_ThrowsInvalidConfigurationsException()
     {
         var builder = new ExecutionBuilder()
-            .AddSession(new SessionBuilder
+            .CreateSession(new SessionBuilder
             {
                 Name = "session-missing-probe-name",
                 Stage = 0,
@@ -349,7 +349,7 @@ public class ExecutionBuilderTests
     public void Build_WithDuplicateMockerCommandNames_ThrowsInvalidConfigurationsException()
     {
         var builder = new ExecutionBuilder()
-            .AddSession(new SessionBuilder
+            .CreateSession(new SessionBuilder
             {
                 Name = "session-with-duplicate-mocker-commands",
                 Stage = 0,
@@ -359,14 +359,14 @@ public class ExecutionBuilderTests
                     new MockerCommandBuilder()
                         .Named("duplicate-command")
                         .WithServerName("server-a")
-                        .WithCommand(new MockerCommandConfig
+                        .Configure(new MockerCommandConfig
                         {
                             TriggerAction = new Qaas.Mocker.CommunicationObjects.ConfigurationObjects.Command.TriggerAction()
                         }),
                     new MockerCommandBuilder()
                         .Named("duplicate-command")
                         .WithServerName("server-b")
-                        .WithCommand(new MockerCommandConfig
+                        .Configure(new MockerCommandConfig
                         {
                             TriggerAction = new Qaas.Mocker.CommunicationObjects.ConfigurationObjects.Command.TriggerAction()
                         })
@@ -933,7 +933,7 @@ public class ExecutionBuilderTests
             Stage = 0,
             Probes = []
         };
-        builder.AddSession(sessionBuilder);
+        builder.CreateSession(sessionBuilder);
 
         // Add valid assertion builder
         var assertionBuilder = new AssertionBuilder
@@ -943,7 +943,7 @@ public class ExecutionBuilderTests
             AssertionInstance = null,
             Reporter = null
         }.HookNamed(nameof(TestAssertion));
-        builder.AddAssertion(assertionBuilder);
+        builder.CreateAssertion(assertionBuilder);
 
         // Add valid storage builder
         var storageBuilder = new StorageBuilder().Configure(new S3Config
@@ -953,16 +953,16 @@ public class ExecutionBuilderTests
             AccessKey = "access",
             SecretKey = "secret"
         });
-        builder.AddStorage(storageBuilder);
+        builder.CreateStorage(storageBuilder);
 
         // Add valid link builder
         var linkBuilder = new LinkBuilder()
             { Grafana = new GrafanaLinkConfig { DashboardId = "dash-id", Url = "https://grafa.com", Variables = [] } };
-        builder.AddLink(linkBuilder);
+        builder.CreateLink(linkBuilder);
 
         // Add valid data source builder
         var dataSourceBuilder = new DataSourceBuilder().Named("test-datasource").HookNamed("TestGenerator");
-        builder.AddDataSource(dataSourceBuilder);
+        builder.CreateDataSource(dataSourceBuilder);
 
         return builder.SetExecutionId("test").SetCase("valid").WithLogger(Globals.Logger)
             .WithMetadata(new MetaDataConfig { Team = "Smoke", System = "QaaS" })
@@ -972,14 +972,14 @@ public class ExecutionBuilderTests
     private ExecutionBuilder CreateExecutionBuilderWithPublisher(PublisherBuilder publisherBuilder)
     {
         return new ExecutionBuilder()
-            .AddSession(new SessionBuilder
+            .CreateSession(new SessionBuilder
             {
                 Name = "publisher-session",
                 Stage = 0,
                 Publishers = [publisherBuilder],
                 Probes = []
             })
-            .AddDataSource(new DataSourceBuilder().Named("payload").HookNamed("TestGenerator"))
+            .CreateDataSource(new DataSourceBuilder().Named("payload").HookNamed("TestGenerator"))
             .ExecutionType(ExecutionType.Act)
             .SetExecutionId("publisher-validation")
             .SetCase("publisher-validation-case")
@@ -1007,8 +1007,8 @@ public class ExecutionBuilderTests
             Probes = []
         };
 
-        builder.AddSession(sessionBuilder1);
-        builder.AddSession(sessionBuilder2);
+        builder.CreateSession(sessionBuilder1);
+        builder.CreateSession(sessionBuilder2);
 
         // Add valid assertion builder
         var assertionBuilder = new AssertionBuilder
@@ -1018,7 +1018,7 @@ public class ExecutionBuilderTests
             AssertionInstance = null,
             Reporter = null
         }.HookNamed(nameof(TestAssertion));
-        builder.AddAssertion(assertionBuilder);
+        builder.CreateAssertion(assertionBuilder);
 
         return builder.ExecutionType(ExecutionType.Run).SetExecutionId("test").SetCase("invalid")
             .WithLogger(Globals.Logger).WithGlobalDict(new Dictionary<string, object?>())
@@ -1088,3 +1088,4 @@ public class ExecutionBuilderTests
 
     private sealed record LogEntry(LogLevel LogLevel, string Message);
 }
+

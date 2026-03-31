@@ -77,6 +77,11 @@ public class AssertionBuilder : IYamlConvertible
     [Description("Implementation configuration for the assertion, " +
                  "the configuration given here is loaded into the provided assertion dynamically.")]
     public IConfiguration AssertionConfiguration { get; internal set; } = new ConfigurationBuilder().Build();
+    public IConfiguration Configuration
+    {
+        get => AssertionConfiguration;
+        internal set => AssertionConfiguration = value ?? new ConfigurationBuilder().Build();
+    }
     [Description("The assertion's specific links. Will be added with the general links.")]
     public List<LinkBuilder> Links { get; internal set; } = [];
     /// <summary>
@@ -160,11 +165,14 @@ public class AssertionBuilder : IYamlConvertible
     /// Use this method when working with the documented Runner assertion builder API surface in code. The change is stored on the current builder instance and is consumed by later build, validation, or execution steps.
     /// </remarks>
     /// <qaas-docs group="Configuration as Code" subgroup="Assertions" />
-    public AssertionBuilder WeatherToSaveSessionData(bool weatherToSaveSessionData)
+    public AssertionBuilder ShouldSaveSessionData(bool shouldSaveSessionData)
     {
-        SaveSessionData = weatherToSaveSessionData;
+        SaveSessionData = shouldSaveSessionData;
         return this;
     }
+
+    internal AssertionBuilder WeatherToSaveSessionData(bool weatherToSaveSessionData) =>
+        ShouldSaveSessionData(weatherToSaveSessionData);
 
     /// <summary>
     /// Configures whether logs are saved with the assertion result.
@@ -173,11 +181,13 @@ public class AssertionBuilder : IYamlConvertible
     /// Use this method when working with the documented Runner assertion builder API surface in code. The change is stored on the current builder instance and is consumed by later build, validation, or execution steps.
     /// </remarks>
     /// <qaas-docs group="Configuration as Code" subgroup="Assertions" />
-    public AssertionBuilder WeatherToSaveLogs(bool weatherToSaveLogs)
+    public AssertionBuilder ShouldSaveLogs(bool shouldSaveLogs)
     {
-        SaveLogs = weatherToSaveLogs;
+        SaveLogs = shouldSaveLogs;
         return this;
     }
+
+    internal AssertionBuilder WeatherToSaveLogs(bool weatherToSaveLogs) => ShouldSaveLogs(weatherToSaveLogs);
     
     /// <summary>
     /// Configures whether the rendered configuration template is saved with the assertion result.
@@ -186,11 +196,14 @@ public class AssertionBuilder : IYamlConvertible
     /// Use this method when working with the documented Runner assertion builder API surface in code. The change is stored on the current builder instance and is consumed by later build, validation, or execution steps.
     /// </remarks>
     /// <qaas-docs group="Configuration as Code" subgroup="Assertions" />
-    public AssertionBuilder WeatherToSaveConfigurationTemplate(bool weatherToSaveConfigurationTemplate)
+    public AssertionBuilder ShouldSaveConfigurationTemplate(bool shouldSaveConfigurationTemplate)
     {
-        SaveTemplate = weatherToSaveConfigurationTemplate;
+        SaveTemplate = shouldSaveConfigurationTemplate;
         return this;
     }
+
+    internal AssertionBuilder WeatherToSaveConfigurationTemplate(bool weatherToSaveConfigurationTemplate) =>
+        ShouldSaveConfigurationTemplate(weatherToSaveConfigurationTemplate);
 
     /// <summary>
     /// Sets the severity associated with the assertion result.
@@ -212,11 +225,14 @@ public class AssertionBuilder : IYamlConvertible
     /// Use this method when working with the documented Runner assertion builder API surface in code. The change is stored on the current builder instance and is consumed by later build, validation, or execution steps.
     /// </remarks>
     /// <qaas-docs group="Configuration as Code" subgroup="Assertions" />
-    public AssertionBuilder WeatherToSaveAttachments(bool weatherToSaveAttachments)
+    public AssertionBuilder ShouldSaveAttachments(bool shouldSaveAttachments)
     {
-        SaveAttachments = weatherToSaveAttachments;
+        SaveAttachments = shouldSaveAttachments;
         return this;
     }
+
+    internal AssertionBuilder WeatherToSaveAttachments(bool weatherToSaveAttachments) =>
+        ShouldSaveAttachments(weatherToSaveAttachments);
     
     /// <summary>
     /// Configures whether the assertion trace is displayed with the result.
@@ -225,11 +241,14 @@ public class AssertionBuilder : IYamlConvertible
     /// Use this method when working with the documented Runner assertion builder API surface in code. The behavior exposed here is part of the public surface that the generated function documentation groups under 'Configuration as Code / Assertions'.
     /// </remarks>
     /// <qaas-docs group="Configuration as Code" subgroup="Assertions" />
-    public AssertionBuilder WeatherToDisplayTrace(bool weatherToDisplayTrace)
+    public AssertionBuilder ShouldDisplayTrace(bool shouldDisplayTrace)
     {
-        DisplayTrace = weatherToDisplayTrace;
+        DisplayTrace = shouldDisplayTrace;
         return this;
     }
+
+    internal AssertionBuilder WeatherToDisplayTrace(bool weatherToDisplayTrace) =>
+        ShouldDisplayTrace(weatherToDisplayTrace);
     
     /// <summary>
     /// Sets the name used for the current Runner assertion builder instance.
@@ -264,7 +283,7 @@ public class AssertionBuilder : IYamlConvertible
     /// Use this method when working with the documented Runner assertion builder API surface in code. The change is stored on the current builder instance and is consumed by later build, validation, or execution steps.
     /// </remarks>
     /// <qaas-docs group="Configuration as Code" subgroup="Assertions" />
-    public AssertionBuilder AddDataSourceName(string dataSourceName)
+    internal AssertionBuilder AddDataSourceName(string dataSourceName)
     {
         DataSourceNames = DataSourceNames.Append(dataSourceName).ToArray();
         return this;
@@ -332,7 +351,7 @@ public class AssertionBuilder : IYamlConvertible
     /// Use this method when working with the documented Runner assertion builder API surface in code. The change is stored on the current builder instance and is consumed by later build, validation, or execution steps.
     /// </remarks>
     /// <qaas-docs group="Configuration as Code" subgroup="Assertions" />
-    public AssertionBuilder AddDataSourcePattern(string dataSourcePattern)
+    internal AssertionBuilder AddDataSourcePattern(string dataSourcePattern)
     {
         DataSourcePatterns = DataSourcePatterns.Append(dataSourcePattern).ToArray();
         return this;
@@ -400,7 +419,7 @@ public class AssertionBuilder : IYamlConvertible
     /// Use this method when working with the documented Runner assertion builder API surface in code. The change is stored on the current builder instance and is consumed by later build, validation, or execution steps.
     /// </remarks>
     /// <qaas-docs group="Configuration as Code" subgroup="Assertions" />
-    public AssertionBuilder AddSessionName(string sessionName)
+    internal AssertionBuilder AddSessionName(string sessionName)
     {
         SessionNames = SessionNames == null ? [sessionName] : SessionNames.Append(sessionName).ToArray();
         return this;
@@ -473,7 +492,7 @@ public class AssertionBuilder : IYamlConvertible
     /// Use this method when working with the documented Runner assertion builder API surface in code. The change is stored on the current builder instance and is consumed by later build, validation, or execution steps.
     /// </remarks>
     /// <qaas-docs group="Configuration as Code" subgroup="Assertions" />
-    public AssertionBuilder AddSessionPattern(string sessionPattern)
+    internal AssertionBuilder AddSessionPattern(string sessionPattern)
     {
         SessionNamePatterns = SessionNamePatterns == null
             ? [sessionPattern]
@@ -548,7 +567,7 @@ public class AssertionBuilder : IYamlConvertible
     /// Use this method when working with the documented Runner assertion builder API surface in code. The change is stored on the current builder instance and is consumed by later build, validation, or execution steps.
     /// </remarks>
     /// <qaas-docs group="Configuration as Code" subgroup="Assertions" />
-    public AssertionBuilder AddLink(LinkBuilder linkBuilder)
+    internal AssertionBuilder AddLink(LinkBuilder linkBuilder)
     {
         Links = Links.Append(linkBuilder).ToList();
         return this;
@@ -630,7 +649,7 @@ public class AssertionBuilder : IYamlConvertible
     /// Use this method when working with the documented Runner assertion builder API surface in code. The change is stored on the current builder instance and is consumed by later build, validation, or execution steps.
     /// </remarks>
     /// <qaas-docs group="Configuration as Code" subgroup="Assertions" />
-    public AssertionBuilder CreateConfiguration(object configuration)
+    internal AssertionBuilder AddConfiguration(object configuration)
     {
         return Configure(configuration);
     }
@@ -642,21 +661,9 @@ public class AssertionBuilder : IYamlConvertible
     /// Use this method when working with the documented Runner assertion builder API surface in code. The change is stored on the current builder instance and is consumed by later build, validation, or execution steps.
     /// </remarks>
     /// <qaas-docs group="Configuration as Code" subgroup="Assertions" />
-    public AssertionBuilder Create(object configuration)
+    internal AssertionBuilder Create(object configuration)
     {
-        return CreateConfiguration(configuration);
-    }
-
-    /// <summary>
-    /// Returns the configuration currently stored on the Runner assertion builder instance.
-    /// </summary>
-    /// <remarks>
-    /// Use this method when working with the documented Runner assertion builder API surface in code. Use it to inspect the current configured state without rebuilding the surrounding collection or runtime object graph.
-    /// </remarks>
-    /// <qaas-docs group="Configuration as Code" subgroup="Assertions" />
-    public IConfiguration ReadConfiguration()
-    {
-        return AssertionConfiguration;
+        return AddConfiguration(configuration);
     }
 
     /// <summary>

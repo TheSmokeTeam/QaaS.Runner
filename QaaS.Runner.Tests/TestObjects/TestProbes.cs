@@ -3,6 +3,7 @@ using System.Collections.Immutable;
 using QaaS.Framework.SDK.DataSourceObjects;
 using QaaS.Framework.SDK.Hooks.Probe;
 using QaaS.Framework.SDK.Session.SessionDataObjects;
+using QaaS.Runner.Sessions.Actions.Probes;
 
 namespace QaaS.Runner.Tests.TestObjects;
 
@@ -14,6 +15,7 @@ public sealed class ProbeMarkerConfig
 public static class ProbeRunRecorder
 {
     private static readonly ConcurrentQueue<(string ProbeName, string Marker)> Runs = new();
+    private static readonly ConcurrentQueue<(string SessionName, string ProbeName)> ScopedRuns = new();
 
     public static IReadOnlyCollection<(string ProbeName, string Marker)> GetRuns()
     {
@@ -25,11 +27,25 @@ public static class ProbeRunRecorder
         while (Runs.TryDequeue(out _))
         {
         }
+
+        while (ScopedRuns.TryDequeue(out _))
+        {
+        }
     }
 
     public static void Record(string probeName, string marker)
     {
         Runs.Enqueue((probeName, marker));
+    }
+
+    public static IReadOnlyCollection<(string SessionName, string ProbeName)> GetScopedRuns()
+    {
+        return ScopedRuns.ToArray();
+    }
+
+    public static void RecordScope(string sessionName, string probeName)
+    {
+        ScopedRuns.Enqueue((sessionName, probeName));
     }
 }
 
@@ -46,5 +62,14 @@ public class SecondTestProbe : BaseProbe<ProbeMarkerConfig>
     public override void Run(IImmutableList<SessionData> sessionDataList, IImmutableList<DataSource> dataSourceList)
     {
         ProbeRunRecorder.Record(nameof(SecondTestProbe), Configuration.Marker);
+    }
+}
+
+public class ScopeAwareTestProbe : BaseProbe<ProbeMarkerConfig>
+{
+    public override void Run(IImmutableList<SessionData> sessionDataList, IImmutableList<DataSource> dataSourceList)
+    {
+        var descriptor = ProbeExecutionScope.GetCurrent();
+        ProbeRunRecorder.RecordScope(descriptor.SessionName, descriptor.ProbeName);
     }
 }

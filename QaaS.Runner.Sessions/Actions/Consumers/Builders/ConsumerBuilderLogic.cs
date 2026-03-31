@@ -24,6 +24,21 @@ namespace QaaS.Runner.Sessions.Actions.Consumers.Builders;
 
 public partial class ConsumerBuilder
 {
+    public IReaderConfig? Configuration
+    {
+        get => GetConfiguration();
+        internal set
+        {
+            if (value == null)
+            {
+                Reset();
+                return;
+            }
+
+            Configure(value);
+        }
+    }
+
     /// <summary>
     /// Sets the name used for the current Runner consumer builder instance.
     /// </summary>
@@ -96,7 +111,7 @@ public partial class ConsumerBuilder
     /// Use this method when working with the documented Runner consumer builder API surface in code. The change is stored on the current builder instance and is consumed by later build, validation, or execution steps.
     /// </remarks>
     /// <qaas-docs group="Configuration as Code" subgroup="Consumers" />
-    public ConsumerBuilder AddPolicy(PolicyBuilder policy)
+    internal ConsumerBuilder AddPolicy(PolicyBuilder policy)
     {
         var policiesList = Policies.ToList();
         policiesList.Add(policy);
@@ -171,7 +186,7 @@ public partial class ConsumerBuilder
     /// Use this method when working with the documented Runner consumer builder API surface in code. The change is stored on the current builder instance and is consumed by later build, validation, or execution steps.
     /// </remarks>
     /// <qaas-docs group="Configuration as Code" subgroup="Consumers" />
-    public ConsumerBuilder CreateConfiguration(IReaderConfig config)
+    internal ConsumerBuilder AddConfiguration(IReaderConfig config)
     {
         return Configure(config);
     }
@@ -183,9 +198,9 @@ public partial class ConsumerBuilder
     /// Use this method when working with the documented Runner consumer builder API surface in code. The change is stored on the current builder instance and is consumed by later build, validation, or execution steps.
     /// </remarks>
     /// <qaas-docs group="Configuration as Code" subgroup="Consumers" />
-    public ConsumerBuilder Create(IReaderConfig config)
+    internal ConsumerBuilder Create(IReaderConfig config)
     {
-        return CreateConfiguration(config);
+        return AddConfiguration(config);
     }
 
     /// <summary>
@@ -195,30 +210,9 @@ public partial class ConsumerBuilder
     /// Use this method when working with the documented Runner consumer builder API surface in code. Use it to inspect the current configured state without rebuilding the surrounding collection or runtime object graph.
     /// </remarks>
     /// <qaas-docs group="Configuration as Code" subgroup="Consumers" />
-    public IReaderConfig? ReadConfiguration()
-    {
-        if (RabbitMq != null) return RabbitMq;
-        if (KafkaTopic != null) return KafkaTopic;
-        if (Socket != null) return Socket;
-        if (IbmMqQueue != null) return IbmMqQueue;
-        if (PostgreSqlTable != null) return PostgreSqlTable;
-        if (OracleSqlTable != null) return OracleSqlTable;
-        if (MsSqlTable != null) return MsSqlTable;
-        if (TrinoSqlTable != null) return TrinoSqlTable;
-        if (ElasticIndices != null) return ElasticIndices;
-        return S3Bucket;
-    }
-
-    /// <summary>
-    /// Updates the configuration currently stored on the Runner consumer builder instance.
-    /// </summary>
-    /// <remarks>
-    /// Use this method when working with the documented Runner consumer builder API surface in code. The change is stored on the current builder instance and is consumed by later build, validation, or execution steps.
-    /// </remarks>
-    /// <qaas-docs group="Configuration as Code" subgroup="Consumers" />
     public ConsumerBuilder UpdateConfiguration(Func<IReaderConfig, IReaderConfig> update)
     {
-        var currentConfig = ReadConfiguration() ??
+        var currentConfig = Configuration ??
                             throw new InvalidOperationException("Consumer configuration is not set");
         return UpdateConfiguration(update(currentConfig));
     }
@@ -232,7 +226,7 @@ public partial class ConsumerBuilder
     /// <qaas-docs group="Configuration as Code" subgroup="Consumers" />
     public ConsumerBuilder UpdateConfiguration(IReaderConfig config)
     {
-        var currentConfig = ReadConfiguration() ??
+        var currentConfig = Configuration ??
                             throw new InvalidOperationException("Consumer configuration is not set");
         return Configure(ConfigurationUpdateExtensions.UpdateConfiguration(currentConfig, config));
     }
@@ -246,7 +240,7 @@ public partial class ConsumerBuilder
     /// <qaas-docs group="Configuration as Code" subgroup="Consumers" />
     public ConsumerBuilder UpdateConfiguration(object configuration)
     {
-        var currentConfig = ReadConfiguration() ??
+        var currentConfig = Configuration ??
                             throw new InvalidOperationException("Consumer configuration is not set");
         return Configure(ConfigurationUpdateExtensions.UpdateConfiguration(currentConfig, configuration));
     }
@@ -403,5 +397,19 @@ public partial class ConsumerBuilder
         }
 
         return null;
+    }
+
+    private IReaderConfig? GetConfiguration()
+    {
+        if (RabbitMq != null) return RabbitMq;
+        if (KafkaTopic != null) return KafkaTopic;
+        if (Socket != null) return Socket;
+        if (IbmMqQueue != null) return IbmMqQueue;
+        if (PostgreSqlTable != null) return PostgreSqlTable;
+        if (OracleSqlTable != null) return OracleSqlTable;
+        if (MsSqlTable != null) return MsSqlTable;
+        if (TrinoSqlTable != null) return TrinoSqlTable;
+        if (ElasticIndices != null) return ElasticIndices;
+        return S3Bucket;
     }
 }

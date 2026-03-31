@@ -57,7 +57,7 @@ public class ProbeBuilderTests
     public void AddDataSourceName_Should_Add_To_Array()
     {
         var builder = new ProbeBuilder();
-        builder.AddDataSourceName("DataSource1");
+        builder.CreateDataSourceName("DataSource1");
 
         Assert.That(builder.DataSourceNames, Contains.Item("DataSource1"));
     }
@@ -66,7 +66,7 @@ public class ProbeBuilderTests
     public void AddDataSourcePattern_Should_Add_To_Array()
     {
         var builder = new ProbeBuilder();
-        builder.AddDataSourcePattern(@"^\w+$");
+        builder.CreateDataSourcePattern(@"^\w+$");
 
         Assert.That(builder.DataSourcePatterns, Contains.Item(@"^\w+$"));
     }
@@ -75,8 +75,8 @@ public class ProbeBuilderTests
     public void DeleteDataSourceName_Should_Remove_From_Array()
     {
         var builder = new ProbeBuilder()
-            .AddDataSourceName("DataSource1")
-            .AddDataSourceName("DataSource2");
+            .CreateDataSourceName("DataSource1")
+            .CreateDataSourceName("DataSource2");
 
         builder.DeleteDataSourceName("DataSource1");
 
@@ -87,8 +87,8 @@ public class ProbeBuilderTests
     public void DeleteDataSourcePattern_Should_Remove_From_Array()
     {
         var builder = new ProbeBuilder()
-            .AddDataSourcePattern(@"^\w+$")
-            .AddDataSourcePattern(@"^\d+$");
+            .CreateDataSourcePattern(@"^\w+$")
+            .CreateDataSourcePattern(@"^\d+$");
 
         builder.DeleteDataSourcePattern(@"^\w+$");
 
@@ -104,8 +104,8 @@ public class ProbeBuilderTests
         typeof(ProbeBuilder).GetProperty("DataSourcePatterns", BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic)!
             .SetValue(builder, null);
 
-        builder.AddDataSourceName("DataSource1")
-            .AddDataSourcePattern(@"^\w+$");
+        builder.CreateDataSourceName("DataSource1")
+            .CreateDataSourcePattern(@"^\w+$");
 
         Assert.That(builder.DataSourceNames, Contains.Item("DataSource1"));
         Assert.That(builder.DataSourcePatterns, Contains.Item(@"^\w+$"));
@@ -230,3 +230,4 @@ public class ProbeBuilderTests
         });
     }
 }
+

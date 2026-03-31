@@ -56,7 +56,7 @@ public class TransactionBuilderTests
     {
         var builder = new TransactionBuilder();
         builder.Named("TestName");
-        builder.AddDataSource("Source1");
+        builder.CreateDataSource("Source1");
 
         Assert.That(builder.Name, Is.EqualTo("TestName"));
     }
@@ -66,7 +66,7 @@ public class TransactionBuilderTests
     {
         var builder = new TransactionBuilder();
         builder.AtStage(5);
-        builder.AddDataSource("Source1");
+        builder.CreateDataSource("Source1");
         builder.Named("test");
 
         Assert.That(builder.Stage, Is.EqualTo(5));
@@ -77,7 +77,7 @@ public class TransactionBuilderTests
     {
         var builder = new TransactionBuilder();
         builder.WithTimeout(3000);
-        builder.AddDataSource("Source1");
+        builder.CreateDataSource("Source1");
         builder.Named("test");
 
         Assert.That(builder.TimeoutMs, Is.EqualTo(3000));
@@ -89,7 +89,7 @@ public class TransactionBuilderTests
         var filter = new DataFilter();
         var builder = new TransactionBuilder();
         builder.FilterInputData(filter);
-        builder.AddDataSource("Source1");
+        builder.CreateDataSource("Source1");
         builder.Named("test");
 
         Assert.That(builder.InputDataFilter, Is.SameAs(filter));
@@ -101,7 +101,7 @@ public class TransactionBuilderTests
         var filter = new DataFilter();
         var builder = new TransactionBuilder();
         builder.FilterOutputData(filter);
-        builder.AddDataSource("Source1");
+        builder.CreateDataSource("Source1");
         builder.Named("test");
 
         Assert.That(builder.OutputDataFilter, Is.SameAs(filter));
@@ -113,7 +113,7 @@ public class TransactionBuilderTests
         var config = new DeserializeConfig();
         var builder = new TransactionBuilder();
         builder.WithDeserializer(config);
-        builder.AddDataSource("Source1");
+        builder.CreateDataSource("Source1");
         builder.Named("test");
 
         Assert.That(builder.OutputDeserialize, Is.SameAs(config));
@@ -125,7 +125,7 @@ public class TransactionBuilderTests
         var config = new SerializeConfig();
         var builder = new TransactionBuilder();
         builder.WithSerializer(config);
-        builder.AddDataSource("Source1");
+        builder.CreateDataSource("Source1");
         builder.Named("test");
 
         Assert.That(builder.InputSerialize, Is.SameAs(config));
@@ -136,7 +136,7 @@ public class TransactionBuilderTests
     {
         var builder = new TransactionBuilder();
         builder.WithIterations(10);
-        builder.AddDataSource("Source1");
+        builder.CreateDataSource("Source1");
         builder.Named("test");
 
         Assert.That(builder.Iterations, Is.EqualTo(10));
@@ -146,8 +146,8 @@ public class TransactionBuilderTests
     public void AddDataSource_Should_Add_To_DataSourceNames()
     {
         var builder = new TransactionBuilder();
-        builder.AddDataSource("Source1");
-        builder.AddDataSource("Source2");
+        builder.CreateDataSource("Source1");
+        builder.CreateDataSource("Source2");
         builder.Named("test");
 
         Assert.That(builder.DataSourceNames, Is.EqualTo(new[] { "Source1", "Source2" }));
@@ -157,8 +157,8 @@ public class TransactionBuilderTests
     public void AddDataSourcePattern_Should_Add_To_DataSourceNamePatterns()
     {
         var builder = new TransactionBuilder();
-        builder.AddDataSourcePattern("Pattern1");
-        builder.AddDataSourcePattern("Pattern2");
+        builder.CreateDataSourcePattern("Pattern1");
+        builder.CreateDataSourcePattern("Pattern2");
         builder.Named("test");
 
         Assert.That(builder.DataSourcePatterns, Is.EqualTo(new[] { "Pattern1", "Pattern2" }));
@@ -170,7 +170,7 @@ public class TransactionBuilderTests
         var builder = new TransactionBuilder();
         builder.InLoops();
         builder.Named("test");
-        builder.AddDataSource("test");
+        builder.CreateDataSource("test");
 
         Assert.That(builder.Loop, Is.True);
     }
@@ -181,7 +181,7 @@ public class TransactionBuilderTests
         var builder = new TransactionBuilder();
         builder.WithSleep(1000);
         builder.Named("test");
-        builder.AddDataSource("test");
+        builder.CreateDataSource("test");
 
         Assert.That(builder.SleepTimeMs, Is.EqualTo(1000UL));
     }
@@ -193,7 +193,7 @@ public class TransactionBuilderTests
         var builder = new TransactionBuilder();
         builder.Configure(httpConfig);
         builder.Named("test");
-        builder.AddDataSource("test");
+        builder.CreateDataSource("test");
 
         Assert.That(builder.Http, Is.SameAs(httpConfig));
         Assert.That(builder.Grpc, Is.Null);
@@ -206,7 +206,7 @@ public class TransactionBuilderTests
         var builder = new TransactionBuilder();
         builder.Configure(grpcConfig);
         builder.Named("test");
-        builder.AddDataSource("test");
+        builder.CreateDataSource("test");
 
         Assert.That(builder.Grpc, Is.SameAs(grpcConfig));
         Assert.That(builder.Http, Is.Null);
@@ -225,7 +225,7 @@ public class TransactionBuilderTests
     {
         var builder = new TransactionBuilder();
         builder.Named("Test");
-        builder.AddDataSource("test");
+        builder.CreateDataSource("test");
         builder.WithTimeout(1000);
 
         var result = builder.Build(_context, _actionFailures, _sessionName);
@@ -239,7 +239,7 @@ public class TransactionBuilderTests
     {
         var builder = new TransactionBuilder();
         builder.Named("Test");
-        builder.AddDataSourcePattern("test");
+        builder.CreateDataSourcePattern("test");
         builder.WithTimeout(1000);
         builder.Configure(new HttpTransactorConfig());
         builder.Configure(new GrpcTransactorConfig()); // This overrides previous
@@ -256,7 +256,7 @@ public class TransactionBuilderTests
         var builder = new TransactionBuilder();
         builder.Named("Test");
         builder.WithTimeout(1000);
-        builder.AddDataSourcePattern("test");
+        builder.CreateDataSourcePattern("test");
         builder.Configure(new HttpTransactorConfig
         {
             Method = HttpMethods.Delete,
@@ -364,7 +364,7 @@ public class TransactionBuilderTests
         var builder = new TransactionBuilder()
             .Named("transaction-conflict")
             .WithTimeout(1000)
-            .AddDataSource("source-a");
+            .CreateDataSource("source-a");
 
         typeof(TransactionBuilder).GetProperty("Http", BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic)!
             .SetValue(builder, new HttpTransactorConfig { Method = HttpMethods.Get, BaseAddress = "https://test.com" });
@@ -406,3 +406,4 @@ public class TransactionBuilderTests
         }
     }
 }
+

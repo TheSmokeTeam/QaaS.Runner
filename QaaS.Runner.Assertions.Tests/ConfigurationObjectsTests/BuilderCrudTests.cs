@@ -28,7 +28,7 @@ public class BuilderCrudTests
                 Url = "https://kibana",
                 DataViewId = "view"
             }))
-            .CreateConfiguration(new { key = "value" });
+            .Configure(new { key = "value" });
 
         builder.UpdateSessionName("session-a", "session-updated")
             .UpdateSessionPattern("^session-.*$", "^updated-.*$")
@@ -48,9 +48,9 @@ public class BuilderCrudTests
         Assert.That(builder.ReadDataSourcePatterns(), Is.EquivalentTo(["^updated-source-.*$"]));
         Assert.That(builder.ReadLinks(), Has.Count.EqualTo(1));
         Assert.That(builder.ReadLinks()[0].Name, Is.EqualTo("link-updated"));
-        Assert.That(builder.ReadConfiguration()["key"], Is.EqualTo("value"));
-        Assert.That(builder.ReadConfiguration()["changed"], Is.EqualTo("yes"));
-        Assert.That(builder.ReadConfiguration()["nested:enabled"], Is.EqualTo("True"));
+        Assert.That(builder.Configuration["key"], Is.EqualTo("value"));
+        Assert.That(builder.Configuration["changed"], Is.EqualTo("yes"));
+        Assert.That(builder.Configuration["nested:enabled"], Is.EqualTo("True"));
 
         builder.DeleteSessionName("session-updated")
             .DeleteSessionPattern("^updated-.*$")
@@ -64,14 +64,14 @@ public class BuilderCrudTests
         Assert.That(builder.ReadDataSourceNames(), Is.Empty);
         Assert.That(builder.ReadDataSourcePatterns(), Is.Empty);
         Assert.That(builder.ReadLinks(), Is.Empty);
-        Assert.That(builder.ReadConfiguration().AsEnumerable().Any(), Is.False);
+        Assert.That(builder.Configuration.AsEnumerable().Any(), Is.False);
     }
 
     [Test]
     public void LinkBuilder_ShouldSupportConfigurationCrud()
     {
         var builder = new LinkBuilder()
-            .CreateConfiguration(new KibanaLinkConfig { Url = "https://kibana", DataViewId = "view" });
+            .Configure(new KibanaLinkConfig { Url = "https://kibana", DataViewId = "view" });
 
         builder.UpdateConfiguration(_ => new GrafanaLinkConfig
         {
@@ -84,10 +84,10 @@ public class BuilderCrudTests
             DataViewId = "view-2"
         });
 
-        Assert.That(builder.ReadConfiguration(), Is.TypeOf<KibanaLinkConfig>());
+        Assert.That(builder.Configuration, Is.TypeOf<KibanaLinkConfig>());
 
         builder.DeleteConfiguration();
-        Assert.That(builder.ReadConfiguration(), Is.Null);
+        Assert.That(builder.Configuration, Is.Null);
         Assert.Throws<InvalidOperationException>(() => builder.Build());
     }
 
@@ -95,7 +95,7 @@ public class BuilderCrudTests
     public void LinkBuilder_UpdateConfiguration_WithConfiguration_MergesSameTypeAndPreservesExistingFields()
     {
         var builder = new LinkBuilder()
-            .CreateConfiguration(new KibanaLinkConfig
+            .Configure(new KibanaLinkConfig
             {
                 Url = "https://kibana",
                 DataViewId = "view",
@@ -107,7 +107,7 @@ public class BuilderCrudTests
             KqlQuery = "service.name : api"
         });
 
-        var mergedConfiguration = (KibanaLinkConfig)builder.ReadConfiguration()!;
+        var mergedConfiguration = (KibanaLinkConfig)builder.Configuration!;
         Assert.Multiple(() =>
         {
             Assert.That(mergedConfiguration.Url, Is.EqualTo("https://kibana"));
@@ -117,3 +117,4 @@ public class BuilderCrudTests
         });
     }
 }
+

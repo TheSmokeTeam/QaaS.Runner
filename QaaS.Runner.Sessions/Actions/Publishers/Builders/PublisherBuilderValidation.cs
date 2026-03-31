@@ -16,7 +16,7 @@ public partial class PublisherBuilder : IValidatableObject
     {
         ArgumentNullException.ThrowIfNull(validationContext);
 
-        var configuredProtocol = ReadConfiguration();
+        var configuredProtocol = Configuration;
         if (configuredProtocol == null)
         {
             return [];

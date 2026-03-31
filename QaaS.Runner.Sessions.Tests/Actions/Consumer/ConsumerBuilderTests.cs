@@ -221,7 +221,7 @@ public class ConsumerBuilderTests
         var builder = new ConsumerBuilder();
 
         // Act
-        builder.AddPolicy(policy);
+        builder.CreatePolicy(policy);
 
         // Assert
         Assert.That(builder.Policies, Has.Length.EqualTo(1));
@@ -237,8 +237,8 @@ public class ConsumerBuilderTests
         var builder = new ConsumerBuilder();
 
         // Act
-        builder.AddPolicy(policy1);
-        builder.AddPolicy(policy2);
+        builder.CreatePolicy(policy1);
+        builder.CreatePolicy(policy2);
 
         // Assert
         Assert.That(builder.Policies, Has.Length.EqualTo(2));
@@ -482,7 +482,7 @@ public class ConsumerBuilderTests
     {
         var builder = new ConsumerBuilder().Configure(config);
 
-        Assert.That(builder.ReadConfiguration(), Is.SameAs(config));
+        Assert.That(builder.Configuration, Is.SameAs(config));
     }
 
     [Test]
@@ -490,7 +490,7 @@ public class ConsumerBuilderTests
     {
         var builder = new ConsumerBuilder();
 
-        Assert.That(builder.ReadConfiguration(), Is.Null);
+        Assert.That(builder.Configuration, Is.Null);
     }
 
     [Test]
@@ -878,8 +878,8 @@ public class ConsumerBuilderTests
     {
         var replacementPolicy = new PolicyBuilder();
         var builder = new ConsumerBuilder()
-            .AddPolicy(new PolicyBuilder())
-            .AddPolicy(new PolicyBuilder());
+            .CreatePolicy(new PolicyBuilder())
+            .CreatePolicy(new PolicyBuilder());
 
         builder.UpdatePolicyAt(0, replacementPolicy);
 
@@ -929,3 +929,4 @@ public class ConsumerBuilderTests
         Assert.That(_actionFailures, Is.Not.Empty);
     }
 }
+

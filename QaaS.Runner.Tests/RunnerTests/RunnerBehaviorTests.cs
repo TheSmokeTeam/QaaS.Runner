@@ -1,8 +1,10 @@
 using System.Reflection;
 using Autofac;
 using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Logging;
 using Moq;
 using NUnit.Framework;
+using QaaS.Framework.Configurations.CustomExceptions;
 using QaaS.Framework.SDK;
 using QaaS.Framework.SDK.ContextObjects;
 using QaaS.Framework.SDK.Extensions;
@@ -29,6 +31,17 @@ public class RunnerBehaviorTests
         public void InvokeTeardown() => base.Teardown();
         public List<Execution> InvokeBuildExecutions() => base.BuildExecutions();
         public int InvokeStartExecutions(List<Execution> executions) => base.StartExecutions(executions);
+    }
+
+    private sealed class VariablesDisabledByOverrideRunner(
+        ILifetimeScope scope,
+        List<ExecutionBuilder> executionBuilders,
+        Microsoft.Extensions.Logging.ILogger logger,
+        Serilog.ILogger serilogLogger) : Runner(scope, executionBuilders, logger, serilogLogger)
+    {
+        public override bool LoadVariablesIntoGlobalDict { get; set; } = false;
+
+        public List<Execution> InvokeBuildExecutions() => base.BuildExecutions();
     }
 
     private sealed class BaseExitRunner(
@@ -162,6 +175,33 @@ public class RunnerBehaviorTests
         {
             Calls.Add("build");
             throw new InvalidOperationException("boom");
+        }
+
+        protected override void Teardown() => Calls.Add("teardown");
+
+        public override void Dispose()
+        {
+            Disposed = true;
+            Calls.Add("dispose");
+            base.Dispose();
+        }
+    }
+
+    private sealed class InvalidConfigurationBuildRunner(
+        ILifetimeScope scope,
+        List<ExecutionBuilder> executionBuilders,
+        Microsoft.Extensions.Logging.ILogger logger,
+        Serilog.ILogger serilogLogger) : Runner(scope, executionBuilders, logger, serilogLogger)
+    {
+        public List<string> Calls { get; } = [];
+        public bool Disposed { get; private set; }
+
+        protected override void Setup() => Calls.Add("setup");
+
+        protected override List<Execution> BuildExecutions()
+        {
+            Calls.Add("build");
+            throw new InvalidConfigurationsException("invalid configuration");
         }
 
         protected override void Teardown() => Calls.Add("teardown");
@@ -508,6 +548,63 @@ public class RunnerBehaviorTests
     }
 
     [Test]
+    public void BuildExecutions_LoadsVariablesSectionIntoSharedGlobalDictionaryByDefault()
+    {
+        using var scope = BuildScope();
+        var configuration = new ConfigurationBuilder()
+            .AddInMemoryCollection(new Dictionary<string, string?>
+            {
+                ["variables:rabbitmq:host"] = "localhost",
+                ["variables:rabbitmq:port"] = "5672"
+            })
+            .Build();
+        var builders = new List<ExecutionBuilder>
+        {
+            CreateTemplateExecutionBuilder("case-1", configuration),
+            CreateTemplateExecutionBuilder("case-2", configuration)
+        };
+
+        var runner = new ExposedRunner(scope, builders, Globals.Logger, new Mock<Serilog.ILogger>().Object);
+        runner.InvokeBuildExecutions();
+
+        var globalDictField = typeof(ExecutionBuilder).GetField("_globalDict", BindingFlags.Instance | BindingFlags.NonPublic)!;
+        var sharedGlobalDict = (Dictionary<string, object?>)globalDictField.GetValue(builders[0])!;
+        var variables = (Dictionary<string, object?>)sharedGlobalDict["Variables"]!;
+        var rabbitMq = (Dictionary<string, object?>)variables["rabbitmq"]!;
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(sharedGlobalDict, Contains.Key("Variables"));
+            Assert.That(rabbitMq["host"], Is.EqualTo("localhost"));
+            Assert.That(rabbitMq["port"], Is.EqualTo("5672"));
+        });
+    }
+
+    [Test]
+    public void BuildExecutions_WhenVariablesLoadingIsDisabled_DoesNotPopulateVariablesGlobalPath()
+    {
+        using var scope = BuildScope();
+        var configuration = new ConfigurationBuilder()
+            .AddInMemoryCollection(new Dictionary<string, string?>
+            {
+                ["variables:rabbitmq:host"] = "localhost"
+            })
+            .Build();
+        var builders = new List<ExecutionBuilder>
+        {
+            CreateTemplateExecutionBuilder("case-1", configuration)
+        };
+
+        var runner = new VariablesDisabledByOverrideRunner(scope, builders, Globals.Logger, new Mock<Serilog.ILogger>().Object);
+        runner.InvokeBuildExecutions();
+
+        var globalDictField = typeof(ExecutionBuilder).GetField("_globalDict", BindingFlags.Instance | BindingFlags.NonPublic)!;
+        var sharedGlobalDict = (Dictionary<string, object?>)globalDictField.GetValue(builders[0])!;
+
+        Assert.That(sharedGlobalDict, Does.Not.ContainKey("Variables"));
+    }
+
+    [Test]
     public void StartExecutions_WithNoExecutions_ReturnsZero()
     {
         using var scope = BuildScope();
@@ -640,6 +737,32 @@ public class RunnerBehaviorTests
         var runner = new FailingBuildRunner(scope, [], Globals.Logger, new Mock<Serilog.ILogger>().Object);
 
         Assert.Throws<InvalidOperationException>(() => runner.RunAndGetExitCode());
+    }
+
+    [Test]
+    public void RunAndGetExitCode_WhenBuildExecutionsThrowsInvalidConfigurationsException_ReturnsFailureExitCode()
+    {
+        using var scope = BuildScope();
+        var logger = new Mock<Microsoft.Extensions.Logging.ILogger>();
+        var runner = new InvalidConfigurationBuildRunner(scope, [], logger.Object, new Mock<Serilog.ILogger>().Object);
+
+        var exitCode = runner.RunAndGetExitCode();
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(exitCode, Is.EqualTo(1));
+            Assert.That(runner.Calls, Is.EqualTo(new[] { "setup", "build", "teardown", "dispose" }));
+            Assert.That(runner.Disposed, Is.True);
+            Assert.That(runner.LastExitCode, Is.EqualTo(1));
+        });
+
+        logger.Verify(log => log.Log(
+                It.Is<LogLevel>(level => level == LogLevel.Error),
+                It.IsAny<EventId>(),
+                It.Is<It.IsAnyType>((_, _) => true),
+                It.IsAny<Exception>(),
+                It.IsAny<Func<It.IsAnyType, Exception?, string>>()),
+            Times.Never);
     }
 
     [Test]
@@ -777,10 +900,23 @@ public class RunnerBehaviorTests
         return markerFile;
     }
 
-    private static ExecutionBuilder CreateTemplateExecutionBuilder(string caseName)
+    private static ExecutionBuilder CreateTemplateExecutionBuilder(string caseName, IConfiguration? rootConfiguration = null)
     {
-        return new ExecutionBuilder()
-            .ExecutionType(ExecutionType.Template)
+        var context = new InternalContext
+        {
+            Logger = Globals.Logger,
+            CaseName = caseName,
+            ExecutionId = $"exec-{caseName}",
+            RootConfiguration = rootConfiguration ?? new ConfigurationBuilder().Build(),
+            InternalRunningSessions = new RunningSessions(new Dictionary<string, RunningSessionData<object, object>>())
+        };
+        context.InsertValueIntoGlobalDictionary(context.GetMetaDataPath(), new MetaDataConfig
+        {
+            Team = "Smoke",
+            System = "QaaS"
+        });
+
+        return new ExecutionBuilder(context, ExecutionType.Template, null, null, null, null)
             .SetExecutionId($"exec-{caseName}")
             .SetCase(caseName)
             .WithMetadata(new MetaDataConfig
