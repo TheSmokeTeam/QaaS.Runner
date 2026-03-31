@@ -176,7 +176,7 @@ public class TransactionBuilder
     /// Use this method when working with the documented Runner transaction builder API surface in code. The change is stored on the current builder instance and is consumed by later build, validation, or execution steps.
     /// </remarks>
     /// <qaas-docs group="Configuration as Code" subgroup="Transactions" />
-    public TransactionBuilder AddDataSource(string dataSourceName)
+    internal TransactionBuilder AddDataSource(string dataSourceName)
     {
         var dataSourceNamesList = DataSourceNames?.ToList() ?? [];
         dataSourceNamesList.Add(dataSourceName);
@@ -203,7 +203,7 @@ public class TransactionBuilder
     /// Use this method when working with the documented Runner transaction builder API surface in code. The change is stored on the current builder instance and is consumed by later build, validation, or execution steps.
     /// </remarks>
     /// <qaas-docs group="Configuration as Code" subgroup="Transactions" />
-    public TransactionBuilder AddDataSourcePattern(string dataSourcePattern)
+    internal TransactionBuilder AddDataSourcePattern(string dataSourcePattern)
     {
         var dataSourcePatternsList = DataSourcePatterns?.ToList() ?? [];
         dataSourcePatternsList.Add(dataSourcePattern);
@@ -256,7 +256,7 @@ public class TransactionBuilder
     /// Use this method when working with the documented Runner transaction builder API surface in code. The change is stored on the current builder instance and is consumed by later build, validation, or execution steps.
     /// </remarks>
     /// <qaas-docs group="Configuration as Code" subgroup="Transactions" />
-    public TransactionBuilder AddPolicy(PolicyBuilder policy)
+    internal TransactionBuilder AddPolicy(PolicyBuilder policy)
     {
         var policies = Policies.ToList();
         policies.Add(policy);
@@ -427,7 +427,7 @@ public class TransactionBuilder
     /// Use this method when working with the documented Runner transaction builder API surface in code. The change is stored on the current builder instance and is consumed by later build, validation, or execution steps.
     /// </remarks>
     /// <qaas-docs group="Configuration as Code" subgroup="Transactions" />
-    public TransactionBuilder CreateConfiguration(ITransactorConfig config)
+    internal TransactionBuilder CreateConfiguration(ITransactorConfig config)
     {
         return Configure(config);
     }
@@ -439,7 +439,7 @@ public class TransactionBuilder
     /// Use this method when working with the documented Runner transaction builder API surface in code. The change is stored on the current builder instance and is consumed by later build, validation, or execution steps.
     /// </remarks>
     /// <qaas-docs group="Configuration as Code" subgroup="Transactions" />
-    public TransactionBuilder Create(ITransactorConfig config)
+    internal TransactionBuilder Create(ITransactorConfig config)
     {
         return CreateConfiguration(config);
     }

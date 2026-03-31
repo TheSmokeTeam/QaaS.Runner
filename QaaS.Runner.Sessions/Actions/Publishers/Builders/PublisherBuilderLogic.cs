@@ -99,7 +99,7 @@ public partial class PublisherBuilder
     /// Use this method when working with the documented Runner publisher builder API surface in code. The change is stored on the current builder instance and is consumed by later build, validation, or execution steps.
     /// </remarks>
     /// <qaas-docs group="Configuration as Code" subgroup="Publishers" />
-    public PublisherBuilder AddDataSource(string dataSourceName)
+    internal PublisherBuilder AddDataSource(string dataSourceName)
     {
         var dataSourceNamesList = DataSourceNames?.ToList() ?? [];
         dataSourceNamesList.Add(dataSourceName);
@@ -174,7 +174,7 @@ public partial class PublisherBuilder
     /// Use this method when working with the documented Runner publisher builder API surface in code. The change is stored on the current builder instance and is consumed by later build, validation, or execution steps.
     /// </remarks>
     /// <qaas-docs group="Configuration as Code" subgroup="Publishers" />
-    public PublisherBuilder AddDataSourcePattern(string dataSourcePattern)
+    internal PublisherBuilder AddDataSourcePattern(string dataSourcePattern)
     {
         var dataSourcePatternsList = DataSourcePatterns?.ToList() ?? [];
         dataSourcePatternsList.Add(dataSourcePattern);
@@ -288,7 +288,7 @@ public partial class PublisherBuilder
     /// Use this method when working with the documented Runner publisher builder API surface in code. The change is stored on the current builder instance and is consumed by later build, validation, or execution steps.
     /// </remarks>
     /// <qaas-docs group="Configuration as Code" subgroup="Publishers" />
-    public PublisherBuilder AddPolicy(PolicyBuilder policy)
+    internal PublisherBuilder AddPolicy(PolicyBuilder policy)
     {
         var policiesList = Policies.ToList();
         policiesList.Add(policy);
@@ -376,7 +376,7 @@ public partial class PublisherBuilder
     /// Use this method when working with the documented Runner publisher builder API surface in code. The change is stored on the current builder instance and is consumed by later build, validation, or execution steps.
     /// </remarks>
     /// <qaas-docs group="Configuration as Code" subgroup="Publishers" />
-    public PublisherBuilder CreateConfiguration(ISenderConfig config)
+    internal PublisherBuilder CreateConfiguration(ISenderConfig config)
     {
         return Configure(config);
     }
@@ -388,7 +388,7 @@ public partial class PublisherBuilder
     /// Use this method when working with the documented Runner publisher builder API surface in code. The change is stored on the current builder instance and is consumed by later build, validation, or execution steps.
     /// </remarks>
     /// <qaas-docs group="Configuration as Code" subgroup="Publishers" />
-    public PublisherBuilder Create(ISenderConfig config)
+    internal PublisherBuilder Create(ISenderConfig config)
     {
         return CreateConfiguration(config);
     }

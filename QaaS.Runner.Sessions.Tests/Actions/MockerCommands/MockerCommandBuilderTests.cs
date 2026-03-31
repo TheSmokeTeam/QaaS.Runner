@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using NUnit.Framework;
 using QaaS.Framework.SDK.ContextObjects;
@@ -43,7 +43,7 @@ public class MockerCommandBuilderTests
     {
         var builder = new MockerCommandBuilder()
             .Named("MockerCommandWithoutType")
-            .WithCommand(new MockerCommandConfig());
+            .Configure(new MockerCommandConfig());
 
         var result = builder.Build(_context, _actionFailures, SessionName);
 
@@ -57,7 +57,7 @@ public class MockerCommandBuilderTests
     {
         var builder = new MockerCommandBuilder()
             .Named("MockerCommandWithConflicts")
-            .WithCommand(new MockerCommandConfig
+            .Configure(new MockerCommandConfig
             {
                 ChangeActionStub = new ChangeActionStub(),
                 TriggerAction = new TriggerAction()
@@ -75,7 +75,7 @@ public class MockerCommandBuilderTests
     {
         var builder = new MockerCommandBuilder()
             .Named("MockerCommandWithSingleType")
-            .WithCommand(commandConfig)
+            .Configure(commandConfig)
             .WithServerName("test-server");
 
         var result = builder.Build(_context, _actionFailures, SessionName);
@@ -113,7 +113,7 @@ public class MockerCommandBuilderTests
         var builder = new MockerCommandBuilder();
         var initialCommand = new MockerCommandConfig { TriggerAction = new TriggerAction() };
 
-        builder.CreateConfiguration(initialCommand);
+        builder.Configure(initialCommand);
         Assert.That(builder.ReadConfiguration(), Is.SameAs(initialCommand));
 
         builder.UpdateConfiguration(command =>
@@ -134,7 +134,7 @@ public class MockerCommandBuilderTests
     public void UpdateConfiguration_WithConfiguration_MergesSameTypeAndPreservesExistingFields()
     {
         var builder = new MockerCommandBuilder()
-            .CreateConfiguration(new MockerCommandConfig
+            .Configure(new MockerCommandConfig
             {
                 Consume = new ConsumeCommandConfig
                 {
@@ -191,4 +191,5 @@ public class MockerCommandBuilderTests
         yield return new MockerCommandConfig { Consume = new ConsumeCommandConfig() };
     }
 }
+
 

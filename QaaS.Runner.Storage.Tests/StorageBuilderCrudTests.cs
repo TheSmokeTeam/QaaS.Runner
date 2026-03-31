@@ -13,7 +13,7 @@ public class StorageBuilderCrudTests
     public void StorageBuilder_ShouldSupportConfigurationCrud()
     {
         var builder = new StorageBuilder()
-            .Create(new FilesInFileSystemConfig { Path = "one/path" });
+            .Configure(new FilesInFileSystemConfig { Path = "one/path" });
 
         Assert.That(builder.ReadConfiguration(), Is.TypeOf<FilesInFileSystemConfig>());
 
@@ -29,7 +29,7 @@ public class StorageBuilderCrudTests
     public void StorageBuilder_UpdateConfiguration_WithConfiguration_MergesSameTypeAndPreservesExistingFields()
     {
         var builder = new StorageBuilder()
-            .Create(new S3Config
+            .Configure(new S3Config
             {
                 StorageBucket = "bucket-a",
                 ServiceURL = "https://s3.local",

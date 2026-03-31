@@ -39,9 +39,9 @@ public class AssertionBuilderTests
             .AddSessionName("session-1")
             .AddSessionName("session-2")
             .AddSessionPattern("^session-.*$")
-            .AddDataSourceName("source-1")
-            .AddDataSourcePattern("^source-.*$")
-            .AddLink(new LinkBuilder().Named("local-link").Configure(new PrometheusLinkConfig
+            .CreateDataSourceName("source-1")
+            .CreateDataSourcePattern("^source-.*$")
+            .CreateLink(new LinkBuilder().Named("local-link").Configure(new PrometheusLinkConfig
             {
                 Url = "https://prometheus.local",
                 Expressions = ["up"]
@@ -82,11 +82,11 @@ public class AssertionBuilderTests
     {
         var builder = CreateBuilder()
             .Named("assertion-display")
-            .WeatherToSaveSessionData(false)
-            .WeatherToSaveLogs(false)
-            .WeatherToSaveAttachments(false)
-            .WeatherToSaveConfigurationTemplate(false)
-            .WeatherToDisplayTrace(false)
+            .ShouldSaveSessionData(false)
+            .ShouldSaveLogs(false)
+            .ShouldSaveAttachments(false)
+            .ShouldSaveConfigurationTemplate(false)
+            .ShouldDisplayTrace(false)
             .WithSeverity(AssertionSeverity.Critical);
 
         var context = new Context
@@ -202,7 +202,7 @@ public class AssertionBuilderTests
             .Named("assertion-display")
             .HookNamed("hook-type")
             .WithCategory("smoke")
-            .WeatherToSaveLogs(false)
+            .ShouldSaveLogs(false)
             .Configure(new
             {
                 Enabled = true,
@@ -237,7 +237,7 @@ public class AssertionBuilderTests
         var builder = CreateBuilder()
             .Named("assertion-display")
             .HookNamed("hook-type")
-            .AddLink(new LinkBuilder().Named("local-link").Configure(new PrometheusLinkConfig
+            .CreateLink(new LinkBuilder().Named("local-link").Configure(new PrometheusLinkConfig
             {
                 Url = "https://prometheus.local",
                 Expressions = ["up"]
@@ -266,3 +266,4 @@ public class AssertionBuilderTests
         };
     }
 }
+

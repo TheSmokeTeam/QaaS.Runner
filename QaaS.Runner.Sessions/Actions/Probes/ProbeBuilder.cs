@@ -119,7 +119,7 @@ public class ProbeBuilder : IYamlConvertible
     /// Use this method when working with the documented Runner probe builder API surface in code. The change is stored on the current builder instance and is consumed by later build, validation, or execution steps.
     /// </remarks>
     /// <qaas-docs group="Configuration as Code" subgroup="Probes" />
-    public ProbeBuilder AddDataSourceName(string dataSourceName)
+    internal ProbeBuilder AddDataSourceName(string dataSourceName)
     {
         var dataSourceNamesList = DataSourceNames?.ToList() ?? [];
         dataSourceNamesList.Add(dataSourceName);
@@ -189,7 +189,7 @@ public class ProbeBuilder : IYamlConvertible
     /// Use this method when working with the documented Runner probe builder API surface in code. The behavior exposed here is part of the public surface that the generated function documentation groups under 'Configuration as Code / Probes'.
     /// </remarks>
     /// <qaas-docs group="Configuration as Code" subgroup="Probes" />
-    public ProbeBuilder RemoveDataSourceName(string dataSourceName)
+    internal ProbeBuilder RemoveDataSourceName(string dataSourceName)
     {
         return DeleteDataSourceName(dataSourceName);
     }
@@ -201,7 +201,7 @@ public class ProbeBuilder : IYamlConvertible
     /// Use this method when working with the documented Runner probe builder API surface in code. The change is stored on the current builder instance and is consumed by later build, validation, or execution steps.
     /// </remarks>
     /// <qaas-docs group="Configuration as Code" subgroup="Probes" />
-    public ProbeBuilder AddDataSourcePattern(string dataSourcePattern)
+    internal ProbeBuilder AddDataSourcePattern(string dataSourcePattern)
     {
         var dataSourcePatternsList = DataSourcePatterns?.ToList() ?? [];
         dataSourcePatternsList.Add(dataSourcePattern);
@@ -271,7 +271,7 @@ public class ProbeBuilder : IYamlConvertible
     /// Use this method when working with the documented Runner probe builder API surface in code. The behavior exposed here is part of the public surface that the generated function documentation groups under 'Configuration as Code / Probes'.
     /// </remarks>
     /// <qaas-docs group="Configuration as Code" subgroup="Probes" />
-    public ProbeBuilder RemoveDataSourcePattern(string dataSourcePattern)
+    internal ProbeBuilder RemoveDataSourcePattern(string dataSourcePattern)
     {
         return DeleteDataSourcePattern(dataSourcePattern);
     }
@@ -297,7 +297,7 @@ public class ProbeBuilder : IYamlConvertible
     /// Use this method when working with the documented Runner probe builder API surface in code. The change is stored on the current builder instance and is consumed by later build, validation, or execution steps.
     /// </remarks>
     /// <qaas-docs group="Configuration as Code" subgroup="Probes" />
-    public ProbeBuilder CreateConfiguration(object configuration)
+    internal ProbeBuilder CreateConfiguration(object configuration)
     {
         return Configure(configuration);
     }
@@ -309,7 +309,7 @@ public class ProbeBuilder : IYamlConvertible
     /// Use this method when working with the documented Runner probe builder API surface in code. The change is stored on the current builder instance and is consumed by later build, validation, or execution steps.
     /// </remarks>
     /// <qaas-docs group="Configuration as Code" subgroup="Probes" />
-    public ProbeBuilder Create(object configuration)
+    internal ProbeBuilder Create(object configuration)
     {
         return CreateConfiguration(configuration);
     }

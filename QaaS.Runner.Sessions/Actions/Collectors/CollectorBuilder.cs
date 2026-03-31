@@ -86,37 +86,8 @@ public class CollectorBuilder
     /// Use this method when working with the documented Runner collector builder API surface in code. The change is stored on the current builder instance and is consumed by later build, validation, or execution steps.
     /// </remarks>
     /// <qaas-docs group="Configuration as Code" subgroup="Collectors" />
-    public CollectorBuilder Create(IFetcherConfig config)
-    {
-        return CreateConfiguration(config);
-    }
-
     /// <summary>
-    /// Sets the configuration currently stored on the Runner collector builder instance.
-    /// </summary>
-    /// <remarks>
-    /// Use this method when working with the documented Runner collector builder API surface in code. The change is stored on the current builder instance and is consumed by later build, validation, or execution steps.
-    /// </remarks>
-    /// <qaas-docs group="Configuration as Code" subgroup="Collectors" />
-    public CollectorBuilder CreateConfiguration(IFetcherConfig config)
-    {
-        return Configure(config);
-    }
-
-    /// <summary>
-    /// Returns the configuration currently stored on the Runner collector builder instance.
-    /// </summary>
-    /// <remarks>
-    /// Use this method when working with the documented Runner collector builder API surface in code. Use it to inspect the current configured state without rebuilding the surrounding collection or runtime object graph.
-    /// </remarks>
-    /// <qaas-docs group="Configuration as Code" subgroup="Collectors" />
-    public IFetcherConfig? ReadConfiguration()
-    {
-        return Prometheus;
-    }
-
-    /// <summary>
-    /// Updates the configuration currently stored on the Runner collector builder instance.
+     /// Updates the configuration currently stored on the Runner collector builder instance.
     /// </summary>
     /// <remarks>
     /// Use this method when working with the documented Runner collector builder API surface in code. The change is stored on the current builder instance and is consumed by later build, validation, or execution steps.
@@ -195,6 +166,18 @@ public class CollectorBuilder
         }
 
         return this;
+    }
+
+    /// <summary>
+    /// Returns the configuration currently stored on the Runner collector builder instance.
+    /// </summary>
+    /// <remarks>
+    /// Use this method when working with the documented Runner collector builder API surface in code. Use it to inspect the current configured state without rebuilding the surrounding collection or runtime object graph.
+    /// </remarks>
+    /// <qaas-docs group="Configuration as Code" subgroup="Collectors" />
+    public IFetcherConfig? ReadConfiguration()
+    {
+        return Prometheus;
     }
 
     /// <summary>

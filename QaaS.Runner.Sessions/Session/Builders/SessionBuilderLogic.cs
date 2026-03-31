@@ -127,7 +127,7 @@ public partial class SessionBuilder
     /// Use this method when working with the documented Runner session builder API surface in code. The change is stored on the current builder instance and is consumed by later build, validation, or execution steps.
     /// </remarks>
     /// <qaas-docs group="Configuration as Code" subgroup="Sessions" />
-    public SessionBuilder AddConsumer(ConsumerBuilder consumerBuilder)
+    internal SessionBuilder AddConsumer(ConsumerBuilder consumerBuilder)
     {
         Consumers = Consumers is null ? [consumerBuilder] : Consumers.Append(consumerBuilder).ToArray();
         return this;
@@ -215,7 +215,7 @@ public partial class SessionBuilder
     /// Use this method when working with the documented Runner session builder API surface in code. The change is stored on the current builder instance and is consumed by later build, validation, or execution steps.
     /// </remarks>
     /// <qaas-docs group="Configuration as Code" subgroup="Sessions" />
-    public SessionBuilder AddPublisher(PublisherBuilder publisherBuilder)
+    internal SessionBuilder AddPublisher(PublisherBuilder publisherBuilder)
     {
         Publishers = Publishers is null ? [publisherBuilder] : Publishers.Append(publisherBuilder).ToArray();
         return this;
@@ -303,7 +303,7 @@ public partial class SessionBuilder
     /// Use this method when working with the documented Runner session builder API surface in code. The change is stored on the current builder instance and is consumed by later build, validation, or execution steps.
     /// </remarks>
     /// <qaas-docs group="Configuration as Code" subgroup="Sessions" />
-    public SessionBuilder AddTransaction(TransactionBuilder transactionBuilder)
+    internal SessionBuilder AddTransaction(TransactionBuilder transactionBuilder)
     {
         Transactions = Transactions is null ? [transactionBuilder] : Transactions.Append(transactionBuilder).ToArray();
         return this;
@@ -391,7 +391,7 @@ public partial class SessionBuilder
     /// Use this method when working with the documented Runner session builder API surface in code. The change is stored on the current builder instance and is consumed by later build, validation, or execution steps.
     /// </remarks>
     /// <qaas-docs group="Configuration as Code" subgroup="Sessions" />
-    public SessionBuilder AddProbe(ProbeBuilder probeBuilder)
+    internal SessionBuilder AddProbe(ProbeBuilder probeBuilder)
     {
         Probes = Probes is null ? [probeBuilder] : Probes.Append(probeBuilder).ToArray();
         return this;
@@ -479,7 +479,7 @@ public partial class SessionBuilder
     /// Use this method when working with the documented Runner session builder API surface in code. The change is stored on the current builder instance and is consumed by later build, validation, or execution steps.
     /// </remarks>
     /// <qaas-docs group="Configuration as Code" subgroup="Sessions" />
-    public SessionBuilder AddCollector(CollectorBuilder collectorBuilder)
+    internal SessionBuilder AddCollector(CollectorBuilder collectorBuilder)
     {
         Collectors = Collectors is null ? [collectorBuilder] : Collectors.Append(collectorBuilder).ToArray();
         return this;
@@ -567,7 +567,7 @@ public partial class SessionBuilder
     /// Use this method when working with the documented Runner session builder API surface in code. The change is stored on the current builder instance and is consumed by later build, validation, or execution steps.
     /// </remarks>
     /// <qaas-docs group="Configuration as Code" subgroup="Sessions" />
-    public SessionBuilder AddMockerCommand(MockerCommandBuilder mockerCommandBuilder)
+    internal SessionBuilder AddMockerCommand(MockerCommandBuilder mockerCommandBuilder)
     {
         MockerCommands = MockerCommands is null
             ? [mockerCommandBuilder]
@@ -657,7 +657,7 @@ public partial class SessionBuilder
     /// Use this method when working with the documented Runner session builder API surface in code. The change is stored on the current builder instance and is consumed by later build, validation, or execution steps.
     /// </remarks>
     /// <qaas-docs group="Configuration as Code" subgroup="Sessions" />
-    public SessionBuilder AddStage(StageConfig stage)
+    internal SessionBuilder AddStage(StageConfig stage)
     {
         Stages = Stages.Append(stage).ToArray();
         return this;

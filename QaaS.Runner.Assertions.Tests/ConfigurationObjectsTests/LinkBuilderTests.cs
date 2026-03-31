@@ -89,7 +89,7 @@ public class LinkBuilderTests
     {
         var builder = new LinkBuilder()
             .Named("kibana-link")
-            .CreateConfiguration(new KibanaLinkConfig
+            .Configure(new KibanaLinkConfig
             {
                 Url = "https://kibana.local",
                 DataViewId = "data-view"
@@ -106,7 +106,7 @@ public class LinkBuilderTests
     public void Build_WithPrometheusConfig_ReturnsPrometheusLink()
     {
         var builder = new LinkBuilder()
-            .CreateConfiguration(new PrometheusLinkConfig
+            .Configure(new PrometheusLinkConfig
             {
                 Url = "https://prometheus.local",
                 Expressions = ["up"]
@@ -121,7 +121,7 @@ public class LinkBuilderTests
     public void Build_WithGrafanaConfig_ReturnsGrafanaLink()
     {
         var builder = new LinkBuilder()
-            .CreateConfiguration(new GrafanaLinkConfig
+            .Configure(new GrafanaLinkConfig
             {
                 Url = "https://grafana.local",
                 DashboardId = "dashboard-id"
@@ -136,7 +136,7 @@ public class LinkBuilderTests
     public void Build_WithoutConfiguredName_UsesConfigTypeName()
     {
         var builder = new LinkBuilder()
-            .CreateConfiguration(new KibanaLinkConfig
+            .Configure(new KibanaLinkConfig
             {
                 Url = "https://kibana.local",
                 DataViewId = "data-view"
@@ -188,3 +188,4 @@ public class LinkBuilderTests
         Assert.That(result, Is.TypeOf<GrafanaLink>());
     }
 }
+

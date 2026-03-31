@@ -46,12 +46,12 @@ public class SessionBuilderCrudTests
                 .DeleteMockerCommand("missing");
         });
 
-        builder.AddConsumer(new ConsumerBuilder().Named("consumer-a"))
-            .AddPublisher(new PublisherBuilder().Named("publisher-a"))
-            .AddTransaction(new TransactionBuilder().Named("transaction-a"))
-            .AddProbe(new ProbeBuilder().Named("probe-a"))
-            .AddCollector(new CollectorBuilder().Named("collector-a"))
-            .AddMockerCommand(new MockerCommandBuilder().Named("command-a"));
+        builder.CreateConsumer(new ConsumerBuilder().Named("consumer-a"))
+            .CreatePublisher(new PublisherBuilder().Named("publisher-a"))
+            .CreateTransaction(new TransactionBuilder().Named("transaction-a"))
+            .CreateProbe(new ProbeBuilder().Named("probe-a"))
+            .CreateCollector(new CollectorBuilder().Named("collector-a"))
+            .CreateMockerCommand(new MockerCommandBuilder().Named("command-a"));
 
         Assert.Multiple(() =>
         {
@@ -226,3 +226,4 @@ public class SessionBuilderCrudTests
         }
     }
 }
+

@@ -31,7 +31,7 @@ public class BuilderCrudTests
 
         builder.UpdatePolicyAt(0, new PolicyBuilder());
         builder.DeletePolicyAt(1);
-        builder.Create(new RabbitMqReaderConfig());
+        builder.Configure(new RabbitMqReaderConfig());
         builder.UpdateConfiguration(_ => new KafkaTopicReaderConfig());
         builder.UpdateConfiguration(new SocketReaderConfig());
 
@@ -46,7 +46,7 @@ public class BuilderCrudTests
     public void ConsumerBuilder_UpdateConfiguration_WithConfiguration_MergesSameTypeAndPreservesExistingFields()
     {
         var builder = new ConsumerBuilder()
-            .CreateConfiguration(new RabbitMqReaderConfig
+            .Configure(new RabbitMqReaderConfig
             {
                 Host = "rabbitmq.local",
                 ExchangeName = "events",
@@ -72,7 +72,7 @@ public class BuilderCrudTests
     public void ConsumerBuilder_UpdateConfiguration_WithSparseSameTypeUpdate_DoesNotClearExistingStringFields()
     {
         var builder = new ConsumerBuilder()
-            .Create(new RabbitMqReaderConfig
+            .Configure(new RabbitMqReaderConfig
             {
                 Host = "rabbitmq.local",
                 ExchangeName = "events",
@@ -99,7 +99,7 @@ public class BuilderCrudTests
     public void ConsumerBuilder_UpdateConfiguration_WithObjectPatch_MergesSameTypeAndPreservesExistingFields()
     {
         var builder = new ConsumerBuilder()
-            .Create(new RabbitMqReaderConfig
+            .Configure(new RabbitMqReaderConfig
             {
                 Host = "rabbitmq.local",
                 ExchangeName = "events",
@@ -129,7 +129,7 @@ public class BuilderCrudTests
             .CreateDataSource("source-b")
             .CreateDataSourcePattern("^source-.*$")
             .CreatePolicy(new PolicyBuilder())
-            .Create(new RabbitMqSenderConfig());
+            .Configure(new RabbitMqSenderConfig());
 
         builder.UpdateDataSource("source-a", "source-updated");
         builder.DeleteDataSource("source-b");
@@ -151,7 +151,7 @@ public class BuilderCrudTests
     public void PublisherBuilder_UpdateConfiguration_WithConfiguration_MergesSameTypeAndPreservesExistingFields()
     {
         var builder = new PublisherBuilder()
-            .CreateConfiguration(new RabbitMqSenderConfig
+            .Configure(new RabbitMqSenderConfig
             {
                 Host = "rabbitmq.local",
                 ExchangeName = "events",
@@ -177,7 +177,7 @@ public class BuilderCrudTests
     public void PublisherBuilder_UpdateConfiguration_WithSparseSameTypeUpdate_DoesNotClearExistingStringFields()
     {
         var builder = new PublisherBuilder()
-            .CreateConfiguration(new RabbitMqSenderConfig
+            .Configure(new RabbitMqSenderConfig
             {
                 Host = "rabbitmq.local",
                 ExchangeName = "events",
@@ -204,7 +204,7 @@ public class BuilderCrudTests
     public void PublisherBuilder_UpdateConfiguration_WithObjectPatch_MergesKafkaHeadersAndPreservesExistingFields()
     {
         var builder = new PublisherBuilder()
-            .Create(new KafkaTopicSenderConfig
+            .Configure(new KafkaTopicSenderConfig
             {
                 HostNames = ["broker:9092"],
                 Username = "runner",
@@ -241,7 +241,7 @@ public class BuilderCrudTests
             .CreatePolicy(new PolicyBuilder())
             .CreateDataSource("source-a")
             .CreateDataSourcePattern("^source-.*$")
-            .Create(new HttpTransactorConfig());
+            .Configure(new HttpTransactorConfig());
 
         builder.UpdatePolicyAt(0, new PolicyBuilder());
         builder.UpdateDataSource("source-a", "source-updated");
@@ -269,7 +269,7 @@ public class BuilderCrudTests
     public void TransactionBuilder_UpdateConfiguration_WithConfiguration_MergesSameTypeAndPreservesExistingFields()
     {
         var builder = new TransactionBuilder()
-            .CreateConfiguration(new HttpTransactorConfig
+            .Configure(new HttpTransactorConfig
             {
                 Method = HttpMethods.Put,
                 BaseAddress = "https://service.local",
@@ -297,7 +297,7 @@ public class BuilderCrudTests
     public void TransactionBuilder_UpdateConfiguration_WithObjectPatch_MergesSameTypeAndPreservesExistingFields()
     {
         var builder = new TransactionBuilder()
-            .Create(new HttpTransactorConfig
+            .Configure(new HttpTransactorConfig
             {
                 Method = HttpMethods.Put,
                 BaseAddress = "https://service.local",
@@ -327,7 +327,7 @@ public class BuilderCrudTests
         var builder = new ProbeBuilder()
             .CreateDataSourceName("source-a")
             .CreateDataSourcePattern("^source-.*$")
-            .CreateConfiguration(new { enabled = true });
+            .Configure(new { enabled = true });
 
         builder.UpdateDataSourceName("source-a", "source-updated");
         builder.UpdateDataSourcePattern("^source-.*$", "^updated-.*$");
@@ -352,7 +352,7 @@ public class BuilderCrudTests
     [Test]
     public void CollectorBuilder_ShouldSupportConfigurationCrud()
     {
-        var builder = new CollectorBuilder().Create(new PrometheusFetcherConfig
+        var builder = new CollectorBuilder().Configure(new PrometheusFetcherConfig
         {
             Url = "https://prometheus",
             Expression = "up"
@@ -379,7 +379,7 @@ public class BuilderCrudTests
     [Test]
     public void CollectorBuilder_UpdateConfiguration_WithObjectPatch_MergesSameTypeAndPreservesExistingFields()
     {
-        var builder = new CollectorBuilder().Create(new PrometheusFetcherConfig
+        var builder = new CollectorBuilder().Configure(new PrometheusFetcherConfig
         {
             Url = "https://prometheus",
             Expression = "up",
@@ -404,7 +404,7 @@ public class BuilderCrudTests
     [Test]
     public void CollectorBuilder_UpdateConfiguration_WithConfiguration_MergesSameTypeAndPreservesExistingFields()
     {
-        var builder = new CollectorBuilder().CreateConfiguration(new PrometheusFetcherConfig
+        var builder = new CollectorBuilder().Configure(new PrometheusFetcherConfig
         {
             Url = "https://prometheus",
             Expression = "up",
@@ -429,7 +429,7 @@ public class BuilderCrudTests
     [Test]
     public void MockerCommandBuilder_ShouldSupportConfigurationCrud()
     {
-        var builder = new MockerCommandBuilder().Create(new MockerCommandConfig
+        var builder = new MockerCommandBuilder().Configure(new MockerCommandConfig
         {
             Consume = new ConsumeCommandConfig()
         });
@@ -453,7 +453,7 @@ public class BuilderCrudTests
     [Test]
     public void MockerCommandBuilder_UpdateConfiguration_WithObjectPatch_MergesNestedCommandValues()
     {
-        var builder = new MockerCommandBuilder().Create(new MockerCommandConfig
+        var builder = new MockerCommandBuilder().Configure(new MockerCommandConfig
         {
             TriggerAction = new TriggerAction
             {
@@ -479,3 +479,4 @@ public class BuilderCrudTests
         });
     }
 }
+

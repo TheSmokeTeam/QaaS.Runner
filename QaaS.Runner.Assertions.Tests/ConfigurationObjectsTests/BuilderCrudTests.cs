@@ -28,7 +28,7 @@ public class BuilderCrudTests
                 Url = "https://kibana",
                 DataViewId = "view"
             }))
-            .CreateConfiguration(new { key = "value" });
+            .Configure(new { key = "value" });
 
         builder.UpdateSessionName("session-a", "session-updated")
             .UpdateSessionPattern("^session-.*$", "^updated-.*$")
@@ -71,7 +71,7 @@ public class BuilderCrudTests
     public void LinkBuilder_ShouldSupportConfigurationCrud()
     {
         var builder = new LinkBuilder()
-            .CreateConfiguration(new KibanaLinkConfig { Url = "https://kibana", DataViewId = "view" });
+            .Configure(new KibanaLinkConfig { Url = "https://kibana", DataViewId = "view" });
 
         builder.UpdateConfiguration(_ => new GrafanaLinkConfig
         {
@@ -95,7 +95,7 @@ public class BuilderCrudTests
     public void LinkBuilder_UpdateConfiguration_WithConfiguration_MergesSameTypeAndPreservesExistingFields()
     {
         var builder = new LinkBuilder()
-            .CreateConfiguration(new KibanaLinkConfig
+            .Configure(new KibanaLinkConfig
             {
                 Url = "https://kibana",
                 DataViewId = "view",
@@ -117,3 +117,4 @@ public class BuilderCrudTests
         });
     }
 }
+

@@ -52,37 +52,8 @@ public class StorageBuilder
     /// Use this method when working with the documented Runner storage builder API surface in code. The change is stored on the current builder instance and is consumed by later build, validation, or execution steps.
     /// </remarks>
     /// <qaas-docs group="Configuration as Code" subgroup="Storages" />
-    public StorageBuilder Create(IStorageConfig storageConfig)
-    {
-        return CreateConfiguration(storageConfig);
-    }
-
     /// <summary>
-    /// Sets the configuration currently stored on the Runner storage builder instance.
-    /// </summary>
-    /// <remarks>
-    /// Use this method when working with the documented Runner storage builder API surface in code. The change is stored on the current builder instance and is consumed by later build, validation, or execution steps.
-    /// </remarks>
-    /// <qaas-docs group="Configuration as Code" subgroup="Storages" />
-    public StorageBuilder CreateConfiguration(IStorageConfig storageConfig)
-    {
-        return Configure(storageConfig);
-    }
-
-    /// <summary>
-    /// Returns the configuration currently stored on the Runner storage builder instance.
-    /// </summary>
-    /// <remarks>
-    /// Use this method when working with the documented Runner storage builder API surface in code. Use it to inspect the current configured state without rebuilding the surrounding collection or runtime object graph.
-    /// </remarks>
-    /// <qaas-docs group="Configuration as Code" subgroup="Storages" />
-    public IStorageConfig? ReadConfiguration()
-    {
-        return (IStorageConfig?)S3 ?? FileSystem;
-    }
-
-    /// <summary>
-    /// Updates the configuration currently stored on the Runner storage builder instance.
+     /// Updates the configuration currently stored on the Runner storage builder instance.
     /// </summary>
     /// <remarks>
     /// Use this method when working with the documented Runner storage builder API surface in code. The change is stored on the current builder instance and is consumed by later build, validation, or execution steps.
@@ -156,6 +127,18 @@ public class StorageBuilder
         }
 
         return this;
+    }
+
+    /// <summary>
+    /// Returns the configuration currently stored on the Runner storage builder instance.
+    /// </summary>
+    /// <remarks>
+    /// Use this method when working with the documented Runner storage builder API surface in code. Use it to inspect the current configured state without rebuilding the surrounding collection or runtime object graph.
+    /// </remarks>
+    /// <qaas-docs group="Configuration as Code" subgroup="Storages" />
+    public IStorageConfig? ReadConfiguration()
+    {
+        return (IStorageConfig?)S3 ?? FileSystem;
     }
 
     /// <summary>

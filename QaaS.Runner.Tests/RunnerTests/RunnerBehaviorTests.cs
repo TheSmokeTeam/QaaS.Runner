@@ -1,8 +1,10 @@
 using System.Reflection;
 using Autofac;
 using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Logging;
 using Moq;
 using NUnit.Framework;
+using QaaS.Framework.Configurations.CustomExceptions;
 using QaaS.Framework.SDK;
 using QaaS.Framework.SDK.ContextObjects;
 using QaaS.Framework.SDK.Extensions;
@@ -162,6 +164,33 @@ public class RunnerBehaviorTests
         {
             Calls.Add("build");
             throw new InvalidOperationException("boom");
+        }
+
+        protected override void Teardown() => Calls.Add("teardown");
+
+        public override void Dispose()
+        {
+            Disposed = true;
+            Calls.Add("dispose");
+            base.Dispose();
+        }
+    }
+
+    private sealed class InvalidConfigurationBuildRunner(
+        ILifetimeScope scope,
+        List<ExecutionBuilder> executionBuilders,
+        Microsoft.Extensions.Logging.ILogger logger,
+        Serilog.ILogger serilogLogger) : Runner(scope, executionBuilders, logger, serilogLogger)
+    {
+        public List<string> Calls { get; } = [];
+        public bool Disposed { get; private set; }
+
+        protected override void Setup() => Calls.Add("setup");
+
+        protected override List<Execution> BuildExecutions()
+        {
+            Calls.Add("build");
+            throw new InvalidConfigurationsException("invalid configuration");
         }
 
         protected override void Teardown() => Calls.Add("teardown");
@@ -640,6 +669,32 @@ public class RunnerBehaviorTests
         var runner = new FailingBuildRunner(scope, [], Globals.Logger, new Mock<Serilog.ILogger>().Object);
 
         Assert.Throws<InvalidOperationException>(() => runner.RunAndGetExitCode());
+    }
+
+    [Test]
+    public void RunAndGetExitCode_WhenBuildExecutionsThrowsInvalidConfigurationsException_ReturnsFailureExitCode()
+    {
+        using var scope = BuildScope();
+        var logger = new Mock<Microsoft.Extensions.Logging.ILogger>();
+        var runner = new InvalidConfigurationBuildRunner(scope, [], logger.Object, new Mock<Serilog.ILogger>().Object);
+
+        var exitCode = runner.RunAndGetExitCode();
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(exitCode, Is.EqualTo(1));
+            Assert.That(runner.Calls, Is.EqualTo(new[] { "setup", "build", "teardown", "dispose" }));
+            Assert.That(runner.Disposed, Is.True);
+            Assert.That(runner.LastExitCode, Is.EqualTo(1));
+        });
+
+        logger.Verify(log => log.Log(
+                It.Is<LogLevel>(level => level == LogLevel.Error),
+                It.IsAny<EventId>(),
+                It.Is<It.IsAnyType>((_, _) => true),
+                It.IsAny<Exception>(),
+                It.IsAny<Func<It.IsAnyType, Exception?, string>>()),
+            Times.Never);
     }
 
     [Test]

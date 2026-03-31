@@ -137,7 +137,7 @@ public class MockerCommandBuilder
     /// Use this method when working with the documented Runner mocker command builder API surface in code. The change is stored on the current builder instance and is consumed by later build, validation, or execution steps.
     /// </remarks>
     /// <qaas-docs group="Configuration as Code" subgroup="Mocker Commands" />
-    public MockerCommandBuilder WithCommand(MockerCommandConfig command)
+    internal MockerCommandBuilder WithCommand(MockerCommandConfig command)
     {
         return Configure(command);
     }
@@ -149,7 +149,7 @@ public class MockerCommandBuilder
     /// Use this method when working with the documented Runner mocker command builder API surface in code. The change is stored on the current builder instance and is consumed by later build, validation, or execution steps.
     /// </remarks>
     /// <qaas-docs group="Configuration as Code" subgroup="Mocker Commands" />
-    public MockerCommandBuilder CreateConfiguration(MockerCommandConfig command)
+    internal MockerCommandBuilder CreateConfiguration(MockerCommandConfig command)
     {
         return Configure(command);
     }
@@ -161,7 +161,7 @@ public class MockerCommandBuilder
     /// Use this method when working with the documented Runner mocker command builder API surface in code. The change is stored on the current builder instance and is consumed by later build, validation, or execution steps.
     /// </remarks>
     /// <qaas-docs group="Configuration as Code" subgroup="Mocker Commands" />
-    public MockerCommandBuilder Create(MockerCommandConfig command)
+    internal MockerCommandBuilder Create(MockerCommandConfig command)
     {
         return CreateConfiguration(command);
     }

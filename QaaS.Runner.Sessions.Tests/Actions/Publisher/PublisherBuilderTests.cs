@@ -109,8 +109,8 @@ public class PublisherBuilderTests
     public void AddDataSource_Should_Add_To_DataSourceNames()
     {
         var builder = new PublisherBuilder();
-        builder.AddDataSource("source1");
-        builder.AddDataSource("source2");
+        builder.CreateDataSource("source1");
+        builder.CreateDataSource("source2");
 
         Assert.That(builder.DataSourceNames, Is.EquivalentTo(new[] { "source1", "source2" }));
     }
@@ -119,8 +119,8 @@ public class PublisherBuilderTests
     public void AddDataSourcePattern_Should_Add_To_DataSourcePatterns()
     {
         var builder = new PublisherBuilder();
-        builder.AddDataSourcePattern("pattern1");
-        builder.AddDataSourcePattern("pattern2");
+        builder.CreateDataSourcePattern("pattern1");
+        builder.CreateDataSourcePattern("pattern2");
 
         Assert.That(builder.DataSourcePatterns, Is.EquivalentTo(new[] { "pattern1", "pattern2" }));
     }
@@ -129,8 +129,8 @@ public class PublisherBuilderTests
     public void UpdateAndDeleteDataSourcePattern_ShouldApplyExpectedMutations()
     {
         var builder = new PublisherBuilder()
-            .AddDataSourcePattern("pattern1")
-            .AddDataSourcePattern("pattern2");
+            .CreateDataSourcePattern("pattern1")
+            .CreateDataSourcePattern("pattern2");
 
         builder.UpdateDataSourcePattern("pattern1", "pattern1-updated");
         builder.DeleteDataSourcePattern("pattern2");
@@ -207,7 +207,7 @@ public class PublisherBuilderTests
     {
         var policy = new PolicyBuilder();
         var builder = new PublisherBuilder();
-        builder.AddPolicy(policy);
+        builder.CreatePolicy(policy);
 
         Assert.That(builder.Policies, Contains.Item(policy));
     }
@@ -216,8 +216,8 @@ public class PublisherBuilderTests
     public void DeletePolicyAt_WithValidIndex_RemovesPolicy()
     {
         var builder = new PublisherBuilder()
-            .AddPolicy(new PolicyBuilder())
-            .AddPolicy(new PolicyBuilder());
+            .CreatePolicy(new PolicyBuilder())
+            .CreatePolicy(new PolicyBuilder());
 
         builder.DeletePolicyAt(0);
 
@@ -376,8 +376,8 @@ public class PublisherBuilderTests
     {
         var replacementPolicy = new PolicyBuilder();
         var builder = new PublisherBuilder()
-            .AddPolicy(new PolicyBuilder())
-            .AddPolicy(new PolicyBuilder());
+            .CreatePolicy(new PolicyBuilder())
+            .CreatePolicy(new PolicyBuilder());
 
         builder.UpdatePolicyAt(0, replacementPolicy);
 
@@ -586,3 +586,4 @@ public class PublisherBuilderTests
             : [];
     }
 }
+

@@ -96,7 +96,7 @@ public partial class ConsumerBuilder
     /// Use this method when working with the documented Runner consumer builder API surface in code. The change is stored on the current builder instance and is consumed by later build, validation, or execution steps.
     /// </remarks>
     /// <qaas-docs group="Configuration as Code" subgroup="Consumers" />
-    public ConsumerBuilder AddPolicy(PolicyBuilder policy)
+    internal ConsumerBuilder AddPolicy(PolicyBuilder policy)
     {
         var policiesList = Policies.ToList();
         policiesList.Add(policy);
@@ -171,7 +171,7 @@ public partial class ConsumerBuilder
     /// Use this method when working with the documented Runner consumer builder API surface in code. The change is stored on the current builder instance and is consumed by later build, validation, or execution steps.
     /// </remarks>
     /// <qaas-docs group="Configuration as Code" subgroup="Consumers" />
-    public ConsumerBuilder CreateConfiguration(IReaderConfig config)
+    internal ConsumerBuilder CreateConfiguration(IReaderConfig config)
     {
         return Configure(config);
     }
@@ -183,7 +183,7 @@ public partial class ConsumerBuilder
     /// Use this method when working with the documented Runner consumer builder API surface in code. The change is stored on the current builder instance and is consumed by later build, validation, or execution steps.
     /// </remarks>
     /// <qaas-docs group="Configuration as Code" subgroup="Consumers" />
-    public ConsumerBuilder Create(IReaderConfig config)
+    internal ConsumerBuilder Create(IReaderConfig config)
     {
         return CreateConfiguration(config);
     }

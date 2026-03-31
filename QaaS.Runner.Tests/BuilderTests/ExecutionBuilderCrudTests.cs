@@ -20,8 +20,12 @@ public class ExecutionBuilderCrudTests
 
         var sessions = builder.ReadSessions();
 
-        Assert.That(sessions, Has.Count.EqualTo(1));
-        Assert.That(sessions[0], Is.SameAs(session));
+        Assert.Multiple(() =>
+        {
+            Assert.That(sessions, Has.Count.EqualTo(1));
+            Assert.That(sessions[0], Is.SameAs(session));
+            Assert.That(builder.ReadSession("session-a"), Is.SameAs(session));
+        });
     }
 
     [Test]
@@ -51,11 +55,11 @@ public class ExecutionBuilderCrudTests
             DataViewId = "view"
         });
 
-        builder.AddSession(session)
-            .AddAssertion(assertion)
-            .AddStorage(storage)
-            .AddDataSource(dataSource)
-            .AddLink(link);
+        builder.CreateSession(session)
+            .CreateAssertion(assertion)
+            .CreateStorage(storage)
+            .CreateDataSource(dataSource)
+            .CreateLink(link);
 
         Assert.Multiple(() =>
         {
@@ -64,6 +68,10 @@ public class ExecutionBuilderCrudTests
             Assert.That(builder.ReadStorages(), Is.EqualTo(new[] { storage }));
             Assert.That(builder.ReadDataSources(), Is.EqualTo(new[] { dataSource }));
             Assert.That(builder.ReadLinks(), Is.EqualTo(new[] { link }));
+            Assert.That(builder.ReadAssertion("assertion-a"), Is.SameAs(assertion));
+            Assert.That(builder.ReadStorageAt(0), Is.SameAs(storage));
+            Assert.That(builder.ReadDataSource("source-a"), Is.SameAs(dataSource));
+            Assert.That(builder.ReadLinkAt(0), Is.SameAs(link));
         });
     }
 
@@ -90,7 +98,7 @@ public class ExecutionBuilderCrudTests
     {
         var original = new SessionBuilder { Name = "session-a", Stage = 0, Probes = [] };
         var updated = new SessionBuilder { Name = "session-a", Stage = 1, Probes = [] };
-        var builder = new ExecutionBuilder().AddSession(original);
+        var builder = new ExecutionBuilder().CreateSession(original);
 
         builder.UpdateSession("session-a", updated);
 
@@ -101,8 +109,8 @@ public class ExecutionBuilderCrudTests
     public void DeleteSession_ShouldRemoveMatchingSessionByName()
     {
         var builder = new ExecutionBuilder()
-            .AddSession(new SessionBuilder { Name = "session-a", Stage = 0, Probes = [] })
-            .AddSession(new SessionBuilder { Name = "session-b", Stage = 1, Probes = [] });
+            .CreateSession(new SessionBuilder { Name = "session-a", Stage = 0, Probes = [] })
+            .CreateSession(new SessionBuilder { Name = "session-b", Stage = 1, Probes = [] });
 
         builder.DeleteSession("session-a");
 
@@ -115,7 +123,7 @@ public class ExecutionBuilderCrudTests
     {
         var original = new SessionBuilder { Name = "session-a", Stage = 0, Probes = [] };
         var replacement = new SessionBuilder { Name = "session-b", Stage = 1, Probes = [] };
-        var builder = new ExecutionBuilder().AddSession(original);
+        var builder = new ExecutionBuilder().CreateSession(original);
 
         builder.UpdateSession("does-not-exist", replacement);
 
@@ -164,13 +172,23 @@ public class ExecutionBuilderCrudTests
             Variables = []
         }));
 
-        Assert.That(builder.ReadAssertions(), Has.Count.EqualTo(1));
-        Assert.That(builder.ReadAssertions()[0], Is.SameAs(updatedAssertion));
-        Assert.That(builder.ReadDataSources(), Is.Empty);
-        Assert.That(builder.ReadLinks(), Has.Count.EqualTo(1));
-        Assert.That(builder.ReadLinks()[0].Grafana, Is.Not.Null);
+        Assert.Multiple(() =>
+        {
+            Assert.That(builder.ReadAssertions(), Has.Count.EqualTo(1));
+            Assert.That(builder.ReadAssertions()[0], Is.SameAs(updatedAssertion));
+            Assert.That(builder.ReadAssertion("assertion-a"), Is.SameAs(updatedAssertion));
+            Assert.That(builder.ReadDataSources(), Is.Empty);
+            Assert.That(builder.ReadDataSource("source-a"), Is.Null);
+            Assert.That(builder.ReadLinks(), Has.Count.EqualTo(1));
+            Assert.That(builder.ReadLinkAt(0)?.Grafana, Is.Not.Null);
+        });
 
         builder.DeleteLinkAt(0);
-        Assert.That(builder.ReadLinks(), Is.Empty);
+        Assert.Multiple(() =>
+        {
+            Assert.That(builder.ReadLinks(), Is.Empty);
+            Assert.That(builder.ReadLinkAt(0), Is.Null);
+        });
     }
 }
+

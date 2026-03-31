@@ -704,7 +704,7 @@ public class SessionExecutionCoverageTests
     {
         if (builder.ReadStage(stageNumber) == null)
         {
-            builder.AddStage(new StageConfig(stageNumber, timeoutBefore: 0, timeoutAfter: 0));
+            builder.CreateStage(new StageConfig(stageNumber, timeoutBefore: 0, timeoutAfter: 0));
             return;
         }
 
@@ -865,14 +865,14 @@ public class SessionExecutionCoverageTests
             {
                 foreach (var pattern in IncludedDataSourcePatterns)
                 {
-                    publisherBuilder.AddDataSourcePattern(pattern);
+                    publisherBuilder.CreateDataSourcePattern(pattern);
                 }
             }
             else
             {
                 foreach (var name in IncludedDataSourceNames)
                 {
-                    publisherBuilder.AddDataSource(name);
+                    publisherBuilder.CreateDataSource(name);
                 }
             }
 
@@ -891,7 +891,7 @@ public class SessionExecutionCoverageTests
                 publisherBuilder.WithParallelism(scenario.Publisher.Parallelism.Value);
             }
 
-            builder.AddPublisher(publisherBuilder);
+            builder.CreatePublisher(publisherBuilder);
         }
 
         if (scenario.Consumer != null)
@@ -906,7 +906,7 @@ public class SessionExecutionCoverageTests
                 consumerBuilder.WithDeserializer(new DeserializeConfig { Deserializer = SerializationType.Binary });
             }
 
-            builder.AddConsumer(consumerBuilder);
+            builder.CreateConsumer(consumerBuilder);
         }
 
         if (scenario.Transaction != null)
@@ -921,14 +921,14 @@ public class SessionExecutionCoverageTests
             {
                 foreach (var pattern in IncludedDataSourcePatterns)
                 {
-                    transactionBuilder.AddDataSourcePattern(pattern);
+                    transactionBuilder.CreateDataSourcePattern(pattern);
                 }
             }
             else
             {
                 foreach (var name in IncludedDataSourceNames)
                 {
-                    transactionBuilder.AddDataSource(name);
+                    transactionBuilder.CreateDataSource(name);
                 }
             }
 
@@ -939,25 +939,25 @@ public class SessionExecutionCoverageTests
                     .WithDeserializer(new DeserializeConfig { Deserializer = SerializationType.Binary });
             }
 
-            builder.AddTransaction(transactionBuilder);
+            builder.CreateTransaction(transactionBuilder);
         }
 
         if (scenario.Collector != null)
         {
-            builder.AddCollector(new QaaS.Runner.Sessions.Actions.Collectors.CollectorBuilder()
+            builder.CreateCollector(new QaaS.Runner.Sessions.Actions.Collectors.CollectorBuilder()
                 .Named(scenario.Collector.ActionName)
                 .Configure(scenario.Collector.Configuration));
         }
 
         if (scenario.Mocker != null)
         {
-            builder.AddMockerCommand(new MockerCommandBuilder()
+            builder.CreateMockerCommand(new MockerCommandBuilder()
                 .Named(scenario.Mocker.ActionName)
                 .WithServerName("test-server")
                 .WithRedis(new QaaS.Runner.Sessions.ConfigurationObjects.RedisConfig { Host = "localhost:6379" })
                 .WithRequestDurationMs(MinimalMockerRequestDurationMs)
                 .WithRequestRetries(1)
-                .WithCommand(scenario.Mocker.Command));
+                .Configure(scenario.Mocker.Command));
         }
 
         ApplyZeroTimeoutStageConfiguration(builder, scenario);
@@ -968,7 +968,7 @@ public class SessionExecutionCoverageTests
     {
         foreach (var stageNumber in GetUsedActionStages(scenario))
         {
-            builder.AddStage(new StageConfig(stageNumber, timeoutBefore: 0, timeoutAfter: 0));
+            builder.CreateStage(new StageConfig(stageNumber, timeoutBefore: 0, timeoutAfter: 0));
         }
     }
 
@@ -1913,3 +1913,4 @@ public class SessionExecutionCoverageTests
         public const string MockerCall = "mocker-call";
     }
 }
+
