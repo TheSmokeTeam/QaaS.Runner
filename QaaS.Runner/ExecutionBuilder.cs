@@ -920,10 +920,31 @@ public class ExecutionBuilder() : BaseExecutionBuilder<InternalContext, Executio
         if (!variablesSection.Exists())
             return;
 
-        Context.LoadConfigurationSectionIntoGlobalDictionary("variables", ["Variables"]);
+        var loadedVariables = ConvertConfigurationSectionToGlobalValue(variablesSection);
+        Context.InsertValueIntoGlobalDictionary(["Variables"], loadedVariables);
+        _globalDict["Variables"] = loadedVariables;
+    }
 
-        if (Context.InternalGlobalDict.TryGetValue("Variables", out var loadedVariables))
-            _globalDict["Variables"] = loadedVariables;
+    private static object? ConvertConfigurationSectionToGlobalValue(IConfigurationSection configurationSection)
+    {
+        var children = configurationSection.GetChildren().ToList();
+        if (children.Count == 0)
+        {
+            return configurationSection.Value;
+        }
+
+        if (children.All(child => int.TryParse(child.Key, out _)))
+        {
+            return children
+                .OrderBy(child => int.Parse(child.Key))
+                .Select(ConvertConfigurationSectionToGlobalValue)
+                .ToList();
+        }
+
+        return children.ToDictionary(
+            child => child.Key,
+            ConvertConfigurationSectionToGlobalValue,
+            StringComparer.Ordinal);
     }
 
     /// <summary>
