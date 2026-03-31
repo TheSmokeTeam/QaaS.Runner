@@ -25,6 +25,20 @@ public class StorageBuilder
     public FilesInFileSystemConfig? FileSystem { get; internal set; }
     [Description("Supports storage as an S3 bucket with a certain prefix")]
     public S3Config? S3 { get; internal set; }
+    public IStorageConfig? Configuration
+    {
+        get => (IStorageConfig?)S3 ?? FileSystem;
+        internal set
+        {
+            if (value == null)
+            {
+                Reset();
+                return;
+            }
+
+            Configure(value);
+        }
+    }
     private StorageBuilder Reset()
     {
         FileSystem = null;
@@ -61,7 +75,7 @@ public class StorageBuilder
     /// <qaas-docs group="Configuration as Code" subgroup="Storages" />
     public StorageBuilder UpdateConfiguration(Func<IStorageConfig, IStorageConfig> update)
     {
-        var currentConfig = ReadConfiguration() ??
+        var currentConfig = Configuration ??
                             throw new InvalidOperationException("Storage configuration is not set");
         return UpdateConfiguration(update(currentConfig));
     }
@@ -75,7 +89,7 @@ public class StorageBuilder
     /// <qaas-docs group="Configuration as Code" subgroup="Storages" />
     public StorageBuilder UpdateConfiguration(IStorageConfig storageConfig)
     {
-        var currentConfig = ReadConfiguration() ??
+        var currentConfig = Configuration ??
                             throw new InvalidOperationException("Storage configuration is not set");
         return Configure(currentConfig.UpdateConfiguration(storageConfig));
     }
@@ -89,7 +103,7 @@ public class StorageBuilder
     /// <qaas-docs group="Configuration as Code" subgroup="Storages" />
     public StorageBuilder UpdateConfiguration(object configuration)
     {
-        var currentConfig = ReadConfiguration() ??
+        var currentConfig = Configuration ??
                             throw new InvalidOperationException("Storage configuration is not set");
         return Configure(currentConfig.UpdateConfiguration(configuration));
     }
@@ -136,14 +150,6 @@ public class StorageBuilder
     /// Use this method when working with the documented Runner storage builder API surface in code. Use it to inspect the current configured state without rebuilding the surrounding collection or runtime object graph.
     /// </remarks>
     /// <qaas-docs group="Configuration as Code" subgroup="Storages" />
-    public IStorageConfig? ReadConfiguration()
-    {
-        return (IStorageConfig?)S3 ?? FileSystem;
-    }
-
-    /// <summary>
-    /// Builds a runtime storage instance from the configured type and wires the execution context into it.
-    /// </summary>
     internal IStorage Build(Context context)
     {
         var configuredStorages = new List<object?> { S3, FileSystem };

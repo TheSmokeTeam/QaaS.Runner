@@ -36,10 +36,10 @@ public class BuilderCrudTests
         builder.UpdateConfiguration(new SocketReaderConfig());
 
         Assert.That(builder.ReadPolicies(), Has.Count.EqualTo(1));
-        Assert.That(builder.ReadConfiguration(), Is.TypeOf<SocketReaderConfig>());
+        Assert.That(builder.Configuration, Is.TypeOf<SocketReaderConfig>());
 
         builder.DeleteConfiguration();
-        Assert.That(builder.ReadConfiguration(), Is.Null);
+        Assert.That(builder.Configuration, Is.Null);
     }
 
     [Test]
@@ -58,7 +58,7 @@ public class BuilderCrudTests
             RequestedConnectionTimeoutSeconds = 12
         });
 
-        var mergedConfiguration = (RabbitMqReaderConfig)builder.ReadConfiguration()!;
+        var mergedConfiguration = (RabbitMqReaderConfig)builder.Configuration!;
         Assert.Multiple(() =>
         {
             Assert.That(mergedConfiguration.Host, Is.EqualTo("rabbitmq.local"));
@@ -85,7 +85,7 @@ public class BuilderCrudTests
             HandshakeContinuationTimeoutSeconds = 7
         });
 
-        var mergedConfiguration = (RabbitMqReaderConfig)builder.ReadConfiguration()!;
+        var mergedConfiguration = (RabbitMqReaderConfig)builder.Configuration!;
         Assert.Multiple(() =>
         {
             Assert.That(mergedConfiguration.ExchangeName, Is.EqualTo("events"));
@@ -111,7 +111,7 @@ public class BuilderCrudTests
             RequestedConnectionTimeoutSeconds = 12
         });
 
-        var mergedConfiguration = (RabbitMqReaderConfig)builder.ReadConfiguration()!;
+        var mergedConfiguration = (RabbitMqReaderConfig)builder.Configuration!;
         Assert.Multiple(() =>
         {
             Assert.That(mergedConfiguration.Host, Is.EqualTo("rabbitmq.local"));
@@ -141,10 +141,10 @@ public class BuilderCrudTests
         Assert.That(builder.ReadDataSources(), Is.EquivalentTo(["source-updated"]));
         Assert.That(builder.ReadDataSourcePatterns(), Is.EquivalentTo(["^updated-.*$"]));
         Assert.That(builder.ReadPolicies(), Has.Count.EqualTo(1));
-        Assert.That(builder.ReadConfiguration(), Is.TypeOf<KafkaTopicSenderConfig>());
+        Assert.That(builder.Configuration, Is.TypeOf<KafkaTopicSenderConfig>());
 
         builder.DeleteConfiguration();
-        Assert.That(builder.ReadConfiguration(), Is.Null);
+        Assert.That(builder.Configuration, Is.Null);
     }
 
     [Test]
@@ -163,7 +163,7 @@ public class BuilderCrudTests
             Expiration = "30000"
         });
 
-        var mergedConfiguration = (RabbitMqSenderConfig)builder.ReadConfiguration()!;
+        var mergedConfiguration = (RabbitMqSenderConfig)builder.Configuration!;
         Assert.Multiple(() =>
         {
             Assert.That(mergedConfiguration.Host, Is.EqualTo("rabbitmq.local"));
@@ -190,7 +190,7 @@ public class BuilderCrudTests
             HandshakeContinuationTimeoutSeconds = 5
         });
 
-        var mergedConfiguration = (RabbitMqSenderConfig)builder.ReadConfiguration()!;
+        var mergedConfiguration = (RabbitMqSenderConfig)builder.Configuration!;
         Assert.Multiple(() =>
         {
             Assert.That(mergedConfiguration.ExchangeName, Is.EqualTo("events"));
@@ -221,7 +221,7 @@ public class BuilderCrudTests
             }
         });
 
-        var mergedConfiguration = (KafkaTopicSenderConfig)builder.ReadConfiguration()!;
+        var mergedConfiguration = (KafkaTopicSenderConfig)builder.Configuration!;
         Assert.Multiple(() =>
         {
             Assert.That(mergedConfiguration.HostNames, Is.EqualTo(new[] { "broker:9092" }));
@@ -252,7 +252,7 @@ public class BuilderCrudTests
         Assert.That(builder.ReadPolicies(), Has.Count.EqualTo(1));
         Assert.That(builder.ReadDataSources(), Is.EquivalentTo(["source-updated"]));
         Assert.That(builder.ReadDataSourcePatterns(), Is.EquivalentTo(["^updated-.*$"]));
-        Assert.That(builder.ReadConfiguration(), Is.TypeOf<HttpTransactorConfig>());
+        Assert.That(builder.Configuration, Is.TypeOf<HttpTransactorConfig>());
 
         builder.DeleteDataSource("source-updated")
             .DeleteDataSourcePattern("^updated-.*$")
@@ -262,7 +262,7 @@ public class BuilderCrudTests
         Assert.That(builder.ReadDataSources(), Is.Empty);
         Assert.That(builder.ReadDataSourcePatterns(), Is.Empty);
         Assert.That(builder.ReadPolicies(), Is.Empty);
-        Assert.That(builder.ReadConfiguration(), Is.Null);
+        Assert.That(builder.Configuration, Is.Null);
     }
 
     [Test]
@@ -282,7 +282,7 @@ public class BuilderCrudTests
             MessageSendRetriesIntervalMs = 0
         });
 
-        var mergedConfiguration = (HttpTransactorConfig)builder.ReadConfiguration()!;
+        var mergedConfiguration = (HttpTransactorConfig)builder.Configuration!;
         Assert.Multiple(() =>
         {
             Assert.That(mergedConfiguration.Method, Is.EqualTo(HttpMethods.Put));
@@ -310,7 +310,7 @@ public class BuilderCrudTests
             MessageSendRetriesIntervalMs = 0
         });
 
-        var mergedConfiguration = (HttpTransactorConfig)builder.ReadConfiguration()!;
+        var mergedConfiguration = (HttpTransactorConfig)builder.Configuration!;
         Assert.Multiple(() =>
         {
             Assert.That(mergedConfiguration.Method, Is.EqualTo(HttpMethods.Put));
@@ -336,9 +336,9 @@ public class BuilderCrudTests
 
         Assert.That(builder.ReadDataSourceNames(), Is.EquivalentTo(["source-updated"]));
         Assert.That(builder.ReadDataSourcePatterns(), Is.EquivalentTo(["^updated-.*$"]));
-        Assert.That(builder.ReadConfiguration()["enabled"], Is.EqualTo("True"));
-        Assert.That(builder.ReadConfiguration()["threshold"], Is.EqualTo("5"));
-        Assert.That(builder.ReadConfiguration()["nested:value"], Is.EqualTo("set"));
+        Assert.That(builder.Configuration["enabled"], Is.EqualTo("True"));
+        Assert.That(builder.Configuration["threshold"], Is.EqualTo("5"));
+        Assert.That(builder.Configuration["nested:value"], Is.EqualTo("set"));
 
         builder.DeleteDataSourceName("source-updated")
             .DeleteDataSourcePattern("^updated-.*$")
@@ -346,7 +346,7 @@ public class BuilderCrudTests
 
         Assert.That(builder.ReadDataSourceNames(), Is.Empty);
         Assert.That(builder.ReadDataSourcePatterns(), Is.Empty);
-        Assert.That(builder.ReadConfiguration().AsEnumerable().Any(), Is.False);
+        Assert.That(builder.Configuration.AsEnumerable().Any(), Is.False);
     }
 
     [Test]
@@ -369,11 +369,11 @@ public class BuilderCrudTests
             Expression = "max(up)"
         });
 
-        Assert.That(builder.ReadConfiguration(), Is.TypeOf<PrometheusFetcherConfig>());
-        Assert.That(((PrometheusFetcherConfig)builder.ReadConfiguration()!).Expression, Is.EqualTo("max(up)"));
+        Assert.That(builder.Configuration, Is.TypeOf<PrometheusFetcherConfig>());
+        Assert.That(((PrometheusFetcherConfig)builder.Configuration!).Expression, Is.EqualTo("max(up)"));
 
         builder.DeleteConfiguration();
-        Assert.That(builder.ReadConfiguration(), Is.Null);
+        Assert.That(builder.Configuration, Is.Null);
     }
 
     [Test]
@@ -391,7 +391,7 @@ public class BuilderCrudTests
             ApiKey = "api-key"
         });
 
-        var mergedConfiguration = (PrometheusFetcherConfig)builder.ReadConfiguration()!;
+        var mergedConfiguration = (PrometheusFetcherConfig)builder.Configuration!;
         Assert.Multiple(() =>
         {
             Assert.That(mergedConfiguration.Url, Is.EqualTo("https://prometheus"));
@@ -416,7 +416,7 @@ public class BuilderCrudTests
             ApiKey = "api-key"
         });
 
-        var mergedConfiguration = (PrometheusFetcherConfig)builder.ReadConfiguration()!;
+        var mergedConfiguration = (PrometheusFetcherConfig)builder.Configuration!;
         Assert.Multiple(() =>
         {
             Assert.That(mergedConfiguration.Url, Is.EqualTo("https://prometheus"));
@@ -443,11 +443,11 @@ public class BuilderCrudTests
             Consume = new ConsumeCommandConfig()
         });
 
-        Assert.That(builder.ReadConfiguration(), Is.Not.Null);
-        Assert.That(builder.ReadConfiguration()!.Consume, Is.Not.Null);
+        Assert.That(builder.Configuration, Is.Not.Null);
+        Assert.That(builder.Configuration!.Consume, Is.Not.Null);
 
         builder.DeleteConfiguration();
-        Assert.That(builder.ReadConfiguration(), Is.Null);
+        Assert.That(builder.Configuration, Is.Null);
     }
 
     [Test]
@@ -470,7 +470,7 @@ public class BuilderCrudTests
             }
         });
 
-        var command = builder.ReadConfiguration()!;
+        var command = builder.Configuration!;
         Assert.Multiple(() =>
         {
             Assert.That(command.TriggerAction, Is.Not.Null);

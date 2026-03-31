@@ -40,6 +40,11 @@ public class ProbeBuilder : IYamlConvertible
     [Description("Implementation configuration for the probe, " +
                  "the configuration given here is loaded into the provided probe dynamically.")]
     public IConfiguration ProbeConfiguration { get; internal set; } = new ConfigurationBuilder().Build();
+    public IConfiguration Configuration
+    {
+        get => ProbeConfiguration;
+        internal set => ProbeConfiguration = value ?? new ConfigurationBuilder().Build();
+    }
     /// <summary>
     /// Reads the serialized configuration for the current Runner probe builder instance.
     /// </summary>
@@ -297,7 +302,7 @@ public class ProbeBuilder : IYamlConvertible
     /// Use this method when working with the documented Runner probe builder API surface in code. The change is stored on the current builder instance and is consumed by later build, validation, or execution steps.
     /// </remarks>
     /// <qaas-docs group="Configuration as Code" subgroup="Probes" />
-    internal ProbeBuilder CreateConfiguration(object configuration)
+    internal ProbeBuilder AddConfiguration(object configuration)
     {
         return Configure(configuration);
     }
@@ -311,19 +316,7 @@ public class ProbeBuilder : IYamlConvertible
     /// <qaas-docs group="Configuration as Code" subgroup="Probes" />
     internal ProbeBuilder Create(object configuration)
     {
-        return CreateConfiguration(configuration);
-    }
-
-    /// <summary>
-    /// Returns the configuration currently stored on the Runner probe builder instance.
-    /// </summary>
-    /// <remarks>
-    /// Use this method when working with the documented Runner probe builder API surface in code. Use it to inspect the current configured state without rebuilding the surrounding collection or runtime object graph.
-    /// </remarks>
-    /// <qaas-docs group="Configuration as Code" subgroup="Probes" />
-    public IConfiguration ReadConfiguration()
-    {
-        return ProbeConfiguration;
+        return AddConfiguration(configuration);
     }
 
     /// <summary>

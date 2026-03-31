@@ -482,7 +482,7 @@ public class ConsumerBuilderTests
     {
         var builder = new ConsumerBuilder().Configure(config);
 
-        Assert.That(builder.ReadConfiguration(), Is.SameAs(config));
+        Assert.That(builder.Configuration, Is.SameAs(config));
     }
 
     [Test]
@@ -490,7 +490,7 @@ public class ConsumerBuilderTests
     {
         var builder = new ConsumerBuilder();
 
-        Assert.That(builder.ReadConfiguration(), Is.Null);
+        Assert.That(builder.Configuration, Is.Null);
     }
 
     [Test]

@@ -15,14 +15,14 @@ public class StorageBuilderCrudTests
         var builder = new StorageBuilder()
             .Configure(new FilesInFileSystemConfig { Path = "one/path" });
 
-        Assert.That(builder.ReadConfiguration(), Is.TypeOf<FilesInFileSystemConfig>());
+        Assert.That(builder.Configuration, Is.TypeOf<FilesInFileSystemConfig>());
 
         builder.UpdateConfiguration(_ => new S3Config { Prefix = "prefix" });
         builder.UpdateConfiguration(new FilesInFileSystemConfig { Path = "two/path" });
-        Assert.That(builder.ReadConfiguration(), Is.TypeOf<FilesInFileSystemConfig>());
+        Assert.That(builder.Configuration, Is.TypeOf<FilesInFileSystemConfig>());
 
         builder.DeleteConfiguration();
-        Assert.That(builder.ReadConfiguration(), Is.Null);
+        Assert.That(builder.Configuration, Is.Null);
     }
 
     [Test]
@@ -46,7 +46,7 @@ public class StorageBuilderCrudTests
             SkipEmptyObjects = false
         });
 
-        var mergedConfiguration = (S3Config)builder.ReadConfiguration()!;
+        var mergedConfiguration = (S3Config)builder.Configuration!;
         Assert.Multiple(() =>
         {
             Assert.That(mergedConfiguration.StorageBucket, Is.EqualTo("bucket-a"));

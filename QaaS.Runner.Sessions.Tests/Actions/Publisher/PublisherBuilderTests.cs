@@ -267,7 +267,7 @@ public class PublisherBuilderTests
     {
         var builder = new PublisherBuilder().Configure(config);
 
-        Assert.That(builder.ReadConfiguration(), Is.SameAs(config));
+        Assert.That(builder.Configuration, Is.SameAs(config));
     }
 
     [Test]
@@ -275,7 +275,7 @@ public class PublisherBuilderTests
     {
         var builder = new PublisherBuilder();
 
-        Assert.That(builder.ReadConfiguration(), Is.Null);
+        Assert.That(builder.Configuration, Is.Null);
     }
 
     [Test]

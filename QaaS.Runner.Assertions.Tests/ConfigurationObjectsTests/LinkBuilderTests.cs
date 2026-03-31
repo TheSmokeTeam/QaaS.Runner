@@ -15,7 +15,7 @@ public class LinkBuilderTests
     {
         var builder = new LinkBuilder();
 
-        Assert.That(builder.ReadConfiguration(), Is.Null);
+        Assert.That(builder.Configuration, Is.Null);
     }
 
     [Test]
@@ -29,7 +29,7 @@ public class LinkBuilderTests
         var builder = new LinkBuilder()
             .Configure(config);
 
-        Assert.That(builder.ReadConfiguration(), Is.SameAs(config));
+        Assert.That(builder.Configuration, Is.SameAs(config));
     }
 
     [Test]
@@ -43,7 +43,7 @@ public class LinkBuilderTests
         var builder = new LinkBuilder()
             .Configure(config);
 
-        Assert.That(builder.ReadConfiguration(), Is.SameAs(config));
+        Assert.That(builder.Configuration, Is.SameAs(config));
     }
 
     [Test]
@@ -57,7 +57,7 @@ public class LinkBuilderTests
         var builder = new LinkBuilder()
             .Configure(config);
 
-        Assert.That(builder.ReadConfiguration(), Is.SameAs(config));
+        Assert.That(builder.Configuration, Is.SameAs(config));
     }
 
     [Test]

@@ -77,6 +77,11 @@ public class AssertionBuilder : IYamlConvertible
     [Description("Implementation configuration for the assertion, " +
                  "the configuration given here is loaded into the provided assertion dynamically.")]
     public IConfiguration AssertionConfiguration { get; internal set; } = new ConfigurationBuilder().Build();
+    public IConfiguration Configuration
+    {
+        get => AssertionConfiguration;
+        internal set => AssertionConfiguration = value ?? new ConfigurationBuilder().Build();
+    }
     [Description("The assertion's specific links. Will be added with the general links.")]
     public List<LinkBuilder> Links { get; internal set; } = [];
     /// <summary>
@@ -644,7 +649,7 @@ public class AssertionBuilder : IYamlConvertible
     /// Use this method when working with the documented Runner assertion builder API surface in code. The change is stored on the current builder instance and is consumed by later build, validation, or execution steps.
     /// </remarks>
     /// <qaas-docs group="Configuration as Code" subgroup="Assertions" />
-    internal AssertionBuilder CreateConfiguration(object configuration)
+    internal AssertionBuilder AddConfiguration(object configuration)
     {
         return Configure(configuration);
     }
@@ -658,19 +663,7 @@ public class AssertionBuilder : IYamlConvertible
     /// <qaas-docs group="Configuration as Code" subgroup="Assertions" />
     internal AssertionBuilder Create(object configuration)
     {
-        return CreateConfiguration(configuration);
-    }
-
-    /// <summary>
-    /// Returns the configuration currently stored on the Runner assertion builder instance.
-    /// </summary>
-    /// <remarks>
-    /// Use this method when working with the documented Runner assertion builder API surface in code. Use it to inspect the current configured state without rebuilding the surrounding collection or runtime object graph.
-    /// </remarks>
-    /// <qaas-docs group="Configuration as Code" subgroup="Assertions" />
-    public IConfiguration ReadConfiguration()
-    {
-        return AssertionConfiguration;
+        return AddConfiguration(configuration);
     }
 
     /// <summary>

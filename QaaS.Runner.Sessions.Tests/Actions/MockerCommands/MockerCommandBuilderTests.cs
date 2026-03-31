@@ -114,7 +114,7 @@ public class MockerCommandBuilderTests
         var initialCommand = new MockerCommandConfig { TriggerAction = new TriggerAction() };
 
         builder.Configure(initialCommand);
-        Assert.That(builder.ReadConfiguration(), Is.SameAs(initialCommand));
+        Assert.That(builder.Configuration, Is.SameAs(initialCommand));
 
         builder.UpdateConfiguration(command =>
         {
@@ -123,11 +123,11 @@ public class MockerCommandBuilderTests
             return command;
         });
 
-        Assert.That(builder.ReadConfiguration()!.ChangeActionStub, Is.Not.Null);
-        Assert.That(builder.ReadConfiguration()!.TriggerAction, Is.Null);
+        Assert.That(builder.Configuration!.ChangeActionStub, Is.Not.Null);
+        Assert.That(builder.Configuration!.TriggerAction, Is.Null);
 
         builder.DeleteConfiguration();
-        Assert.That(builder.ReadConfiguration(), Is.Null);
+        Assert.That(builder.Configuration, Is.Null);
     }
 
     [Test]
@@ -158,9 +158,9 @@ public class MockerCommandBuilderTests
 
         Assert.Multiple(() =>
         {
-            Assert.That(builder.ReadConfiguration()!.Consume, Is.Not.Null);
-            Assert.That(builder.ReadConfiguration()!.Consume!.InputDeserialize!.Deserializer, Is.EqualTo(SerializationType.Json));
-            Assert.That(builder.ReadConfiguration()!.Consume!.OutputDeserialize!.Deserializer, Is.EqualTo(SerializationType.Binary));
+            Assert.That(builder.Configuration!.Consume, Is.Not.Null);
+            Assert.That(builder.Configuration!.Consume!.InputDeserialize!.Deserializer, Is.EqualTo(SerializationType.Json));
+            Assert.That(builder.Configuration!.Consume!.OutputDeserialize!.Deserializer, Is.EqualTo(SerializationType.Binary));
         });
     }
 

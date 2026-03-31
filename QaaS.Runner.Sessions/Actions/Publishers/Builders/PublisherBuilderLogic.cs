@@ -27,6 +27,21 @@ namespace QaaS.Runner.Sessions.Actions.Publishers.Builders;
 
 public partial class PublisherBuilder
 {
+    public ISenderConfig? Configuration
+    {
+        get => GetConfiguration();
+        internal set
+        {
+            if (value == null)
+            {
+                Reset();
+                return;
+            }
+
+            Configure(value);
+        }
+    }
+
     /// <summary>
     /// Sets the name used for the current Runner publisher builder instance.
     /// </summary>
@@ -376,7 +391,7 @@ public partial class PublisherBuilder
     /// Use this method when working with the documented Runner publisher builder API surface in code. The change is stored on the current builder instance and is consumed by later build, validation, or execution steps.
     /// </remarks>
     /// <qaas-docs group="Configuration as Code" subgroup="Publishers" />
-    internal PublisherBuilder CreateConfiguration(ISenderConfig config)
+    internal PublisherBuilder AddConfiguration(ISenderConfig config)
     {
         return Configure(config);
     }
@@ -390,29 +405,7 @@ public partial class PublisherBuilder
     /// <qaas-docs group="Configuration as Code" subgroup="Publishers" />
     internal PublisherBuilder Create(ISenderConfig config)
     {
-        return CreateConfiguration(config);
-    }
-
-    /// <summary>
-    /// Returns the configuration currently stored on the Runner publisher builder instance.
-    /// </summary>
-    /// <remarks>
-    /// Use this method when working with the documented Runner publisher builder API surface in code. Use it to inspect the current configured state without rebuilding the surrounding collection or runtime object graph.
-    /// </remarks>
-    /// <qaas-docs group="Configuration as Code" subgroup="Publishers" />
-    public ISenderConfig? ReadConfiguration()
-    {
-        if (RabbitMq != null) return RabbitMq;
-        if (KafkaTopic != null) return KafkaTopic;
-        if (Socket != null) return Socket;
-        if (Sftp != null) return Sftp;
-        if (PostgreSqlTable != null) return PostgreSqlTable;
-        if (OracleSqlTable != null) return OracleSqlTable;
-        if (MsSqlTable != null) return MsSqlTable;
-        if (ElasticIndex != null) return ElasticIndex;
-        if (Redis != null) return Redis;
-        if (S3Bucket != null) return S3Bucket;
-        return MongoDbCollection;
+        return AddConfiguration(config);
     }
 
     /// <summary>
@@ -424,7 +417,7 @@ public partial class PublisherBuilder
     /// <qaas-docs group="Configuration as Code" subgroup="Publishers" />
     public PublisherBuilder UpdateConfiguration(Func<ISenderConfig, ISenderConfig> update)
     {
-        var currentConfig = ReadConfiguration() ??
+        var currentConfig = Configuration ??
                             throw new InvalidOperationException("Publisher configuration is not set");
         return UpdateConfiguration(update(currentConfig));
     }
@@ -438,7 +431,7 @@ public partial class PublisherBuilder
     /// <qaas-docs group="Configuration as Code" subgroup="Publishers" />
     public PublisherBuilder UpdateConfiguration(ISenderConfig config)
     {
-        var currentConfig = ReadConfiguration() ??
+        var currentConfig = Configuration ??
                             throw new InvalidOperationException("Publisher configuration is not set");
         return Configure(ConfigurationUpdateExtensions.UpdateConfiguration(currentConfig, config));
     }
@@ -452,7 +445,7 @@ public partial class PublisherBuilder
     /// <qaas-docs group="Configuration as Code" subgroup="Publishers" />
     public PublisherBuilder UpdateConfiguration(object configuration)
     {
-        var currentConfig = ReadConfiguration() ??
+        var currentConfig = Configuration ??
                             throw new InvalidOperationException("Publisher configuration is not set");
         return Configure(ConfigurationUpdateExtensions.UpdateConfiguration(currentConfig, configuration));
     }
@@ -625,5 +618,20 @@ public partial class PublisherBuilder
         }
 
         return null;
+    }
+
+    private ISenderConfig? GetConfiguration()
+    {
+        if (RabbitMq != null) return RabbitMq;
+        if (KafkaTopic != null) return KafkaTopic;
+        if (Socket != null) return Socket;
+        if (Sftp != null) return Sftp;
+        if (PostgreSqlTable != null) return PostgreSqlTable;
+        if (OracleSqlTable != null) return OracleSqlTable;
+        if (MsSqlTable != null) return MsSqlTable;
+        if (ElasticIndex != null) return ElasticIndex;
+        if (Redis != null) return Redis;
+        if (S3Bucket != null) return S3Bucket;
+        return MongoDbCollection;
     }
 }

@@ -64,6 +64,20 @@ public class TransactionBuilder
     [Description("Sends an http request")] internal HttpTransactorConfig? Http { get; set; }
 
     [Description("Invokes a Grpc Method")] internal GrpcTransactorConfig? Grpc { get; set; }
+    public ITransactorConfig? Configuration
+    {
+        get => (ITransactorConfig?)Http ?? Grpc;
+        internal set
+        {
+            if (value == null)
+            {
+                Reset();
+                return;
+            }
+
+            Configure(value);
+        }
+    }
 
     /// <summary>
     /// Sets the name used for the current Runner transaction builder instance.
@@ -427,7 +441,7 @@ public class TransactionBuilder
     /// Use this method when working with the documented Runner transaction builder API surface in code. The change is stored on the current builder instance and is consumed by later build, validation, or execution steps.
     /// </remarks>
     /// <qaas-docs group="Configuration as Code" subgroup="Transactions" />
-    internal TransactionBuilder CreateConfiguration(ITransactorConfig config)
+    internal TransactionBuilder AddConfiguration(ITransactorConfig config)
     {
         return Configure(config);
     }
@@ -441,19 +455,7 @@ public class TransactionBuilder
     /// <qaas-docs group="Configuration as Code" subgroup="Transactions" />
     internal TransactionBuilder Create(ITransactorConfig config)
     {
-        return CreateConfiguration(config);
-    }
-
-    /// <summary>
-    /// Returns the configuration currently stored on the Runner transaction builder instance.
-    /// </summary>
-    /// <remarks>
-    /// Use this method when working with the documented Runner transaction builder API surface in code. Use it to inspect the current configured state without rebuilding the surrounding collection or runtime object graph.
-    /// </remarks>
-    /// <qaas-docs group="Configuration as Code" subgroup="Transactions" />
-    public ITransactorConfig? ReadConfiguration()
-    {
-        return (ITransactorConfig?)Http ?? Grpc;
+        return AddConfiguration(config);
     }
 
     /// <summary>
@@ -465,7 +467,7 @@ public class TransactionBuilder
     /// <qaas-docs group="Configuration as Code" subgroup="Transactions" />
     public TransactionBuilder UpdateConfiguration(Func<ITransactorConfig, ITransactorConfig> update)
     {
-        var currentConfig = ReadConfiguration() ??
+        var currentConfig = Configuration ??
                             throw new InvalidOperationException("Transaction configuration is not set");
         return UpdateConfiguration(update(currentConfig));
     }
@@ -479,7 +481,7 @@ public class TransactionBuilder
     /// <qaas-docs group="Configuration as Code" subgroup="Transactions" />
     public TransactionBuilder UpdateConfiguration(ITransactorConfig config)
     {
-        var currentConfig = ReadConfiguration() ??
+        var currentConfig = Configuration ??
                             throw new InvalidOperationException("Transaction configuration is not set");
         return Configure(currentConfig.UpdateConfiguration(config));
     }
@@ -493,7 +495,7 @@ public class TransactionBuilder
     /// <qaas-docs group="Configuration as Code" subgroup="Transactions" />
     public TransactionBuilder UpdateConfiguration(object configuration)
     {
-        var currentConfig = ReadConfiguration() ??
+        var currentConfig = Configuration ??
                             throw new InvalidOperationException("Transaction configuration is not set");
         return Configure(currentConfig.UpdateConfiguration(configuration));
     }
