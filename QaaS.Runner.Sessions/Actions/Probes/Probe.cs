@@ -37,6 +37,8 @@ public class Probe : StagedAction
     internal override InternalCommunicationData<object> Act()
     {
         Logger.LogDebug("Running probe {ActionName}", Name);
+        using var executionScope =
+            QaaS.Framework.SDK.ContextObjects.ProbeExecutionContext.Enter(ProbeHook.Context, _sessionName, Name);
         ProbeHook.Run(SessionDataList.ToImmutableList(), DataSources.ToImmutableList());
         // probe doesn't initialize either input and output
         return new InternalCommunicationData<object>();

@@ -20,6 +20,7 @@
         <ProjectReference Include="..\QaaS.Runner.Assertions\QaaS.Runner.Assertions.csproj" />
         <ProjectReference Include="..\QaaS.Runner.Sessions\QaaS.Runner.Sessions.csproj" />
         <ProjectReference Include="..\QaaS.Runner.Storage\QaaS.Runner.Storage.csproj" />
+        <ProjectReference Include="..\..\QaaS.Framework\QaaS.Framework.SDK\QaaS.Framework.SDK.csproj" />
     </ItemGroup>
 
     <ItemGroup>

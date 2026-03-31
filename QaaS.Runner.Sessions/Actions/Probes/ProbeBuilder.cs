@@ -394,4 +394,32 @@ public class ProbeBuilder : IYamlConvertible
         ArgumentException.ThrowIfNullOrWhiteSpace(probeName);
         return $"{sessionName.Length}:{sessionName}{probeName}";
     }
+
+    internal static (string SessionName, string ProbeName) ParseScopedHookName(string scopedHookName)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(scopedHookName);
+
+        var delimiterIndex = scopedHookName.IndexOf(':');
+        if (delimiterIndex <= 0 ||
+            !int.TryParse(scopedHookName[..delimiterIndex], out var sessionNameLength) ||
+            sessionNameLength < 0)
+        {
+            throw new FormatException($"Probe scoped hook name '{scopedHookName}' is not in the expected format.");
+        }
+
+        var sessionNameStartIndex = delimiterIndex + 1;
+        if (scopedHookName.Length < sessionNameStartIndex + sessionNameLength)
+        {
+            throw new FormatException($"Probe scoped hook name '{scopedHookName}' is truncated.");
+        }
+
+        var sessionName = scopedHookName.Substring(sessionNameStartIndex, sessionNameLength);
+        var probeName = scopedHookName[(sessionNameStartIndex + sessionNameLength)..];
+        if (string.IsNullOrWhiteSpace(probeName))
+        {
+            throw new FormatException($"Probe scoped hook name '{scopedHookName}' is missing the probe name.");
+        }
+
+        return (sessionName, probeName);
+    }
 }

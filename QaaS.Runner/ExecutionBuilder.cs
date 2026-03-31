@@ -824,6 +824,9 @@ public class ExecutionBuilder() : BaseExecutionBuilder<InternalContext, Executio
                 throw;
             }
 
+            var (sessionName, probeName) = ProbeBuilder.ParseScopedHookName(hookData.Name);
+            using var probeExecutionScope =
+                QaaS.Framework.SDK.ContextObjects.ProbeExecutionContext.Enter(hook.Context, sessionName, probeName);
             var configurationsValidationResults = (hook.LoadAndValidateConfiguration(
                 hookData.Configuration) ?? Enumerable.Empty<ValidationResult>()).ToList();
             foreach (var validationResult in configurationsValidationResults)
