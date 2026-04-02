@@ -77,6 +77,19 @@ public partial class ConsumerBuilder
         TimeoutMs = timeoutMs;
         return this;
     }
+    
+    /// <summary>
+    /// Configures timeout on the current Runner consumer builder instance.
+    /// </summary>
+    /// <remarks>
+    /// Use this method when working with the documented Runner consumer builder API surface in code. The change is stored on the current builder instance and is consumed by later build, validation, or execution steps.
+    /// </remarks>
+    /// <qaas-docs group="Configuration as Code" subgroup="Consumers" />
+    public ConsumerBuilder WithInitialTimeout(int? initialTimeoutMs)
+    {
+        InitialTimeoutMs = initialTimeoutMs;
+        return this;
+    }
 
     /// <summary>
     /// Sets the data filter used by the current Runner consumer builder instance.
@@ -343,7 +356,7 @@ public partial class ConsumerBuilder
             var serializationType = Deserialize?.Deserializer;
             var deserializerSpecificType = Deserialize?.SpecificType?.GetConfiguredType();
             var timeout = TimeSpan.FromMilliseconds(TimeoutMs!.Value);
-            var initialTimeout = TimeSpan.FromMilliseconds(InitialTimeoutMs!.Value);
+            var initialTimeout = InitialTimeoutMs.HasValue ? TimeSpan.FromMilliseconds(InitialTimeoutMs.Value) : (TimeSpan?)null;
             var allTypes = new List<IReaderConfig?>
             {
                 RabbitMq, KafkaTopic, Socket, IbmMqQueue, PostgreSqlTable, OracleSqlTable, MsSqlTable, TrinoSqlTable,

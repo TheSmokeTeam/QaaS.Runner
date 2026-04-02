@@ -542,6 +542,34 @@ public class ConsumerBuilderTests
         Assert.That(result, Is.Not.Null);
         Assert.That(result!.Name, Is.EqualTo("TestConsumer"));
     }
+    
+    [Test]
+    public void Build_With_Valid_KafkaTopic_Config_And_InitialTimeout_Should_Create_Consumer()
+    {
+        // Arrange
+        var config = new KafkaTopicReaderConfig
+        {
+            TopicName = "test",
+            GroupId = "test",
+            HostNames = ["host1:8080", "host2:8081"],
+            Username = "test",
+            Password = "test"
+        };
+        var builder = new ConsumerBuilder()
+            .Named("TestConsumer")
+            .AtStage(1)
+            .WithTimeout(1000)
+            .WithInitialTimeout(1000)
+            .FilterData(new DataFilter())
+            .Configure(config);
+
+        // Act
+        var result = builder.Build(Globals.GetContextWithMetadata(), _actionFailures!, _sessionName!);
+
+        // Assert
+        Assert.That(result, Is.Not.Null);
+        Assert.That(result!.Name, Is.EqualTo("TestConsumer"));
+    }
 
     [Test]
     public void Build_With_Valid_Socket_Config_Should_Create_Consumer()
@@ -743,6 +771,33 @@ public class ConsumerBuilderTests
             .Named("TestConsumer")
             .AtStage(1)
             .WithTimeout(1000)
+            .FilterData(new DataFilter())
+            .Configure(config);
+
+        // Act
+        var result = builder.Build(Globals.GetContextWithMetadata(), _actionFailures, _sessionName);
+
+        // Assert
+        Assert.That(result, Is.Not.Null);
+        Assert.That(result!.Name, Is.EqualTo("TestConsumer"));
+    }
+    
+    [Test]
+    public void Build_With_Valid_S3Bucket_Config_And_InitialTimeout_Should_Create_Consumer()
+    {
+        // Arrange
+        var config = new S3BucketReaderConfig
+        {
+            StorageBucket = "test",
+            ServiceURL = "url",
+            AccessKey = "test",
+            SecretKey = "test"
+        };
+        var builder = new ConsumerBuilder()
+            .Named("TestConsumer")
+            .AtStage(1)
+            .WithTimeout(1000)
+            .WithInitialTimeout(1000)
             .FilterData(new DataFilter())
             .Configure(config);
 

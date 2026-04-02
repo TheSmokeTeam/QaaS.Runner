@@ -25,10 +25,9 @@ public partial class ConsumerBuilder
                  " (timeout is the time since last message was read by the consumer)")]
     public int? TimeoutMs { get; internal set; }
 
-    [Required]
     [Description("The initial consumption timeout in milliseconds" +
                  " (timeout is the time before any message has been read by the consumer)")]
-    public int? InitialTimeoutMs { get; internal set; } = null;
+    public int? InitialTimeoutMs { get; internal set; }
 
     [Description("How to filter the properties of each returned consumed data")]
     public DataFilter DataFilter { get; internal set; } = new();
