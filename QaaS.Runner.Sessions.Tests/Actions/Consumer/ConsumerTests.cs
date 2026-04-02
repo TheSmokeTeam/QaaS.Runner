@@ -38,11 +38,12 @@ public class ConsumerTests
         int numOfMsgToSend = 100)
     {
         return reader != null
-            ? new Sessions.Actions.Consumers.Consumer("TestConsumer", reader, new TimeSpan(1), 1,
-                new CountPolicy(numOfMsgToSend), new DataFilter { Body = true, MetaData = false, Timestamp = false },
+            ? new Sessions.Actions.Consumers.Consumer("TestConsumer", reader, new TimeSpan(1),
+                null, 1, new CountPolicy(numOfMsgToSend),
+                new DataFilter { Body = true, MetaData = false, Timestamp = false },
                 SerializationType.Binary, null, Globals.Logger)
             : chunkReader != null
-                ? new ChunkConsumer("TestConsumer", chunkReader, new TimeSpan(1), 1,
+                ? new ChunkConsumer("TestConsumer", chunkReader, new TimeSpan(1), null, 1,
                     new CountPolicy(numOfMsgToSend),
                     new DataFilter { Body = true, MetaData = false, Timestamp = false },
                     SerializationType.Binary, null, Globals.Logger)
@@ -121,6 +122,7 @@ public class ConsumerTests
             "TestConsumer",
             null,
             TimeSpan.FromMilliseconds(1),
+            null,
             1,
             null,
             new DataFilter(),
@@ -142,6 +144,7 @@ public class ConsumerTests
             "TestConsumer",
             null,
             TimeSpan.FromMilliseconds(1),
+            null,
             1,
             null,
             new DataFilter(),
@@ -165,6 +168,7 @@ public class ConsumerTests
             "TestConsumer",
             new NamedReader(),
             TimeSpan.FromMilliseconds(1),
+            null,
             1,
             null,
             new DataFilter(),

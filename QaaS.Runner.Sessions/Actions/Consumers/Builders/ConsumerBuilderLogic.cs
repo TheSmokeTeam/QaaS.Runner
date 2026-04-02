@@ -343,6 +343,7 @@ public partial class ConsumerBuilder
             var serializationType = Deserialize?.Deserializer;
             var deserializerSpecificType = Deserialize?.SpecificType?.GetConfiguredType();
             var timeout = TimeSpan.FromMilliseconds(TimeoutMs!.Value);
+            var initialTimeout = TimeSpan.FromMilliseconds(InitialTimeoutMs!.Value);
             var allTypes = new List<IReaderConfig?>
             {
                 RabbitMq, KafkaTopic, Socket, IbmMqQueue, PostgreSqlTable, OracleSqlTable, MsSqlTable, TrinoSqlTable,
@@ -382,10 +383,10 @@ public partial class ConsumerBuilder
                 context.GetMetaDataOrDefault(), new object?[] { consumerTypeName });
 
             return reader != null
-                ? new Consumer(Name!, reader, timeout, Stage, policies, DataFilter, serializationType,
+                ? new Consumer(Name!, reader, timeout, initialTimeout, Stage, policies, DataFilter, serializationType,
                     deserializerSpecificType, context.Logger)
                 : chunkReader != null
-                    ? new ChunkConsumer(Name!, chunkReader, timeout, Stage, policies, DataFilter,
+                    ? new ChunkConsumer(Name!, chunkReader, timeout, initialTimeout, Stage, policies, DataFilter,
                         serializationType,
                         deserializerSpecificType, context.Logger)
                     : null;
