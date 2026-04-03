@@ -21,8 +21,8 @@ public class StorageBuilderCrudTests
         builder.UpdateConfiguration(new FilesInFileSystemConfig { Path = "two/path" });
         Assert.That(builder.Configuration, Is.TypeOf<FilesInFileSystemConfig>());
 
-        builder.DeleteConfiguration();
-        Assert.That(builder.Configuration, Is.Null);
+        builder.Configure(new S3Config { Prefix = "latest-prefix" });
+        Assert.That(builder.Configuration, Is.TypeOf<S3Config>());
     }
 
     [Test]

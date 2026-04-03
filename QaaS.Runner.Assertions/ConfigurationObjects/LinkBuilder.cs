@@ -98,18 +98,6 @@ public class LinkBuilder
         return Configure(currentConfig.UpdateConfiguration(configuration));
     }
 
-    /// <summary>
-    /// Clears the configuration currently stored on the Runner link builder instance.
-    /// </summary>
-    /// <remarks>
-    /// Use this method when working with the documented Runner link builder API surface in code. The change is stored on the current builder instance and is consumed by later build, validation, or execution steps.
-    /// </remarks>
-    /// <qaas-docs group="Configuration as Code" subgroup="Links" />
-    public LinkBuilder DeleteConfiguration()
-    {
-        return Reset();
-    }
-    
     private LinkBuilder Reset()
     {
         Kibana = null;

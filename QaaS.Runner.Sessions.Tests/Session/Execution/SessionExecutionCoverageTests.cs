@@ -865,14 +865,14 @@ public class SessionExecutionCoverageTests
             {
                 foreach (var pattern in IncludedDataSourcePatterns)
                 {
-                    publisherBuilder.CreateDataSourcePattern(pattern);
+                    publisherBuilder.AddDataSourcePattern(pattern);
                 }
             }
             else
             {
                 foreach (var name in IncludedDataSourceNames)
                 {
-                    publisherBuilder.CreateDataSource(name);
+                    publisherBuilder.AddDataSource(name);
                 }
             }
 
@@ -921,14 +921,14 @@ public class SessionExecutionCoverageTests
             {
                 foreach (var pattern in IncludedDataSourcePatterns)
                 {
-                    transactionBuilder.CreateDataSourcePattern(pattern);
+                    transactionBuilder.AddDataSourcePattern(pattern);
                 }
             }
             else
             {
                 foreach (var name in IncludedDataSourceNames)
                 {
-                    transactionBuilder.CreateDataSource(name);
+                    transactionBuilder.AddDataSource(name);
                 }
             }
 
@@ -998,7 +998,7 @@ public class SessionExecutionCoverageTests
     private static SessionBuilder CreateYamlSessionBuilder(InternalContext context, SessionScenarioDefinition scenario)
     {
         var executionBuilder = new ExecutionBuilder(context, ExecutionType.Act, null, null, null, null);
-        var builder = executionBuilder.ReadSessions().Single(session => session.Name == scenario.Name);
+        var builder = (executionBuilder.Sessions ?? []).Single(session => session.Name == scenario.Name);
         ApplyZeroTimeoutStageConfiguration(builder, scenario);
         return builder;
     }
@@ -1913,4 +1913,6 @@ public class SessionExecutionCoverageTests
         public const string MockerCall = "mocker-call";
     }
 }
+
+
 

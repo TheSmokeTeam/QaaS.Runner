@@ -108,7 +108,7 @@ public class MockerCommandBuilderTests
     }
 
     [Test]
-    public void CreateReadUpdateDeleteConfiguration_PerformsExpectedCrudFlow()
+    public void CreateReadUpdateConfiguration_PerformsExpectedCrudFlow()
     {
         var builder = new MockerCommandBuilder();
         var initialCommand = new MockerCommandConfig { TriggerAction = new TriggerAction() };
@@ -126,8 +126,12 @@ public class MockerCommandBuilderTests
         Assert.That(builder.Configuration!.ChangeActionStub, Is.Not.Null);
         Assert.That(builder.Configuration!.TriggerAction, Is.Null);
 
-        builder.DeleteConfiguration();
-        Assert.That(builder.Configuration, Is.Null);
+        builder.Configure(new MockerCommandConfig
+        {
+            TriggerAction = new TriggerAction()
+        });
+        Assert.That(builder.Configuration, Is.Not.Null);
+        Assert.That(builder.Configuration!.TriggerAction, Is.Not.Null);
     }
 
     [Test]

@@ -19,22 +19,27 @@ public class BuilderCrudTests
             Reporter = null!
         };
 
-        builder.CreateSessionName("session-a")
-            .CreateSessionPattern("^session-.*$")
-            .CreateDataSourceName("source-a")
-            .CreateDataSourcePattern("^source-.*$")
-            .CreateLink(new LinkBuilder().Named("link-a").Configure(new KibanaLinkConfig
+        builder.AddSessionName("session-a")
+            .AddSessionPattern("^session-.*$")
+            .AddDataSourceName("source-a")
+            .AddDataSourcePattern("^source-.*$")
+            .AddLink(new LinkBuilder().Named("link-a").Configure(new KibanaLinkConfig
             {
                 Url = "https://kibana",
                 DataViewId = "view"
             }))
             .Configure(new { key = "value" });
 
-        builder.UpdateSessionName("session-a", "session-updated")
-            .UpdateSessionPattern("^session-.*$", "^updated-.*$")
-            .UpdateDataSourceName("source-a", "source-updated")
-            .UpdateDataSourcePattern("^source-.*$", "^updated-source-.*$")
-            .UpdateLink("link-a", new LinkBuilder().Named("link-updated").Configure(new PrometheusLinkConfig
+        builder.RemoveSessionName("session-a")
+            .AddSessionName("session-updated")
+            .RemoveSessionPattern("^session-.*$")
+            .AddSessionPattern("^updated-.*$")
+            .RemoveDataSourceName("source-a")
+            .AddDataSourceName("source-updated")
+            .RemoveDataSourcePattern("^source-.*$")
+            .AddDataSourcePattern("^updated-source-.*$")
+            .RemoveLink("link-a")
+            .AddLink(new LinkBuilder().Named("link-updated").Configure(new PrometheusLinkConfig
             {
                 Url = "https://prometheus",
                 Expressions = ["up"]
@@ -42,28 +47,28 @@ public class BuilderCrudTests
             .UpdateConfiguration(new { changed = "yes" })
             .UpdateConfiguration(new { nested = new { enabled = true } });
 
-        Assert.That(builder.ReadSessionNames(), Is.EquivalentTo(["session-updated"]));
-        Assert.That(builder.ReadSessionPatterns(), Is.EquivalentTo(["^updated-.*$"]));
-        Assert.That(builder.ReadDataSourceNames(), Is.EquivalentTo(["source-updated"]));
-        Assert.That(builder.ReadDataSourcePatterns(), Is.EquivalentTo(["^updated-source-.*$"]));
-        Assert.That(builder.ReadLinks(), Has.Count.EqualTo(1));
-        Assert.That(builder.ReadLinks()[0].Name, Is.EqualTo("link-updated"));
+        Assert.That(builder.SessionNames, Is.EquivalentTo(["session-updated"]));
+        Assert.That(builder.SessionNamePatterns, Is.EquivalentTo(["^updated-.*$"]));
+        Assert.That(builder.DataSourceNames, Is.EquivalentTo(["source-updated"]));
+        Assert.That(builder.DataSourcePatterns, Is.EquivalentTo(["^updated-source-.*$"]));
+        Assert.That(builder.Links, Has.Count.EqualTo(1));
+        Assert.That(builder.Links[0].Name, Is.EqualTo("link-updated"));
         Assert.That(builder.Configuration["key"], Is.EqualTo("value"));
         Assert.That(builder.Configuration["changed"], Is.EqualTo("yes"));
         Assert.That(builder.Configuration["nested:enabled"], Is.EqualTo("True"));
 
-        builder.DeleteSessionName("session-updated")
-            .DeleteSessionPattern("^updated-.*$")
-            .DeleteDataSourceName("source-updated")
-            .DeleteDataSourcePattern("^updated-source-.*$")
-            .DeleteLink("link-updated")
-            .DeleteConfiguration();
+        builder.RemoveSessionName("session-updated")
+            .RemoveSessionPattern("^updated-.*$")
+            .RemoveDataSourceName("source-updated")
+            .RemoveDataSourcePattern("^updated-source-.*$")
+            .RemoveLink("link-updated")
+            .RemoveConfiguration();
 
-        Assert.That(builder.ReadSessionNames(), Is.Empty);
-        Assert.That(builder.ReadSessionPatterns(), Is.Empty);
-        Assert.That(builder.ReadDataSourceNames(), Is.Empty);
-        Assert.That(builder.ReadDataSourcePatterns(), Is.Empty);
-        Assert.That(builder.ReadLinks(), Is.Empty);
+        Assert.That(builder.SessionNames, Is.Empty);
+        Assert.That(builder.SessionNamePatterns, Is.Empty);
+        Assert.That(builder.DataSourceNames, Is.Empty);
+        Assert.That(builder.DataSourcePatterns, Is.Empty);
+        Assert.That(builder.Links, Is.Empty);
         Assert.That(builder.Configuration.AsEnumerable().Any(), Is.False);
     }
 
@@ -86,9 +91,12 @@ public class BuilderCrudTests
 
         Assert.That(builder.Configuration, Is.TypeOf<KibanaLinkConfig>());
 
-        builder.DeleteConfiguration();
-        Assert.That(builder.Configuration, Is.Null);
-        Assert.Throws<InvalidOperationException>(() => builder.Build());
+        builder.Configure(new PrometheusLinkConfig
+        {
+            Url = "https://prometheus",
+            Expressions = ["up"]
+        });
+        Assert.That(builder.Configuration, Is.TypeOf<PrometheusLinkConfig>());
     }
 
     [Test]
@@ -117,4 +125,6 @@ public class BuilderCrudTests
         });
     }
 }
+
+
 
