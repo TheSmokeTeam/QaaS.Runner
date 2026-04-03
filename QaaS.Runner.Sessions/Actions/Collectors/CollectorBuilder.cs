@@ -142,18 +142,6 @@ public class CollectorBuilder
         return Configure(ConfigurationUpdateExtensions.UpdateConfiguration(currentConfig, configuration));
     }
 
-    /// <summary>
-    /// Clears the configuration currently stored on the Runner collector builder instance.
-    /// </summary>
-    /// <remarks>
-    /// Use this method when working with the documented Runner collector builder API surface in code. The change is stored on the current builder instance and is consumed by later build, validation, or execution steps.
-    /// </remarks>
-    /// <qaas-docs group="Configuration as Code" subgroup="Collectors" />
-    public CollectorBuilder DeleteConfiguration()
-    {
-        return Reset();
-    }
-
     private CollectorBuilder Reset()
     {
         Prometheus = null;

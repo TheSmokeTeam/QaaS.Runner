@@ -39,9 +39,9 @@ public class AssertionBuilderTests
             .AddSessionName("session-1")
             .AddSessionName("session-2")
             .AddSessionPattern("^session-.*$")
-            .CreateDataSourceName("source-1")
-            .CreateDataSourcePattern("^source-.*$")
-            .CreateLink(new LinkBuilder().Named("local-link").Configure(new PrometheusLinkConfig
+            .AddDataSourceName("source-1")
+            .AddDataSourcePattern("^source-.*$")
+            .AddLink(new LinkBuilder().Named("local-link").Configure(new PrometheusLinkConfig
             {
                 Url = "https://prometheus.local",
                 Expressions = ["up"]
@@ -149,8 +149,8 @@ public class AssertionBuilderTests
 
         Assert.Multiple(() =>
         {
-            Assert.That(builder.ReadSessionNames(), Is.Empty);
-            Assert.That(builder.ReadSessionPatterns(), Is.Empty);
+            Assert.That(builder.SessionNames, Is.Null);
+            Assert.That(builder.SessionNamePatterns, Is.Null);
         });
 
         builder.AddSessionName("session-a")
@@ -158,8 +158,8 @@ public class AssertionBuilderTests
 
         Assert.Multiple(() =>
         {
-            Assert.That(builder.ReadSessionNames(), Is.EqualTo(new[] { "session-a" }));
-            Assert.That(builder.ReadSessionPatterns(), Is.EqualTo(new[] { "^session-.*$" }));
+            Assert.That(builder.SessionNames, Is.EqualTo(new[] { "session-a" }));
+            Assert.That(builder.SessionNamePatterns, Is.EqualTo(new[] { "^session-.*$" }));
         });
     }
 
@@ -170,28 +170,24 @@ public class AssertionBuilderTests
         builder.SessionNames = null;
         builder.SessionNamePatterns = null;
 
-        builder.UpdateSessionName("missing", "updated")
-            .UpdateSessionPattern("missing", "updated")
-            .DeleteSessionName("missing")
-            .DeleteSessionPattern("missing");
+        builder.RemoveSessionName("missing")
+            .RemoveSessionPattern("missing");
 
         Assert.Multiple(() =>
         {
-            Assert.That(builder.ReadSessionNames(), Is.Empty);
-            Assert.That(builder.ReadSessionPatterns(), Is.Empty);
+            Assert.That(builder.SessionNames, Is.Null);
+            Assert.That(builder.SessionNamePatterns, Is.Null);
         });
 
         builder.AddSessionName("session-a")
             .AddSessionPattern("^session-.*$")
-            .UpdateSessionName("other-session", "updated")
-            .UpdateSessionPattern("^other$", "^updated$")
-            .DeleteSessionName("other-session")
-            .DeleteSessionPattern("^other$");
+            .RemoveSessionName("other-session")
+            .RemoveSessionPattern("^other$");
 
         Assert.Multiple(() =>
         {
-            Assert.That(builder.ReadSessionNames(), Is.EqualTo(new[] { "session-a" }));
-            Assert.That(builder.ReadSessionPatterns(), Is.EqualTo(new[] { "^session-.*$" }));
+            Assert.That(builder.SessionNames, Is.EqualTo(new[] { "session-a" }));
+            Assert.That(builder.SessionNamePatterns, Is.EqualTo(new[] { "^session-.*$" }));
         });
     }
 
@@ -237,7 +233,7 @@ public class AssertionBuilderTests
         var builder = CreateBuilder()
             .Named("assertion-display")
             .HookNamed("hook-type")
-            .CreateLink(new LinkBuilder().Named("local-link").Configure(new PrometheusLinkConfig
+            .AddLink(new LinkBuilder().Named("local-link").Configure(new PrometheusLinkConfig
             {
                 Url = "https://prometheus.local",
                 Expressions = ["up"]
@@ -266,4 +262,6 @@ public class AssertionBuilderTests
         };
     }
 }
+
+
 

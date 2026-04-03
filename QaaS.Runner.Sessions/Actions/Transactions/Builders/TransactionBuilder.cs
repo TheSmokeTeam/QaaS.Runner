@@ -327,7 +327,7 @@ public class TransactionBuilder
     /// Use this method when working with the documented Runner transaction builder API surface in code. The change is stored on the current builder instance and is consumed by later build, validation, or execution steps.
     /// </remarks>
     /// <qaas-docs group="Configuration as Code" subgroup="Transactions" />
-    public TransactionBuilder DeletePolicyAt(int index)
+    public TransactionBuilder RemovePolicyAt(int index)
     {
         if (index < 0 || index >= Policies.Length)
         {
@@ -380,7 +380,7 @@ public class TransactionBuilder
     /// Use this method when working with the documented Runner transaction builder API surface in code. The change is stored on the current builder instance and is consumed by later build, validation, or execution steps.
     /// </remarks>
     /// <qaas-docs group="Configuration as Code" subgroup="Transactions" />
-    public TransactionBuilder DeleteDataSource(string dataSourceName)
+    public TransactionBuilder RemoveDataSource(string dataSourceName)
     {
         DataSourceNames = DataSourceNames?.Where(value => value != dataSourceName).ToArray();
         return this;
@@ -428,7 +428,7 @@ public class TransactionBuilder
     /// Use this method when working with the documented Runner transaction builder API surface in code. The change is stored on the current builder instance and is consumed by later build, validation, or execution steps.
     /// </remarks>
     /// <qaas-docs group="Configuration as Code" subgroup="Transactions" />
-    public TransactionBuilder DeleteDataSourcePattern(string dataSourcePattern)
+    public TransactionBuilder RemoveDataSourcePattern(string dataSourcePattern)
     {
         DataSourcePatterns = DataSourcePatterns?.Where(value => value != dataSourcePattern).ToArray();
         return this;
@@ -498,18 +498,6 @@ public class TransactionBuilder
         var currentConfig = Configuration ??
                             throw new InvalidOperationException("Transaction configuration is not set");
         return Configure(currentConfig.UpdateConfiguration(configuration));
-    }
-
-    /// <summary>
-    /// Clears the configuration currently stored on the Runner transaction builder instance.
-    /// </summary>
-    /// <remarks>
-    /// Use this method when working with the documented Runner transaction builder API surface in code. The change is stored on the current builder instance and is consumed by later build, validation, or execution steps.
-    /// </remarks>
-    /// <qaas-docs group="Configuration as Code" subgroup="Transactions" />
-    public TransactionBuilder DeleteConfiguration()
-    {
-        return Reset();
     }
 
     private TransactionBuilder Reset()
