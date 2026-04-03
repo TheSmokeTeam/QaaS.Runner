@@ -57,7 +57,7 @@ public class ProbeBuilderTests
     public void AddDataSourceName_Should_Add_To_Array()
     {
         var builder = new ProbeBuilder();
-        builder.CreateDataSourceName("DataSource1");
+        builder.AddDataSourceName("DataSource1");
 
         Assert.That(builder.DataSourceNames, Contains.Item("DataSource1"));
     }
@@ -66,31 +66,31 @@ public class ProbeBuilderTests
     public void AddDataSourcePattern_Should_Add_To_Array()
     {
         var builder = new ProbeBuilder();
-        builder.CreateDataSourcePattern(@"^\w+$");
+        builder.AddDataSourcePattern(@"^\w+$");
 
         Assert.That(builder.DataSourcePatterns, Contains.Item(@"^\w+$"));
     }
 
     [Test]
-    public void DeleteDataSourceName_Should_Remove_From_Array()
+    public void RemoveDataSourceName_Should_Remove_From_Array()
     {
         var builder = new ProbeBuilder()
-            .CreateDataSourceName("DataSource1")
-            .CreateDataSourceName("DataSource2");
+            .AddDataSourceName("DataSource1")
+            .AddDataSourceName("DataSource2");
 
-        builder.DeleteDataSourceName("DataSource1");
+        builder.RemoveDataSourceName("DataSource1");
 
         Assert.That(builder.DataSourceNames, Is.EquivalentTo(["DataSource2"]));
     }
 
     [Test]
-    public void DeleteDataSourcePattern_Should_Remove_From_Array()
+    public void RemoveDataSourcePattern_Should_Remove_From_Array()
     {
         var builder = new ProbeBuilder()
-            .CreateDataSourcePattern(@"^\w+$")
-            .CreateDataSourcePattern(@"^\d+$");
+            .AddDataSourcePattern(@"^\w+$")
+            .AddDataSourcePattern(@"^\d+$");
 
-        builder.DeleteDataSourcePattern(@"^\w+$");
+        builder.RemoveDataSourcePattern(@"^\w+$");
 
         Assert.That(builder.DataSourcePatterns, Is.EquivalentTo([@"^\d+$"]));
     }
@@ -104,8 +104,8 @@ public class ProbeBuilderTests
         typeof(ProbeBuilder).GetProperty("DataSourcePatterns", BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic)!
             .SetValue(builder, null);
 
-        builder.CreateDataSourceName("DataSource1")
-            .CreateDataSourcePattern(@"^\w+$");
+        builder.AddDataSourceName("DataSource1")
+            .AddDataSourcePattern(@"^\w+$");
 
         Assert.That(builder.DataSourceNames, Contains.Item("DataSource1"));
         Assert.That(builder.DataSourcePatterns, Contains.Item(@"^\w+$"));
@@ -230,4 +230,6 @@ public class ProbeBuilderTests
         });
     }
 }
+
+
 

@@ -94,7 +94,7 @@ public class ExecutionBuilderTests
     public void Build_WithSessionWithoutConfiguredStage_AssignsIndexAsDefaultStage()
     {
         var builder = new ExecutionBuilder()
-            .CreateSession(new SessionBuilder
+            .AddSession(new SessionBuilder
             {
                 Name = "session-without-stage",
                 Stage = null,
@@ -109,8 +109,8 @@ public class ExecutionBuilderTests
 
         _ = builder.Build();
 
-        Assert.That(builder.ReadSessions(), Has.Count.EqualTo(1));
-        Assert.That(builder.ReadSessions()[0].Stage, Is.EqualTo(0));
+        Assert.That(builder.Sessions ?? [], Has.Length.EqualTo(1));
+        Assert.That(builder.Sessions[0].Stage, Is.EqualTo(0));
     }
 
     [Test]
@@ -128,19 +128,19 @@ public class ExecutionBuilderTests
         Assert.DoesNotThrow(() =>
         {
             builder.UpdateSession("missing", new SessionBuilder());
-            builder.DeleteSession("missing");
+            builder.RemoveSession("missing");
             builder.UpdateAssertion("missing", new AssertionBuilder
             {
                 AssertionInstance = null!,
                 Reporter = null!
             });
-            builder.DeleteAssertion("missing");
+            builder.RemoveAssertion("missing");
             builder.UpdateStorageAt(0, new StorageBuilder());
-            builder.DeleteStorageAt(0);
+            builder.RemoveStorageAt(0);
             builder.UpdateDataSource("missing", new DataSourceBuilder());
-            builder.DeleteDataSource("missing");
+            builder.RemoveDataSource("missing");
             builder.UpdateLinkAt(0, new LinkBuilder());
-            builder.DeleteLinkAt(0);
+            builder.RemoveLinkAt(0);
         });
 
         Assert.That(builder.Sessions, Is.Null);
@@ -158,9 +158,9 @@ public class ExecutionBuilderTests
             Storages = null
         };
 
-        var storages = builder.ReadStorages();
+        var storages = builder.Storages;
 
-        Assert.That(storages, Is.Empty);
+        Assert.That(storages, Is.Null);
     }
 
     [Test]
@@ -171,7 +171,7 @@ public class ExecutionBuilderTests
             Sessions = null
         };
 
-        Assert.That(builder.ReadSessions(), Is.Empty);
+        Assert.That(builder.Sessions, Is.Null);
     }
 
     [Test]
@@ -179,7 +179,7 @@ public class ExecutionBuilderTests
     {
         const string sharedProbeName = "shared-probe";
         var builder = new ExecutionBuilder()
-            .CreateSession(new SessionBuilder
+            .AddSession(new SessionBuilder
             {
                 Name = "session-1",
                 Stage = 0,
@@ -191,7 +191,7 @@ public class ExecutionBuilderTests
                         .Configure(new ProbeMarkerConfig { Marker = "first-config" })
                 ]
             })
-            .CreateSession(new SessionBuilder
+            .AddSession(new SessionBuilder
             {
                 Name = "session-2",
                 Stage = 1,
@@ -226,7 +226,7 @@ public class ExecutionBuilderTests
         const string sharedProbeName = "SharedProbe";
         var logger = new CapturingLogger();
         var builder = new ExecutionBuilder()
-            .CreateSession(new SessionBuilder
+            .AddSession(new SessionBuilder
             {
                 Name = "session-a",
                 Stage = 0,
@@ -238,7 +238,7 @@ public class ExecutionBuilderTests
                         .Configure(new ProbeMarkerConfig { Marker = "first-config" })
                 ]
             })
-            .CreateSession(new SessionBuilder
+            .AddSession(new SessionBuilder
             {
                 Name = "session-b",
                 Stage = 1,
@@ -280,7 +280,7 @@ public class ExecutionBuilderTests
     public void Start_WithProbeNamesThatWouldCollideWithoutScopedKeys_UsesDistinctProbeConfigurations()
     {
         var builder = new ExecutionBuilder()
-            .CreateSession(new SessionBuilder
+            .AddSession(new SessionBuilder
             {
                 Name = "ab",
                 Stage = 0,
@@ -292,7 +292,7 @@ public class ExecutionBuilderTests
                         .Configure(new ProbeMarkerConfig { Marker = "first-collision-config" })
                 ]
             })
-            .CreateSession(new SessionBuilder
+            .AddSession(new SessionBuilder
             {
                 Name = "a",
                 Stage = 1,
@@ -325,7 +325,7 @@ public class ExecutionBuilderTests
     public void Build_WithProbeMissingName_ThrowsInvalidConfigurationsException()
     {
         var builder = new ExecutionBuilder()
-            .CreateSession(new SessionBuilder
+            .AddSession(new SessionBuilder
             {
                 Name = "session-missing-probe-name",
                 Stage = 0,
@@ -349,7 +349,7 @@ public class ExecutionBuilderTests
     public void Build_WithDuplicateMockerCommandNames_ThrowsInvalidConfigurationsException()
     {
         var builder = new ExecutionBuilder()
-            .CreateSession(new SessionBuilder
+            .AddSession(new SessionBuilder
             {
                 Name = "session-with-duplicate-mocker-commands",
                 Stage = 0,
@@ -442,7 +442,7 @@ public class ExecutionBuilderTests
         });
 
         var builder = new ExecutionBuilder(context, ExecutionType.Run, null, null, null, null);
-        var session = builder.ReadSessions().Single();
+        var session = builder.Sessions.Single();
         var publisher = session.ReadPublishers().Single();
         var consumer = session.ReadConsumers().Single();
         var publisherRabbitMq = (RabbitMqSenderConfig?)typeof(QaaS.Runner.Sessions.Actions.Publishers.Builders.PublisherBuilder)
@@ -477,7 +477,7 @@ public class ExecutionBuilderTests
         });
 
         var builder = new ExecutionBuilder(context, ExecutionType.Template, null, null, null, null);
-        var session = builder.ReadSessions().Single();
+        var session = builder.Sessions.Single();
         var stage = session.ReadStages().Single();
 
         Assert.Multiple(() =>
@@ -521,7 +521,7 @@ public class ExecutionBuilderTests
         });
 
         var builder = new ExecutionBuilder(context, ExecutionType.Run, null, null, null, null);
-        var session = builder.ReadSessions().Single();
+        var session = builder.Sessions.Single();
         var publisher = session.ReadPublishers().Single();
         Assert.Throws<InvalidConfigurationsException>(() => builder.Build());
         var validationResults = (IReadOnlyList<System.ComponentModel.DataAnnotations.ValidationResult>)typeof(ExecutionBuilder)
@@ -590,9 +590,9 @@ public class ExecutionBuilderTests
         Assert.Multiple(() =>
         {
             Assert.Throws<ArgumentOutOfRangeException>(() => builder.UpdateStorageAt(-1, new StorageBuilder()));
-            Assert.Throws<ArgumentOutOfRangeException>(() => builder.DeleteStorageAt(5));
+            Assert.Throws<ArgumentOutOfRangeException>(() => builder.RemoveStorageAt(5));
             Assert.Throws<ArgumentOutOfRangeException>(() => builder.UpdateLinkAt(-1, new LinkBuilder()));
-            Assert.Throws<ArgumentOutOfRangeException>(() => builder.DeleteLinkAt(5));
+            Assert.Throws<ArgumentOutOfRangeException>(() => builder.RemoveLinkAt(5));
         });
     }
 
@@ -805,8 +805,8 @@ public class ExecutionBuilderTests
 
         Assert.Multiple(() =>
         {
-            Assert.That(builder.Assertions, Is.Empty);
-            Assert.That(builder.Sessions, Is.Empty);
+            Assert.That(builder.Assertions, Has.Length.EqualTo(0));
+            Assert.That(builder.Sessions, Has.Length.EqualTo(0));
             Assert.That(((InternalContext)typeof(ExecutionBuilder).BaseType!
                     .GetField("Context", BindingFlags.Instance | BindingFlags.NonPublic)!
                     .GetValue(builder)!)
@@ -904,7 +904,7 @@ public class ExecutionBuilderTests
             Assert.That(builtAssertions.Cast<object>(), Is.Empty);
             Assert.That(builtReports.Cast<object>(), Is.Empty);
             Assert.That(builtStorages.Cast<object>(), Is.Empty);
-            Assert.That(builder.Sessions, Is.Empty);
+            Assert.That(builder.Sessions, Has.Length.EqualTo(0));
         });
     }
 
@@ -933,7 +933,7 @@ public class ExecutionBuilderTests
             Stage = 0,
             Probes = []
         };
-        builder.CreateSession(sessionBuilder);
+        builder.AddSession(sessionBuilder);
 
         // Add valid assertion builder
         var assertionBuilder = new AssertionBuilder
@@ -943,7 +943,7 @@ public class ExecutionBuilderTests
             AssertionInstance = null,
             Reporter = null
         }.HookNamed(nameof(TestAssertion));
-        builder.CreateAssertion(assertionBuilder);
+        builder.AddAssertion(assertionBuilder);
 
         // Add valid storage builder
         var storageBuilder = new StorageBuilder().Configure(new S3Config
@@ -953,16 +953,16 @@ public class ExecutionBuilderTests
             AccessKey = "access",
             SecretKey = "secret"
         });
-        builder.CreateStorage(storageBuilder);
+        builder.AddStorage(storageBuilder);
 
         // Add valid link builder
         var linkBuilder = new LinkBuilder()
             { Grafana = new GrafanaLinkConfig { DashboardId = "dash-id", Url = "https://grafa.com", Variables = [] } };
-        builder.CreateLink(linkBuilder);
+        builder.AddLink(linkBuilder);
 
         // Add valid data source builder
         var dataSourceBuilder = new DataSourceBuilder().Named("test-datasource").HookNamed("TestGenerator");
-        builder.CreateDataSource(dataSourceBuilder);
+        builder.AddDataSource(dataSourceBuilder);
 
         return builder.SetExecutionId("test").SetCase("valid").WithLogger(Globals.Logger)
             .WithMetadata(new MetaDataConfig { Team = "Smoke", System = "QaaS" })
@@ -972,14 +972,14 @@ public class ExecutionBuilderTests
     private ExecutionBuilder CreateExecutionBuilderWithPublisher(PublisherBuilder publisherBuilder)
     {
         return new ExecutionBuilder()
-            .CreateSession(new SessionBuilder
+            .AddSession(new SessionBuilder
             {
                 Name = "publisher-session",
                 Stage = 0,
                 Publishers = [publisherBuilder],
                 Probes = []
             })
-            .CreateDataSource(new DataSourceBuilder().Named("payload").HookNamed("TestGenerator"))
+            .AddDataSource(new DataSourceBuilder().Named("payload").HookNamed("TestGenerator"))
             .ExecutionType(ExecutionType.Act)
             .SetExecutionId("publisher-validation")
             .SetCase("publisher-validation-case")
@@ -1007,8 +1007,8 @@ public class ExecutionBuilderTests
             Probes = []
         };
 
-        builder.CreateSession(sessionBuilder1);
-        builder.CreateSession(sessionBuilder2);
+        builder.AddSession(sessionBuilder1);
+        builder.AddSession(sessionBuilder2);
 
         // Add valid assertion builder
         var assertionBuilder = new AssertionBuilder
@@ -1018,7 +1018,7 @@ public class ExecutionBuilderTests
             AssertionInstance = null,
             Reporter = null
         }.HookNamed(nameof(TestAssertion));
-        builder.CreateAssertion(assertionBuilder);
+        builder.AddAssertion(assertionBuilder);
 
         return builder.ExecutionType(ExecutionType.Run).SetExecutionId("test").SetCase("invalid")
             .WithLogger(Globals.Logger).WithGlobalDict(new Dictionary<string, object?>())
@@ -1088,4 +1088,7 @@ public class ExecutionBuilderTests
 
     private sealed record LogEntry(LogLevel LogLevel, string Message);
 }
+
+
+
 

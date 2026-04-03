@@ -896,11 +896,11 @@ public class ConsumerBuilderTests
     }
 
     [Test]
-    public void DeletePolicyAt_WithInvalidIndex_ThrowsArgumentOutOfRangeException()
+    public void RemovePolicyAt_WithInvalidIndex_ThrowsArgumentOutOfRangeException()
     {
         var builder = new ConsumerBuilder();
 
-        Assert.Throws<ArgumentOutOfRangeException>(() => builder.DeletePolicyAt(0));
+        Assert.Throws<ArgumentOutOfRangeException>(() => builder.RemovePolicyAt(0));
     }
 
     [Test]

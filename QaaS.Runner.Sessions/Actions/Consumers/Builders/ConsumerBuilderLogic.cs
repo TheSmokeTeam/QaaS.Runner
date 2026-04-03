@@ -168,7 +168,7 @@ public partial class ConsumerBuilder
     /// Use this method when working with the documented Runner consumer builder API surface in code. The change is stored on the current builder instance and is consumed by later build, validation, or execution steps.
     /// </remarks>
     /// <qaas-docs group="Configuration as Code" subgroup="Consumers" />
-    public ConsumerBuilder DeletePolicyAt(int index)
+    public ConsumerBuilder RemovePolicyAt(int index)
     {
         if (index < 0 || index >= Policies.Length)
         {
@@ -243,18 +243,6 @@ public partial class ConsumerBuilder
         var currentConfig = Configuration ??
                             throw new InvalidOperationException("Consumer configuration is not set");
         return Configure(ConfigurationUpdateExtensions.UpdateConfiguration(currentConfig, configuration));
-    }
-
-    /// <summary>
-    /// Clears the configuration currently stored on the Runner consumer builder instance.
-    /// </summary>
-    /// <remarks>
-    /// Use this method when working with the documented Runner consumer builder API surface in code. The change is stored on the current builder instance and is consumed by later build, validation, or execution steps.
-    /// </remarks>
-    /// <qaas-docs group="Configuration as Code" subgroup="Consumers" />
-    public ConsumerBuilder DeleteConfiguration()
-    {
-        return Reset();
     }
 
     private ConsumerBuilder Reset()

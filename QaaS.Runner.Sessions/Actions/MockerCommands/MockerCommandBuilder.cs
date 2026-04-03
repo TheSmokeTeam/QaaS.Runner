@@ -216,20 +216,6 @@ public class MockerCommandBuilder
     }
 
     /// <summary>
-    /// Clears the configuration currently stored on the Runner mocker command builder instance.
-    /// </summary>
-    /// <remarks>
-    /// Use this method when working with the documented Runner mocker command builder API surface in code. The change is stored on the current builder instance and is consumed by later build, validation, or execution steps.
-    /// </remarks>
-    /// <qaas-docs group="Configuration as Code" subgroup="Mocker Commands" />
-    public MockerCommandBuilder DeleteConfiguration()
-    {
-        Command = null;
-        return this;
-    }
-
-
-    /// <summary>
     /// Builds the configured mocker command type and writes recoverable build failures to <paramref name="actionFailures"/>.
     /// </summary>
     internal StagedAction? Build(InternalContext context, IList<ActionFailure> actionFailures, string sessionName)

@@ -30,9 +30,9 @@
 //             .SetName("RunWithNoArgs");
 //
 //         var args2 = new[] { "run", "TestData/test.qaas.yaml", "-w", "TestData/override.yaml" };
-//         defaultExecutionBuilder2.CreateAssertion(new AssertionBuilder());
-//         defaultExecutionBuilder2.CreateSession(new SessionBuilder());
-//         defaultExecutionBuilder2.CreateDataSource(new DataSourceBuilder());
+//         defaultExecutionBuilder2.AddAssertion(new AssertionBuilder());
+//         defaultExecutionBuilder2.AddSession(new SessionBuilder());
+//         defaultExecutionBuilder2.AddDataSource(new DataSourceBuilder());
 //         yield return new TestCaseData(
 //                 new Runner(defaultScope, [defaultExecutionBuilder2], Globals.Logger), args2)
 //             .SetName("RunWithOverrideFiles");
@@ -73,5 +73,6 @@
 //         }
 //     }
 // }
+
 
 

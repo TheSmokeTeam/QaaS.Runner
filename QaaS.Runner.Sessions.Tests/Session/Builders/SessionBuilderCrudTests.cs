@@ -38,12 +38,12 @@ public class SessionBuilderCrudTests
 
         Assert.DoesNotThrow(() =>
         {
-            builder.DeleteConsumer("missing")
-                .DeletePublisher("missing")
-                .DeleteTransaction("missing")
-                .DeleteProbe("missing")
-                .DeleteCollector("missing")
-                .DeleteMockerCommand("missing");
+            builder.RemoveConsumer("missing")
+                .RemovePublisher("missing")
+                .RemoveTransaction("missing")
+                .RemoveProbe("missing")
+                .RemoveCollector("missing")
+                .RemoveMockerCommand("missing");
         });
 
         builder.CreateConsumer(new ConsumerBuilder().Named("consumer-a"))
@@ -72,7 +72,7 @@ public class SessionBuilderCrudTests
             .CreateConsumer(new ConsumerBuilder().Named("consumer-b"));
 
         builder.UpdateConsumer("consumer-a", new ConsumerBuilder().Named("consumer-updated"));
-        builder.DeleteConsumer("consumer-b");
+        builder.RemoveConsumer("consumer-b");
 
         Assert.That(builder.ReadConsumers(), Has.Count.EqualTo(1));
         Assert.That(builder.ReadConsumers()[0].Name, Is.EqualTo("consumer-updated"));
@@ -98,9 +98,9 @@ public class SessionBuilderCrudTests
         Assert.That(builder.ReadTransaction("transaction-updated")?.Name, Is.EqualTo("transaction-updated"));
         Assert.That(builder.ReadProbe("probe-updated")?.Name, Is.EqualTo("probe-updated"));
 
-        builder.DeletePublisher("publisher-updated")
-            .DeleteTransaction("transaction-updated")
-            .DeleteProbe("probe-updated");
+        builder.RemovePublisher("publisher-updated")
+            .RemoveTransaction("transaction-updated")
+            .RemoveProbe("probe-updated");
 
         Assert.That(builder.ReadPublishers(), Is.Empty);
         Assert.That(builder.ReadTransactions(), Is.Empty);
@@ -122,8 +122,8 @@ public class SessionBuilderCrudTests
         Assert.That(builder.ReadCollector("collector-updated")?.Name, Is.EqualTo("collector-updated"));
         Assert.That(builder.ReadMockerCommand("command-updated")?.Name, Is.EqualTo("command-updated"));
 
-        builder.DeleteCollector("collector-updated")
-            .DeleteMockerCommand("command-updated");
+        builder.RemoveCollector("collector-updated")
+            .RemoveMockerCommand("command-updated");
 
         Assert.That(builder.ReadCollectors(), Is.Empty);
         Assert.That(builder.ReadMockerCommands(), Is.Empty);
@@ -142,7 +142,7 @@ public class SessionBuilderCrudTests
         Assert.That(builder.ReadStages().First(stage => stage.StageNumber == 1).TimeoutBefore, Is.EqualTo(99));
         Assert.That(builder.ReadStage(1)?.TimeoutBefore, Is.EqualTo(99));
 
-        builder.DeleteStage(2);
+        builder.RemoveStage(2);
         Assert.That(builder.ReadStages(), Has.Count.EqualTo(1));
         Assert.That(builder.ReadStages()[0].StageNumber, Is.EqualTo(1));
     }
@@ -226,4 +226,7 @@ public class SessionBuilderCrudTests
         }
     }
 }
+
+
+
 
