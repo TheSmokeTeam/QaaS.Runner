@@ -127,7 +127,7 @@ public partial class SessionBuilder
     /// Use this method when working with the documented Runner session builder API surface in code. The change is stored on the current builder instance and is consumed by later build, validation, or execution steps.
     /// </remarks>
     /// <qaas-docs group="Configuration as Code" subgroup="Sessions" />
-    internal SessionBuilder AddConsumer(ConsumerBuilder consumerBuilder)
+    public SessionBuilder AddConsumer(ConsumerBuilder consumerBuilder)
     {
         Consumers = Consumers is null ? [consumerBuilder] : Consumers.Append(consumerBuilder).ToArray();
         return this;
@@ -202,9 +202,9 @@ public partial class SessionBuilder
     /// Use this method when working with the documented Runner session builder API surface in code. The change is stored on the current builder instance and is consumed by later build, validation, or execution steps.
     /// </remarks>
     /// <qaas-docs group="Configuration as Code" subgroup="Sessions" />
-    public SessionBuilder DeleteConsumer(string name)
+    public SessionBuilder RemoveConsumer(string name)
     {
-        Consumers = DeleteByName(Consumers, name, consumer => consumer.Name);
+        Consumers = RemoveByName(Consumers, name, consumer => consumer.Name);
         return this;
     }
 
@@ -215,7 +215,7 @@ public partial class SessionBuilder
     /// Use this method when working with the documented Runner session builder API surface in code. The change is stored on the current builder instance and is consumed by later build, validation, or execution steps.
     /// </remarks>
     /// <qaas-docs group="Configuration as Code" subgroup="Sessions" />
-    internal SessionBuilder AddPublisher(PublisherBuilder publisherBuilder)
+    public SessionBuilder AddPublisher(PublisherBuilder publisherBuilder)
     {
         Publishers = Publishers is null ? [publisherBuilder] : Publishers.Append(publisherBuilder).ToArray();
         return this;
@@ -290,9 +290,9 @@ public partial class SessionBuilder
     /// Use this method when working with the documented Runner session builder API surface in code. The change is stored on the current builder instance and is consumed by later build, validation, or execution steps.
     /// </remarks>
     /// <qaas-docs group="Configuration as Code" subgroup="Sessions" />
-    public SessionBuilder DeletePublisher(string name)
+    public SessionBuilder RemovePublisher(string name)
     {
-        Publishers = DeleteByName(Publishers, name, publisher => publisher.Name);
+        Publishers = RemoveByName(Publishers, name, publisher => publisher.Name);
         return this;
     }
 
@@ -303,7 +303,7 @@ public partial class SessionBuilder
     /// Use this method when working with the documented Runner session builder API surface in code. The change is stored on the current builder instance and is consumed by later build, validation, or execution steps.
     /// </remarks>
     /// <qaas-docs group="Configuration as Code" subgroup="Sessions" />
-    internal SessionBuilder AddTransaction(TransactionBuilder transactionBuilder)
+    public SessionBuilder AddTransaction(TransactionBuilder transactionBuilder)
     {
         Transactions = Transactions is null ? [transactionBuilder] : Transactions.Append(transactionBuilder).ToArray();
         return this;
@@ -378,9 +378,9 @@ public partial class SessionBuilder
     /// Use this method when working with the documented Runner session builder API surface in code. The change is stored on the current builder instance and is consumed by later build, validation, or execution steps.
     /// </remarks>
     /// <qaas-docs group="Configuration as Code" subgroup="Sessions" />
-    public SessionBuilder DeleteTransaction(string name)
+    public SessionBuilder RemoveTransaction(string name)
     {
-        Transactions = DeleteByName(Transactions, name, transaction => transaction.Name);
+        Transactions = RemoveByName(Transactions, name, transaction => transaction.Name);
         return this;
     }
 
@@ -391,7 +391,7 @@ public partial class SessionBuilder
     /// Use this method when working with the documented Runner session builder API surface in code. The change is stored on the current builder instance and is consumed by later build, validation, or execution steps.
     /// </remarks>
     /// <qaas-docs group="Configuration as Code" subgroup="Sessions" />
-    internal SessionBuilder AddProbe(ProbeBuilder probeBuilder)
+    public SessionBuilder AddProbe(ProbeBuilder probeBuilder)
     {
         Probes = Probes is null ? [probeBuilder] : Probes.Append(probeBuilder).ToArray();
         return this;
@@ -466,9 +466,9 @@ public partial class SessionBuilder
     /// Use this method when working with the documented Runner session builder API surface in code. The change is stored on the current builder instance and is consumed by later build, validation, or execution steps.
     /// </remarks>
     /// <qaas-docs group="Configuration as Code" subgroup="Sessions" />
-    public SessionBuilder DeleteProbe(string name)
+    public SessionBuilder RemoveProbe(string name)
     {
-        Probes = DeleteByName(Probes, name, probe => probe.Name);
+        Probes = RemoveByName(Probes, name, probe => probe.Name);
         return this;
     }
 
@@ -479,7 +479,7 @@ public partial class SessionBuilder
     /// Use this method when working with the documented Runner session builder API surface in code. The change is stored on the current builder instance and is consumed by later build, validation, or execution steps.
     /// </remarks>
     /// <qaas-docs group="Configuration as Code" subgroup="Sessions" />
-    internal SessionBuilder AddCollector(CollectorBuilder collectorBuilder)
+    public SessionBuilder AddCollector(CollectorBuilder collectorBuilder)
     {
         Collectors = Collectors is null ? [collectorBuilder] : Collectors.Append(collectorBuilder).ToArray();
         return this;
@@ -554,9 +554,9 @@ public partial class SessionBuilder
     /// Use this method when working with the documented Runner session builder API surface in code. The change is stored on the current builder instance and is consumed by later build, validation, or execution steps.
     /// </remarks>
     /// <qaas-docs group="Configuration as Code" subgroup="Sessions" />
-    public SessionBuilder DeleteCollector(string name)
+    public SessionBuilder RemoveCollector(string name)
     {
-        Collectors = DeleteByName(Collectors, name, collector => collector.Name);
+        Collectors = RemoveByName(Collectors, name, collector => collector.Name);
         return this;
     }
 
@@ -567,7 +567,7 @@ public partial class SessionBuilder
     /// Use this method when working with the documented Runner session builder API surface in code. The change is stored on the current builder instance and is consumed by later build, validation, or execution steps.
     /// </remarks>
     /// <qaas-docs group="Configuration as Code" subgroup="Sessions" />
-    internal SessionBuilder AddMockerCommand(MockerCommandBuilder mockerCommandBuilder)
+    public SessionBuilder AddMockerCommand(MockerCommandBuilder mockerCommandBuilder)
     {
         MockerCommands = MockerCommands is null
             ? [mockerCommandBuilder]
@@ -644,9 +644,9 @@ public partial class SessionBuilder
     /// Use this method when working with the documented Runner session builder API surface in code. The change is stored on the current builder instance and is consumed by later build, validation, or execution steps.
     /// </remarks>
     /// <qaas-docs group="Configuration as Code" subgroup="Sessions" />
-    public SessionBuilder DeleteMockerCommand(string name)
+    public SessionBuilder RemoveMockerCommand(string name)
     {
-        MockerCommands = DeleteByName(MockerCommands, name, command => command.Name);
+        MockerCommands = RemoveByName(MockerCommands, name, command => command.Name);
         return this;
     }
 
@@ -657,7 +657,7 @@ public partial class SessionBuilder
     /// Use this method when working with the documented Runner session builder API surface in code. The change is stored on the current builder instance and is consumed by later build, validation, or execution steps.
     /// </remarks>
     /// <qaas-docs group="Configuration as Code" subgroup="Sessions" />
-    internal SessionBuilder AddStage(StageConfig stage)
+    public SessionBuilder AddStage(StageConfig stage)
     {
         Stages = Stages.Append(stage).ToArray();
         return this;
@@ -725,7 +725,7 @@ public partial class SessionBuilder
     /// Use this method when working with the documented Runner session builder API surface in code. The change is stored on the current builder instance and is consumed by later build, validation, or execution steps.
     /// </remarks>
     /// <qaas-docs group="Configuration as Code" subgroup="Sessions" />
-    public SessionBuilder DeleteStage(int stageNumber)
+    public SessionBuilder RemoveStage(int stageNumber)
     {
         Stages = Stages.Where(configuredStage => configuredStage.StageNumber != stageNumber).ToArray();
         return this;
@@ -845,8 +845,9 @@ public partial class SessionBuilder
         return values?.FirstOrDefault(value => nameSelector(value) == name);
     }
 
-    private static T[]? DeleteByName<T>(T[]? values, string name, Func<T, string?> nameSelector)
+    private static T[]? RemoveByName<T>(T[]? values, string name, Func<T, string?> nameSelector)
     {
         return values?.Where(value => nameSelector(value) != name).ToArray();
     }
 }
+

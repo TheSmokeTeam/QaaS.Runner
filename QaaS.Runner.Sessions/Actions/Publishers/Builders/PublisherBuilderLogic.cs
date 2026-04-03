@@ -114,7 +114,7 @@ public partial class PublisherBuilder
     /// Use this method when working with the documented Runner publisher builder API surface in code. The change is stored on the current builder instance and is consumed by later build, validation, or execution steps.
     /// </remarks>
     /// <qaas-docs group="Configuration as Code" subgroup="Publishers" />
-    internal PublisherBuilder AddDataSource(string dataSourceName)
+    public PublisherBuilder AddDataSource(string dataSourceName)
     {
         var dataSourceNamesList = DataSourceNames?.ToList() ?? [];
         dataSourceNamesList.Add(dataSourceName);
@@ -189,7 +189,7 @@ public partial class PublisherBuilder
     /// Use this method when working with the documented Runner publisher builder API surface in code. The change is stored on the current builder instance and is consumed by later build, validation, or execution steps.
     /// </remarks>
     /// <qaas-docs group="Configuration as Code" subgroup="Publishers" />
-    internal PublisherBuilder AddDataSourcePattern(string dataSourcePattern)
+    public PublisherBuilder AddDataSourcePattern(string dataSourcePattern)
     {
         var dataSourcePatternsList = DataSourcePatterns?.ToList() ?? [];
         dataSourcePatternsList.Add(dataSourcePattern);
@@ -303,7 +303,7 @@ public partial class PublisherBuilder
     /// Use this method when working with the documented Runner publisher builder API surface in code. The change is stored on the current builder instance and is consumed by later build, validation, or execution steps.
     /// </remarks>
     /// <qaas-docs group="Configuration as Code" subgroup="Publishers" />
-    internal PublisherBuilder AddPolicy(PolicyBuilder policy)
+    public PublisherBuilder AddPolicy(PolicyBuilder policy)
     {
         var policiesList = Policies.ToList();
         policiesList.Add(policy);

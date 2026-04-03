@@ -283,51 +283,9 @@ public class AssertionBuilder : IYamlConvertible
     /// Use this method when working with the documented Runner assertion builder API surface in code. The change is stored on the current builder instance and is consumed by later build, validation, or execution steps.
     /// </remarks>
     /// <qaas-docs group="Configuration as Code" subgroup="Assertions" />
-    internal AssertionBuilder AddDataSourceName(string dataSourceName)
+    public AssertionBuilder AddDataSourceName(string dataSourceName)
     {
-        DataSourceNames = DataSourceNames.Append(dataSourceName).ToArray();
-        return this;
-    }
-
-    /// <summary>
-    /// Creates or adds the configured data source name entry on the current Runner assertion builder instance.
-    /// </summary>
-    /// <remarks>
-    /// Use this method when working with the documented Runner assertion builder API surface in code. The change is stored on the current builder instance and is consumed by later build, validation, or execution steps.
-    /// </remarks>
-    /// <qaas-docs group="Configuration as Code" subgroup="Assertions" />
-    public AssertionBuilder CreateDataSourceName(string dataSourceName)
-    {
-        return AddDataSourceName(dataSourceName);
-    }
-
-    /// <summary>
-    /// Returns the configured data source names currently stored on the Runner assertion builder instance.
-    /// </summary>
-    /// <remarks>
-    /// Use this method when working with the documented Runner assertion builder API surface in code. Use it to inspect the current configured state without rebuilding the surrounding collection or runtime object graph.
-    /// </remarks>
-    /// <qaas-docs group="Configuration as Code" subgroup="Assertions" />
-    public IReadOnlyList<string> ReadDataSourceNames()
-    {
-        return DataSourceNames;
-    }
-
-    /// <summary>
-    /// Updates the configured data source name stored on the current Runner assertion builder instance.
-    /// </summary>
-    /// <remarks>
-    /// Use this method when working with the documented Runner assertion builder API surface in code. The change is stored on the current builder instance and is consumed by later build, validation, or execution steps.
-    /// </remarks>
-    /// <qaas-docs group="Configuration as Code" subgroup="Assertions" />
-    public AssertionBuilder UpdateDataSourceName(string existingValue, string newValue)
-    {
-        var index = Array.IndexOf(DataSourceNames, existingValue);
-        if (index >= 0)
-        {
-            DataSourceNames[index] = newValue;
-        }
-
+        DataSourceNames = (DataSourceNames ?? []).Append(dataSourceName).ToArray();
         return this;
     }
 
@@ -338,9 +296,9 @@ public class AssertionBuilder : IYamlConvertible
     /// Use this method when working with the documented Runner assertion builder API surface in code. The change is stored on the current builder instance and is consumed by later build, validation, or execution steps.
     /// </remarks>
     /// <qaas-docs group="Configuration as Code" subgroup="Assertions" />
-    public AssertionBuilder DeleteDataSourceName(string dataSourceName)
+    public AssertionBuilder RemoveDataSourceName(string dataSourceName)
     {
-        DataSourceNames = DataSourceNames.Where(value => value != dataSourceName).ToArray();
+        DataSourceNames = (DataSourceNames ?? []).Where(value => value != dataSourceName).ToArray();
         return this;
     }
 
@@ -351,51 +309,9 @@ public class AssertionBuilder : IYamlConvertible
     /// Use this method when working with the documented Runner assertion builder API surface in code. The change is stored on the current builder instance and is consumed by later build, validation, or execution steps.
     /// </remarks>
     /// <qaas-docs group="Configuration as Code" subgroup="Assertions" />
-    internal AssertionBuilder AddDataSourcePattern(string dataSourcePattern)
+    public AssertionBuilder AddDataSourcePattern(string dataSourcePattern)
     {
-        DataSourcePatterns = DataSourcePatterns.Append(dataSourcePattern).ToArray();
-        return this;
-    }
-
-    /// <summary>
-    /// Creates or adds the configured data source pattern entry on the current Runner assertion builder instance.
-    /// </summary>
-    /// <remarks>
-    /// Use this method when working with the documented Runner assertion builder API surface in code. The change is stored on the current builder instance and is consumed by later build, validation, or execution steps.
-    /// </remarks>
-    /// <qaas-docs group="Configuration as Code" subgroup="Assertions" />
-    public AssertionBuilder CreateDataSourcePattern(string dataSourcePattern)
-    {
-        return AddDataSourcePattern(dataSourcePattern);
-    }
-
-    /// <summary>
-    /// Returns the configured data source patterns currently stored on the Runner assertion builder instance.
-    /// </summary>
-    /// <remarks>
-    /// Use this method when working with the documented Runner assertion builder API surface in code. Use it to inspect the current configured state without rebuilding the surrounding collection or runtime object graph.
-    /// </remarks>
-    /// <qaas-docs group="Configuration as Code" subgroup="Assertions" />
-    public IReadOnlyList<string> ReadDataSourcePatterns()
-    {
-        return DataSourcePatterns;
-    }
-
-    /// <summary>
-    /// Updates the configured data source pattern stored on the current Runner assertion builder instance.
-    /// </summary>
-    /// <remarks>
-    /// Use this method when working with the documented Runner assertion builder API surface in code. The change is stored on the current builder instance and is consumed by later build, validation, or execution steps.
-    /// </remarks>
-    /// <qaas-docs group="Configuration as Code" subgroup="Assertions" />
-    public AssertionBuilder UpdateDataSourcePattern(string existingValue, string newValue)
-    {
-        var index = Array.IndexOf(DataSourcePatterns, existingValue);
-        if (index >= 0)
-        {
-            DataSourcePatterns[index] = newValue;
-        }
-
+        DataSourcePatterns = (DataSourcePatterns ?? []).Append(dataSourcePattern).ToArray();
         return this;
     }
 
@@ -406,9 +322,9 @@ public class AssertionBuilder : IYamlConvertible
     /// Use this method when working with the documented Runner assertion builder API surface in code. The change is stored on the current builder instance and is consumed by later build, validation, or execution steps.
     /// </remarks>
     /// <qaas-docs group="Configuration as Code" subgroup="Assertions" />
-    public AssertionBuilder DeleteDataSourcePattern(string dataSourcePattern)
+    public AssertionBuilder RemoveDataSourcePattern(string dataSourcePattern)
     {
-        DataSourcePatterns = DataSourcePatterns.Where(value => value != dataSourcePattern).ToArray();
+        DataSourcePatterns = (DataSourcePatterns ?? []).Where(value => value != dataSourcePattern).ToArray();
         return this;
     }
 
@@ -419,56 +335,9 @@ public class AssertionBuilder : IYamlConvertible
     /// Use this method when working with the documented Runner assertion builder API surface in code. The change is stored on the current builder instance and is consumed by later build, validation, or execution steps.
     /// </remarks>
     /// <qaas-docs group="Configuration as Code" subgroup="Assertions" />
-    internal AssertionBuilder AddSessionName(string sessionName)
+    public AssertionBuilder AddSessionName(string sessionName)
     {
         SessionNames = SessionNames == null ? [sessionName] : SessionNames.Append(sessionName).ToArray();
-        return this;
-    }
-
-    /// <summary>
-    /// Creates or adds the configured session name entry on the current Runner assertion builder instance.
-    /// </summary>
-    /// <remarks>
-    /// Use this method when working with the documented Runner assertion builder API surface in code. The change is stored on the current builder instance and is consumed by later build, validation, or execution steps.
-    /// </remarks>
-    /// <qaas-docs group="Configuration as Code" subgroup="Assertions" />
-    public AssertionBuilder CreateSessionName(string sessionName)
-    {
-        return AddSessionName(sessionName);
-    }
-
-    /// <summary>
-    /// Returns the configured session names currently stored on the Runner assertion builder instance.
-    /// </summary>
-    /// <remarks>
-    /// Use this method when working with the documented Runner assertion builder API surface in code. Use it to inspect the current configured state without rebuilding the surrounding collection or runtime object graph.
-    /// </remarks>
-    /// <qaas-docs group="Configuration as Code" subgroup="Assertions" />
-    public IReadOnlyList<string> ReadSessionNames()
-    {
-        return SessionNames ?? [];
-    }
-
-    /// <summary>
-    /// Updates the configured session name stored on the current Runner assertion builder instance.
-    /// </summary>
-    /// <remarks>
-    /// Use this method when working with the documented Runner assertion builder API surface in code. The change is stored on the current builder instance and is consumed by later build, validation, or execution steps.
-    /// </remarks>
-    /// <qaas-docs group="Configuration as Code" subgroup="Assertions" />
-    public AssertionBuilder UpdateSessionName(string existingValue, string newValue)
-    {
-        if (SessionNames == null)
-        {
-            return this;
-        }
-
-        var index = Array.IndexOf(SessionNames, existingValue);
-        if (index >= 0)
-        {
-            SessionNames[index] = newValue;
-        }
-
         return this;
     }
 
@@ -479,7 +348,7 @@ public class AssertionBuilder : IYamlConvertible
     /// Use this method when working with the documented Runner assertion builder API surface in code. The change is stored on the current builder instance and is consumed by later build, validation, or execution steps.
     /// </remarks>
     /// <qaas-docs group="Configuration as Code" subgroup="Assertions" />
-    public AssertionBuilder DeleteSessionName(string sessionName)
+    public AssertionBuilder RemoveSessionName(string sessionName)
     {
         SessionNames = SessionNames?.Where(value => value != sessionName).ToArray();
         return this;
@@ -492,58 +361,11 @@ public class AssertionBuilder : IYamlConvertible
     /// Use this method when working with the documented Runner assertion builder API surface in code. The change is stored on the current builder instance and is consumed by later build, validation, or execution steps.
     /// </remarks>
     /// <qaas-docs group="Configuration as Code" subgroup="Assertions" />
-    internal AssertionBuilder AddSessionPattern(string sessionPattern)
+    public AssertionBuilder AddSessionPattern(string sessionPattern)
     {
         SessionNamePatterns = SessionNamePatterns == null
             ? [sessionPattern]
             : SessionNamePatterns.Append(sessionPattern).ToArray();
-        return this;
-    }
-
-    /// <summary>
-    /// Creates or adds the configured session pattern entry on the current Runner assertion builder instance.
-    /// </summary>
-    /// <remarks>
-    /// Use this method when working with the documented Runner assertion builder API surface in code. The change is stored on the current builder instance and is consumed by later build, validation, or execution steps.
-    /// </remarks>
-    /// <qaas-docs group="Configuration as Code" subgroup="Assertions" />
-    public AssertionBuilder CreateSessionPattern(string sessionPattern)
-    {
-        return AddSessionPattern(sessionPattern);
-    }
-
-    /// <summary>
-    /// Returns the configured session patterns currently stored on the Runner assertion builder instance.
-    /// </summary>
-    /// <remarks>
-    /// Use this method when working with the documented Runner assertion builder API surface in code. Use it to inspect the current configured state without rebuilding the surrounding collection or runtime object graph.
-    /// </remarks>
-    /// <qaas-docs group="Configuration as Code" subgroup="Assertions" />
-    public IReadOnlyList<string> ReadSessionPatterns()
-    {
-        return SessionNamePatterns ?? [];
-    }
-
-    /// <summary>
-    /// Updates the configured session pattern stored on the current Runner assertion builder instance.
-    /// </summary>
-    /// <remarks>
-    /// Use this method when working with the documented Runner assertion builder API surface in code. The change is stored on the current builder instance and is consumed by later build, validation, or execution steps.
-    /// </remarks>
-    /// <qaas-docs group="Configuration as Code" subgroup="Assertions" />
-    public AssertionBuilder UpdateSessionPattern(string existingValue, string newValue)
-    {
-        if (SessionNamePatterns == null)
-        {
-            return this;
-        }
-
-        var index = Array.IndexOf(SessionNamePatterns, existingValue);
-        if (index >= 0)
-        {
-            SessionNamePatterns[index] = newValue;
-        }
-
         return this;
     }
 
@@ -554,7 +376,7 @@ public class AssertionBuilder : IYamlConvertible
     /// Use this method when working with the documented Runner assertion builder API surface in code. The change is stored on the current builder instance and is consumed by later build, validation, or execution steps.
     /// </remarks>
     /// <qaas-docs group="Configuration as Code" subgroup="Assertions" />
-    public AssertionBuilder DeleteSessionPattern(string sessionPattern)
+    public AssertionBuilder RemoveSessionPattern(string sessionPattern)
     {
         SessionNamePatterns = SessionNamePatterns?.Where(value => value != sessionPattern).ToArray();
         return this;
@@ -567,51 +389,9 @@ public class AssertionBuilder : IYamlConvertible
     /// Use this method when working with the documented Runner assertion builder API surface in code. The change is stored on the current builder instance and is consumed by later build, validation, or execution steps.
     /// </remarks>
     /// <qaas-docs group="Configuration as Code" subgroup="Assertions" />
-    internal AssertionBuilder AddLink(LinkBuilder linkBuilder)
+    public AssertionBuilder AddLink(LinkBuilder linkBuilder)
     {
-        Links = Links.Append(linkBuilder).ToList();
-        return this;
-    }
-
-    /// <summary>
-    /// Creates or adds the configured link entry on the current Runner assertion builder instance.
-    /// </summary>
-    /// <remarks>
-    /// Use this method when working with the documented Runner assertion builder API surface in code. The change is stored on the current builder instance and is consumed by later build, validation, or execution steps.
-    /// </remarks>
-    /// <qaas-docs group="Configuration as Code" subgroup="Assertions" />
-    public AssertionBuilder CreateLink(LinkBuilder linkBuilder)
-    {
-        return AddLink(linkBuilder);
-    }
-
-    /// <summary>
-    /// Returns the configured links currently stored on the Runner assertion builder instance.
-    /// </summary>
-    /// <remarks>
-    /// Use this method when working with the documented Runner assertion builder API surface in code. Use it to inspect the current configured state without rebuilding the surrounding collection or runtime object graph.
-    /// </remarks>
-    /// <qaas-docs group="Configuration as Code" subgroup="Assertions" />
-    public IReadOnlyList<LinkBuilder> ReadLinks()
-    {
-        return Links;
-    }
-
-    /// <summary>
-    /// Updates the configured link stored on the current Runner assertion builder instance.
-    /// </summary>
-    /// <remarks>
-    /// Use this method when working with the documented Runner assertion builder API surface in code. The change is stored on the current builder instance and is consumed by later build, validation, or execution steps.
-    /// </remarks>
-    /// <qaas-docs group="Configuration as Code" subgroup="Assertions" />
-    public AssertionBuilder UpdateLink(string name, LinkBuilder linkBuilder)
-    {
-        var index = Links.FindIndex(configuredLink => configuredLink.Name == name);
-        if (index >= 0)
-        {
-            Links[index] = linkBuilder;
-        }
-
+        Links = (Links ?? []).Append(linkBuilder).ToList();
         return this;
     }
 
@@ -622,9 +402,9 @@ public class AssertionBuilder : IYamlConvertible
     /// Use this method when working with the documented Runner assertion builder API surface in code. The change is stored on the current builder instance and is consumed by later build, validation, or execution steps.
     /// </remarks>
     /// <qaas-docs group="Configuration as Code" subgroup="Assertions" />
-    public AssertionBuilder DeleteLink(string name)
+    public AssertionBuilder RemoveLink(string name)
     {
-        Links = Links.Where(link => link.Name != name).ToList();
+        Links = (Links ?? []).Where(link => link.Name != name).ToList();
         return this;
     }
 
@@ -661,18 +441,6 @@ public class AssertionBuilder : IYamlConvertible
     /// Use this method when working with the documented Runner assertion builder API surface in code. The change is stored on the current builder instance and is consumed by later build, validation, or execution steps.
     /// </remarks>
     /// <qaas-docs group="Configuration as Code" subgroup="Assertions" />
-    internal AssertionBuilder Create(object configuration)
-    {
-        return AddConfiguration(configuration);
-    }
-
-    /// <summary>
-    /// Updates the configuration currently stored on the Runner assertion builder instance.
-    /// </summary>
-    /// <remarks>
-    /// Use this method when working with the documented Runner assertion builder API surface in code. The change is stored on the current builder instance and is consumed by later build, validation, or execution steps.
-    /// </remarks>
-    /// <qaas-docs group="Configuration as Code" subgroup="Assertions" />
     public AssertionBuilder UpdateConfiguration(object configuration)
     {
         AssertionConfiguration = AssertionConfiguration.UpdateConfiguration(configuration);
@@ -686,7 +454,7 @@ public class AssertionBuilder : IYamlConvertible
     /// Use this method when working with the documented Runner assertion builder API surface in code. The change is stored on the current builder instance and is consumed by later build, validation, or execution steps.
     /// </remarks>
     /// <qaas-docs group="Configuration as Code" subgroup="Assertions" />
-    public AssertionBuilder DeleteConfiguration()
+    public AssertionBuilder RemoveConfiguration()
     {
         AssertionConfiguration = new ConfigurationBuilder().Build();
         return this;
