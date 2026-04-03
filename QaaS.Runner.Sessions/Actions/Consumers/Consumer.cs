@@ -3,6 +3,7 @@ using QaaS.Framework.Policies;
 using QaaS.Framework.Protocols.Protocols;
 using QaaS.Framework.SDK.Session;
 using QaaS.Framework.SDK.Session.CommunicationDataObjects;
+using QaaS.Framework.SDK.Session.DataObjects;
 using QaaS.Framework.Serialization;
 
 namespace QaaS.Runner.Sessions.Actions.Consumers;
@@ -11,9 +12,9 @@ public sealed class Consumer : BaseConsumer
 {
     private readonly IReader? _reader;
 
-    public Consumer(string name, IReader? reader, TimeSpan timeoutMs, int stage, Policy? policies,
+    public Consumer(string name, IReader? reader, TimeSpan timeoutMs, TimeSpan? initialTimeoutMs, int stage, Policy? policies,
         DataFilter dataFilter, SerializationType? serializationType, Type? deserializerSpecificType,
-        ILogger logger) : base(name, timeoutMs, stage, policies, dataFilter, serializationType,
+        ILogger logger) : base(name, timeoutMs, initialTimeoutMs, stage, policies, dataFilter, serializationType,
         deserializerSpecificType, logger)
     {
         _reader = reader;
@@ -30,18 +31,37 @@ public sealed class Consumer : BaseConsumer
 
     protected override void Consume(InternalCommunicationData<object> actData)
     {
-        while (true)
-        {
+        do {
             var readData = _reader!.Read(TimeoutMs);
             if (readData == null) break;
 
             LogData(actData, readData);
 
-            if (Policies?.RunChain() == false) break;
+        } while(Policies?.RunChain() != false);
+
+        TerminateConsumer();
+    }
+
+    protected override bool InitialConsume(InternalCommunicationData<object> actData)
+    {
+        if (InitialTimeoutMs == null) return true;
+        
+        var readData = _reader!.Read((TimeSpan)InitialTimeoutMs);
+        if (readData == null)
+        {
+            TerminateConsumer();
+            return false;
         }
 
-        RunningCommunicationData.Data.CompleteAdding();
+        LogData(actData, readData);
+
+        if (Policies?.RunChain() != false)
+            return true;
+
+        TerminateConsumer();
+        return false;
     }
+    
 
     protected override SerializationType? GetCommunicationSerializationType() =>
         _reader?.GetSerializationType() ?? SerializationType;

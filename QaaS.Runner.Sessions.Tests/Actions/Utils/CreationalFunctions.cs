@@ -115,6 +115,7 @@ public static class CreationalFunctions
         
         return new Sessions.Actions.Consumers.Consumer(
             "TestConsumer", reader.Object, new TimeSpan(1),
+            null,
             1,
             new CountPolicy(numOfMsgToRead),
             new DataFilter {Body = true, MetaData = false, Timestamp = false},
@@ -132,6 +133,7 @@ public static class CreationalFunctions
         
         return new Sessions.Actions.Consumers.ChunkConsumer(
             "TestConsumer", reader.Object, new TimeSpan(1),
+            null,
             1,
             new CountPolicy(numOfMsgToRead),
             new DataFilter {Body = true, MetaData = false, Timestamp = false},
