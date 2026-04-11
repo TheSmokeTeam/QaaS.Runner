@@ -98,6 +98,13 @@ public class ExecutionBuilder() : BaseExecutionBuilder<InternalContext, Executio
     /// </summary>
     [Description("The metadata for the tests' run")]
     public MetaDataConfig? MetaData { get; internal set; }
+
+    /// <summary>
+    /// Optional configuration for publishing the same assertion results to ReportPortal.
+    /// </summary>
+    [Description("Optional configuration for publishing the same assertion results to ReportPortal.")]
+    public ReportPortalConfig? ReportPortal { get; internal set; }
+
     private ExecutionType Type { get; set; }
 
     private bool LoadedContext { get; }
@@ -119,6 +126,8 @@ public class ExecutionBuilder() : BaseExecutionBuilder<InternalContext, Executio
     private string? _configuredCaseName;
     private string? _configuredExecutionId;
     private Dictionary<string, object?> _globalDict = new();
+    private ReportPortalLaunchManager? _reportPortalLaunchManager;
+    private ReportPortalRunDescriptor? _reportPortalRunDescriptor;
     private readonly IConfiguration? _templateSourceConfiguration;
     private const BindingFlags ValidationBindingFlags =
         BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance;
@@ -141,6 +150,7 @@ public class ExecutionBuilder() : BaseExecutionBuilder<InternalContext, Executio
         Sessions = blankRunBuilderFromContext.Sessions;
         Links = blankRunBuilderFromContext.Links;
         MetaData = blankRunBuilderFromContext.MetaData;
+        ReportPortal = blankRunBuilderFromContext.ReportPortal;
 
         _sessionNamesToRun = sessionNamesToRun != null && !sessionNamesToRun.Any() ? null : sessionNamesToRun;
         _sessionCategoriesToRun = sessionCategoriesToRun != null && !sessionCategoriesToRun.Any()
@@ -218,8 +228,16 @@ public class ExecutionBuilder() : BaseExecutionBuilder<InternalContext, Executio
     private IEnumerable<IReporter> BuildReports()
     {
         if (Assertions is null) return [];
+        var reportPortalRunDescriptor = _reportPortalRunDescriptor ?? new ReportPortalRunDescriptor(
+            MetaData?.Team,
+            MetaData?.System,
+            ReadSessions().Select(session => session.Name).Where(sessionName => !string.IsNullOrWhiteSpace(sessionName))
+                .Select(sessionName => sessionName!).ToArray(),
+            Type.ToString().ToLowerInvariant(),
+            DateTimeOffset.Now);
+        var reportPortalSettings = ReportPortalConfig.Resolve(ReportPortal, reportPortalRunDescriptor);
         var resolvedReports = Assertions.SelectMany(assertionReport =>
-            assertionReport.BuildReporters(Context, DateTime.UtcNow));
+            assertionReport.BuildReporters(Context, DateTime.UtcNow, reportPortalSettings, _reportPortalLaunchManager));
         return resolvedReports;
     }
 
@@ -588,6 +606,33 @@ public class ExecutionBuilder() : BaseExecutionBuilder<InternalContext, Executio
     {
         _configuredLogger = logger;
         return this;
+    }
+
+    internal ExecutionBuilder WithReportPortalLaunchManager(ReportPortalLaunchManager reportPortalLaunchManager)
+    {
+        _reportPortalLaunchManager = reportPortalLaunchManager;
+        return this;
+    }
+
+    internal ExecutionBuilder WithReportPortalRunDescriptor(ReportPortalRunDescriptor reportPortalRunDescriptor)
+    {
+        _reportPortalRunDescriptor = reportPortalRunDescriptor;
+        return this;
+    }
+
+    internal ExecutionType ReadExecutionType()
+    {
+        return Type;
+    }
+
+    internal string? ReadCase()
+    {
+        return _configuredCaseName ?? Context.CaseName;
+    }
+
+    internal string? ReadExecutionId()
+    {
+        return _configuredExecutionId ?? Context.ExecutionId;
     }
 
     /// <summary>

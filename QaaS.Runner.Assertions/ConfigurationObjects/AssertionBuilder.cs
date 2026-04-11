@@ -747,8 +747,30 @@ public class AssertionBuilder : IYamlConvertible
     }
 
     internal IEnumerable<IReporter> BuildReporters(Context context, DateTime testSuiteStartTimeUtc,
+        ReportPortalSettings? reportPortalSettings = null,
+        ReportPortalLaunchManager? reportPortalLaunchManager = null,
         IFileSystem? fileSystem = null)
     {
         yield return Build(context, testSuiteStartTimeUtc, fileSystem);
+        if (reportPortalSettings is { Enabled: true } && reportPortalLaunchManager is not null)
+        {
+            yield return new ReportPortalReporter
+            {
+                Name = $"{Name!} (ReportPortal)",
+                AssertionName = Name!,
+                DisplayTrace = DisplayTrace,
+                SaveSessionData = SaveSessionData,
+                SaveLogs = SaveLogs,
+                SaveAttachments = SaveAttachments,
+                SaveTemplate = SaveTemplate,
+                Severity = Severity,
+                Context = context,
+                EpochTestSuiteStartTime =
+                    new DateTimeOffset(testSuiteStartTimeUtc, new TimeSpan(0)).ToUnixTimeMilliseconds(),
+                FileSystem = fileSystem ?? new FileSystem(),
+                Settings = reportPortalSettings,
+                LaunchManager = reportPortalLaunchManager
+            };
+        }
     }
 }

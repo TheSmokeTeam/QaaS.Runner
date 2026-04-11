@@ -1,0 +1,32 @@
+MetaData:
+  Team: wOnDeR
+  System: Young
+  ExtraLabels:
+    Component: CaseInsensitive
+    Area: Validation
+    Owner: QaaS
+
+ReportPortal:
+  Attributes:
+    Variation: CaseInsensitiveTeam
+    Suite: ReportPortalE2E
+
+Sessions:
+  - Name: Case Insensitive Team Session
+    Probes:
+      - Name: CaseInsensitiveProbe
+        Probe: ReportPortalDiagnosticProbe
+        ProbeConfiguration:
+          StepName: Case Insensitive Diagnostics
+          TraceMessage: This run validates that team-to-project routing ignores letter casing.
+
+Assertions:
+  - Name: CaseInsensitiveAssertion
+    Assertion: ReportPortalRichAssertion
+    AssertionConfiguration:
+      Outcome: Passed
+      Message: Case insensitive team routing assertion message
+      TracePrefix: Case insensitive team routing assertion trace
+      AttachmentCount: 1
+      AttachmentKinds:
+        - Json

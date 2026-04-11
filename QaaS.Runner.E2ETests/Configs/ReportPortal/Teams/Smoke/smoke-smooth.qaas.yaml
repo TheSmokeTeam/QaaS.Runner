@@ -1,0 +1,127 @@
+MetaData:
+  Team: Smoke
+  System: Smooth
+  ExtraLabels:
+    Component: Scheduler
+    Area: Dispatch
+    Owner: Smoke
+    Environment: Lab
+    Scenario: Baseline
+
+ReportPortal:
+  Attributes:
+    Variation: SmokeSmooth
+    Suite: ReportPortalE2E
+    Profile: Baseline
+    Visibility: Core
+
+DataSources:
+  - Name: SmokeSmoothPayloads
+    Generator: ReportPortalPayloadGenerator
+    GeneratorConfiguration:
+      Count: 2
+      PayloadPrefix: smoke-smooth
+      Component: Scheduler
+      Area: Dispatch
+      Owner: Smoke
+      EnvironmentName: Lab
+      Capability: SchedulerFlow
+      Region: IL
+      Scenario: Baseline
+      EvidenceCount: 2
+      Tags:
+        - Smoke
+        - Smooth
+        - Scheduler
+        - Dispatch
+
+Sessions:
+  - Name: Smooth Scheduler Session
+    Probes:
+      - Name: SmoothSchedulerProbe
+        Probe: ReportPortalDiagnosticProbe
+        ProbeConfiguration:
+          StepName: Smooth Scheduler Diagnostics
+          TraceMessage: Scheduler probe completed without failure.
+          DelayMilliseconds: 60
+          Notes:
+            - dispatch queue drained successfully
+
+  - Name: Smooth Replay Session
+    Probes:
+      - Name: SmoothReplayProbe
+        Probe: ReportPortalDiagnosticProbe
+        ProbeConfiguration:
+          StepName: Smooth Replay Failure
+          TraceMessage: Replay probe failed intentionally to test action history.
+          DelayMilliseconds: 90
+          ThrowOnRun: true
+          Notes:
+            - replay checksum mismatch
+            - dead-letter routing invoked
+
+Assertions:
+  - Name: SmokeSmoothPassed
+    Assertion: ReportPortalRichAssertion
+    Severity: Critical
+    SessionNamePatterns:
+      - Smooth.*Session
+    DataSourceNames:
+      - SmokeSmoothPayloads
+    Links:
+      - Name: Smooth Dispatch Dashboard
+        Grafana:
+          Url: https://grafana.example.local
+          DashboardId: smooth-dispatch
+          Variables:
+            - Key: system
+              Value: Smooth
+            - Key: area
+              Value: Dispatch
+    AssertionConfiguration:
+      Outcome: Passed
+      Message: Smoke Smooth passed assertion message
+      TracePrefix: Smoke Smooth passed assertion trace
+      AttachmentCount: 2
+      AttachmentKinds:
+        - Json
+        - Binary
+      AdditionalTraceSections:
+        - Baseline smooth run with scheduler payloads and one recoverable replay issue.
+
+  - Name: SmokeSmoothFailed
+    Assertion: ReportPortalRichAssertion
+    Severity: Blocker
+    SessionNamePatterns:
+      - Smooth.*Session
+    DataSourceNames:
+      - SmokeSmoothPayloads
+    AssertionConfiguration:
+      Outcome: Failed
+      Message: Smoke Smooth failed assertion message
+      TracePrefix: Smoke Smooth failed assertion trace
+      AttachmentCount: 1
+      AttachmentKinds:
+        - Yaml
+      AdditionalTraceSections:
+        - Failure should correlate with the replay-session action failure in ReportPortal.
+
+  - Name: SmokeSmoothNoTrace
+    Assertion: ReportPortalRichAssertion
+    Severity: Minor
+    DisplayTrace: false
+    SaveAttachments: false
+    SaveTemplate: false
+    SessionNamePatterns:
+      - Smooth.*Session
+    DataSourcePatterns:
+      - SmokeSmooth.*
+    AssertionConfiguration:
+      Outcome: Passed
+      Message: Smoke Smooth minimal assertion message
+      TracePrefix: Smoke Smooth hidden trace
+      AttachmentCount: 1
+      AttachmentKinds:
+        - Json
+      AdditionalTraceSections:
+        - Hidden trace path for dashboard population and reporter toggle coverage.

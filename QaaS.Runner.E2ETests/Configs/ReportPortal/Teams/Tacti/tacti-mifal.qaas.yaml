@@ -1,0 +1,107 @@
+MetaData:
+  Team: Tacti
+  System: Mifal
+  ExtraLabels:
+    Component: Factory
+    Area: Ingest
+    Owner: Tacti
+    Environment: Lab
+    Scenario: Baseline
+
+ReportPortal:
+  Attributes:
+    Variation: TactiMifal
+    Suite: ReportPortalE2E
+    Profile: Baseline
+    Visibility: Core
+
+DataSources:
+  - Name: TactiMifalPayloads
+    Generator: ReportPortalPayloadGenerator
+    GeneratorConfiguration:
+      Count: 2
+      PayloadPrefix: tacti-mifal
+      Component: Factory
+      Area: Ingest
+      Owner: Tacti
+      EnvironmentName: Lab
+      Capability: IngestFlow
+      Region: IL
+      Scenario: Baseline
+      EvidenceCount: 2
+      Tags:
+        - Tacti
+        - Mifal
+        - Factory
+        - Ingest
+
+Sessions:
+  - Name: Tacti Mifal Session
+    Probes:
+      - Name: TactiMifalProbe
+        Probe: ReportPortalDiagnosticProbe
+        ProbeConfiguration:
+          StepName: Tacti Mifal Diagnostics
+          TraceMessage: Mifal diagnostics completed without failure.
+          DelayMilliseconds: 95
+          Notes:
+            - ingest path completed with nominal latency
+
+Assertions:
+  - Name: TactiMifalPassed
+    Assertion: ReportPortalRichAssertion
+    Severity: Critical
+    SessionNamePatterns:
+      - Tacti.*Session
+    DataSourceNames:
+      - TactiMifalPayloads
+    Links:
+      - Name: Mifal Throughput
+        Prometheus:
+          Url: https://prometheus.example.local
+          Expressions:
+            - sum(rate(tacti_mifal_ingest_total[5m]))
+            - max_over_time(tacti_mifal_ingest_lag[15m])
+    AssertionConfiguration:
+      Outcome: Passed
+      Message: Tacti Mifal passed assertion message
+      TracePrefix: Tacti Mifal passed assertion trace
+      AttachmentCount: 2
+      AttachmentKinds:
+        - Json
+        - Binary
+      AdditionalTraceSections:
+        - Ingest baseline keeps only healthy sessions but still emits structured payload evidence.
+
+  - Name: TactiMifalBroken
+    Assertion: ReportPortalRichAssertion
+    Severity: Blocker
+    SessionNamePatterns:
+      - Tacti.*Session
+    AssertionConfiguration:
+      Outcome: Broken
+      Message: Tacti Mifal broken assertion message
+      TracePrefix: Tacti Mifal broken assertion trace
+      AttachmentCount: 1
+      AttachmentKinds:
+        - Yaml
+      AdditionalTraceSections:
+        - Broken path verifies stack traces when no session failure exists.
+
+  - Name: TactiMifalNoTrace
+    Assertion: ReportPortalRichAssertion
+    Severity: Minor
+    DisplayTrace: false
+    SaveTemplate: false
+    SaveAttachments: false
+    SessionNamePatterns:
+      - Tacti.*Session
+    DataSourcePatterns:
+      - TactiMifal.*
+    AssertionConfiguration:
+      Outcome: Passed
+      Message: Tacti Mifal hidden trace assertion message
+      TracePrefix: Tacti Mifal hidden trace
+      AttachmentCount: 1
+      AttachmentKinds:
+        - Json
