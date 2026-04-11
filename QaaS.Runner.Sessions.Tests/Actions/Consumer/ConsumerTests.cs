@@ -13,6 +13,7 @@ using QaaS.Framework.Protocols.Protocols;
 using QaaS.Framework.SDK.Session;
 using QaaS.Framework.SDK.Session.CommunicationDataObjects;
 using QaaS.Framework.SDK.Session.DataObjects;
+using QaaS.Framework.SDK.Session.MetaDataObjects;
 using QaaS.Framework.Serialization;
 using QaaS.Runner.Sessions.Actions.Consumers;
 using QaaS.Runner.Sessions.Tests.Actions.Utils;
@@ -180,6 +181,41 @@ public class ConsumerTests
             Contains.Item("Initializing Consumer TestConsumer with Reader type NamedReader and Deserializer Json"));
     }
 
+    [Test]
+    public void Act_WithBinaryDeserializerAndNoSpecificType_DeserializesToOriginalPayloadType()
+    {
+        var payload = new BinaryPayload { Value = "deserialized" };
+        var serializer = SerializerFactory.BuildSerializer(SerializationType.Binary)!;
+        var reader = new Mock<IReader>();
+        reader.Setup(instance => instance.Read(It.IsAny<TimeSpan>()))
+            .Returns(new DetailedData<object>
+            {
+                Body = serializer.Serialize(payload),
+                MetaData = new MetaData()
+            });
+        reader.Setup(instance => instance.GetSerializationType()).Returns(SerializationType.Binary);
+        var consumer = new Sessions.Actions.Consumers.Consumer(
+            "BinaryConsumer",
+            reader.Object,
+            TimeSpan.FromMilliseconds(1),
+            null,
+            1,
+            new CountPolicy(1),
+            new DataFilter { Body = true, MetaData = true, Timestamp = true },
+            SerializationType.Binary,
+            null,
+            Globals.Logger);
+
+        var actData = consumer.Act();
+
+        var body = actData.Output!.Single()!.Body;
+        Assert.Multiple(() =>
+        {
+            Assert.That(body, Is.TypeOf<BinaryPayload>());
+            Assert.That(((BinaryPayload)body!).Value, Is.EqualTo(payload.Value));
+        });
+    }
+
     private sealed class NamedReader : IReader
     {
         public void Connect()
@@ -229,5 +265,11 @@ public class ConsumerTests
             {
             }
         }
+    }
+
+    [Serializable]
+    private sealed class BinaryPayload
+    {
+        public string Value { get; set; } = string.Empty;
     }
 }

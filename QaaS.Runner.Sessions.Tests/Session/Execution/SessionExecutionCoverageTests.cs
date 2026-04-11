@@ -702,9 +702,9 @@ public class SessionExecutionCoverageTests
 
     private static void EnsureZeroTimeoutStageConfiguration(SessionBuilder builder, int stageNumber)
     {
-        if (builder.ReadStage(stageNumber) == null)
+        if (builder.Stages.FirstOrDefault(stage => stage.StageNumber == stageNumber) == null)
         {
-            builder.CreateStage(new StageConfig(stageNumber, timeoutBefore: 0, timeoutAfter: 0));
+            builder.AddStage(new StageConfig(stageNumber, timeoutBefore: 0, timeoutAfter: 0));
             return;
         }
 
@@ -891,7 +891,7 @@ public class SessionExecutionCoverageTests
                 publisherBuilder.WithParallelism(scenario.Publisher.Parallelism.Value);
             }
 
-            builder.CreatePublisher(publisherBuilder);
+            builder.AddPublisher(publisherBuilder);
         }
 
         if (scenario.Consumer != null)
@@ -906,7 +906,7 @@ public class SessionExecutionCoverageTests
                 consumerBuilder.WithDeserializer(new DeserializeConfig { Deserializer = SerializationType.Binary });
             }
 
-            builder.CreateConsumer(consumerBuilder);
+            builder.AddConsumer(consumerBuilder);
         }
 
         if (scenario.Transaction != null)
@@ -939,19 +939,19 @@ public class SessionExecutionCoverageTests
                     .WithDeserializer(new DeserializeConfig { Deserializer = SerializationType.Binary });
             }
 
-            builder.CreateTransaction(transactionBuilder);
+            builder.AddTransaction(transactionBuilder);
         }
 
         if (scenario.Collector != null)
         {
-            builder.CreateCollector(new QaaS.Runner.Sessions.Actions.Collectors.CollectorBuilder()
+            builder.AddCollector(new QaaS.Runner.Sessions.Actions.Collectors.CollectorBuilder()
                 .Named(scenario.Collector.ActionName)
                 .Configure(scenario.Collector.Configuration));
         }
 
         if (scenario.Mocker != null)
         {
-            builder.CreateMockerCommand(new MockerCommandBuilder()
+            builder.AddMockerCommand(new MockerCommandBuilder()
                 .Named(scenario.Mocker.ActionName)
                 .WithServerName("test-server")
                 .WithRedis(new QaaS.Runner.Sessions.ConfigurationObjects.RedisConfig { Host = "localhost:6379" })
@@ -968,7 +968,7 @@ public class SessionExecutionCoverageTests
     {
         foreach (var stageNumber in GetUsedActionStages(scenario))
         {
-            builder.CreateStage(new StageConfig(stageNumber, timeoutBefore: 0, timeoutAfter: 0));
+            builder.AddStage(new StageConfig(stageNumber, timeoutBefore: 0, timeoutAfter: 0));
         }
     }
 

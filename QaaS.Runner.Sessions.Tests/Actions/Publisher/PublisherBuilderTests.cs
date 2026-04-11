@@ -207,7 +207,7 @@ public class PublisherBuilderTests
     {
         var policy = new PolicyBuilder();
         var builder = new PublisherBuilder();
-        builder.CreatePolicy(policy);
+        builder.AddPolicy(policy);
 
         Assert.That(builder.Policies, Contains.Item(policy));
     }
@@ -216,8 +216,8 @@ public class PublisherBuilderTests
     public void RemovePolicyAt_WithValidIndex_RemovesPolicy()
     {
         var builder = new PublisherBuilder()
-            .CreatePolicy(new PolicyBuilder())
-            .CreatePolicy(new PolicyBuilder());
+            .AddPolicy(new PolicyBuilder())
+            .AddPolicy(new PolicyBuilder());
 
         builder.RemovePolicyAt(0);
 
@@ -364,11 +364,14 @@ public class PublisherBuilderTests
     }
 
     [Test]
-    public void UpdateConfiguration_WithConfigurationWithoutExistingConfiguration_ThrowsInvalidOperationException()
+    public void UpdateConfiguration_WithConfigurationWithoutExistingConfiguration_ConfiguresIncomingType()
     {
         var builder = new PublisherBuilder();
+        var config = new RabbitMqSenderConfig();
 
-        Assert.Throws<InvalidOperationException>(() => builder.UpdateConfiguration(new RabbitMqSenderConfig()));
+        builder.UpdateConfiguration(config);
+
+        Assert.That(builder.Configuration, Is.SameAs(config));
     }
 
     [Test]
@@ -376,8 +379,8 @@ public class PublisherBuilderTests
     {
         var replacementPolicy = new PolicyBuilder();
         var builder = new PublisherBuilder()
-            .CreatePolicy(new PolicyBuilder())
-            .CreatePolicy(new PolicyBuilder());
+            .AddPolicy(new PolicyBuilder())
+            .AddPolicy(new PolicyBuilder());
 
         builder.UpdatePolicyAt(0, replacementPolicy);
 

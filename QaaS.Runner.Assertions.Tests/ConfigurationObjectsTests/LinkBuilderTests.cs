@@ -69,11 +69,14 @@ public class LinkBuilderTests
     }
 
     [Test]
-    public void UpdateConfiguration_WithConfigurationWithoutExistingConfiguration_ThrowsInvalidOperationException()
+    public void UpdateConfiguration_WithConfigurationWithoutExistingConfiguration_ConfiguresIncomingType()
     {
         var builder = new LinkBuilder();
+        var config = new KibanaLinkConfig();
 
-        Assert.Throws<InvalidOperationException>(() => builder.UpdateConfiguration(new KibanaLinkConfig()));
+        builder.UpdateConfiguration(config);
+
+        Assert.That(builder.Configuration, Is.SameAs(config));
     }
 
     [Test]

@@ -92,12 +92,6 @@ public abstract class BaseConsumer : StagedAction
 
     private DetailedData<object> GetDeserializedData(DetailedData<object> readData)
     {
-        if (_deserializerSpecificType is null &&
-            SerializationType == QaaS.Framework.Serialization.SerializationType.Binary)
-        {
-            return readData;
-        }
-
         return new DetailedData<object>
         {
             Body = _deserializer!.Deserialize(readData.CastObjectData<byte[]>().Body, _deserializerSpecificType),

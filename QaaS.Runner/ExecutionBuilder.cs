@@ -294,6 +294,19 @@ public class ExecutionBuilder() : BaseExecutionBuilder<InternalContext, Executio
     }
 
     /// <summary>
+    /// Removes the configured session at the specified index from the current Runner execution builder instance.
+    /// </summary>
+    /// <remarks>
+    /// Use this method when working with the documented Runner execution builder API surface in code. The change is stored on the current builder instance and is consumed by later build, validation, or execution steps.
+    /// </remarks>
+    /// <qaas-docs group="Configuration as Code" subgroup="Executions" />
+    public ExecutionBuilder RemoveSessionAt(int index)
+    {
+        Sessions = RemoveAt(Sessions, index);
+        return this;
+    }
+
+    /// <summary>
     /// Adds the supplied assertion to the current Runner execution builder instance.
     /// </summary>
     /// <remarks>
@@ -329,6 +342,19 @@ public class ExecutionBuilder() : BaseExecutionBuilder<InternalContext, Executio
     public ExecutionBuilder RemoveAssertion(string assertionName)
     {
         Assertions = RemoveByName(Assertions, assertionName, assertion => assertion.Name);
+        return this;
+    }
+
+    /// <summary>
+    /// Removes the configured assertion at the specified index from the current Runner execution builder instance.
+    /// </summary>
+    /// <remarks>
+    /// Use this method when working with the documented Runner execution builder API surface in code. The change is stored on the current builder instance and is consumed by later build, validation, or execution steps.
+    /// </remarks>
+    /// <qaas-docs group="Configuration as Code" subgroup="Executions" />
+    public ExecutionBuilder RemoveAssertionAt(int index)
+    {
+        Assertions = RemoveAt(Assertions, index);
         return this;
     }
 
@@ -411,6 +437,19 @@ public class ExecutionBuilder() : BaseExecutionBuilder<InternalContext, Executio
     }
 
     /// <summary>
+    /// Removes the configured data source at the specified index from the current Runner execution builder instance.
+    /// </summary>
+    /// <remarks>
+    /// Use this method when working with the documented Runner execution builder API surface in code. The change is stored on the current builder instance and is consumed by later build, validation, or execution steps.
+    /// </remarks>
+    /// <qaas-docs group="Configuration as Code" subgroup="Executions" />
+    public ExecutionBuilder RemoveDataSourceAt(int index)
+    {
+        DataSources = RemoveAt(DataSources, index);
+        return this;
+    }
+
+    /// <summary>
     /// Adds the supplied link to the current Runner execution builder instance.
     /// </summary>
     /// <remarks>
@@ -433,6 +472,19 @@ public class ExecutionBuilder() : BaseExecutionBuilder<InternalContext, Executio
     public ExecutionBuilder UpdateLinkAt(int index, LinkBuilder linkBuilder)
     {
         Links = UpdateAt(Links, index, linkBuilder);
+        return this;
+    }
+
+    /// <summary>
+    /// Removes the configured link from the current Runner execution builder instance.
+    /// </summary>
+    /// <remarks>
+    /// Use this method when working with the documented Runner execution builder API surface in code. The change is stored on the current builder instance and is consumed by later build, validation, or execution steps.
+    /// </remarks>
+    /// <qaas-docs group="Configuration as Code" subgroup="Executions" />
+    public ExecutionBuilder RemoveLink(string linkName)
+    {
+        Links = RemoveByName(Links, linkName, link => link.Name);
         return this;
     }
 

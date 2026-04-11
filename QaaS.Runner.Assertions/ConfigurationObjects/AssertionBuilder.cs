@@ -303,6 +303,19 @@ public class AssertionBuilder : IYamlConvertible
     }
 
     /// <summary>
+    /// Removes the configured data source name at the specified index from the current Runner assertion builder instance.
+    /// </summary>
+    /// <remarks>
+    /// Use this method when working with the documented Runner assertion builder API surface in code. The change is stored on the current builder instance and is consumed by later build, validation, or execution steps.
+    /// </remarks>
+    /// <qaas-docs group="Configuration as Code" subgroup="Assertions" />
+    public AssertionBuilder RemoveDataSourceNameAt(int index)
+    {
+        DataSourceNames = RemoveAt(DataSourceNames, index) ?? [];
+        return this;
+    }
+
+    /// <summary>
     /// Adds the supplied data source pattern to the current Runner assertion builder instance.
     /// </summary>
     /// <remarks>
@@ -329,6 +342,19 @@ public class AssertionBuilder : IYamlConvertible
     }
 
     /// <summary>
+    /// Removes the configured data source pattern at the specified index from the current Runner assertion builder instance.
+    /// </summary>
+    /// <remarks>
+    /// Use this method when working with the documented Runner assertion builder API surface in code. The change is stored on the current builder instance and is consumed by later build, validation, or execution steps.
+    /// </remarks>
+    /// <qaas-docs group="Configuration as Code" subgroup="Assertions" />
+    public AssertionBuilder RemoveDataSourcePatternAt(int index)
+    {
+        DataSourcePatterns = RemoveAt(DataSourcePatterns, index) ?? [];
+        return this;
+    }
+
+    /// <summary>
     /// Adds the supplied session name to the current Runner assertion builder instance.
     /// </summary>
     /// <remarks>
@@ -351,6 +377,19 @@ public class AssertionBuilder : IYamlConvertible
     public AssertionBuilder RemoveSessionName(string sessionName)
     {
         SessionNames = SessionNames?.Where(value => value != sessionName).ToArray();
+        return this;
+    }
+
+    /// <summary>
+    /// Removes the configured session name at the specified index from the current Runner assertion builder instance.
+    /// </summary>
+    /// <remarks>
+    /// Use this method when working with the documented Runner assertion builder API surface in code. The change is stored on the current builder instance and is consumed by later build, validation, or execution steps.
+    /// </remarks>
+    /// <qaas-docs group="Configuration as Code" subgroup="Assertions" />
+    public AssertionBuilder RemoveSessionNameAt(int index)
+    {
+        SessionNames = RemoveAt(SessionNames, index);
         return this;
     }
 
@@ -383,6 +422,19 @@ public class AssertionBuilder : IYamlConvertible
     }
 
     /// <summary>
+    /// Removes the configured session pattern at the specified index from the current Runner assertion builder instance.
+    /// </summary>
+    /// <remarks>
+    /// Use this method when working with the documented Runner assertion builder API surface in code. The change is stored on the current builder instance and is consumed by later build, validation, or execution steps.
+    /// </remarks>
+    /// <qaas-docs group="Configuration as Code" subgroup="Assertions" />
+    public AssertionBuilder RemoveSessionPatternAt(int index)
+    {
+        SessionNamePatterns = RemoveAt(SessionNamePatterns, index);
+        return this;
+    }
+
+    /// <summary>
     /// Adds the supplied link to the current Runner assertion builder instance.
     /// </summary>
     /// <remarks>
@@ -405,6 +457,24 @@ public class AssertionBuilder : IYamlConvertible
     public AssertionBuilder RemoveLink(string name)
     {
         Links = (Links ?? []).Where(link => link.Name != name).ToList();
+        return this;
+    }
+
+    /// <summary>
+    /// Removes the configured link at the specified index from the current Runner assertion builder instance.
+    /// </summary>
+    /// <remarks>
+    /// Use this method when working with the documented Runner assertion builder API surface in code. The change is stored on the current builder instance and is consumed by later build, validation, or execution steps.
+    /// </remarks>
+    /// <qaas-docs group="Configuration as Code" subgroup="Assertions" />
+    public AssertionBuilder RemoveLinkAt(int index)
+    {
+        if (index < 0 || index >= Links.Count)
+        {
+            throw new ArgumentOutOfRangeException(nameof(index));
+        }
+
+        Links.RemoveAt(index);
         return this;
     }
 
@@ -443,7 +513,8 @@ public class AssertionBuilder : IYamlConvertible
     /// <qaas-docs group="Configuration as Code" subgroup="Assertions" />
     public AssertionBuilder UpdateConfiguration(object configuration)
     {
-        AssertionConfiguration = AssertionConfiguration.UpdateConfiguration(configuration);
+        AssertionConfiguration = (AssertionConfiguration ?? new ConfigurationBuilder().Build())
+            .UpdateConfiguration(configuration);
         return this;
     }
 
@@ -458,6 +529,21 @@ public class AssertionBuilder : IYamlConvertible
     {
         AssertionConfiguration = new ConfigurationBuilder().Build();
         return this;
+    }
+
+    private static T[]? RemoveAt<T>(T[]? values, int index)
+    {
+        if (values == null)
+        {
+            return null;
+        }
+
+        if (index < 0 || index >= values.Length)
+        {
+            throw new ArgumentOutOfRangeException(nameof(index));
+        }
+
+        return values.Where((_, i) => i != index).ToArray();
     }
 
     /// <summary>

@@ -142,13 +142,15 @@ public class CollectorBuilderTests
     }
 
     [Test]
-    public void UpdateConfiguration_WithConfigurationWithoutExistingConfiguration_Should_Throw()
+    public void UpdateConfiguration_WithConfigurationWithoutExistingConfiguration_ShouldConfigureIncomingType()
     {
         var builder = new CollectorBuilder()
             .Named("TestCollector");
+        var config = new PrometheusFetcherConfig();
 
-        Assert.Throws<InvalidOperationException>(() =>
-            builder.UpdateConfiguration(new PrometheusFetcherConfig()));
+        builder.UpdateConfiguration(config);
+
+        Assert.That(builder.Configuration, Is.SameAs(config));
     }
 
     [Test]

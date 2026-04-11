@@ -76,7 +76,8 @@ public class StorageBuilder
     public StorageBuilder UpdateConfiguration(Func<IStorageConfig, IStorageConfig> update)
     {
         var currentConfig = Configuration ??
-                            throw new InvalidOperationException("Storage configuration is not set");
+                            throw new InvalidOperationException(
+                                "Storage configuration is not set and cannot be inferred from an update function.");
         return UpdateConfiguration(update(currentConfig));
     }
 
@@ -89,9 +90,12 @@ public class StorageBuilder
     /// <qaas-docs group="Configuration as Code" subgroup="Storages" />
     public StorageBuilder UpdateConfiguration(IStorageConfig storageConfig)
     {
-        var currentConfig = Configuration ??
-                            throw new InvalidOperationException("Storage configuration is not set");
-        return Configure(currentConfig.UpdateConfiguration(storageConfig));
+        ArgumentNullException.ThrowIfNull(storageConfig);
+
+        var currentConfig = Configuration;
+        return Configure(currentConfig == null
+            ? storageConfig
+            : currentConfig.UpdateConfiguration(storageConfig));
     }
 
     /// <summary>
@@ -103,8 +107,16 @@ public class StorageBuilder
     /// <qaas-docs group="Configuration as Code" subgroup="Storages" />
     public StorageBuilder UpdateConfiguration(object configuration)
     {
+        ArgumentNullException.ThrowIfNull(configuration);
+
+        if (configuration is IStorageConfig typedConfiguration)
+        {
+            return UpdateConfiguration(typedConfiguration);
+        }
+
         var currentConfig = Configuration ??
-                            throw new InvalidOperationException("Storage configuration is not set");
+                            throw new InvalidOperationException(
+                                "Storage configuration is not set and cannot be inferred from an object patch. Configure a concrete storage configuration first.");
         return Configure(currentConfig.UpdateConfiguration(configuration));
     }
 

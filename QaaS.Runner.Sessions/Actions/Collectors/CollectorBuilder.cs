@@ -110,7 +110,8 @@ public class CollectorBuilder
     public CollectorBuilder UpdateConfiguration(Func<IFetcherConfig, IFetcherConfig> update)
     {
         var currentConfig = Configuration ??
-                            throw new InvalidOperationException("Collector configuration is not set");
+                            throw new InvalidOperationException(
+                                "Collector configuration is not set and cannot be inferred from an update function.");
         return UpdateConfiguration(update(currentConfig));
     }
 
@@ -123,9 +124,12 @@ public class CollectorBuilder
     /// <qaas-docs group="Configuration as Code" subgroup="Collectors" />
     public CollectorBuilder UpdateConfiguration(IFetcherConfig config)
     {
-        var currentConfig = Configuration ??
-                            throw new InvalidOperationException("Collector configuration is not set");
-        return Configure(ConfigurationUpdateExtensions.UpdateConfiguration(currentConfig, config));
+        ArgumentNullException.ThrowIfNull(config);
+
+        var currentConfig = Configuration;
+        return Configure(currentConfig == null
+            ? config
+            : ConfigurationUpdateExtensions.UpdateConfiguration(currentConfig, config));
     }
 
     /// <summary>
@@ -137,8 +141,16 @@ public class CollectorBuilder
     /// <qaas-docs group="Configuration as Code" subgroup="Collectors" />
     public CollectorBuilder UpdateConfiguration(object configuration)
     {
+        ArgumentNullException.ThrowIfNull(configuration);
+
+        if (configuration is IFetcherConfig typedConfiguration)
+        {
+            return UpdateConfiguration(typedConfiguration);
+        }
+
         var currentConfig = Configuration ??
-                            throw new InvalidOperationException("Collector configuration is not set");
+                            throw new InvalidOperationException(
+                                "Collector configuration is not set and cannot be inferred from an object patch. Configure a concrete collector configuration first.");
         return Configure(ConfigurationUpdateExtensions.UpdateConfiguration(currentConfig, configuration));
     }
 

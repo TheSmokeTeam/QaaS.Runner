@@ -47,6 +47,21 @@ public class BuilderCrudTests
             .UpdateConfiguration(new { changed = "yes" })
             .UpdateConfiguration(new { nested = new { enabled = true } });
 
+        builder.AddSessionName("session-indexed")
+            .AddSessionPattern("^indexed-session-.*$")
+            .AddDataSourceName("source-indexed")
+            .AddDataSourcePattern("^indexed-source-.*$")
+            .AddLink(new LinkBuilder().Named("link-indexed").Configure(new GrafanaLinkConfig
+            {
+                Url = "https://grafana",
+                DashboardId = "dash"
+            }))
+            .RemoveSessionNameAt(1)
+            .RemoveSessionPatternAt(1)
+            .RemoveDataSourceNameAt(1)
+            .RemoveDataSourcePatternAt(1)
+            .RemoveLinkAt(1);
+
         Assert.That(builder.SessionNames, Is.EquivalentTo(["session-updated"]));
         Assert.That(builder.SessionNamePatterns, Is.EquivalentTo(["^updated-.*$"]));
         Assert.That(builder.DataSourceNames, Is.EquivalentTo(["source-updated"]));

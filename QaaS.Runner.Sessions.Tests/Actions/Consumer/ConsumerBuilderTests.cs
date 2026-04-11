@@ -221,7 +221,7 @@ public class ConsumerBuilderTests
         var builder = new ConsumerBuilder();
 
         // Act
-        builder.CreatePolicy(policy);
+        builder.AddPolicy(policy);
 
         // Assert
         Assert.That(builder.Policies, Has.Length.EqualTo(1));
@@ -237,8 +237,8 @@ public class ConsumerBuilderTests
         var builder = new ConsumerBuilder();
 
         // Act
-        builder.CreatePolicy(policy1);
-        builder.CreatePolicy(policy2);
+        builder.AddPolicy(policy1);
+        builder.AddPolicy(policy2);
 
         // Assert
         Assert.That(builder.Policies, Has.Length.EqualTo(2));
@@ -921,11 +921,14 @@ public class ConsumerBuilderTests
     }
 
     [Test]
-    public void UpdateConfiguration_WithConfigurationWithoutExistingConfiguration_ThrowsInvalidOperationException()
+    public void UpdateConfiguration_WithConfigurationWithoutExistingConfiguration_ConfiguresIncomingType()
     {
         var builder = new ConsumerBuilder();
+        var config = new RabbitMqReaderConfig();
 
-        Assert.Throws<InvalidOperationException>(() => builder.UpdateConfiguration(new RabbitMqReaderConfig()));
+        builder.UpdateConfiguration(config);
+
+        Assert.That(builder.Configuration, Is.SameAs(config));
     }
 
     [Test]
@@ -933,8 +936,8 @@ public class ConsumerBuilderTests
     {
         var replacementPolicy = new PolicyBuilder();
         var builder = new ConsumerBuilder()
-            .CreatePolicy(new PolicyBuilder())
-            .CreatePolicy(new PolicyBuilder());
+            .AddPolicy(new PolicyBuilder())
+            .AddPolicy(new PolicyBuilder());
 
         builder.UpdatePolicyAt(0, replacementPolicy);
 

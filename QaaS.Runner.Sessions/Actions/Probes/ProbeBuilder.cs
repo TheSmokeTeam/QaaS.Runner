@@ -141,7 +141,20 @@ public class ProbeBuilder : IYamlConvertible
     /// <qaas-docs group="Configuration as Code" subgroup="Probes" />
     public ProbeBuilder RemoveDataSourceName(string dataSourceName)
     {
-        DataSourceNames = DataSourceNames.Where(value => value != dataSourceName).ToArray();
+        DataSourceNames = (DataSourceNames ?? []).Where(value => value != dataSourceName).ToArray();
+        return this;
+    }
+
+    /// <summary>
+    /// Removes the configured data source name at the specified index from the current Runner probe builder instance.
+    /// </summary>
+    /// <remarks>
+    /// Use this method when working with the documented Runner probe builder API surface in code. The change is stored on the current builder instance and is consumed by later build, validation, or execution steps.
+    /// </remarks>
+    /// <qaas-docs group="Configuration as Code" subgroup="Probes" />
+    public ProbeBuilder RemoveDataSourceNameAt(int index)
+    {
+        DataSourceNames = RemoveAt(DataSourceNames, index);
         return this;
     }
 
@@ -169,7 +182,20 @@ public class ProbeBuilder : IYamlConvertible
     /// <qaas-docs group="Configuration as Code" subgroup="Probes" />
     public ProbeBuilder RemoveDataSourcePattern(string dataSourcePattern)
     {
-        DataSourcePatterns = DataSourcePatterns.Where(value => value != dataSourcePattern).ToArray();
+        DataSourcePatterns = (DataSourcePatterns ?? []).Where(value => value != dataSourcePattern).ToArray();
+        return this;
+    }
+
+    /// <summary>
+    /// Removes the configured data source pattern at the specified index from the current Runner probe builder instance.
+    /// </summary>
+    /// <remarks>
+    /// Use this method when working with the documented Runner probe builder API surface in code. The change is stored on the current builder instance and is consumed by later build, validation, or execution steps.
+    /// </remarks>
+    /// <qaas-docs group="Configuration as Code" subgroup="Probes" />
+    public ProbeBuilder RemoveDataSourcePatternAt(int index)
+    {
+        DataSourcePatterns = RemoveAt(DataSourcePatterns, index);
         return this;
     }
 
@@ -208,7 +234,9 @@ public class ProbeBuilder : IYamlConvertible
     /// <qaas-docs group="Configuration as Code" subgroup="Probes" />
     public ProbeBuilder UpdateConfiguration(object configuration)
     {
-        ProbeConfiguration = ConfigurationUpdateExtensions.UpdateConfiguration(ProbeConfiguration, configuration);
+        ProbeConfiguration = ConfigurationUpdateExtensions.UpdateConfiguration(
+            ProbeConfiguration ?? new ConfigurationBuilder().Build(),
+            configuration);
         return this;
     }
 
@@ -223,6 +251,21 @@ public class ProbeBuilder : IYamlConvertible
     {
         ProbeConfiguration = new ConfigurationBuilder().Build();
         return this;
+    }
+
+    private static T[] RemoveAt<T>(T[]? values, int index)
+    {
+        if (values == null)
+        {
+            return [];
+        }
+
+        if (index < 0 || index >= values.Length)
+        {
+            throw new ArgumentOutOfRangeException(nameof(index));
+        }
+
+        return values.Where((_, i) => i != index).ToArray();
     }
 
     /// <summary>

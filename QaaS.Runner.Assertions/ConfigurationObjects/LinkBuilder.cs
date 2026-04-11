@@ -66,7 +66,8 @@ public class LinkBuilder
     public LinkBuilder UpdateConfiguration(Func<ILinkConfig, ILinkConfig> update)
     {
         var currentConfig = Configuration ??
-                            throw new InvalidOperationException("Link configuration is not set");
+                            throw new InvalidOperationException(
+                                "Link configuration is not set and cannot be inferred from an update function.");
         return UpdateConfiguration(update(currentConfig));
     }
 
@@ -79,9 +80,10 @@ public class LinkBuilder
     /// <qaas-docs group="Configuration as Code" subgroup="Links" />
     public LinkBuilder UpdateConfiguration(ILinkConfig config)
     {
-        var currentConfig = Configuration ??
-                            throw new InvalidOperationException("Link configuration is not set");
-        return Configure(currentConfig.UpdateConfiguration(config));
+        ArgumentNullException.ThrowIfNull(config);
+
+        var currentConfig = Configuration;
+        return Configure(currentConfig == null ? config : currentConfig.UpdateConfiguration(config));
     }
 
     /// <summary>
@@ -93,8 +95,16 @@ public class LinkBuilder
     /// <qaas-docs group="Configuration as Code" subgroup="Links" />
     public LinkBuilder UpdateConfiguration(object configuration)
     {
+        ArgumentNullException.ThrowIfNull(configuration);
+
+        if (configuration is ILinkConfig typedConfiguration)
+        {
+            return UpdateConfiguration(typedConfiguration);
+        }
+
         var currentConfig = Configuration ??
-                            throw new InvalidOperationException("Link configuration is not set");
+                            throw new InvalidOperationException(
+                                "Link configuration is not set and cannot be inferred from an object patch. Configure a concrete link configuration first.");
         return Configure(currentConfig.UpdateConfiguration(configuration));
     }
 

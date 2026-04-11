@@ -181,7 +181,8 @@ public class MockerCommandBuilder
     public MockerCommandBuilder UpdateConfiguration(Func<MockerCommandConfig, MockerCommandConfig> update)
     {
         var currentConfig = Configuration ??
-                            throw new InvalidOperationException("Command configuration is not set");
+                            throw new InvalidOperationException(
+                                "Command configuration is not set and cannot be inferred from an update function.");
         return UpdateConfiguration(update(currentConfig));
     }
 
@@ -194,9 +195,12 @@ public class MockerCommandBuilder
     /// <qaas-docs group="Configuration as Code" subgroup="Mocker Commands" />
     public MockerCommandBuilder UpdateConfiguration(MockerCommandConfig command)
     {
-        var currentConfig = Configuration ??
-                            throw new InvalidOperationException("Command configuration is not set");
-        Command = ConfigurationUpdateExtensions.UpdateConfiguration(currentConfig, command);
+        ArgumentNullException.ThrowIfNull(command);
+
+        var currentConfig = Configuration;
+        Command = currentConfig == null
+            ? command
+            : ConfigurationUpdateExtensions.UpdateConfiguration(currentConfig, command);
         return this;
     }
 
@@ -209,8 +213,14 @@ public class MockerCommandBuilder
     /// <qaas-docs group="Configuration as Code" subgroup="Mocker Commands" />
     public MockerCommandBuilder UpdateConfiguration(object configuration)
     {
-        var currentConfig = Configuration ??
-                            throw new InvalidOperationException("Command configuration is not set");
+        ArgumentNullException.ThrowIfNull(configuration);
+
+        if (configuration is MockerCommandConfig typedConfiguration)
+        {
+            return UpdateConfiguration(typedConfiguration);
+        }
+
+        var currentConfig = Configuration ?? new MockerCommandConfig();
         Command = ConfigurationUpdateExtensions.UpdateConfiguration(currentConfig, configuration);
         return this;
     }

@@ -443,8 +443,8 @@ public class ExecutionBuilderTests
 
         var builder = new ExecutionBuilder(context, ExecutionType.Run, null, null, null, null);
         var session = builder.Sessions.Single();
-        var publisher = session.ReadPublishers().Single();
-        var consumer = session.ReadConsumers().Single();
+        var publisher = session.Publishers!.Single();
+        var consumer = session.Consumers!.Single();
         var publisherRabbitMq = (RabbitMqSenderConfig?)typeof(QaaS.Runner.Sessions.Actions.Publishers.Builders.PublisherBuilder)
             .GetProperty("RabbitMq", BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic)!
             .GetValue(publisher);
@@ -478,7 +478,7 @@ public class ExecutionBuilderTests
 
         var builder = new ExecutionBuilder(context, ExecutionType.Template, null, null, null, null);
         var session = builder.Sessions.Single();
-        var stage = session.ReadStages().Single();
+        var stage = session.Stages.Single();
 
         Assert.Multiple(() =>
         {
@@ -522,7 +522,7 @@ public class ExecutionBuilderTests
 
         var builder = new ExecutionBuilder(context, ExecutionType.Run, null, null, null, null);
         var session = builder.Sessions.Single();
-        var publisher = session.ReadPublishers().Single();
+        var publisher = session.Publishers!.Single();
         Assert.Throws<InvalidConfigurationsException>(() => builder.Build());
         var validationResults = (IReadOnlyList<System.ComponentModel.DataAnnotations.ValidationResult>)typeof(ExecutionBuilder)
             .GetField("_validationResults", BindingFlags.Instance | BindingFlags.NonPublic)!

@@ -75,12 +75,14 @@ public class StorageBuilderTests
     }
 
     [Test]
-    public void UpdateConfiguration_WithConfigurationWithoutExistingConfiguration_ThrowsInvalidOperationException()
+    public void UpdateConfiguration_WithConfigurationWithoutExistingConfiguration_ConfiguresIncomingType()
     {
         var builder = new StorageBuilder();
+        var config = new FilesInFileSystemConfig { Path = "some/path" };
 
-        Assert.Throws<InvalidOperationException>(() =>
-            builder.UpdateConfiguration(new FilesInFileSystemConfig { Path = "some/path" }));
+        builder.UpdateConfiguration(config);
+
+        Assert.That(builder.Configuration, Is.SameAs(config));
     }
 
     private static IStorage InvokeBuild(StorageBuilder builder, Context context)
