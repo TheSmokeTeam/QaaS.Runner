@@ -253,6 +253,35 @@ public class AssertionBuilderTests
         Assert.That(builtAssertion.Links![0], Is.TypeOf<global::QaaS.Runner.Assertions.LinkBuilders.PrometheusLink>());
     }
 
+    [Test]
+    public void UpdateConfiguration_WithIndexedInputNames_ReplacesExistingIndexes()
+    {
+        var builder = CreateBuilder()
+            .Configure(new ConfigurationBuilder()
+                .AddInMemoryCollection(new Dictionary<string, string?>
+                {
+                    ["InputNames"] = "scalar-that-should-not-survive",
+                    ["InputNames:0"] = "Name1",
+                    ["InputNames:1"] = "StaleName"
+                })
+                .Build());
+
+        builder.UpdateConfiguration(new
+        {
+            InputNames = new[] { "Name2" }
+        });
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(builder.Configuration["InputNames:0"], Is.EqualTo("Name2"));
+            Assert.That(builder.Configuration["InputNames:1"], Is.Null);
+            Assert.That(builder.Configuration["InputNames"], Is.Null);
+            Assert.That(builder.Configuration.AsEnumerable().Count(pair =>
+                pair.Key.StartsWith("InputNames:", StringComparison.OrdinalIgnoreCase) &&
+                pair.Value != null), Is.EqualTo(1));
+        });
+    }
+
     private static AssertionBuilder CreateBuilder()
     {
         return new AssertionBuilder

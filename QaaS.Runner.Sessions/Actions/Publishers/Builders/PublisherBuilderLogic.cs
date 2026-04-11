@@ -359,62 +359,6 @@ public partial class PublisherBuilder
     }
 
     /// <summary>
-    /// Sets the configuration currently stored on the Runner publisher builder instance.
-    /// </summary>
-    /// <remarks>
-    /// Use this method when working with the documented Runner publisher builder API surface in code. The change is stored on the current builder instance and is consumed by later build, validation, or execution steps.
-    /// </remarks>
-    /// <qaas-docs group="Configuration as Code" subgroup="Publishers" />
-    internal PublisherBuilder AddConfiguration(ISenderConfig config)
-    {
-        return Configure(config);
-    }
-
-    /// <summary>
-    /// Sets the configuration currently stored on the Runner publisher builder instance.
-    /// </summary>
-    /// <remarks>
-    /// Use this method when working with the documented Runner publisher builder API surface in code. The change is stored on the current builder instance and is consumed by later build, validation, or execution steps.
-    /// </remarks>
-    /// <qaas-docs group="Configuration as Code" subgroup="Publishers" />
-    internal PublisherBuilder Create(ISenderConfig config)
-    {
-        return AddConfiguration(config);
-    }
-
-    /// <summary>
-    /// Updates the configuration currently stored on the Runner publisher builder instance.
-    /// </summary>
-    /// <remarks>
-    /// Use this method when working with the documented Runner publisher builder API surface in code. The change is stored on the current builder instance and is consumed by later build, validation, or execution steps.
-    /// </remarks>
-    /// <qaas-docs group="Configuration as Code" subgroup="Publishers" />
-    public PublisherBuilder UpdateConfiguration(Func<ISenderConfig, ISenderConfig> update)
-    {
-        var currentConfig = Configuration ??
-                            throw new InvalidOperationException(
-                                "Publisher configuration is not set and cannot be inferred from an update function.");
-        return UpdateConfiguration(update(currentConfig));
-    }
-
-    /// <summary>
-    /// Updates the configuration currently stored on the Runner publisher builder instance.
-    /// </summary>
-    /// <remarks>
-    /// Use this method when working with the documented Runner publisher builder API surface in code. The change is stored on the current builder instance and is consumed by later build, validation, or execution steps.
-    /// </remarks>
-    /// <qaas-docs group="Configuration as Code" subgroup="Publishers" />
-    public PublisherBuilder UpdateConfiguration(ISenderConfig config)
-    {
-        ArgumentNullException.ThrowIfNull(config);
-
-        var currentConfig = Configuration;
-        return Configure(currentConfig == null
-            ? config
-            : ConfigurationUpdateExtensions.UpdateConfiguration(currentConfig, config));
-    }
-
-    /// <summary>
     /// Updates the configuration currently stored on the Runner publisher builder instance.
     /// </summary>
     /// <remarks>
@@ -425,15 +369,18 @@ public partial class PublisherBuilder
     {
         ArgumentNullException.ThrowIfNull(configuration);
 
+        var currentConfig = Configuration;
         if (configuration is ISenderConfig typedConfiguration)
         {
-            return UpdateConfiguration(typedConfiguration);
+            return Configure(currentConfig == null
+                ? typedConfiguration
+                : currentConfig.UpdateConfiguration(typedConfiguration));
         }
 
-        var currentConfig = Configuration ??
-                            throw new InvalidOperationException(
-                                "Publisher configuration is not set and cannot be inferred from an object patch. Configure a concrete publisher configuration first.");
-        return Configure(ConfigurationUpdateExtensions.UpdateConfiguration(currentConfig, configuration));
+        if (currentConfig == null)
+            throw new InvalidOperationException(
+                "Publisher configuration is not set and cannot be inferred from an object patch. Configure a concrete publisher configuration first.");
+        return Configure(currentConfig.UpdateConfiguration(configuration));
     }
 
     private PublisherBuilder Reset()

@@ -675,27 +675,29 @@ public class SessionExecutionCoverageTests
     {
         if (scenario.Consumer != null)
         {
-            builder.UpdateConsumer(scenario.Consumer.ActionName, consumer => consumer.AtStage(layout.ConsumerStage));
+            var consumer = builder.Consumers!.First(consumer => consumer.Name == scenario.Consumer.ActionName);
+            builder.UpdateConsumer(scenario.Consumer.ActionName, consumer.AtStage(layout.ConsumerStage));
             EnsureZeroTimeoutStageConfiguration(builder, layout.ConsumerStage);
         }
 
         if (scenario.Publisher != null)
         {
-            builder.UpdatePublisher(scenario.Publisher.ActionName,
-                publisher => publisher.AtStage(layout.PublisherStage));
+            var publisher = builder.Publishers!.First(publisher => publisher.Name == scenario.Publisher.ActionName);
+            builder.UpdatePublisher(scenario.Publisher.ActionName, publisher.AtStage(layout.PublisherStage));
             EnsureZeroTimeoutStageConfiguration(builder, layout.PublisherStage);
         }
 
         if (scenario.Transaction != null)
         {
-            builder.UpdateTransaction(scenario.Transaction.ActionName,
-                transaction => transaction.AtStage(layout.TransactionStage));
+            var transaction = builder.Transactions!.First(transaction => transaction.Name == scenario.Transaction.ActionName);
+            builder.UpdateTransaction(scenario.Transaction.ActionName, transaction.AtStage(layout.TransactionStage));
             EnsureZeroTimeoutStageConfiguration(builder, layout.TransactionStage);
         }
 
         if (scenario.Mocker != null)
         {
-            builder.UpdateMockerCommand(scenario.Mocker.ActionName, command => command.AtStage(layout.MockerStage));
+            var command = builder.MockerCommands!.First(command => command.Name == scenario.Mocker.ActionName);
+            builder.UpdateMockerCommand(scenario.Mocker.ActionName, command.AtStage(layout.MockerStage));
             EnsureZeroTimeoutStageConfiguration(builder, layout.MockerStage);
         }
     }

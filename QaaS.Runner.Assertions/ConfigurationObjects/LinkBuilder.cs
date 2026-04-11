@@ -50,43 +50,6 @@ public class LinkBuilder
     }
 
     /// <summary>
-    /// Sets the configuration currently stored on the Runner link builder instance.
-    /// </summary>
-    /// <remarks>
-    /// Use this method when working with the documented Runner link builder API surface in code. The change is stored on the current builder instance and is consumed by later build, validation, or execution steps.
-    /// </remarks>
-    /// <qaas-docs group="Configuration as Code" subgroup="Links" />
-    /// <summary>
-     /// Updates the configuration currently stored on the Runner link builder instance.
-    /// </summary>
-    /// <remarks>
-    /// Use this method when working with the documented Runner link builder API surface in code. The change is stored on the current builder instance and is consumed by later build, validation, or execution steps.
-    /// </remarks>
-    /// <qaas-docs group="Configuration as Code" subgroup="Links" />
-    public LinkBuilder UpdateConfiguration(Func<ILinkConfig, ILinkConfig> update)
-    {
-        var currentConfig = Configuration ??
-                            throw new InvalidOperationException(
-                                "Link configuration is not set and cannot be inferred from an update function.");
-        return UpdateConfiguration(update(currentConfig));
-    }
-
-    /// <summary>
-    /// Updates the configuration currently stored on the Runner link builder instance.
-    /// </summary>
-    /// <remarks>
-    /// Use this method when working with the documented Runner link builder API surface in code. The change is stored on the current builder instance and is consumed by later build, validation, or execution steps.
-    /// </remarks>
-    /// <qaas-docs group="Configuration as Code" subgroup="Links" />
-    public LinkBuilder UpdateConfiguration(ILinkConfig config)
-    {
-        ArgumentNullException.ThrowIfNull(config);
-
-        var currentConfig = Configuration;
-        return Configure(currentConfig == null ? config : currentConfig.UpdateConfiguration(config));
-    }
-
-    /// <summary>
     /// Updates the configuration currently stored on the Runner link builder instance.
     /// </summary>
     /// <remarks>
@@ -97,14 +60,17 @@ public class LinkBuilder
     {
         ArgumentNullException.ThrowIfNull(configuration);
 
+        var currentConfig = Configuration;
         if (configuration is ILinkConfig typedConfiguration)
         {
-            return UpdateConfiguration(typedConfiguration);
+            return Configure(currentConfig == null
+                ? typedConfiguration
+                : currentConfig.UpdateConfiguration(typedConfiguration));
         }
 
-        var currentConfig = Configuration ??
-                            throw new InvalidOperationException(
-                                "Link configuration is not set and cannot be inferred from an object patch. Configure a concrete link configuration first.");
+        if (currentConfig == null)
+            throw new InvalidOperationException(
+                "Link configuration is not set and cannot be inferred from an object patch. Configure a concrete link configuration first.");
         return Configure(currentConfig.UpdateConfiguration(configuration));
     }
 

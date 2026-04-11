@@ -499,18 +499,6 @@ public class AssertionBuilder : IYamlConvertible
     /// Use this method when working with the documented Runner assertion builder API surface in code. The change is stored on the current builder instance and is consumed by later build, validation, or execution steps.
     /// </remarks>
     /// <qaas-docs group="Configuration as Code" subgroup="Assertions" />
-    internal AssertionBuilder AddConfiguration(object configuration)
-    {
-        return Configure(configuration);
-    }
-
-    /// <summary>
-    /// Sets the configuration currently stored on the Runner assertion builder instance.
-    /// </summary>
-    /// <remarks>
-    /// Use this method when working with the documented Runner assertion builder API surface in code. The change is stored on the current builder instance and is consumed by later build, validation, or execution steps.
-    /// </remarks>
-    /// <qaas-docs group="Configuration as Code" subgroup="Assertions" />
     public AssertionBuilder UpdateConfiguration(object configuration)
     {
         AssertionConfiguration = (AssertionConfiguration ?? new ConfigurationBuilder().Build())

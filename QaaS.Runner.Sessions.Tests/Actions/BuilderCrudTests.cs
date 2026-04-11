@@ -32,7 +32,7 @@ public class BuilderCrudTests
         builder.UpdatePolicyAt(0, new PolicyBuilder());
         builder.RemovePolicyAt(1);
         builder.Configure(new RabbitMqReaderConfig());
-        builder.UpdateConfiguration(_ => new KafkaTopicReaderConfig());
+        builder.UpdateConfiguration(new KafkaTopicReaderConfig());
         builder.UpdateConfiguration(new SocketReaderConfig());
 
         Assert.That(builder.Policies, Has.Length.EqualTo(1));
@@ -135,7 +135,7 @@ public class BuilderCrudTests
         builder.RemoveDataSource("source-b");
         builder.UpdateDataSourcePattern("^source-.*$", "^updated-.*$");
         builder.UpdatePolicyAt(0, new PolicyBuilder());
-        builder.UpdateConfiguration(_ => new SocketSenderConfig());
+        builder.UpdateConfiguration(new SocketSenderConfig());
         builder.UpdateConfiguration(new KafkaTopicSenderConfig());
 
         Assert.That(builder.DataSourceNames, Is.EquivalentTo(["source-updated"]));
@@ -254,7 +254,7 @@ public class BuilderCrudTests
         builder.UpdatePolicyAt(0, new PolicyBuilder());
         builder.UpdateDataSource("source-a", "source-updated");
         builder.UpdateDataSourcePattern("^source-.*$", "^updated-.*$");
-        builder.UpdateConfiguration(_ => new GrpcTransactorConfig());
+        builder.UpdateConfiguration(new GrpcTransactorConfig());
         builder.UpdateConfiguration(new HttpTransactorConfig());
 
         Assert.That(builder.Policies, Has.Length.EqualTo(1));
@@ -380,7 +380,7 @@ public class BuilderCrudTests
             Expression = "up"
         });
 
-        builder.UpdateConfiguration(_ => new PrometheusFetcherConfig
+        builder.UpdateConfiguration(new PrometheusFetcherConfig
         {
             Url = "https://prometheus-updated",
             Expression = "sum(up)"
@@ -460,7 +460,7 @@ public class BuilderCrudTests
             Consume = new ConsumeCommandConfig()
         });
 
-        builder.UpdateConfiguration(_ => new MockerCommandConfig
+        builder.UpdateConfiguration(new MockerCommandConfig
         {
             TriggerAction = new TriggerAction()
         });

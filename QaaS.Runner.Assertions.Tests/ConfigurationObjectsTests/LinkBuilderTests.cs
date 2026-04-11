@@ -65,7 +65,7 @@ public class LinkBuilderTests
     {
         var builder = new LinkBuilder();
 
-        Assert.Throws<InvalidOperationException>(() => builder.UpdateConfiguration(config => config));
+        Assert.Throws<InvalidOperationException>(() => builder.UpdateConfiguration(new { Url = "https://link.local" }));
     }
 
     [Test]

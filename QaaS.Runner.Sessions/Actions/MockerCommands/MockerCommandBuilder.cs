@@ -136,75 +136,6 @@ public class MockerCommandBuilder
     }
 
     /// <summary>
-    /// Configures command on the current Runner mocker command builder instance.
-    /// </summary>
-    /// <remarks>
-    /// Use this method when working with the documented Runner mocker command builder API surface in code. The change is stored on the current builder instance and is consumed by later build, validation, or execution steps.
-    /// </remarks>
-    /// <qaas-docs group="Configuration as Code" subgroup="Mocker Commands" />
-    internal MockerCommandBuilder WithCommand(MockerCommandConfig command)
-    {
-        return Configure(command);
-    }
-
-    /// <summary>
-    /// Sets the configuration currently stored on the Runner mocker command builder instance.
-    /// </summary>
-    /// <remarks>
-    /// Use this method when working with the documented Runner mocker command builder API surface in code. The change is stored on the current builder instance and is consumed by later build, validation, or execution steps.
-    /// </remarks>
-    /// <qaas-docs group="Configuration as Code" subgroup="Mocker Commands" />
-    internal MockerCommandBuilder AddConfiguration(MockerCommandConfig command)
-    {
-        return Configure(command);
-    }
-
-    /// <summary>
-    /// Sets the configuration currently stored on the Runner mocker command builder instance.
-    /// </summary>
-    /// <remarks>
-    /// Use this method when working with the documented Runner mocker command builder API surface in code. The change is stored on the current builder instance and is consumed by later build, validation, or execution steps.
-    /// </remarks>
-    /// <qaas-docs group="Configuration as Code" subgroup="Mocker Commands" />
-    internal MockerCommandBuilder Create(MockerCommandConfig command)
-    {
-        return AddConfiguration(command);
-    }
-
-    /// <summary>
-    /// Updates the configuration currently stored on the Runner mocker command builder instance.
-    /// </summary>
-    /// <remarks>
-    /// Use this method when working with the documented Runner mocker command builder API surface in code. The change is stored on the current builder instance and is consumed by later build, validation, or execution steps.
-    /// </remarks>
-    /// <qaas-docs group="Configuration as Code" subgroup="Mocker Commands" />
-    public MockerCommandBuilder UpdateConfiguration(Func<MockerCommandConfig, MockerCommandConfig> update)
-    {
-        var currentConfig = Configuration ??
-                            throw new InvalidOperationException(
-                                "Command configuration is not set and cannot be inferred from an update function.");
-        return UpdateConfiguration(update(currentConfig));
-    }
-
-    /// <summary>
-    /// Updates the configuration currently stored on the Runner mocker command builder instance.
-    /// </summary>
-    /// <remarks>
-    /// Use this method when working with the documented Runner mocker command builder API surface in code. The change is stored on the current builder instance and is consumed by later build, validation, or execution steps.
-    /// </remarks>
-    /// <qaas-docs group="Configuration as Code" subgroup="Mocker Commands" />
-    public MockerCommandBuilder UpdateConfiguration(MockerCommandConfig command)
-    {
-        ArgumentNullException.ThrowIfNull(command);
-
-        var currentConfig = Configuration;
-        Command = currentConfig == null
-            ? command
-            : ConfigurationUpdateExtensions.UpdateConfiguration(currentConfig, command);
-        return this;
-    }
-
-    /// <summary>
     /// Updates the configuration currently stored on the Runner mocker command builder instance.
     /// </summary>
     /// <remarks>
@@ -215,13 +146,17 @@ public class MockerCommandBuilder
     {
         ArgumentNullException.ThrowIfNull(configuration);
 
+        var currentConfig = Configuration;
         if (configuration is MockerCommandConfig typedConfiguration)
         {
-            return UpdateConfiguration(typedConfiguration);
+            Command = currentConfig == null
+                ? typedConfiguration
+                : currentConfig.UpdateConfiguration(typedConfiguration);
+            return this;
         }
 
-        var currentConfig = Configuration ?? new MockerCommandConfig();
-        Command = ConfigurationUpdateExtensions.UpdateConfiguration(currentConfig, configuration);
+        currentConfig ??= new MockerCommandConfig();
+        Command = currentConfig.UpdateConfiguration(configuration);
         return this;
     }
 

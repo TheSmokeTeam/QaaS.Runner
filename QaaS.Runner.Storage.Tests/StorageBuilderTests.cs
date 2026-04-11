@@ -71,7 +71,7 @@ public class StorageBuilderTests
         var builder = new StorageBuilder();
 
         Assert.Throws<InvalidOperationException>(() =>
-            builder.UpdateConfiguration(config => config));
+            builder.UpdateConfiguration(new { Path = "some/path" }));
     }
 
     [Test]

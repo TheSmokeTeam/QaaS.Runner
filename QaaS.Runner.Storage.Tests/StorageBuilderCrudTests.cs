@@ -17,7 +17,7 @@ public class StorageBuilderCrudTests
 
         Assert.That(builder.Configuration, Is.TypeOf<FilesInFileSystemConfig>());
 
-        builder.UpdateConfiguration(_ => new S3Config { Prefix = "prefix" });
+        builder.UpdateConfiguration(new S3Config { Prefix = "prefix" });
         builder.UpdateConfiguration(new FilesInFileSystemConfig { Path = "two/path" });
         Assert.That(builder.Configuration, Is.TypeOf<FilesInFileSystemConfig>());
 

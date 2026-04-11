@@ -360,7 +360,7 @@ public class PublisherBuilderTests
     {
         var builder = new PublisherBuilder();
 
-        Assert.Throws<InvalidOperationException>(() => builder.UpdateConfiguration(config => config));
+        Assert.Throws<InvalidOperationException>(() => builder.UpdateConfiguration(new { Host = "rabbit.local" }));
     }
 
     [Test]

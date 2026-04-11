@@ -917,7 +917,7 @@ public class ConsumerBuilderTests
     {
         var builder = new ConsumerBuilder();
 
-        Assert.Throws<InvalidOperationException>(() => builder.UpdateConfiguration(config => config));
+        Assert.Throws<InvalidOperationException>(() => builder.UpdateConfiguration(new { Host = "rabbit.local" }));
     }
 
     [Test]

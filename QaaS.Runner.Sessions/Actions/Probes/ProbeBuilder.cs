@@ -220,23 +220,10 @@ public class ProbeBuilder : IYamlConvertible
     /// Use this method when working with the documented Runner probe builder API surface in code. The change is stored on the current builder instance and is consumed by later build, validation, or execution steps.
     /// </remarks>
     /// <qaas-docs group="Configuration as Code" subgroup="Probes" />
-    internal ProbeBuilder AddConfiguration(object configuration)
-    {
-        return Configure(configuration);
-    }
-
-    /// <summary>
-    /// Sets the configuration currently stored on the Runner probe builder instance.
-    /// </summary>
-    /// <remarks>
-    /// Use this method when working with the documented Runner probe builder API surface in code. The change is stored on the current builder instance and is consumed by later build, validation, or execution steps.
-    /// </remarks>
-    /// <qaas-docs group="Configuration as Code" subgroup="Probes" />
     public ProbeBuilder UpdateConfiguration(object configuration)
     {
-        ProbeConfiguration = ConfigurationUpdateExtensions.UpdateConfiguration(
-            ProbeConfiguration ?? new ConfigurationBuilder().Build(),
-            configuration);
+        ProbeConfiguration = (ProbeConfiguration ?? new ConfigurationBuilder().Build())
+            .UpdateConfiguration(configuration);
         return this;
     }
 

@@ -93,7 +93,7 @@ public class BuilderCrudTests
         var builder = new LinkBuilder()
             .Configure(new KibanaLinkConfig { Url = "https://kibana", DataViewId = "view" });
 
-        builder.UpdateConfiguration(_ => new GrafanaLinkConfig
+        builder.UpdateConfiguration(new GrafanaLinkConfig
         {
             Url = "https://grafana",
             DashboardId = "dash"

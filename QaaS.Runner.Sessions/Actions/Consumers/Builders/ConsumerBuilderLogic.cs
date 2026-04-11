@@ -169,62 +169,6 @@ public partial class ConsumerBuilder
     }
 
     /// <summary>
-    /// Sets the configuration currently stored on the Runner consumer builder instance.
-    /// </summary>
-    /// <remarks>
-    /// Use this method when working with the documented Runner consumer builder API surface in code. The change is stored on the current builder instance and is consumed by later build, validation, or execution steps.
-    /// </remarks>
-    /// <qaas-docs group="Configuration as Code" subgroup="Consumers" />
-    internal ConsumerBuilder AddConfiguration(IReaderConfig config)
-    {
-        return Configure(config);
-    }
-
-    /// <summary>
-    /// Sets the configuration currently stored on the Runner consumer builder instance.
-    /// </summary>
-    /// <remarks>
-    /// Use this method when working with the documented Runner consumer builder API surface in code. The change is stored on the current builder instance and is consumed by later build, validation, or execution steps.
-    /// </remarks>
-    /// <qaas-docs group="Configuration as Code" subgroup="Consumers" />
-    internal ConsumerBuilder Create(IReaderConfig config)
-    {
-        return AddConfiguration(config);
-    }
-
-    /// <summary>
-    /// Returns the configuration currently stored on the Runner consumer builder instance.
-    /// </summary>
-    /// <remarks>
-    /// Use this method when working with the documented Runner consumer builder API surface in code. Use it to inspect the current configured state without rebuilding the surrounding collection or runtime object graph.
-    /// </remarks>
-    /// <qaas-docs group="Configuration as Code" subgroup="Consumers" />
-    public ConsumerBuilder UpdateConfiguration(Func<IReaderConfig, IReaderConfig> update)
-    {
-        var currentConfig = Configuration ??
-                            throw new InvalidOperationException(
-                                "Consumer configuration is not set and cannot be inferred from an update function.");
-        return UpdateConfiguration(update(currentConfig));
-    }
-
-    /// <summary>
-    /// Updates the configuration currently stored on the Runner consumer builder instance.
-    /// </summary>
-    /// <remarks>
-    /// Use this method when working with the documented Runner consumer builder API surface in code. The change is stored on the current builder instance and is consumed by later build, validation, or execution steps.
-    /// </remarks>
-    /// <qaas-docs group="Configuration as Code" subgroup="Consumers" />
-    public ConsumerBuilder UpdateConfiguration(IReaderConfig config)
-    {
-        ArgumentNullException.ThrowIfNull(config);
-
-        var currentConfig = Configuration;
-        return Configure(currentConfig == null
-            ? config
-            : ConfigurationUpdateExtensions.UpdateConfiguration(currentConfig, config));
-    }
-
-    /// <summary>
     /// Updates the configuration currently stored on the Runner consumer builder instance.
     /// </summary>
     /// <remarks>
@@ -235,15 +179,18 @@ public partial class ConsumerBuilder
     {
         ArgumentNullException.ThrowIfNull(configuration);
 
+        var currentConfig = Configuration;
         if (configuration is IReaderConfig typedConfiguration)
         {
-            return UpdateConfiguration(typedConfiguration);
+            return Configure(currentConfig == null
+                ? typedConfiguration
+                : currentConfig.UpdateConfiguration(typedConfiguration));
         }
 
-        var currentConfig = Configuration ??
-                            throw new InvalidOperationException(
-                                "Consumer configuration is not set and cannot be inferred from an object patch. Configure a concrete consumer configuration first.");
-        return Configure(ConfigurationUpdateExtensions.UpdateConfiguration(currentConfig, configuration));
+        if (currentConfig == null)
+            throw new InvalidOperationException(
+                "Consumer configuration is not set and cannot be inferred from an object patch. Configure a concrete consumer configuration first.");
+        return Configure(currentConfig.UpdateConfiguration(configuration));
     }
 
     private ConsumerBuilder Reset()

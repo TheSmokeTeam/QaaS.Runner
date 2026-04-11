@@ -138,7 +138,7 @@ public class CollectorBuilderTests
             .Named("TestCollector");
 
         Assert.Throws<InvalidOperationException>(() =>
-            builder.UpdateConfiguration(config => config));
+            builder.UpdateConfiguration(new { Url = "https://prometheus.local" }));
     }
 
     [Test]

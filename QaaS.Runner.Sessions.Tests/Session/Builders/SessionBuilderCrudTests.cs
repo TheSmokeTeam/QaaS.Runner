@@ -187,7 +187,7 @@ public class SessionBuilderCrudTests
     }
 
     [Test]
-    public void UpdateByName_WithMutationDelegate_ShouldAllowEditingExistingBuildersInPlace()
+    public void UpdateByName_WithReplacementBuilder_ShouldReplaceExistingBuilders()
     {
         var builder = new SessionBuilder()
             .AddConsumer(new ConsumerBuilder().Named("consumer-a"))
@@ -197,12 +197,12 @@ public class SessionBuilderCrudTests
             .AddCollector(new CollectorBuilder().Named("collector-a"))
             .AddMockerCommand(new MockerCommandBuilder().Named("command-a"));
 
-        builder.UpdateConsumer("consumer-a", consumer => consumer.Named("consumer-mutated"));
-        builder.UpdatePublisher("publisher-a", publisher => publisher.Named("publisher-mutated"));
-        builder.UpdateTransaction("transaction-a", transaction => transaction.Named("transaction-mutated"));
-        builder.UpdateProbe("probe-a", probe => probe.Named("probe-mutated"));
-        builder.UpdateCollector("collector-a", collector => collector.Named("collector-mutated"));
-        builder.UpdateMockerCommand("command-a", command => command.Named("command-mutated"));
+        builder.UpdateConsumer("consumer-a", new ConsumerBuilder().Named("consumer-mutated"));
+        builder.UpdatePublisher("publisher-a", new PublisherBuilder().Named("publisher-mutated"));
+        builder.UpdateTransaction("transaction-a", new TransactionBuilder().Named("transaction-mutated"));
+        builder.UpdateProbe("probe-a", new ProbeBuilder().Named("probe-mutated"));
+        builder.UpdateCollector("collector-a", new CollectorBuilder().Named("collector-mutated"));
+        builder.UpdateMockerCommand("command-a", new MockerCommandBuilder().Named("command-mutated"));
 
         Assert.That(builder.Consumers!.FirstOrDefault(consumer => consumer.Name == "consumer-mutated"), Is.Not.Null);
         Assert.That(builder.Publishers!.FirstOrDefault(publisher => publisher.Name == "publisher-mutated"), Is.Not.Null);

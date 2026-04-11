@@ -409,62 +409,6 @@ public class TransactionBuilder
     }
 
     /// <summary>
-    /// Sets the configuration currently stored on the Runner transaction builder instance.
-    /// </summary>
-    /// <remarks>
-    /// Use this method when working with the documented Runner transaction builder API surface in code. The change is stored on the current builder instance and is consumed by later build, validation, or execution steps.
-    /// </remarks>
-    /// <qaas-docs group="Configuration as Code" subgroup="Transactions" />
-    internal TransactionBuilder AddConfiguration(ITransactorConfig config)
-    {
-        return Configure(config);
-    }
-
-    /// <summary>
-    /// Sets the configuration currently stored on the Runner transaction builder instance.
-    /// </summary>
-    /// <remarks>
-    /// Use this method when working with the documented Runner transaction builder API surface in code. The change is stored on the current builder instance and is consumed by later build, validation, or execution steps.
-    /// </remarks>
-    /// <qaas-docs group="Configuration as Code" subgroup="Transactions" />
-    internal TransactionBuilder Create(ITransactorConfig config)
-    {
-        return AddConfiguration(config);
-    }
-
-    /// <summary>
-    /// Updates the configuration currently stored on the Runner transaction builder instance.
-    /// </summary>
-    /// <remarks>
-    /// Use this method when working with the documented Runner transaction builder API surface in code. The change is stored on the current builder instance and is consumed by later build, validation, or execution steps.
-    /// </remarks>
-    /// <qaas-docs group="Configuration as Code" subgroup="Transactions" />
-    public TransactionBuilder UpdateConfiguration(Func<ITransactorConfig, ITransactorConfig> update)
-    {
-        var currentConfig = Configuration ??
-                            throw new InvalidOperationException(
-                                "Transaction configuration is not set and cannot be inferred from an update function.");
-        return UpdateConfiguration(update(currentConfig));
-    }
-
-    /// <summary>
-    /// Updates the configuration currently stored on the Runner transaction builder instance.
-    /// </summary>
-    /// <remarks>
-    /// Use this method when working with the documented Runner transaction builder API surface in code. The change is stored on the current builder instance and is consumed by later build, validation, or execution steps.
-    /// </remarks>
-    /// <qaas-docs group="Configuration as Code" subgroup="Transactions" />
-    public TransactionBuilder UpdateConfiguration(ITransactorConfig config)
-    {
-        ArgumentNullException.ThrowIfNull(config);
-
-        var currentConfig = Configuration;
-        return Configure(currentConfig == null
-            ? config
-            : currentConfig.UpdateConfiguration(config));
-    }
-
-    /// <summary>
     /// Updates the configuration currently stored on the Runner transaction builder instance.
     /// </summary>
     /// <remarks>
@@ -475,14 +419,17 @@ public class TransactionBuilder
     {
         ArgumentNullException.ThrowIfNull(configuration);
 
+        var currentConfig = Configuration;
         if (configuration is ITransactorConfig typedConfiguration)
         {
-            return UpdateConfiguration(typedConfiguration);
+            return Configure(currentConfig == null
+                ? typedConfiguration
+                : currentConfig.UpdateConfiguration(typedConfiguration));
         }
 
-        var currentConfig = Configuration ??
-                            throw new InvalidOperationException(
-                                "Transaction configuration is not set and cannot be inferred from an object patch. Configure a concrete transaction configuration first.");
+        if (currentConfig == null)
+            throw new InvalidOperationException(
+                "Transaction configuration is not set and cannot be inferred from an object patch. Configure a concrete transaction configuration first.");
         return Configure(currentConfig.UpdateConfiguration(configuration));
     }
 
