@@ -22,45 +22,39 @@ public class SessionBuilderCrudTests
 
         Assert.Multiple(() =>
         {
-            Assert.That(builder.ReadConsumers(), Is.Empty);
-            Assert.That(builder.ReadPublishers(), Is.Empty);
-            Assert.That(builder.ReadTransactions(), Is.Empty);
-            Assert.That(builder.ReadProbes(), Is.Empty);
-            Assert.That(builder.ReadCollectors(), Is.Empty);
-            Assert.That(builder.ReadMockerCommands(), Is.Empty);
-            Assert.That(builder.ReadConsumer("missing"), Is.Null);
-            Assert.That(builder.ReadPublisher("missing"), Is.Null);
-            Assert.That(builder.ReadTransaction("missing"), Is.Null);
-            Assert.That(builder.ReadProbe("missing"), Is.Null);
-            Assert.That(builder.ReadCollector("missing"), Is.Null);
-            Assert.That(builder.ReadMockerCommand("missing"), Is.Null);
+            Assert.That(builder.Consumers, Is.Null);
+            Assert.That(builder.Publishers, Is.Null);
+            Assert.That(builder.Transactions, Is.Null);
+            Assert.That(builder.Probes, Is.Null);
+            Assert.That(builder.Collectors, Is.Null);
+            Assert.That(builder.MockerCommands, Is.Null);
         });
 
         Assert.DoesNotThrow(() =>
         {
-            builder.DeleteConsumer("missing")
-                .DeletePublisher("missing")
-                .DeleteTransaction("missing")
-                .DeleteProbe("missing")
-                .DeleteCollector("missing")
-                .DeleteMockerCommand("missing");
+            builder.RemoveConsumer("missing")
+                .RemovePublisher("missing")
+                .RemoveTransaction("missing")
+                .RemoveProbe("missing")
+                .RemoveCollector("missing")
+                .RemoveMockerCommand("missing");
         });
 
-        builder.CreateConsumer(new ConsumerBuilder().Named("consumer-a"))
-            .CreatePublisher(new PublisherBuilder().Named("publisher-a"))
-            .CreateTransaction(new TransactionBuilder().Named("transaction-a"))
-            .CreateProbe(new ProbeBuilder().Named("probe-a"))
-            .CreateCollector(new CollectorBuilder().Named("collector-a"))
-            .CreateMockerCommand(new MockerCommandBuilder().Named("command-a"));
+        builder.AddConsumer(new ConsumerBuilder().Named("consumer-a"))
+            .AddPublisher(new PublisherBuilder().Named("publisher-a"))
+            .AddTransaction(new TransactionBuilder().Named("transaction-a"))
+            .AddProbe(new ProbeBuilder().Named("probe-a"))
+            .AddCollector(new CollectorBuilder().Named("collector-a"))
+            .AddMockerCommand(new MockerCommandBuilder().Named("command-a"));
 
         Assert.Multiple(() =>
         {
-            Assert.That(builder.ReadConsumers(), Has.Count.EqualTo(1));
-            Assert.That(builder.ReadPublishers(), Has.Count.EqualTo(1));
-            Assert.That(builder.ReadTransactions(), Has.Count.EqualTo(1));
-            Assert.That(builder.ReadProbes(), Has.Count.EqualTo(1));
-            Assert.That(builder.ReadCollectors(), Has.Count.EqualTo(1));
-            Assert.That(builder.ReadMockerCommands(), Has.Count.EqualTo(1));
+            Assert.That(builder.Consumers, Has.Length.EqualTo(1));
+            Assert.That(builder.Publishers, Has.Length.EqualTo(1));
+            Assert.That(builder.Transactions, Has.Length.EqualTo(1));
+            Assert.That(builder.Probes, Has.Length.EqualTo(1));
+            Assert.That(builder.Collectors, Has.Length.EqualTo(1));
+            Assert.That(builder.MockerCommands, Has.Length.EqualTo(1));
         });
     }
 
@@ -68,121 +62,166 @@ public class SessionBuilderCrudTests
     public void Consumers_ShouldSupportCrudByName()
     {
         var builder = new SessionBuilder()
-            .CreateConsumer(new ConsumerBuilder().Named("consumer-a"))
-            .CreateConsumer(new ConsumerBuilder().Named("consumer-b"));
+            .AddConsumer(new ConsumerBuilder().Named("consumer-a"))
+            .AddConsumer(new ConsumerBuilder().Named("consumer-b"));
 
         builder.UpdateConsumer("consumer-a", new ConsumerBuilder().Named("consumer-updated"));
-        builder.DeleteConsumer("consumer-b");
+        builder.RemoveConsumer("consumer-b");
 
-        Assert.That(builder.ReadConsumers(), Has.Count.EqualTo(1));
-        Assert.That(builder.ReadConsumers()[0].Name, Is.EqualTo("consumer-updated"));
-        Assert.That(builder.ReadConsumer("consumer-updated")?.Name, Is.EqualTo("consumer-updated"));
+        Assert.That(builder.Consumers, Has.Length.EqualTo(1));
+        Assert.That(builder.Consumers![0].Name, Is.EqualTo("consumer-updated"));
+        Assert.That(builder.Consumers.FirstOrDefault(consumer => consumer.Name == "consumer-updated")?.Name,
+            Is.EqualTo("consumer-updated"));
+    }
+
+    [Test]
+    public void ActionCollections_ShouldSupportRemoveAtByIndex()
+    {
+        var builder = new SessionBuilder()
+            .AddConsumer(new ConsumerBuilder().Named("consumer-a"))
+            .AddConsumer(new ConsumerBuilder().Named("consumer-b"))
+            .AddPublisher(new PublisherBuilder().Named("publisher-a"))
+            .AddPublisher(new PublisherBuilder().Named("publisher-b"))
+            .AddTransaction(new TransactionBuilder().Named("transaction-a"))
+            .AddTransaction(new TransactionBuilder().Named("transaction-b"))
+            .AddProbe(new ProbeBuilder().Named("probe-a"))
+            .AddProbe(new ProbeBuilder().Named("probe-b"))
+            .AddCollector(new CollectorBuilder().Named("collector-a"))
+            .AddCollector(new CollectorBuilder().Named("collector-b"))
+            .AddMockerCommand(new MockerCommandBuilder().Named("command-a"))
+            .AddMockerCommand(new MockerCommandBuilder().Named("command-b"))
+            .AddStage(new StageConfig(stageNumber: 1, timeoutBefore: 10, timeoutAfter: 20))
+            .AddStage(new StageConfig(stageNumber: 2, timeoutBefore: 30, timeoutAfter: 40));
+
+        builder.RemoveConsumerAt(0)
+            .RemovePublisherAt(0)
+            .RemoveTransactionAt(0)
+            .RemoveProbeAt(0)
+            .RemoveCollectorAt(0)
+            .RemoveMockerCommandAt(0)
+            .RemoveStageAt(0);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(builder.Consumers!.Single().Name, Is.EqualTo("consumer-b"));
+            Assert.That(builder.Publishers!.Single().Name, Is.EqualTo("publisher-b"));
+            Assert.That(builder.Transactions!.Single().Name, Is.EqualTo("transaction-b"));
+            Assert.That(builder.Probes!.Single().Name, Is.EqualTo("probe-b"));
+            Assert.That(builder.Collectors!.Single().Name, Is.EqualTo("collector-b"));
+            Assert.That(builder.MockerCommands!.Single().Name, Is.EqualTo("command-b"));
+            Assert.That(builder.Stages.Single().StageNumber, Is.EqualTo(2));
+        });
     }
 
     [Test]
     public void PublishersTransactionsAndProbes_ShouldSupportCrudByName()
     {
         var builder = new SessionBuilder()
-            .CreatePublisher(new PublisherBuilder().Named("publisher-a"))
-            .CreateTransaction(new TransactionBuilder().Named("transaction-a"))
-            .CreateProbe(new ProbeBuilder().Named("probe-a"));
+            .AddPublisher(new PublisherBuilder().Named("publisher-a"))
+            .AddTransaction(new TransactionBuilder().Named("transaction-a"))
+            .AddProbe(new ProbeBuilder().Named("probe-a"));
 
         builder.UpdatePublisher("publisher-a", new PublisherBuilder().Named("publisher-updated"));
         builder.UpdateTransaction("transaction-a", new TransactionBuilder().Named("transaction-updated"));
         builder.UpdateProbe("probe-a", new ProbeBuilder().Named("probe-updated"));
 
-        Assert.That(builder.ReadPublishers()[0].Name, Is.EqualTo("publisher-updated"));
-        Assert.That(builder.ReadTransactions()[0].Name, Is.EqualTo("transaction-updated"));
-        Assert.That(builder.ReadProbes()[0].Name, Is.EqualTo("probe-updated"));
-        Assert.That(builder.ReadPublisher("publisher-updated")?.Name, Is.EqualTo("publisher-updated"));
-        Assert.That(builder.ReadTransaction("transaction-updated")?.Name, Is.EqualTo("transaction-updated"));
-        Assert.That(builder.ReadProbe("probe-updated")?.Name, Is.EqualTo("probe-updated"));
+        Assert.That(builder.Publishers![0].Name, Is.EqualTo("publisher-updated"));
+        Assert.That(builder.Transactions![0].Name, Is.EqualTo("transaction-updated"));
+        Assert.That(builder.Probes![0].Name, Is.EqualTo("probe-updated"));
+        Assert.That(builder.Publishers.FirstOrDefault(publisher => publisher.Name == "publisher-updated")?.Name,
+            Is.EqualTo("publisher-updated"));
+        Assert.That(builder.Transactions.FirstOrDefault(transaction => transaction.Name == "transaction-updated")?.Name,
+            Is.EqualTo("transaction-updated"));
+        Assert.That(builder.Probes.FirstOrDefault(probe => probe.Name == "probe-updated")?.Name,
+            Is.EqualTo("probe-updated"));
 
-        builder.DeletePublisher("publisher-updated")
-            .DeleteTransaction("transaction-updated")
-            .DeleteProbe("probe-updated");
+        builder.RemovePublisher("publisher-updated")
+            .RemoveTransaction("transaction-updated")
+            .RemoveProbe("probe-updated");
 
-        Assert.That(builder.ReadPublishers(), Is.Empty);
-        Assert.That(builder.ReadTransactions(), Is.Empty);
-        Assert.That(builder.ReadProbes(), Is.Empty);
+        Assert.That(builder.Publishers, Is.Empty);
+        Assert.That(builder.Transactions, Is.Empty);
+        Assert.That(builder.Probes, Is.Empty);
     }
 
     [Test]
     public void CollectorsAndMockerCommands_ShouldSupportCrudByName()
     {
         var builder = new SessionBuilder()
-            .CreateCollector(new CollectorBuilder().Named("collector-a"))
-            .CreateMockerCommand(new MockerCommandBuilder().Named("command-a"));
+            .AddCollector(new CollectorBuilder().Named("collector-a"))
+            .AddMockerCommand(new MockerCommandBuilder().Named("command-a"));
 
         builder.UpdateCollector("collector-a", new CollectorBuilder().Named("collector-updated"));
         builder.UpdateMockerCommand("command-a", new MockerCommandBuilder().Named("command-updated"));
 
-        Assert.That(builder.ReadCollectors()[0].Name, Is.EqualTo("collector-updated"));
-        Assert.That(builder.ReadMockerCommands()[0].Name, Is.EqualTo("command-updated"));
-        Assert.That(builder.ReadCollector("collector-updated")?.Name, Is.EqualTo("collector-updated"));
-        Assert.That(builder.ReadMockerCommand("command-updated")?.Name, Is.EqualTo("command-updated"));
+        Assert.That(builder.Collectors![0].Name, Is.EqualTo("collector-updated"));
+        Assert.That(builder.MockerCommands![0].Name, Is.EqualTo("command-updated"));
+        Assert.That(builder.Collectors.FirstOrDefault(collector => collector.Name == "collector-updated")?.Name,
+            Is.EqualTo("collector-updated"));
+        Assert.That(builder.MockerCommands.FirstOrDefault(command => command.Name == "command-updated")?.Name,
+            Is.EqualTo("command-updated"));
 
-        builder.DeleteCollector("collector-updated")
-            .DeleteMockerCommand("command-updated");
+        builder.RemoveCollector("collector-updated")
+            .RemoveMockerCommand("command-updated");
 
-        Assert.That(builder.ReadCollectors(), Is.Empty);
-        Assert.That(builder.ReadMockerCommands(), Is.Empty);
+        Assert.That(builder.Collectors, Is.Empty);
+        Assert.That(builder.MockerCommands, Is.Empty);
     }
 
     [Test]
     public void Stages_ShouldSupportCrudByStageNumber()
     {
         var builder = new SessionBuilder()
-            .CreateStage(new StageConfig(stageNumber: 1, timeoutBefore: 10, timeoutAfter: 20))
-            .CreateStage(new StageConfig(stageNumber: 2, timeoutBefore: 30, timeoutAfter: 40));
+            .AddStage(new StageConfig(stageNumber: 1, timeoutBefore: 10, timeoutAfter: 20))
+            .AddStage(new StageConfig(stageNumber: 2, timeoutBefore: 30, timeoutAfter: 40));
 
         builder.UpdateStage(1, new StageConfig(stageNumber: 1, timeoutBefore: 99, timeoutAfter: 100));
 
-        Assert.That(builder.ReadStages(), Has.Count.EqualTo(2));
-        Assert.That(builder.ReadStages().First(stage => stage.StageNumber == 1).TimeoutBefore, Is.EqualTo(99));
-        Assert.That(builder.ReadStage(1)?.TimeoutBefore, Is.EqualTo(99));
+        Assert.That(builder.Stages, Has.Length.EqualTo(2));
+        Assert.That(builder.Stages.First(stage => stage.StageNumber == 1).TimeoutBefore, Is.EqualTo(99));
+        Assert.That(builder.Stages.FirstOrDefault(stage => stage.StageNumber == 1)?.TimeoutBefore, Is.EqualTo(99));
 
-        builder.DeleteStage(2);
-        Assert.That(builder.ReadStages(), Has.Count.EqualTo(1));
-        Assert.That(builder.ReadStages()[0].StageNumber, Is.EqualTo(1));
+        builder.RemoveStage(2);
+        Assert.That(builder.Stages, Has.Length.EqualTo(1));
+        Assert.That(builder.Stages[0].StageNumber, Is.EqualTo(1));
     }
 
     [Test]
-    public void UpdateByName_WithMutationDelegate_ShouldAllowEditingExistingBuildersInPlace()
+    public void UpdateByName_WithReplacementBuilder_ShouldReplaceExistingBuilders()
     {
         var builder = new SessionBuilder()
-            .CreateConsumer(new ConsumerBuilder().Named("consumer-a"))
-            .CreatePublisher(new PublisherBuilder().Named("publisher-a"))
-            .CreateTransaction(new TransactionBuilder().Named("transaction-a"))
-            .CreateProbe(new ProbeBuilder().Named("probe-a"))
-            .CreateCollector(new CollectorBuilder().Named("collector-a"))
-            .CreateMockerCommand(new MockerCommandBuilder().Named("command-a"));
+            .AddConsumer(new ConsumerBuilder().Named("consumer-a"))
+            .AddPublisher(new PublisherBuilder().Named("publisher-a"))
+            .AddTransaction(new TransactionBuilder().Named("transaction-a"))
+            .AddProbe(new ProbeBuilder().Named("probe-a"))
+            .AddCollector(new CollectorBuilder().Named("collector-a"))
+            .AddMockerCommand(new MockerCommandBuilder().Named("command-a"));
 
-        builder.UpdateConsumer("consumer-a", consumer => consumer.Named("consumer-mutated"));
-        builder.UpdatePublisher("publisher-a", publisher => publisher.Named("publisher-mutated"));
-        builder.UpdateTransaction("transaction-a", transaction => transaction.Named("transaction-mutated"));
-        builder.UpdateProbe("probe-a", probe => probe.Named("probe-mutated"));
-        builder.UpdateCollector("collector-a", collector => collector.Named("collector-mutated"));
-        builder.UpdateMockerCommand("command-a", command => command.Named("command-mutated"));
+        builder.UpdateConsumer("consumer-a", new ConsumerBuilder().Named("consumer-mutated"));
+        builder.UpdatePublisher("publisher-a", new PublisherBuilder().Named("publisher-mutated"));
+        builder.UpdateTransaction("transaction-a", new TransactionBuilder().Named("transaction-mutated"));
+        builder.UpdateProbe("probe-a", new ProbeBuilder().Named("probe-mutated"));
+        builder.UpdateCollector("collector-a", new CollectorBuilder().Named("collector-mutated"));
+        builder.UpdateMockerCommand("command-a", new MockerCommandBuilder().Named("command-mutated"));
 
-        Assert.That(builder.ReadConsumer("consumer-mutated"), Is.Not.Null);
-        Assert.That(builder.ReadPublisher("publisher-mutated"), Is.Not.Null);
-        Assert.That(builder.ReadTransaction("transaction-mutated"), Is.Not.Null);
-        Assert.That(builder.ReadProbe("probe-mutated"), Is.Not.Null);
-        Assert.That(builder.ReadCollector("collector-mutated"), Is.Not.Null);
-        Assert.That(builder.ReadMockerCommand("command-mutated"), Is.Not.Null);
+        Assert.That(builder.Consumers!.FirstOrDefault(consumer => consumer.Name == "consumer-mutated"), Is.Not.Null);
+        Assert.That(builder.Publishers!.FirstOrDefault(publisher => publisher.Name == "publisher-mutated"), Is.Not.Null);
+        Assert.That(builder.Transactions!.FirstOrDefault(transaction => transaction.Name == "transaction-mutated"), Is.Not.Null);
+        Assert.That(builder.Probes!.FirstOrDefault(probe => probe.Name == "probe-mutated"), Is.Not.Null);
+        Assert.That(builder.Collectors!.FirstOrDefault(collector => collector.Name == "collector-mutated"), Is.Not.Null);
+        Assert.That(builder.MockerCommands!.FirstOrDefault(command => command.Name == "command-mutated"), Is.Not.Null);
     }
 
     [Test]
     public void UpdateStage_WhenStageNumberDoesNotExist_DoesNotChangeStages()
     {
         var builder = new SessionBuilder()
-            .CreateStage(new StageConfig(stageNumber: 1, timeoutBefore: 10, timeoutAfter: 20));
+            .AddStage(new StageConfig(stageNumber: 1, timeoutBefore: 10, timeoutAfter: 20));
 
         builder.UpdateStage(99, new StageConfig(stageNumber: 99, timeoutBefore: 1, timeoutAfter: 1));
 
-        Assert.That(builder.ReadStages(), Has.Count.EqualTo(1));
-        Assert.That(builder.ReadStages()[0].StageNumber, Is.EqualTo(1));
+        Assert.That(builder.Stages, Has.Length.EqualTo(1));
+        Assert.That(builder.Stages[0].StageNumber, Is.EqualTo(1));
     }
 
     [Test]
@@ -201,12 +240,12 @@ public class SessionBuilderCrudTests
     public void UpdateByName_WhenNameIsMissing_DoesNotMutateCollection()
     {
         var builder = new SessionBuilder()
-            .CreatePublisher(new PublisherBuilder().Named("publisher-a"));
+            .AddPublisher(new PublisherBuilder().Named("publisher-a"));
 
         builder.UpdatePublisher("publisher-missing", new PublisherBuilder().Named("publisher-updated"));
 
-        Assert.That(builder.ReadPublishers(), Has.Count.EqualTo(1));
-        Assert.That(builder.ReadPublishers()[0].Name, Is.EqualTo("publisher-a"));
+        Assert.That(builder.Publishers, Has.Length.EqualTo(1));
+        Assert.That(builder.Publishers![0].Name, Is.EqualTo("publisher-a"));
     }
 
     private static void SetActionCollections(SessionBuilder builder, object? value)
@@ -226,4 +265,7 @@ public class SessionBuilderCrudTests
         }
     }
 }
+
+
+
 

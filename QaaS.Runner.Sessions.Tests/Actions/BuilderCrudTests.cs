@@ -26,20 +26,20 @@ public class BuilderCrudTests
     public void ConsumerBuilder_ShouldSupportPolicyAndConfigurationCrud()
     {
         var builder = new ConsumerBuilder()
-            .CreatePolicy(new PolicyBuilder())
-            .CreatePolicy(new PolicyBuilder());
+            .AddPolicy(new PolicyBuilder())
+            .AddPolicy(new PolicyBuilder());
 
         builder.UpdatePolicyAt(0, new PolicyBuilder());
-        builder.DeletePolicyAt(1);
+        builder.RemovePolicyAt(1);
         builder.Configure(new RabbitMqReaderConfig());
-        builder.UpdateConfiguration(_ => new KafkaTopicReaderConfig());
+        builder.UpdateConfiguration(new KafkaTopicReaderConfig());
         builder.UpdateConfiguration(new SocketReaderConfig());
 
-        Assert.That(builder.ReadPolicies(), Has.Count.EqualTo(1));
+        Assert.That(builder.Policies, Has.Length.EqualTo(1));
         Assert.That(builder.Configuration, Is.TypeOf<SocketReaderConfig>());
 
-        builder.DeleteConfiguration();
-        Assert.That(builder.Configuration, Is.Null);
+        builder.Configure(new RabbitMqReaderConfig());
+        Assert.That(builder.Configuration, Is.TypeOf<RabbitMqReaderConfig>());
     }
 
     [Test]
@@ -125,26 +125,34 @@ public class BuilderCrudTests
     public void PublisherBuilder_ShouldSupportDataSourcePolicyAndConfigurationCrud()
     {
         var builder = new PublisherBuilder()
-            .CreateDataSource("source-a")
-            .CreateDataSource("source-b")
-            .CreateDataSourcePattern("^source-.*$")
-            .CreatePolicy(new PolicyBuilder())
+            .AddDataSource("source-a")
+            .AddDataSource("source-b")
+            .AddDataSourcePattern("^source-.*$")
+            .AddPolicy(new PolicyBuilder())
             .Configure(new RabbitMqSenderConfig());
 
         builder.UpdateDataSource("source-a", "source-updated");
-        builder.DeleteDataSource("source-b");
+        builder.RemoveDataSource("source-b");
         builder.UpdateDataSourcePattern("^source-.*$", "^updated-.*$");
         builder.UpdatePolicyAt(0, new PolicyBuilder());
-        builder.UpdateConfiguration(_ => new SocketSenderConfig());
+        builder.UpdateConfiguration(new SocketSenderConfig());
         builder.UpdateConfiguration(new KafkaTopicSenderConfig());
 
-        Assert.That(builder.ReadDataSources(), Is.EquivalentTo(["source-updated"]));
-        Assert.That(builder.ReadDataSourcePatterns(), Is.EquivalentTo(["^updated-.*$"]));
-        Assert.That(builder.ReadPolicies(), Has.Count.EqualTo(1));
+        Assert.That(builder.DataSourceNames, Is.EquivalentTo(["source-updated"]));
+        Assert.That(builder.DataSourcePatterns, Is.EquivalentTo(["^updated-.*$"]));
+        Assert.That(builder.Policies, Has.Length.EqualTo(1));
         Assert.That(builder.Configuration, Is.TypeOf<KafkaTopicSenderConfig>());
 
-        builder.DeleteConfiguration();
-        Assert.That(builder.Configuration, Is.Null);
+        builder.AddDataSource("source-indexed")
+            .AddDataSourcePattern("^indexed-.*$");
+        builder.RemoveDataSourceAt(1)
+            .RemoveDataSourcePatternAt(1);
+
+        Assert.That(builder.DataSourceNames, Is.EquivalentTo(["source-updated"]));
+        Assert.That(builder.DataSourcePatterns, Is.EquivalentTo(["^updated-.*$"]));
+
+        builder.Configure(new SocketSenderConfig());
+        Assert.That(builder.Configuration, Is.TypeOf<SocketSenderConfig>());
     }
 
     [Test]
@@ -238,31 +246,39 @@ public class BuilderCrudTests
     public void TransactionBuilder_ShouldSupportPolicyDataSourceAndConfigurationCrud()
     {
         var builder = new TransactionBuilder()
-            .CreatePolicy(new PolicyBuilder())
-            .CreateDataSource("source-a")
-            .CreateDataSourcePattern("^source-.*$")
+            .AddPolicy(new PolicyBuilder())
+            .AddDataSource("source-a")
+            .AddDataSourcePattern("^source-.*$")
             .Configure(new HttpTransactorConfig());
 
         builder.UpdatePolicyAt(0, new PolicyBuilder());
         builder.UpdateDataSource("source-a", "source-updated");
         builder.UpdateDataSourcePattern("^source-.*$", "^updated-.*$");
-        builder.UpdateConfiguration(_ => new GrpcTransactorConfig());
+        builder.UpdateConfiguration(new GrpcTransactorConfig());
         builder.UpdateConfiguration(new HttpTransactorConfig());
 
-        Assert.That(builder.ReadPolicies(), Has.Count.EqualTo(1));
-        Assert.That(builder.ReadDataSources(), Is.EquivalentTo(["source-updated"]));
-        Assert.That(builder.ReadDataSourcePatterns(), Is.EquivalentTo(["^updated-.*$"]));
+        Assert.That(builder.Policies, Has.Length.EqualTo(1));
+        Assert.That(builder.DataSourceNames, Is.EquivalentTo(["source-updated"]));
+        Assert.That(builder.DataSourcePatterns, Is.EquivalentTo(["^updated-.*$"]));
         Assert.That(builder.Configuration, Is.TypeOf<HttpTransactorConfig>());
 
-        builder.DeleteDataSource("source-updated")
-            .DeleteDataSourcePattern("^updated-.*$")
-            .DeletePolicyAt(0)
-            .DeleteConfiguration();
+        builder.AddDataSource("source-indexed")
+            .AddDataSourcePattern("^indexed-.*$");
+        builder.RemoveDataSourceAt(1)
+            .RemoveDataSourcePatternAt(1);
 
-        Assert.That(builder.ReadDataSources(), Is.Empty);
-        Assert.That(builder.ReadDataSourcePatterns(), Is.Empty);
-        Assert.That(builder.ReadPolicies(), Is.Empty);
-        Assert.That(builder.Configuration, Is.Null);
+        Assert.That(builder.DataSourceNames, Is.EquivalentTo(["source-updated"]));
+        Assert.That(builder.DataSourcePatterns, Is.EquivalentTo(["^updated-.*$"]));
+
+        builder.RemoveDataSource("source-updated")
+            .RemoveDataSourcePattern("^updated-.*$")
+            .RemovePolicyAt(0)
+            .Configure(new GrpcTransactorConfig());
+
+        Assert.That(builder.DataSourceNames, Is.Empty);
+        Assert.That(builder.DataSourcePatterns, Is.Empty);
+        Assert.That(builder.Policies, Is.Empty);
+        Assert.That(builder.Configuration, Is.TypeOf<GrpcTransactorConfig>());
     }
 
     [Test]
@@ -325,27 +341,33 @@ public class BuilderCrudTests
     public void ProbeBuilder_ShouldSupportDataSourceAndConfigurationCrud()
     {
         var builder = new ProbeBuilder()
-            .CreateDataSourceName("source-a")
-            .CreateDataSourcePattern("^source-.*$")
+            .AddDataSourceName("source-a")
+            .AddDataSourcePattern("^source-.*$")
             .Configure(new { enabled = true });
 
-        builder.UpdateDataSourceName("source-a", "source-updated");
-        builder.UpdateDataSourcePattern("^source-.*$", "^updated-.*$");
+        builder.RemoveDataSourceName("source-a");
+        builder.AddDataSourceName("source-updated");
+        builder.RemoveDataSourcePattern("^source-.*$");
+        builder.AddDataSourcePattern("^updated-.*$");
         builder.UpdateConfiguration(new { threshold = 5 });
         builder.UpdateConfiguration(new { nested = new { value = "set" } });
+        builder.AddDataSourceName("source-indexed")
+            .AddDataSourcePattern("^indexed-.*$")
+            .RemoveDataSourceNameAt(1)
+            .RemoveDataSourcePatternAt(1);
 
-        Assert.That(builder.ReadDataSourceNames(), Is.EquivalentTo(["source-updated"]));
-        Assert.That(builder.ReadDataSourcePatterns(), Is.EquivalentTo(["^updated-.*$"]));
+        Assert.That(builder.DataSourceNames, Is.EquivalentTo(["source-updated"]));
+        Assert.That(builder.DataSourcePatterns, Is.EquivalentTo(["^updated-.*$"]));
         Assert.That(builder.Configuration["enabled"], Is.EqualTo("True"));
         Assert.That(builder.Configuration["threshold"], Is.EqualTo("5"));
         Assert.That(builder.Configuration["nested:value"], Is.EqualTo("set"));
 
-        builder.DeleteDataSourceName("source-updated")
-            .DeleteDataSourcePattern("^updated-.*$")
-            .DeleteConfiguration();
+        builder.RemoveDataSourceName("source-updated")
+            .RemoveDataSourcePattern("^updated-.*$")
+            .RemoveConfiguration();
 
-        Assert.That(builder.ReadDataSourceNames(), Is.Empty);
-        Assert.That(builder.ReadDataSourcePatterns(), Is.Empty);
+        Assert.That(builder.DataSourceNames, Is.Empty);
+        Assert.That(builder.DataSourcePatterns, Is.Empty);
         Assert.That(builder.Configuration.AsEnumerable().Any(), Is.False);
     }
 
@@ -358,7 +380,7 @@ public class BuilderCrudTests
             Expression = "up"
         });
 
-        builder.UpdateConfiguration(_ => new PrometheusFetcherConfig
+        builder.UpdateConfiguration(new PrometheusFetcherConfig
         {
             Url = "https://prometheus-updated",
             Expression = "sum(up)"
@@ -372,8 +394,12 @@ public class BuilderCrudTests
         Assert.That(builder.Configuration, Is.TypeOf<PrometheusFetcherConfig>());
         Assert.That(((PrometheusFetcherConfig)builder.Configuration!).Expression, Is.EqualTo("max(up)"));
 
-        builder.DeleteConfiguration();
-        Assert.That(builder.Configuration, Is.Null);
+        builder.Configure(new PrometheusFetcherConfig
+        {
+            Url = "https://prometheus-latest",
+            Expression = "up"
+        });
+        Assert.That(builder.Configuration, Is.TypeOf<PrometheusFetcherConfig>());
     }
 
     [Test]
@@ -434,7 +460,7 @@ public class BuilderCrudTests
             Consume = new ConsumeCommandConfig()
         });
 
-        builder.UpdateConfiguration(_ => new MockerCommandConfig
+        builder.UpdateConfiguration(new MockerCommandConfig
         {
             TriggerAction = new TriggerAction()
         });
@@ -446,8 +472,11 @@ public class BuilderCrudTests
         Assert.That(builder.Configuration, Is.Not.Null);
         Assert.That(builder.Configuration!.Consume, Is.Not.Null);
 
-        builder.DeleteConfiguration();
-        Assert.That(builder.Configuration, Is.Null);
+        builder.Configure(new MockerCommandConfig
+        {
+            TriggerAction = new TriggerAction()
+        });
+        Assert.That(builder.Configuration!.TriggerAction, Is.Not.Null);
     }
 
     [Test]
@@ -479,4 +508,6 @@ public class BuilderCrudTests
         });
     }
 }
+
+
 

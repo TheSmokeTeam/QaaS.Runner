@@ -190,24 +190,12 @@ public class TransactionBuilder
     /// Use this method when working with the documented Runner transaction builder API surface in code. The change is stored on the current builder instance and is consumed by later build, validation, or execution steps.
     /// </remarks>
     /// <qaas-docs group="Configuration as Code" subgroup="Transactions" />
-    internal TransactionBuilder AddDataSource(string dataSourceName)
+    public TransactionBuilder AddDataSource(string dataSourceName)
     {
         var dataSourceNamesList = DataSourceNames?.ToList() ?? [];
         dataSourceNamesList.Add(dataSourceName);
         DataSourceNames = dataSourceNamesList.ToArray();
         return this;
-    }
-
-    /// <summary>
-    /// Creates or adds the configured data source entry on the current Runner transaction builder instance.
-    /// </summary>
-    /// <remarks>
-    /// Use this method when working with the documented Runner transaction builder API surface in code. The change is stored on the current builder instance and is consumed by later build, validation, or execution steps.
-    /// </remarks>
-    /// <qaas-docs group="Configuration as Code" subgroup="Transactions" />
-    public TransactionBuilder CreateDataSource(string dataSourceName)
-    {
-        return AddDataSource(dataSourceName);
     }
 
     /// <summary>
@@ -217,24 +205,12 @@ public class TransactionBuilder
     /// Use this method when working with the documented Runner transaction builder API surface in code. The change is stored on the current builder instance and is consumed by later build, validation, or execution steps.
     /// </remarks>
     /// <qaas-docs group="Configuration as Code" subgroup="Transactions" />
-    internal TransactionBuilder AddDataSourcePattern(string dataSourcePattern)
+    public TransactionBuilder AddDataSourcePattern(string dataSourcePattern)
     {
         var dataSourcePatternsList = DataSourcePatterns?.ToList() ?? [];
         dataSourcePatternsList.Add(dataSourcePattern);
         DataSourcePatterns = dataSourcePatternsList.ToArray();
         return this;
-    }
-
-    /// <summary>
-    /// Creates or adds the configured data source pattern entry on the current Runner transaction builder instance.
-    /// </summary>
-    /// <remarks>
-    /// Use this method when working with the documented Runner transaction builder API surface in code. The change is stored on the current builder instance and is consumed by later build, validation, or execution steps.
-    /// </remarks>
-    /// <qaas-docs group="Configuration as Code" subgroup="Transactions" />
-    public TransactionBuilder CreateDataSourcePattern(string dataSourcePattern)
-    {
-        return AddDataSourcePattern(dataSourcePattern);
     }
 
     /// <summary>
@@ -270,36 +246,12 @@ public class TransactionBuilder
     /// Use this method when working with the documented Runner transaction builder API surface in code. The change is stored on the current builder instance and is consumed by later build, validation, or execution steps.
     /// </remarks>
     /// <qaas-docs group="Configuration as Code" subgroup="Transactions" />
-    internal TransactionBuilder AddPolicy(PolicyBuilder policy)
+    public TransactionBuilder AddPolicy(PolicyBuilder policy)
     {
         var policies = Policies.ToList();
         policies.Add(policy);
         Policies = policies.ToArray();
         return this;
-    }
-
-    /// <summary>
-    /// Creates or adds the configured policy entry on the current Runner transaction builder instance.
-    /// </summary>
-    /// <remarks>
-    /// Use this method when working with the documented Runner transaction builder API surface in code. The change is stored on the current builder instance and is consumed by later build, validation, or execution steps.
-    /// </remarks>
-    /// <qaas-docs group="Configuration as Code" subgroup="Transactions" />
-    public TransactionBuilder CreatePolicy(PolicyBuilder policy)
-    {
-        return AddPolicy(policy);
-    }
-
-    /// <summary>
-    /// Returns the configured policies currently stored on the Runner transaction builder instance.
-    /// </summary>
-    /// <remarks>
-    /// Use this method when working with the documented Runner transaction builder API surface in code. Use it to inspect the current configured state without rebuilding the surrounding collection or runtime object graph.
-    /// </remarks>
-    /// <qaas-docs group="Configuration as Code" subgroup="Transactions" />
-    public IReadOnlyList<PolicyBuilder> ReadPolicies()
-    {
-        return Policies;
     }
 
     /// <summary>
@@ -327,7 +279,7 @@ public class TransactionBuilder
     /// Use this method when working with the documented Runner transaction builder API surface in code. The change is stored on the current builder instance and is consumed by later build, validation, or execution steps.
     /// </remarks>
     /// <qaas-docs group="Configuration as Code" subgroup="Transactions" />
-    public TransactionBuilder DeletePolicyAt(int index)
+    public TransactionBuilder RemovePolicyAt(int index)
     {
         if (index < 0 || index >= Policies.Length)
         {
@@ -336,18 +288,6 @@ public class TransactionBuilder
 
         Policies = Policies.Where((_, i) => i != index).ToArray();
         return this;
-    }
-
-    /// <summary>
-    /// Returns the configured data sources currently stored on the Runner transaction builder instance.
-    /// </summary>
-    /// <remarks>
-    /// Use this method when working with the documented Runner transaction builder API surface in code. Use it to inspect the current configured state without rebuilding the surrounding collection or runtime object graph.
-    /// </remarks>
-    /// <qaas-docs group="Configuration as Code" subgroup="Transactions" />
-    public IReadOnlyList<string> ReadDataSources()
-    {
-        return DataSourceNames ?? [];
     }
 
     /// <summary>
@@ -380,22 +320,33 @@ public class TransactionBuilder
     /// Use this method when working with the documented Runner transaction builder API surface in code. The change is stored on the current builder instance and is consumed by later build, validation, or execution steps.
     /// </remarks>
     /// <qaas-docs group="Configuration as Code" subgroup="Transactions" />
-    public TransactionBuilder DeleteDataSource(string dataSourceName)
+    public TransactionBuilder RemoveDataSource(string dataSourceName)
     {
         DataSourceNames = DataSourceNames?.Where(value => value != dataSourceName).ToArray();
         return this;
     }
 
     /// <summary>
-    /// Returns the configured data source patterns currently stored on the Runner transaction builder instance.
+    /// Removes the configured data source at the specified index from the current Runner transaction builder instance.
     /// </summary>
     /// <remarks>
-    /// Use this method when working with the documented Runner transaction builder API surface in code. Use it to inspect the current configured state without rebuilding the surrounding collection or runtime object graph.
+    /// Use this method when working with the documented Runner transaction builder API surface in code. The change is stored on the current builder instance and is consumed by later build, validation, or execution steps.
     /// </remarks>
     /// <qaas-docs group="Configuration as Code" subgroup="Transactions" />
-    public IReadOnlyList<string> ReadDataSourcePatterns()
+    public TransactionBuilder RemoveDataSourceAt(int index)
     {
-        return DataSourcePatterns ?? [];
+        if (DataSourceNames == null)
+        {
+            return this;
+        }
+
+        if (index < 0 || index >= DataSourceNames.Length)
+        {
+            throw new ArgumentOutOfRangeException(nameof(index));
+        }
+
+        DataSourceNames = DataSourceNames.Where((_, i) => i != index).ToArray();
+        return this;
     }
 
     /// <summary>
@@ -428,62 +379,33 @@ public class TransactionBuilder
     /// Use this method when working with the documented Runner transaction builder API surface in code. The change is stored on the current builder instance and is consumed by later build, validation, or execution steps.
     /// </remarks>
     /// <qaas-docs group="Configuration as Code" subgroup="Transactions" />
-    public TransactionBuilder DeleteDataSourcePattern(string dataSourcePattern)
+    public TransactionBuilder RemoveDataSourcePattern(string dataSourcePattern)
     {
         DataSourcePatterns = DataSourcePatterns?.Where(value => value != dataSourcePattern).ToArray();
         return this;
     }
 
     /// <summary>
-    /// Sets the configuration currently stored on the Runner transaction builder instance.
+    /// Removes the configured data source pattern at the specified index from the current Runner transaction builder instance.
     /// </summary>
     /// <remarks>
     /// Use this method when working with the documented Runner transaction builder API surface in code. The change is stored on the current builder instance and is consumed by later build, validation, or execution steps.
     /// </remarks>
     /// <qaas-docs group="Configuration as Code" subgroup="Transactions" />
-    internal TransactionBuilder AddConfiguration(ITransactorConfig config)
+    public TransactionBuilder RemoveDataSourcePatternAt(int index)
     {
-        return Configure(config);
-    }
+        if (DataSourcePatterns == null)
+        {
+            return this;
+        }
 
-    /// <summary>
-    /// Sets the configuration currently stored on the Runner transaction builder instance.
-    /// </summary>
-    /// <remarks>
-    /// Use this method when working with the documented Runner transaction builder API surface in code. The change is stored on the current builder instance and is consumed by later build, validation, or execution steps.
-    /// </remarks>
-    /// <qaas-docs group="Configuration as Code" subgroup="Transactions" />
-    internal TransactionBuilder Create(ITransactorConfig config)
-    {
-        return AddConfiguration(config);
-    }
+        if (index < 0 || index >= DataSourcePatterns.Length)
+        {
+            throw new ArgumentOutOfRangeException(nameof(index));
+        }
 
-    /// <summary>
-    /// Updates the configuration currently stored on the Runner transaction builder instance.
-    /// </summary>
-    /// <remarks>
-    /// Use this method when working with the documented Runner transaction builder API surface in code. The change is stored on the current builder instance and is consumed by later build, validation, or execution steps.
-    /// </remarks>
-    /// <qaas-docs group="Configuration as Code" subgroup="Transactions" />
-    public TransactionBuilder UpdateConfiguration(Func<ITransactorConfig, ITransactorConfig> update)
-    {
-        var currentConfig = Configuration ??
-                            throw new InvalidOperationException("Transaction configuration is not set");
-        return UpdateConfiguration(update(currentConfig));
-    }
-
-    /// <summary>
-    /// Updates the configuration currently stored on the Runner transaction builder instance.
-    /// </summary>
-    /// <remarks>
-    /// Use this method when working with the documented Runner transaction builder API surface in code. The change is stored on the current builder instance and is consumed by later build, validation, or execution steps.
-    /// </remarks>
-    /// <qaas-docs group="Configuration as Code" subgroup="Transactions" />
-    public TransactionBuilder UpdateConfiguration(ITransactorConfig config)
-    {
-        var currentConfig = Configuration ??
-                            throw new InvalidOperationException("Transaction configuration is not set");
-        return Configure(currentConfig.UpdateConfiguration(config));
+        DataSourcePatterns = DataSourcePatterns.Where((_, i) => i != index).ToArray();
+        return this;
     }
 
     /// <summary>
@@ -495,21 +417,20 @@ public class TransactionBuilder
     /// <qaas-docs group="Configuration as Code" subgroup="Transactions" />
     public TransactionBuilder UpdateConfiguration(object configuration)
     {
-        var currentConfig = Configuration ??
-                            throw new InvalidOperationException("Transaction configuration is not set");
-        return Configure(currentConfig.UpdateConfiguration(configuration));
-    }
+        ArgumentNullException.ThrowIfNull(configuration);
 
-    /// <summary>
-    /// Clears the configuration currently stored on the Runner transaction builder instance.
-    /// </summary>
-    /// <remarks>
-    /// Use this method when working with the documented Runner transaction builder API surface in code. The change is stored on the current builder instance and is consumed by later build, validation, or execution steps.
-    /// </remarks>
-    /// <qaas-docs group="Configuration as Code" subgroup="Transactions" />
-    public TransactionBuilder DeleteConfiguration()
-    {
-        return Reset();
+        var currentConfig = Configuration;
+        if (configuration is ITransactorConfig typedConfiguration)
+        {
+            return Configure(currentConfig == null
+                ? typedConfiguration
+                : currentConfig.UpdateConfiguration(typedConfiguration));
+        }
+
+        if (currentConfig == null)
+            throw new InvalidOperationException(
+                "Transaction configuration is not set and cannot be inferred from an object patch. Configure a concrete transaction configuration first.");
+        return Configure(currentConfig.UpdateConfiguration(configuration));
     }
 
     private TransactionBuilder Reset()

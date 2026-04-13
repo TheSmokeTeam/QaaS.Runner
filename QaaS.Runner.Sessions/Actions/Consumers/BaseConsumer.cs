@@ -63,8 +63,8 @@ public abstract class BaseConsumer : StagedAction
 
         Policies?.SetupChain();
         Logger.LogDebug(
-            "Starting consumer {ActionName}. TimeoutMs={TimeoutMs}, SerializationType={SerializationType}",
-            Name, TimeoutMs.TotalMilliseconds, SerializationType);
+            "Starting consumer {ActionName}. InitialTimeoutMs={InitialTimeoutMs}, TimeoutMs={TimeoutMs}, SerializationType={SerializationType}",
+            Name, InitialTimeoutMs?.TotalMilliseconds, TimeoutMs.TotalMilliseconds, SerializationType);
         
         if (InitialConsume(data))
             Consume(data);
@@ -92,12 +92,6 @@ public abstract class BaseConsumer : StagedAction
 
     private DetailedData<object> GetDeserializedData(DetailedData<object> readData)
     {
-        if (_deserializerSpecificType is null &&
-            SerializationType == QaaS.Framework.Serialization.SerializationType.Binary)
-        {
-            return readData;
-        }
-
         return new DetailedData<object>
         {
             Body = _deserializer!.Deserialize(readData.CastObjectData<byte[]>().Body, _deserializerSpecificType),

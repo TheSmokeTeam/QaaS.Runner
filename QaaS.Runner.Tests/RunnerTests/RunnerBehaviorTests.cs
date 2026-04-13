@@ -581,6 +581,40 @@ public class RunnerBehaviorTests
     }
 
     [Test]
+    public void BuildExecutions_LoadsVariableListsIntoSharedGlobalDictionaryWithoutIndexedKeys()
+    {
+        using var scope = BuildScope();
+        var configuration = new ConfigurationBuilder()
+            .AddInMemoryCollection(new Dictionary<string, string?>
+            {
+                ["variables:rabbitmq:hosts:0"] = "primary",
+                ["variables:rabbitmq:hosts:1"] = "secondary"
+            })
+            .Build();
+        var builders = new List<ExecutionBuilder>
+        {
+            CreateTemplateExecutionBuilder("case-1", configuration)
+        };
+
+        var runner = new ExposedRunner(scope, builders, Globals.Logger, new Mock<Serilog.ILogger>().Object);
+        runner.InvokeBuildExecutions();
+
+        var globalDictField = typeof(ExecutionBuilder).GetField("_globalDict", BindingFlags.Instance | BindingFlags.NonPublic)!;
+        var sharedGlobalDict = (Dictionary<string, object?>)globalDictField.GetValue(builders[0])!;
+        var variables = (Dictionary<string, object?>)sharedGlobalDict["Variables"]!;
+        var rabbitMq = (Dictionary<string, object?>)variables["rabbitmq"]!;
+        var hosts = rabbitMq["hosts"] as List<object?>;
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(hosts, Is.Not.Null);
+            Assert.That(hosts, Is.EqualTo(new object?[] { "primary", "secondary" }));
+            Assert.That(rabbitMq.ContainsKey("0"), Is.False);
+            Assert.That(rabbitMq.ContainsKey("1"), Is.False);
+        });
+    }
+
+    [Test]
     public void BuildExecutions_WhenVariablesLoadingIsDisabled_DoesNotPopulateVariablesGlobalPath()
     {
         using var scope = BuildScope();

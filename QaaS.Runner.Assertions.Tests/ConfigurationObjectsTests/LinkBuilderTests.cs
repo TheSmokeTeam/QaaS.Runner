@@ -65,15 +65,18 @@ public class LinkBuilderTests
     {
         var builder = new LinkBuilder();
 
-        Assert.Throws<InvalidOperationException>(() => builder.UpdateConfiguration(config => config));
+        Assert.Throws<InvalidOperationException>(() => builder.UpdateConfiguration(new { Url = "https://link.local" }));
     }
 
     [Test]
-    public void UpdateConfiguration_WithConfigurationWithoutExistingConfiguration_ThrowsInvalidOperationException()
+    public void UpdateConfiguration_WithConfigurationWithoutExistingConfiguration_ConfiguresIncomingType()
     {
         var builder = new LinkBuilder();
+        var config = new KibanaLinkConfig();
 
-        Assert.Throws<InvalidOperationException>(() => builder.UpdateConfiguration(new KibanaLinkConfig()));
+        builder.UpdateConfiguration(config);
+
+        Assert.That(builder.Configuration, Is.SameAs(config));
     }
 
     [Test]

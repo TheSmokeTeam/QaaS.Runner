@@ -87,28 +87,31 @@ public class MockerCommandBuilderTests
     }
 
     [Test]
-    public void UpdateConfiguration_WithoutExistingConfiguration_ThrowsInvalidOperationException()
+    public void UpdateConfiguration_WithObjectPatchWithoutExistingConfiguration_CreatesCommandConfiguration()
     {
         var builder = new MockerCommandBuilder();
 
-        Assert.Throws<InvalidOperationException>(() => builder.UpdateConfiguration(command =>
+        builder.UpdateConfiguration(new
         {
-            command.TriggerAction = new TriggerAction();
-            return command;
-        }));
+            TriggerAction = new TriggerAction()
+        });
+
+        Assert.That(builder.Configuration!.TriggerAction, Is.Not.Null);
     }
 
     [Test]
-    public void UpdateConfiguration_WithConfigurationWithoutExistingConfiguration_ThrowsInvalidOperationException()
+    public void UpdateConfiguration_WithConfigurationWithoutExistingConfiguration_ConfiguresIncomingType()
     {
         var builder = new MockerCommandBuilder();
+        var config = new MockerCommandConfig { TriggerAction = new TriggerAction() };
 
-        Assert.Throws<InvalidOperationException>(() =>
-            builder.UpdateConfiguration(new MockerCommandConfig { TriggerAction = new TriggerAction() }));
+        builder.UpdateConfiguration(config);
+
+        Assert.That(builder.Configuration, Is.SameAs(config));
     }
 
     [Test]
-    public void CreateReadUpdateDeleteConfiguration_PerformsExpectedCrudFlow()
+    public void ConfigureUpdateConfiguration_PerformsExpectedFlow()
     {
         var builder = new MockerCommandBuilder();
         var initialCommand = new MockerCommandConfig { TriggerAction = new TriggerAction() };
@@ -116,18 +119,23 @@ public class MockerCommandBuilderTests
         builder.Configure(initialCommand);
         Assert.That(builder.Configuration, Is.SameAs(initialCommand));
 
-        builder.UpdateConfiguration(command =>
+        builder.UpdateConfiguration(new
         {
-            command.TriggerAction = null;
-            command.ChangeActionStub = new ChangeActionStub();
-            return command;
+            TriggerAction = new
+            {
+                TimeoutMs = 5
+            }
         });
 
+        Assert.That(builder.Configuration!.TriggerAction!.TimeoutMs, Is.EqualTo(5));
+
+        builder.Configure(new MockerCommandConfig
+        {
+            ChangeActionStub = new ChangeActionStub()
+        });
+        Assert.That(builder.Configuration, Is.Not.Null);
         Assert.That(builder.Configuration!.ChangeActionStub, Is.Not.Null);
         Assert.That(builder.Configuration!.TriggerAction, Is.Null);
-
-        builder.DeleteConfiguration();
-        Assert.That(builder.Configuration, Is.Null);
     }
 
     [Test]

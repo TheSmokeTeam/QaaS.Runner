@@ -60,41 +60,6 @@ public class StorageBuilder
     }
 
     /// <summary>
-    /// Sets the configuration currently stored on the Runner storage builder instance.
-    /// </summary>
-    /// <remarks>
-    /// Use this method when working with the documented Runner storage builder API surface in code. The change is stored on the current builder instance and is consumed by later build, validation, or execution steps.
-    /// </remarks>
-    /// <qaas-docs group="Configuration as Code" subgroup="Storages" />
-    /// <summary>
-     /// Updates the configuration currently stored on the Runner storage builder instance.
-    /// </summary>
-    /// <remarks>
-    /// Use this method when working with the documented Runner storage builder API surface in code. The change is stored on the current builder instance and is consumed by later build, validation, or execution steps.
-    /// </remarks>
-    /// <qaas-docs group="Configuration as Code" subgroup="Storages" />
-    public StorageBuilder UpdateConfiguration(Func<IStorageConfig, IStorageConfig> update)
-    {
-        var currentConfig = Configuration ??
-                            throw new InvalidOperationException("Storage configuration is not set");
-        return UpdateConfiguration(update(currentConfig));
-    }
-
-    /// <summary>
-    /// Updates the configuration currently stored on the Runner storage builder instance.
-    /// </summary>
-    /// <remarks>
-    /// Use this method when working with the documented Runner storage builder API surface in code. The change is stored on the current builder instance and is consumed by later build, validation, or execution steps.
-    /// </remarks>
-    /// <qaas-docs group="Configuration as Code" subgroup="Storages" />
-    public StorageBuilder UpdateConfiguration(IStorageConfig storageConfig)
-    {
-        var currentConfig = Configuration ??
-                            throw new InvalidOperationException("Storage configuration is not set");
-        return Configure(currentConfig.UpdateConfiguration(storageConfig));
-    }
-
-    /// <summary>
     /// Updates the configuration currently stored on the Runner storage builder instance.
     /// </summary>
     /// <remarks>
@@ -103,21 +68,20 @@ public class StorageBuilder
     /// <qaas-docs group="Configuration as Code" subgroup="Storages" />
     public StorageBuilder UpdateConfiguration(object configuration)
     {
-        var currentConfig = Configuration ??
-                            throw new InvalidOperationException("Storage configuration is not set");
-        return Configure(currentConfig.UpdateConfiguration(configuration));
-    }
+        ArgumentNullException.ThrowIfNull(configuration);
 
-    /// <summary>
-    /// Clears the configuration currently stored on the Runner storage builder instance.
-    /// </summary>
-    /// <remarks>
-    /// Use this method when working with the documented Runner storage builder API surface in code. The change is stored on the current builder instance and is consumed by later build, validation, or execution steps.
-    /// </remarks>
-    /// <qaas-docs group="Configuration as Code" subgroup="Storages" />
-    public StorageBuilder DeleteConfiguration()
-    {
-        return Reset();
+        var currentConfig = Configuration;
+        if (configuration is IStorageConfig typedConfiguration)
+        {
+            return Configure(currentConfig == null
+                ? typedConfiguration
+                : currentConfig.UpdateConfiguration(typedConfiguration));
+        }
+
+        if (currentConfig == null)
+            throw new InvalidOperationException(
+                "Storage configuration is not set and cannot be inferred from an object patch. Configure a concrete storage configuration first.");
+        return Configure(currentConfig.UpdateConfiguration(configuration));
     }
 
     /// <summary>

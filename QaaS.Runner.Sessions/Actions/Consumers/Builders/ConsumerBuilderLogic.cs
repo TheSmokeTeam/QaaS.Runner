@@ -124,36 +124,12 @@ public partial class ConsumerBuilder
     /// Use this method when working with the documented Runner consumer builder API surface in code. The change is stored on the current builder instance and is consumed by later build, validation, or execution steps.
     /// </remarks>
     /// <qaas-docs group="Configuration as Code" subgroup="Consumers" />
-    internal ConsumerBuilder AddPolicy(PolicyBuilder policy)
+    public ConsumerBuilder AddPolicy(PolicyBuilder policy)
     {
         var policiesList = Policies.ToList();
         policiesList.Add(policy);
         Policies = policiesList.ToArray();
         return this;
-    }
-
-    /// <summary>
-    /// Creates or adds the configured policy entry on the current Runner consumer builder instance.
-    /// </summary>
-    /// <remarks>
-    /// Use this method when working with the documented Runner consumer builder API surface in code. The change is stored on the current builder instance and is consumed by later build, validation, or execution steps.
-    /// </remarks>
-    /// <qaas-docs group="Configuration as Code" subgroup="Consumers" />
-    public ConsumerBuilder CreatePolicy(PolicyBuilder policy)
-    {
-        return AddPolicy(policy);
-    }
-
-    /// <summary>
-    /// Returns the configured policies currently stored on the Runner consumer builder instance.
-    /// </summary>
-    /// <remarks>
-    /// Use this method when working with the documented Runner consumer builder API surface in code. Use it to inspect the current configured state without rebuilding the surrounding collection or runtime object graph.
-    /// </remarks>
-    /// <qaas-docs group="Configuration as Code" subgroup="Consumers" />
-    public IReadOnlyList<PolicyBuilder> ReadPolicies()
-    {
-        return Policies;
     }
 
     /// <summary>
@@ -181,7 +157,7 @@ public partial class ConsumerBuilder
     /// Use this method when working with the documented Runner consumer builder API surface in code. The change is stored on the current builder instance and is consumed by later build, validation, or execution steps.
     /// </remarks>
     /// <qaas-docs group="Configuration as Code" subgroup="Consumers" />
-    public ConsumerBuilder DeletePolicyAt(int index)
+    public ConsumerBuilder RemovePolicyAt(int index)
     {
         if (index < 0 || index >= Policies.Length)
         {
@@ -193,58 +169,6 @@ public partial class ConsumerBuilder
     }
 
     /// <summary>
-    /// Sets the configuration currently stored on the Runner consumer builder instance.
-    /// </summary>
-    /// <remarks>
-    /// Use this method when working with the documented Runner consumer builder API surface in code. The change is stored on the current builder instance and is consumed by later build, validation, or execution steps.
-    /// </remarks>
-    /// <qaas-docs group="Configuration as Code" subgroup="Consumers" />
-    internal ConsumerBuilder AddConfiguration(IReaderConfig config)
-    {
-        return Configure(config);
-    }
-
-    /// <summary>
-    /// Sets the configuration currently stored on the Runner consumer builder instance.
-    /// </summary>
-    /// <remarks>
-    /// Use this method when working with the documented Runner consumer builder API surface in code. The change is stored on the current builder instance and is consumed by later build, validation, or execution steps.
-    /// </remarks>
-    /// <qaas-docs group="Configuration as Code" subgroup="Consumers" />
-    internal ConsumerBuilder Create(IReaderConfig config)
-    {
-        return AddConfiguration(config);
-    }
-
-    /// <summary>
-    /// Returns the configuration currently stored on the Runner consumer builder instance.
-    /// </summary>
-    /// <remarks>
-    /// Use this method when working with the documented Runner consumer builder API surface in code. Use it to inspect the current configured state without rebuilding the surrounding collection or runtime object graph.
-    /// </remarks>
-    /// <qaas-docs group="Configuration as Code" subgroup="Consumers" />
-    public ConsumerBuilder UpdateConfiguration(Func<IReaderConfig, IReaderConfig> update)
-    {
-        var currentConfig = Configuration ??
-                            throw new InvalidOperationException("Consumer configuration is not set");
-        return UpdateConfiguration(update(currentConfig));
-    }
-
-    /// <summary>
-    /// Updates the configuration currently stored on the Runner consumer builder instance.
-    /// </summary>
-    /// <remarks>
-    /// Use this method when working with the documented Runner consumer builder API surface in code. The change is stored on the current builder instance and is consumed by later build, validation, or execution steps.
-    /// </remarks>
-    /// <qaas-docs group="Configuration as Code" subgroup="Consumers" />
-    public ConsumerBuilder UpdateConfiguration(IReaderConfig config)
-    {
-        var currentConfig = Configuration ??
-                            throw new InvalidOperationException("Consumer configuration is not set");
-        return Configure(ConfigurationUpdateExtensions.UpdateConfiguration(currentConfig, config));
-    }
-
-    /// <summary>
     /// Updates the configuration currently stored on the Runner consumer builder instance.
     /// </summary>
     /// <remarks>
@@ -253,21 +177,20 @@ public partial class ConsumerBuilder
     /// <qaas-docs group="Configuration as Code" subgroup="Consumers" />
     public ConsumerBuilder UpdateConfiguration(object configuration)
     {
-        var currentConfig = Configuration ??
-                            throw new InvalidOperationException("Consumer configuration is not set");
-        return Configure(ConfigurationUpdateExtensions.UpdateConfiguration(currentConfig, configuration));
-    }
+        ArgumentNullException.ThrowIfNull(configuration);
 
-    /// <summary>
-    /// Clears the configuration currently stored on the Runner consumer builder instance.
-    /// </summary>
-    /// <remarks>
-    /// Use this method when working with the documented Runner consumer builder API surface in code. The change is stored on the current builder instance and is consumed by later build, validation, or execution steps.
-    /// </remarks>
-    /// <qaas-docs group="Configuration as Code" subgroup="Consumers" />
-    public ConsumerBuilder DeleteConfiguration()
-    {
-        return Reset();
+        var currentConfig = Configuration;
+        if (configuration is IReaderConfig typedConfiguration)
+        {
+            return Configure(currentConfig == null
+                ? typedConfiguration
+                : currentConfig.UpdateConfiguration(typedConfiguration));
+        }
+
+        if (currentConfig == null)
+            throw new InvalidOperationException(
+                "Consumer configuration is not set and cannot be inferred from an object patch. Configure a concrete consumer configuration first.");
+        return Configure(currentConfig.UpdateConfiguration(configuration));
     }
 
     private ConsumerBuilder Reset()
