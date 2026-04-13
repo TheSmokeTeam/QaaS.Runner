@@ -489,6 +489,29 @@ public class ExecutionBuilderTests
     }
 
     [Test]
+    public void Constructor_WithConsumerInitialTimeout_BindsInitialTimeoutFromLoadedContext()
+    {
+        var context = CreateLoadedContext(new Dictionary<string, string?>
+        {
+            ["MetaData:Team"] = "Smoke",
+            ["MetaData:System"] = "QaaS",
+            ["Sessions:0:Name"] = "timeout-session",
+            ["Sessions:0:Consumers:0:Name"] = "consumer",
+            ["Sessions:0:Consumers:0:TimeoutMs"] = "1000",
+            ["Sessions:0:Consumers:0:InitialTimeoutMs"] = "7000"
+        });
+
+        var builder = new ExecutionBuilder(context, ExecutionType.Template, null, null, null, null);
+        var consumer = builder.Sessions.Single().Consumers!.Single();
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(consumer.TimeoutMs, Is.EqualTo(1000));
+            Assert.That(consumer.InitialTimeoutMs, Is.EqualTo(7000));
+        });
+    }
+
+    [Test]
     public void Build_WithInvalidNestedRabbitMqTargets_ThrowsInvalidConfigurationsException()
     {
         var directRabbitMqValidationResults = new List<System.ComponentModel.DataAnnotations.ValidationResult>();

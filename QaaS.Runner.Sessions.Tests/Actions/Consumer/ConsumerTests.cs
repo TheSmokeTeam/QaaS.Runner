@@ -216,6 +216,79 @@ public class ConsumerTests
         });
     }
 
+    [Test]
+    public void Act_WithInitialTimeout_UsesInitialTimeoutForFirstReadAndDefaultTimeoutAfterwards()
+    {
+        var observedTimeouts = new List<TimeSpan>();
+        var reader = new Mock<IReader>();
+        reader.Setup(instance => instance.Read(It.IsAny<TimeSpan>()))
+            .Callback<TimeSpan>(timeout => observedTimeouts.Add(timeout))
+            .Returns((TimeSpan timeout) => observedTimeouts.Count switch
+            {
+                1 => new DetailedData<object> { Body = Serialise("first-message"), MetaData = new MetaData() },
+                _ => null
+            });
+        reader.Setup(instance => instance.GetSerializationType()).Returns(SerializationType.Binary);
+
+        var consumer = new Sessions.Actions.Consumers.Consumer(
+            "InitialTimeoutConsumer",
+            reader.Object,
+            TimeSpan.FromMilliseconds(25),
+            TimeSpan.FromMilliseconds(250),
+            1,
+            new CountPolicy(2),
+            new DataFilter { Body = true, MetaData = true, Timestamp = true },
+            SerializationType.Binary,
+            null,
+            Globals.Logger);
+
+        var actData = consumer.Act();
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(observedTimeouts, Is.EqualTo(new[]
+            {
+                TimeSpan.FromMilliseconds(250),
+                TimeSpan.FromMilliseconds(25)
+            }));
+            Assert.That(actData.Output, Has.Count.EqualTo(1));
+        });
+    }
+
+    [Test]
+    public void Act_WithInitialTimeoutAndNoFirstMessage_DoesNotFallBackToDefaultTimeout()
+    {
+        var observedTimeouts = new List<TimeSpan>();
+        var reader = new Mock<IReader>();
+        reader.Setup(instance => instance.Read(It.IsAny<TimeSpan>()))
+            .Callback<TimeSpan>(timeout => observedTimeouts.Add(timeout))
+            .Returns((DetailedData<object>?)null);
+        reader.Setup(instance => instance.GetSerializationType()).Returns(SerializationType.Binary);
+
+        var consumer = new Sessions.Actions.Consumers.Consumer(
+            "InitialTimeoutConsumer",
+            reader.Object,
+            TimeSpan.FromMilliseconds(25),
+            TimeSpan.FromMilliseconds(250),
+            1,
+            new CountPolicy(2),
+            new DataFilter { Body = true, MetaData = true, Timestamp = true },
+            SerializationType.Binary,
+            null,
+            Globals.Logger);
+
+        var actData = consumer.Act();
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(observedTimeouts, Is.EqualTo(new[]
+            {
+                TimeSpan.FromMilliseconds(250)
+            }));
+            Assert.That(actData.Output, Is.Empty);
+        });
+    }
+
     private sealed class NamedReader : IReader
     {
         public void Connect()
@@ -271,5 +344,12 @@ public class ConsumerTests
     private sealed class BinaryPayload
     {
         public string Value { get; set; } = string.Empty;
+    }
+
+    private static byte[] Serialise(string value)
+    {
+        var serializer = SerializerFactory.BuildSerializer(SerializationType.Binary)!;
+        return serializer.Serialize(value) as byte[]
+               ?? throw new InvalidOperationException("Failed to serialize test data using binary serializer.");
     }
 }

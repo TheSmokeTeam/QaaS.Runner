@@ -31,13 +31,9 @@ public sealed class Consumer : BaseConsumer
 
     protected override void Consume(InternalCommunicationData<object> actData)
     {
-        do {
-            var readData = _reader!.Read(TimeoutMs);
-            if (readData == null) break;
-
-            LogData(actData, readData);
-
-        } while(Policies?.RunChain() != false);
+        while (TryReadAndLog(actData, TimeoutMs))
+        {
+        }
 
         TerminateConsumer();
     }
@@ -45,18 +41,8 @@ public sealed class Consumer : BaseConsumer
     protected override bool InitialConsume(InternalCommunicationData<object> actData)
     {
         if (InitialTimeoutMs == null) return true;
-        
-        var readData = _reader!.Read((TimeSpan)InitialTimeoutMs);
-        if (readData == null)
-        {
-            TerminateConsumer();
-            return false;
-        }
 
-        LogData(actData, readData);
-
-        if (Policies?.RunChain() != false)
-            return true;
+        if (TryReadAndLog(actData, InitialTimeoutMs.Value)) return true;
 
         TerminateConsumer();
         return false;
@@ -73,5 +59,17 @@ public sealed class Consumer : BaseConsumer
         var resultedRunData = base.Act();
         _reader!.Disconnect();
         return resultedRunData;
+    }
+
+    private bool TryReadAndLog(InternalCommunicationData<object> actData, TimeSpan timeout)
+    {
+        var readData = _reader!.Read(timeout);
+        if (readData == null)
+        {
+            return false;
+        }
+
+        LogData(actData, readData);
+        return Policies?.RunChain() != false;
     }
 }

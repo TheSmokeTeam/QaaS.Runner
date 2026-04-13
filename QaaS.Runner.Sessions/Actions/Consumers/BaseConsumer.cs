@@ -63,8 +63,8 @@ public abstract class BaseConsumer : StagedAction
 
         Policies?.SetupChain();
         Logger.LogDebug(
-            "Starting consumer {ActionName}. TimeoutMs={TimeoutMs}, SerializationType={SerializationType}",
-            Name, TimeoutMs.TotalMilliseconds, SerializationType);
+            "Starting consumer {ActionName}. InitialTimeoutMs={InitialTimeoutMs}, TimeoutMs={TimeoutMs}, SerializationType={SerializationType}",
+            Name, InitialTimeoutMs?.TotalMilliseconds, TimeoutMs.TotalMilliseconds, SerializationType);
         
         if (InitialConsume(data))
             Consume(data);
