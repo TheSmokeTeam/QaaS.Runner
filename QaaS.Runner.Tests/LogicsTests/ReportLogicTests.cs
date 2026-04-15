@@ -1,6 +1,4 @@
 using System.Linq;
-using Moq;
-using Moq.Protected;
 using NUnit.Framework;
 using QaaS.Framework.SDK.ContextObjects;
 using QaaS.Framework.SDK.ExecutionObjects;
@@ -15,16 +13,13 @@ public class ReportLogicTests
 {
     [TestCase(1)]
     [TestCase(5)]
-    public void TestRun_WithReportersAndAssertionResults_WritesResultsToReporters(int reportersCount)
+    public void TestRun_WithSingleReporterType_WritesMatchingAssertionResults(int assertionCount)
     {
-        var mockReporters = new List<Mock<IReporter>>();
+        var reporter = new RecordingReporter();
         var assertionResults = new List<AssertionResult>();
 
-        for (int i = 0; i < reportersCount; i++)
+        for (int i = 0; i < assertionCount; i++)
         {
-            var mockReporter = new Mock<IReporter>();
-            mockReporter.SetupGet(r => r.Name).Returns($"Reporter{i + 1}");
-            mockReporters.Add(mockReporter);
             var assertion = new Assertion
             {
                 Name = $"Assertion{i + 1}",
@@ -36,6 +31,7 @@ public class ReportLogicTests
                     AssertionStatus.Skipped,
                     AssertionStatus.Unknown
                 ],
+                ReporterType = typeof(RecordingReporter),
                 AssertionName = null,
                 AssertionHook = null
             };
@@ -49,8 +45,7 @@ public class ReportLogicTests
             assertionResults.Add(assertionResult);
         }
 
-        var reportLogic = new ReportLogic(mockReporters.Select(mock => mock.Object).ToList(),
-            Globals.GetContextWithMetadata());
+        var reportLogic = new ReportLogic([reporter], Globals.GetContextWithMetadata());
         var executionData = new ExecutionData();
 
         foreach (var result in assertionResults)
@@ -62,44 +57,30 @@ public class ReportLogicTests
 
         Assert.That(resultedExecutionData, Is.Not.Null);
         Assert.That(resultedExecutionData, Is.SameAs(executionData));
-
-        foreach (var mockReporter in mockReporters)
-        {
-            foreach (var assertionResult in assertionResults)
-            {
-                mockReporter.Verify(r => r.WriteTestResults(assertionResult), Times.Once());
-            }
-        }
+        Assert.That(reporter.Results, Is.EqualTo(assertionResults));
     }
 
     [Test]
     public void TestRun_WithReporterAndNoAssertionResults_DoesNotThrow()
     {
-        var mockReporter = new Mock<IReporter>();
-        mockReporter.SetupGet(r => r.Name).Returns("Allure");
-
-        var mockReporters = new List<IReporter> { mockReporter.Object };
-        var reportLogic = new ReportLogic(mockReporters, Globals.GetContextWithMetadata());
+        var reporter = new RecordingReporter();
+        var reportLogic = new ReportLogic([reporter], Globals.GetContextWithMetadata());
         var executionData = new ExecutionData();
 
         Assert.DoesNotThrow(() => reportLogic.Run(executionData));
-        mockReporter.Verify(currentReporter => currentReporter.WriteTestResults(It.IsAny<AssertionResult>()), Times.Never);
+        Assert.That(reporter.Results, Is.Empty);
     }
 
     [Test]
-    public void TestRun_WithMultipleReportersTargetingSameAssertion_WritesToEachReporter()
+    public void TestRun_WithMultipleReporterTypes_WritesOnlyMatchingAssertions()
     {
-        var firstReporter = new Mock<IReporter>();
-        firstReporter.SetupGet(r => r.Name).Returns("ReporterOne");
-
-        var secondReporter = new Mock<IReporter>();
-        secondReporter.SetupGet(r => r.Name).Returns("ReporterTwo");
-
-        var assertionResult = new AssertionResult
+        var firstReporter = new RecordingReporter();
+        var secondReporter = new AlternateRecordingReporter();
+        var firstAssertionResult = new AssertionResult
         {
             Assertion = new Assertion
             {
-                Name = "AssertionA",
+                Name = "AssertionOne",
                 StatussesToReport =
                 [
                     AssertionStatus.Broken,
@@ -108,6 +89,28 @@ public class ReportLogicTests
                     AssertionStatus.Skipped,
                     AssertionStatus.Unknown
                 ],
+                ReporterType = typeof(RecordingReporter),
+                AssertionName = null,
+                AssertionHook = null
+            },
+            AssertionStatus = AssertionStatus.Passed,
+            TestDurationMs = 0,
+            Flaky = null
+        };
+        var secondAssertionResult = new AssertionResult
+        {
+            Assertion = new Assertion
+            {
+                Name = "AssertionTwo",
+                StatussesToReport =
+                [
+                    AssertionStatus.Broken,
+                    AssertionStatus.Failed,
+                    AssertionStatus.Passed,
+                    AssertionStatus.Skipped,
+                    AssertionStatus.Unknown
+                ],
+                ReporterType = typeof(AlternateRecordingReporter),
                 AssertionName = null,
                 AssertionHook = null
             },
@@ -116,28 +119,32 @@ public class ReportLogicTests
             Flaky = null
         };
 
-        var reportLogic = new ReportLogic([firstReporter.Object, secondReporter.Object], Globals.GetContextWithMetadata());
+        var reportLogic = new ReportLogic([firstReporter, secondReporter], Globals.GetContextWithMetadata());
         var executionData = new ExecutionData();
-        executionData.AssertionResults.Add(assertionResult);
+        executionData.AssertionResults.Add(firstAssertionResult);
+        executionData.AssertionResults.Add(secondAssertionResult);
 
         var result = reportLogic.Run(executionData);
 
         Assert.That(result, Is.SameAs(executionData));
-        firstReporter.Verify(reporter => reporter.WriteTestResults(assertionResult), Times.Once);
-        secondReporter.Verify(reporter => reporter.WriteTestResults(assertionResult), Times.Once);
+        Assert.Multiple(() =>
+        {
+            Assert.That(firstReporter.Results, Is.EqualTo(new[] { firstAssertionResult }));
+            Assert.That(secondReporter.Results, Is.EqualTo(new[] { secondAssertionResult }));
+        });
     }
 
     [Test]
     public void TestRun_WhenAssertionStatusIsNotConfiguredForReporting_DoesNotWriteResults()
     {
-        var reporter = new Mock<IReporter>();
-        reporter.SetupGet(r => r.Name).Returns("Reporter");
+        var reporter = new RecordingReporter();
         var assertionResult = new AssertionResult
         {
             Assertion = new Assertion
             {
                 Name = "AssertionA",
                 StatussesToReport = [AssertionStatus.Failed],
+                ReporterType = typeof(RecordingReporter),
                 AssertionName = null,
                 AssertionHook = null
             },
@@ -147,11 +154,31 @@ public class ReportLogicTests
         };
         var executionData = new ExecutionData();
         executionData.AssertionResults.Add(assertionResult);
-        var logic = new ReportLogic([reporter.Object], Globals.GetContextWithMetadata());
+        var logic = new ReportLogic([reporter], Globals.GetContextWithMetadata());
 
         var result = logic.Run(executionData);
 
         Assert.That(result, Is.SameAs(executionData));
-        reporter.Verify(currentReporter => currentReporter.WriteTestResults(It.IsAny<AssertionResult>()), Times.Never);
+        Assert.That(reporter.Results, Is.Empty);
+    }
+
+    private class RecordingReporter : IReporter
+    {
+        public string Name { get; set; } = nameof(RecordingReporter);
+        public string AssertionName { get; set; } = string.Empty;
+        public bool SaveSessionData { get; set; }
+        public bool SaveAttachments { get; set; }
+        public bool DisplayTrace { get; set; }
+        public long EpochTestSuiteStartTime { get; set; }
+        public List<AssertionResult> Results { get; } = [];
+
+        public void WriteTestResults(AssertionResult assertionResult)
+        {
+            Results.Add(assertionResult);
+        }
+    }
+
+    private sealed class AlternateRecordingReporter : RecordingReporter
+    {
     }
 }

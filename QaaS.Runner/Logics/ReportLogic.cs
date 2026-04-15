@@ -31,7 +31,16 @@ public class ReportLogic(IList<IReporter> reporters, InternalContext context) : 
 
         foreach (var reporter in reporters)
         {
-            foreach (var assertionResult in assertionResults)
+            var matchingAssertionResults = assertionResults
+                .Where(assertionResult => assertionResult.Assertion.ReporterType == reporter.GetType())
+                .ToList();
+
+            context.Logger.LogDebug(
+                "Reporter type {ReporterType} matched {AssertionCount} assertion results",
+                reporter.GetType().Name,
+                matchingAssertionResults.Count);
+
+            foreach (var assertionResult in matchingAssertionResults)
             {
                 context.Logger.LogDebug(
                     "Routing assertion {AssertionName} with status {AssertionStatus} to reporter type {ReporterType}",

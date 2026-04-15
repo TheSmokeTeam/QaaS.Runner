@@ -553,6 +553,7 @@ public class AssertionBuilder : IYamlConvertible
             SaveTemplate = SaveTemplate,
             DisplayTrace = DisplayTrace,
             Severity = Severity,
+            ReporterType = GetReporterType(),
             AssertionHook = assertions.FirstOrDefault(pair => pair.Key == Name!)
                                 .Value ??
                             throw new ArgumentException($"Assertion {Name} of type" +
