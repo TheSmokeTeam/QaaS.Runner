@@ -290,9 +290,9 @@ public class AllureReporter : BaseReporter
 
     private void AddTestCaseAttachments(AssertionResult assertionResult)
     {
-        if (SaveAttachments)
+        if (ShouldSaveAttachments(assertionResult.Assertion))
             AddAssertionAttachmentsToCurrentItem(assertionResult);
-        if (SaveTemplate)
+        if (ShouldSaveTemplate(assertionResult.Assertion))
             AddConfigurationTemplateToCurrentItem(Context.RootConfiguration);
         AddCoveragesToCurrentItem(assertionResult);
     }
@@ -449,9 +449,9 @@ public class AllureReporter : BaseReporter
     {
         var attachments = new List<Attachment>();
 
-        if (SaveAttachments)
+        if (ShouldSaveAttachments(assertionResult.Assertion))
             attachments = attachments.Concat(SaveAssertionAttachmentsToAllure(assertionResult)).ToList();
-        if (SaveTemplate)
+        if (ShouldSaveTemplate(assertionResult.Assertion))
             attachments = attachments.Append(SaveConfigurationTemplateToAllure(Context.RootConfiguration)).ToList();
 
         attachments = attachments.Concat(GetCoveragesAsAttachments(assertionResult)).ToList();
@@ -480,10 +480,11 @@ public class AllureReporter : BaseReporter
 
     private StatusDetails GetStatusDetailsAccordingToStatus(AssertionResult assertionResult)
     {
+        var displayTrace = ShouldDisplayTrace(assertionResult.Assertion);
         var normalStatusDetails = new StatusDetails
         {
             message = assertionResult.Assertion.AssertionHook?.AssertionMessage ?? string.Empty,
-            trace = DisplayTrace
+            trace = displayTrace
                 ? assertionResult.Assertion.AssertionHook?.AssertionTrace ?? string.Empty
                 : TraceDisplayFalseMessage,
             flaky = assertionResult.Flaky.IsFlaky
@@ -491,7 +492,7 @@ public class AllureReporter : BaseReporter
         var brokenStatusDetails = new StatusDetails
         {
             message = assertionResult.BrokenAssertionException?.Message ?? string.Empty,
-            trace = DisplayTrace
+            trace = displayTrace
                 ? assertionResult.BrokenAssertionException?.ToString() ?? string.Empty
                 : TraceDisplayFalseMessage,
             flaky = assertionResult.Flaky.IsFlaky
@@ -563,9 +564,11 @@ public class AllureReporter : BaseReporter
                     Label.Tag(assertionResult.Assertion.AssertionName),
                     Label.Host(),
                     Label.Severity(AssertionSeverityToAllureSeverityMap
-                        [Severity])
+                        [ResolveSeverity(assertionResult.Assertion)])
                 ])),
-            steps = assertionResult.Assertion.SessionDataList?.Select(CreateSessionStep).ToList(),
+            steps = assertionResult.Assertion.SessionDataList?
+                .Select(sessionData => CreateSessionStep(sessionData, assertionResult.Assertion))
+                .ToList(),
             attachments = GetAttachmentsForAssertion(assertionResult),
             statusDetails = GetStatusDetailsAccordingToStatus(assertionResult)
         };
@@ -582,13 +585,13 @@ public class AllureReporter : BaseReporter
         AllureLifecycle.Instance.WriteTestCase(testUniqueId);
     }
 
-    private StepResult CreateSessionStep(SessionData sessionData)
+    private StepResult CreateSessionStep(SessionData sessionData, AssertionObjects.Assertion assertion)
     {
         var attachments = new List<Attachment>();
-        if (SaveSessionData)
+        if (ShouldSaveSessionData(assertion))
             attachments.Add(SaveSessionsDataToAllure(sessionData));
 
-        var sessionLogAttachment = SaveLogs ? SaveSessionLogToAllure(sessionData) : null;
+        var sessionLogAttachment = ShouldSaveLogs(assertion) ? SaveSessionLogToAllure(sessionData) : null;
         if (sessionLogAttachment != null)
             attachments.Add(sessionLogAttachment);
 
@@ -660,15 +663,15 @@ public class AllureReporter : BaseReporter
         };
     }
 
-    private void WriteSessionStep(SessionData sessionData)
+    private void WriteSessionStep(SessionData sessionData, AssertionObjects.Assertion assertion)
     {
-        AllureLifecycle.Instance.StartStep(Guid.NewGuid().ToString("N"), CreateSessionStep(sessionData));
+        AllureLifecycle.Instance.StartStep(Guid.NewGuid().ToString("N"), CreateSessionStep(sessionData, assertion));
         try
         {
-            if (SaveSessionData)
+            if (ShouldSaveSessionData(assertion))
                 AddSessionsDataToCurrentItem(sessionData);
 
-            if (SaveLogs)
+            if (ShouldSaveLogs(assertion))
                 AddSessionLogToCurrentItem(sessionData);
             if (sessionData.SessionFailures.Any())
                 WriteSessionFailureSteps(sessionData.SessionFailures);
@@ -718,4 +721,22 @@ public class AllureReporter : BaseReporter
   **{nameof(sessionFailure.Name)}:** `{sessionFailure.Name}`
   **{nameof(sessionFailure.Reason.Message)}:** `{sessionFailure.Reason.Message}`")));
     }
+
+    private bool ShouldSaveSessionData(AssertionObjects.Assertion assertion) =>
+        assertion.SaveSessionData ?? SaveSessionData;
+
+    private bool ShouldSaveLogs(AssertionObjects.Assertion assertion) =>
+        assertion.SaveLogs ?? SaveLogs;
+
+    private bool ShouldSaveAttachments(AssertionObjects.Assertion assertion) =>
+        assertion.SaveAttachments ?? SaveAttachments;
+
+    private bool ShouldSaveTemplate(AssertionObjects.Assertion assertion) =>
+        assertion.SaveTemplate ?? SaveTemplate;
+
+    private bool ShouldDisplayTrace(AssertionObjects.Assertion assertion) =>
+        assertion.DisplayTrace ?? DisplayTrace;
+
+    private AssertionSeverity ResolveSeverity(AssertionObjects.Assertion assertion) =>
+        assertion.Severity ?? Severity;
 }

@@ -1261,6 +1261,12 @@ public class AllureReporterTests
     public void CreateSessionStep_WithNoFailuresOrArtifacts_ReturnsPassedStepWithoutNestedSteps()
     {
         Reporter!.SaveSessionData = false;
+        Reporter.SaveLogs = false;
+        var assertion = new Assertion
+        {
+            SaveSessionData = false,
+            SaveLogs = false
+        };
         var sessionData = new SessionData
         {
             Name = "clean-session",
@@ -1271,7 +1277,7 @@ public class AllureReporterTests
 
         var step = (StepResult)Reporter.GetType()
             .GetMethod("CreateSessionStep", BindingFlags.NonPublic | BindingFlags.Instance)!
-            .Invoke(Reporter, [sessionData])!;
+            .Invoke(Reporter, [sessionData, assertion])!;
 
         Assert.Multiple(() =>
         {
