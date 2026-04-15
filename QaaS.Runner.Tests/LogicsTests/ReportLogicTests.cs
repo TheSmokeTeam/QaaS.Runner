@@ -17,15 +17,13 @@ public class ReportLogicTests
     [TestCase(5)]
     public void TestRun_WithReportersAndAssertionResults_WritesResultsToReporters(int reportersCount)
     {
-        // Arrange
         var mockReporters = new List<Mock<IReporter>>();
         var assertionResults = new List<AssertionResult>();
 
         for (int i = 0; i < reportersCount; i++)
         {
             var mockReporter = new Mock<IReporter>();
-            mockReporter.SetupGet(r => r.Name).Returns($"Assertion{i + 1}");
-            mockReporter.SetupGet(r => r.AssertionName).Returns($"Assertion{i + 1}");
+            mockReporter.SetupGet(r => r.Name).Returns($"Reporter{i + 1}");
             mockReporters.Add(mockReporter);
             var assertion = new Assertion
             {
@@ -60,50 +58,32 @@ public class ReportLogicTests
             executionData.AssertionResults.Add(result);
         }
 
-        // Act
         var resultedExecutionData = reportLogic.Run(executionData);
 
-        // Assert
         Assert.That(resultedExecutionData, Is.Not.Null);
         Assert.That(resultedExecutionData, Is.SameAs(executionData));
 
-        for (int i = 0; i < reportersCount; i++)
+        foreach (var mockReporter in mockReporters)
         {
-            var mockReporter = mockReporters[i];
-            var mockAssertionResult = assertionResults[i];
-            mockReporter.Verify(r => r.WriteTestResults(mockAssertionResult), Times.Once());
+            foreach (var assertionResult in assertionResults)
+            {
+                mockReporter.Verify(r => r.WriteTestResults(assertionResult), Times.Once());
+            }
         }
     }
 
     [Test]
-    public void TestRun_WithMismatchedReporterAndAssertionResult_ThrowsArgumentException()
+    public void TestRun_WithReporterAndNoAssertionResults_DoesNotThrow()
     {
-        // Arrange
         var mockReporter = new Mock<IReporter>();
         mockReporter.SetupGet(r => r.Name).Returns("Allure");
-        mockReporter.SetupGet(r => r.AssertionName).Returns("NonExistentAssertion");
-
-        var assertionResult = new AssertionResult
-        {
-            Assertion = new Assertion
-            {
-                Name = "DifferentReporter",
-                AssertionName = null,
-                AssertionHook = null,
-                StatussesToReport = null
-            },
-            AssertionStatus = AssertionStatus.Passed,
-            TestDurationMs = 0,
-            Flaky = null
-        };
 
         var mockReporters = new List<IReporter> { mockReporter.Object };
         var reportLogic = new ReportLogic(mockReporters, Globals.GetContextWithMetadata());
         var executionData = new ExecutionData();
-        executionData.AssertionResults.Add(assertionResult);
 
-        // Act & Assert
-        Assert.Throws<ArgumentException>(() => reportLogic.Run(executionData));
+        Assert.DoesNotThrow(() => reportLogic.Run(executionData));
+        mockReporter.Verify(currentReporter => currentReporter.WriteTestResults(It.IsAny<AssertionResult>()), Times.Never);
     }
 
     [Test]
@@ -111,11 +91,9 @@ public class ReportLogicTests
     {
         var firstReporter = new Mock<IReporter>();
         firstReporter.SetupGet(r => r.Name).Returns("ReporterOne");
-        firstReporter.SetupGet(r => r.AssertionName).Returns("AssertionA");
 
         var secondReporter = new Mock<IReporter>();
         secondReporter.SetupGet(r => r.Name).Returns("ReporterTwo");
-        secondReporter.SetupGet(r => r.AssertionName).Returns("AssertionA");
 
         var assertionResult = new AssertionResult
         {
@@ -154,7 +132,6 @@ public class ReportLogicTests
     {
         var reporter = new Mock<IReporter>();
         reporter.SetupGet(r => r.Name).Returns("Reporter");
-        reporter.SetupGet(r => r.AssertionName).Returns("AssertionA");
         var assertionResult = new AssertionResult
         {
             Assertion = new Assertion

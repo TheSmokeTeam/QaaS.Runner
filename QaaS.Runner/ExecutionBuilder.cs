@@ -219,8 +219,10 @@ public class ExecutionBuilder() : BaseExecutionBuilder<InternalContext, Executio
     private IEnumerable<IReporter> BuildReports()
     {
         if (Assertions is null) return [];
-        var resolvedReports = Assertions.SelectMany(assertionReport =>
-            assertionReport.BuildReporters(Context, DateTime.UtcNow));
+        var testSuiteStartTimeUtc = DateTime.UtcNow;
+        var resolvedReports = Assertions
+            .GroupBy(assertionReport => assertionReport.GetReporterType())
+            .Select(assertionReportGroup => assertionReportGroup.First().Build(Context, testSuiteStartTimeUtc));
         return resolvedReports;
     }
 
@@ -953,11 +955,12 @@ public class ExecutionBuilder() : BaseExecutionBuilder<InternalContext, Executio
             var reportLogic =
                 scope.Resolve<ReportLogic>(new TypedParameter(typeof(IList<IReporter>), builtReports));
             var templateLogic = scope.Resolve<TemplateLogic>(new TypedParameter(typeof(Context), Context));
+            var reporterTypes = FormatReporterTypes(builtReports);
 
             Context.Logger.LogDebug(
-                "Resolved execution components. DataSources={DataSourceCount}, Sessions={SessionCount}, Storages={StorageCount}, Assertions={AssertionCount}, Reporters={ReporterCount}",
+                "Resolved execution components. DataSources={DataSourceCount}, Sessions={SessionCount}, Storages={StorageCount}, Assertions={AssertionCount}, Reporters={ReporterCount}, ReporterTypes={ReporterTypes}",
                 builtDataSources.Count, builtSessions.Count, builtStorages.Count, builtAssertions.Count,
-                builtReports.Count);
+                builtReports.Count, reporterTypes);
 
             Context.Logger.LogInformation(
                 "Finished building {Type} execution with executionId {ExecutionId} and case name {CaseName}", Type,
@@ -1324,5 +1327,16 @@ public class ExecutionBuilder() : BaseExecutionBuilder<InternalContext, Executio
         return property.GetCustomAttributes<ValidationAttribute>().Any()
                || property.GetCustomAttributes<DescriptionAttribute>().Any()
                || property.GetCustomAttributes<DefaultValueAttribute>().Any();
+    }
+
+    private static string FormatReporterTypes(IEnumerable<IReporter> reporters)
+    {
+        var reporterTypes = reporters
+            .Select(reporter => reporter.GetType().Name)
+            .Distinct(StringComparer.Ordinal)
+            .OrderBy(reporterType => reporterType, StringComparer.Ordinal)
+            .ToArray();
+
+        return reporterTypes.Length == 0 ? "None" : string.Join(", ", reporterTypes);
     }
 }

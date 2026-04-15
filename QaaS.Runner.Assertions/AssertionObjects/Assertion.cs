@@ -25,6 +25,18 @@ public class Assertion
 
     public List<BaseLink>? Links { get; set; }
 
+    public bool? SaveSessionData { get; set; }
+
+    public bool? SaveLogs { get; set; }
+
+    public bool? SaveAttachments { get; set; }
+
+    public bool? SaveTemplate { get; set; }
+
+    public bool? DisplayTrace { get; set; }
+
+    public AssertionSeverity? Severity { get; set; }
+
     /// <summary>
     ///     All Session data that might be relevant to the session according to its configuration
     /// </summary>

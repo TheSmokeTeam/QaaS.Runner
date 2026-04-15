@@ -547,6 +547,12 @@ public class AssertionBuilder : IYamlConvertible
             _dataSourcePatterns = DataSourcePatterns,
             _dataSourceNames = DataSourceNames,
             Name = Name!,
+            SaveSessionData = SaveSessionData,
+            SaveLogs = SaveLogs,
+            SaveAttachments = SaveAttachments,
+            SaveTemplate = SaveTemplate,
+            DisplayTrace = DisplayTrace,
+            Severity = Severity,
             AssertionHook = assertions.FirstOrDefault(pair => pair.Key == Name!)
                                 .Value ??
                             throw new ArgumentException($"Assertion {Name} of type" +
@@ -564,6 +570,8 @@ public class AssertionBuilder : IYamlConvertible
         return AssertionInstance;
     }
 
+    internal Type GetReporterType() => Reporter?.GetType() ?? typeof(AllureReporter);
+
     /// <summary>
     ///     Resolves the pre-built <see cref="BaseReporter" /> to a runtime object with access to QaaS'
     ///     <see cref="Context" /> and finalize building the Reporter.
@@ -575,11 +583,12 @@ public class AssertionBuilder : IYamlConvertible
     internal IReporter Build(Context context, DateTime testSuiteStartTimeUtc,
         IFileSystem? fileSystem = null)
     {
-        Reporter = new AllureReporter
-        {
-            Name = Name!,
-            AssertionName = Name!
-        };
+        Reporter = (BaseReporter?)Activator.CreateInstance(GetReporterType()) ??
+                   throw new InvalidOperationException(
+                       $"Could not create reporter of type {GetReporterType().FullName}.");
+
+        Reporter.Name = GetReporterType().Name;
+        Reporter.AssertionName = Name!;
 
         Reporter.DisplayTrace = DisplayTrace;
         Reporter.SaveSessionData = SaveSessionData;

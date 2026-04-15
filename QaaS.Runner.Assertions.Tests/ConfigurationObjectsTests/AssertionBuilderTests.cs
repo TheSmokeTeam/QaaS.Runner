@@ -101,7 +101,7 @@ public class AssertionBuilderTests
         var allureReporter = reporter as AllureReporter;
 
         Assert.That(allureReporter, Is.Not.Null);
-        Assert.That(allureReporter!.Name, Is.EqualTo("assertion-display"));
+        Assert.That(allureReporter!.Name, Is.EqualTo(nameof(AllureReporter)));
         Assert.That(allureReporter.AssertionName, Is.EqualTo("assertion-display"));
         Assert.That(allureReporter.Context, Is.SameAs(context));
         Assert.That(allureReporter.SaveSessionData, Is.False);
