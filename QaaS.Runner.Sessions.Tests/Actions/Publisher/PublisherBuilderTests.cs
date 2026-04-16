@@ -213,6 +213,21 @@ public class PublisherBuilderTests
     }
 
     [Test]
+    public void AddPolicy_WhenPoliciesIsNull_InitializesCollectionAndAddsPolicy()
+    {
+        var builder = new PublisherBuilder
+        {
+            Policies = null!
+        };
+        var policy = new PolicyBuilder();
+
+        builder.AddPolicy(policy);
+
+        Assert.That(builder.Policies, Has.Length.EqualTo(1));
+        Assert.That(builder.Policies[0], Is.SameAs(policy));
+    }
+
+    [Test]
     public void RemovePolicyAt_WithValidIndex_RemovesPolicy()
     {
         var builder = new PublisherBuilder()

@@ -469,12 +469,14 @@ public class AssertionBuilder : IYamlConvertible
     /// <qaas-docs group="Configuration as Code" subgroup="Assertions" />
     public AssertionBuilder RemoveLinkAt(int index)
     {
-        if (index < 0 || index >= Links.Count)
+        var links = Links ?? [];
+        if (index < 0 || index >= links.Count)
         {
             throw new ArgumentOutOfRangeException(nameof(index));
         }
 
-        Links.RemoveAt(index);
+        links.RemoveAt(index);
+        Links = links;
         return this;
     }
 

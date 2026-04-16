@@ -344,6 +344,21 @@ public class TransactionBuilderTests
     }
 
     [Test]
+    public void AddPolicy_WhenPoliciesIsNull_InitializesCollectionAndAddsPolicy()
+    {
+        var builder = new TransactionBuilder
+        {
+            Policies = null!
+        };
+        var policy = new PolicyBuilder();
+
+        builder.AddPolicy(policy);
+
+        Assert.That(builder.Policies, Has.Length.EqualTo(1));
+        Assert.That(builder.Policies[0], Is.SameAs(policy));
+    }
+
+    [Test]
     public void UpdateDataSource_WhenCollectionIsNull_DoesNothing()
     {
         var builder = new TransactionBuilder();

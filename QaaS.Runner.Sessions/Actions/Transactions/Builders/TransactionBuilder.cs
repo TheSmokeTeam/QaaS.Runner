@@ -248,7 +248,7 @@ public class TransactionBuilder
     /// <qaas-docs group="Configuration as Code" subgroup="Transactions" />
     public TransactionBuilder AddPolicy(PolicyBuilder policy)
     {
-        var policies = Policies.ToList();
+        var policies = (Policies ?? []).ToList();
         policies.Add(policy);
         Policies = policies.ToArray();
         return this;
@@ -263,12 +263,14 @@ public class TransactionBuilder
     /// <qaas-docs group="Configuration as Code" subgroup="Transactions" />
     public TransactionBuilder UpdatePolicyAt(int index, PolicyBuilder policy)
     {
-        if (index < 0 || index >= Policies.Length)
+        var policies = Policies ?? [];
+        if (index < 0 || index >= policies.Length)
         {
             throw new ArgumentOutOfRangeException(nameof(index));
         }
 
-        Policies[index] = policy;
+        policies[index] = policy;
+        Policies = policies;
         return this;
     }
 
@@ -281,12 +283,13 @@ public class TransactionBuilder
     /// <qaas-docs group="Configuration as Code" subgroup="Transactions" />
     public TransactionBuilder RemovePolicyAt(int index)
     {
-        if (index < 0 || index >= Policies.Length)
+        var policies = Policies ?? [];
+        if (index < 0 || index >= policies.Length)
         {
             throw new ArgumentOutOfRangeException(nameof(index));
         }
 
-        Policies = Policies.Where((_, i) => i != index).ToArray();
+        Policies = policies.Where((_, i) => i != index).ToArray();
         return this;
     }
 

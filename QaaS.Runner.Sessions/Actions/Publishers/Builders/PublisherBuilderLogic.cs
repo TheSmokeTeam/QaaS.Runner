@@ -303,7 +303,7 @@ public partial class PublisherBuilder
     /// <qaas-docs group="Configuration as Code" subgroup="Publishers" />
     public PublisherBuilder AddPolicy(PolicyBuilder policy)
     {
-        var policiesList = Policies.ToList();
+        var policiesList = (Policies ?? []).ToList();
         policiesList.Add(policy);
         Policies = policiesList.ToArray();
         return this;
@@ -318,12 +318,14 @@ public partial class PublisherBuilder
     /// <qaas-docs group="Configuration as Code" subgroup="Publishers" />
     public PublisherBuilder UpdatePolicyAt(int index, PolicyBuilder policy)
     {
-        if (index < 0 || index >= Policies.Length)
+        var policies = Policies ?? [];
+        if (index < 0 || index >= policies.Length)
         {
             throw new ArgumentOutOfRangeException(nameof(index));
         }
 
-        Policies[index] = policy;
+        policies[index] = policy;
+        Policies = policies;
         return this;
     }
 
@@ -336,12 +338,13 @@ public partial class PublisherBuilder
     /// <qaas-docs group="Configuration as Code" subgroup="Publishers" />
     public PublisherBuilder RemovePolicyAt(int index)
     {
-        if (index < 0 || index >= Policies.Length)
+        var policies = Policies ?? [];
+        if (index < 0 || index >= policies.Length)
         {
             throw new ArgumentOutOfRangeException(nameof(index));
         }
 
-        Policies = Policies.Where((_, i) => i != index).ToArray();
+        Policies = policies.Where((_, i) => i != index).ToArray();
         return this;
     }
 
