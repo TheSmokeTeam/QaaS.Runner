@@ -135,6 +135,10 @@ public class CloneSmokeTest
             Assert.That(clonedSession.Consumers, Is.Not.SameAs(sessionBuilder.Consumers));
             Assert.That(clonedSession.Consumers![0], Is.Not.SameAs(sessionBuilder.Consumers![0]));
             Assert.That(clonedExecution.Sessions![0], Is.Not.SameAs(executionBuilder.Sessions![0]));
+
+            Assert.That(clonedPolicy.Count, Is.Not.SameAs(policyBuilder.Count));
+            clonedPolicy.Count!.Count = 42;
+            Assert.That(policyBuilder.Count!.Count, Is.EqualTo(3));
         });
     }
 }
