@@ -1,6 +1,7 @@
 using System.ComponentModel;
 using System.Runtime.CompilerServices;
 using QaaS.Framework.Configurations;
+using QaaS.Framework.Infrastructure;
 using QaaS.Runner.Assertions.ConfigurationObjects.LinkConfigs;
 using QaaS.Runner.Assertions.LinkBuilders;
 
@@ -11,8 +12,10 @@ namespace QaaS.Runner.Assertions.ConfigurationObjects;
 /// <summary>
 /// Fluent builder for assertion link configuration and runtime link creation.
 /// </summary>
-public class LinkBuilder
+public class LinkBuilder : ICloneable<LinkBuilder>
 {
+    public LinkBuilder Clone() => BuilderCloner.DeepClone(this);
+
     [Description("The display name of the link in the test results, if none is given uses the `Type` as the name")]
     public string? Name { get; internal set; }
 

@@ -2,7 +2,9 @@ using System.ComponentModel;
 using System.ComponentModel.DataAnnotations;
 using System.Runtime.CompilerServices;
 using QaaS.Framework.Configurations.CustomValidationAttributes;
+using QaaS.Framework.Infrastructure;
 using QaaS.Runner.Infrastructure;
+using TimeZoneInfoResolver = QaaS.Runner.Infrastructure.TimeZoneInfoResolver;
 using QaaS.Runner.Sessions.Actions.Collectors;
 using QaaS.Runner.Sessions.Actions.Consumers.Builders;
 using QaaS.Runner.Sessions.Actions.MockerCommands;
@@ -14,8 +16,10 @@ using QaaS.Runner.Sessions.Actions.Transactions.Builders;
 
 namespace QaaS.Runner.Sessions.Session.Builders;
 
-public partial class SessionBuilder
+public partial class SessionBuilder : ICloneable<SessionBuilder>
 {
+    public SessionBuilder Clone() => BuilderCloner.DeepClone(this);
+
     [Required]
     [RegularExpression(
         @"^[^\\/]*$", ErrorMessage = "The field Name cannot contain / or \\.", MatchTimeoutInMilliseconds = 5000)]
