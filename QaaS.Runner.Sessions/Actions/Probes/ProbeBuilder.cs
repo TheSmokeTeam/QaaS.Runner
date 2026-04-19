@@ -6,6 +6,7 @@ using System.Text.Json;
 using Microsoft.Extensions.Configuration;
 using QaaS.Framework.Configurations;
 using QaaS.Framework.Configurations.ConfigurationBindingUtils;
+using QaaS.Framework.Infrastructure;
 using QaaS.Framework.SDK.ContextObjects;
 using QaaS.Framework.SDK.Extensions;
 using QaaS.Framework.SDK.Hooks.Probe;
@@ -21,8 +22,10 @@ namespace QaaS.Runner.Sessions.Actions.Probes;
 /// <summary>
 /// Fluent builder for probe configuration and runtime probe action creation.
 /// </summary>
-public class ProbeBuilder : IYamlConvertible
+public class ProbeBuilder : IYamlConvertible, ICloneable<ProbeBuilder>
 {
+    public ProbeBuilder Clone() => BuilderCloner.DeepClone(this);
+
     [Required]
     [Description("The name of the probe")]
     public string? Name { get; internal set; }
