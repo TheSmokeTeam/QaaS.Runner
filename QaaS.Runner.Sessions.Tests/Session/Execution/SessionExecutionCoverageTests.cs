@@ -491,7 +491,7 @@ public class SessionExecutionCoverageTests
                     Port = 22,
                     Username = "user",
                     Password = "pass",
-                    Path = "/tmp/test.txt"
+                    Path = Path.Combine(Path.GetTempPath(), "test.txt")
                 }, useBinarySerialization: true));
         yield return new SessionScenarioDefinition(
             Name: "protocol-publisher-socket",
@@ -1915,6 +1915,5 @@ public class SessionExecutionCoverageTests
         public const string MockerCall = "mocker-call";
     }
 }
-
 
 

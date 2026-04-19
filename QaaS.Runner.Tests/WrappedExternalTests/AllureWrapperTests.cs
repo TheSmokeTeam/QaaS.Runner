@@ -25,7 +25,7 @@ public class AllureWrapperTests
             return GeneratedReportDirectory;
         }
 
-        protected override Process StartProcess(ProcessStartInfo startInfo)
+        protected override void RunProcess(ProcessStartInfo startInfo)
         {
             StartInfos.Add(startInfo);
             if (startInfo.Arguments.Contains(" generate", StringComparison.Ordinal))
@@ -34,15 +34,6 @@ public class AllureWrapperTests
                 File.WriteAllText(Path.Combine(GeneratedReportDirectory, "history", "history-trend.json"),
                     "history-content");
             }
-
-            return Process.Start(new ProcessStartInfo
-            {
-                FileName = "cmd",
-                Arguments = "/c echo allure-serve-test",
-                RedirectStandardOutput = true,
-                RedirectStandardError = true,
-                UseShellExecute = false
-            })!;
         }
     }
 
@@ -151,8 +142,11 @@ public class AllureWrapperTests
         Assert.Multiple(() =>
         {
             Assert.That(_wrapper.StartInfos, Has.Count.EqualTo(2));
-            Assert.That(_wrapper.StartInfos[0].Arguments, Does.Contain($"-o \"{_wrapper.GeneratedReportDirectory}\""));
-            Assert.That(_wrapper.StartInfos[1].Arguments, Does.Contain($"open \"{_wrapper.GeneratedReportDirectory}\""));
+            Assert.That(_wrapper.StartInfos[0].Arguments, Does.Contain(" generate "));
+            Assert.That(_wrapper.StartInfos[0].Arguments, Does.Contain("-o"));
+            Assert.That(_wrapper.StartInfos[0].Arguments, Does.Contain("custom-report"));
+            Assert.That(_wrapper.StartInfos[1].Arguments, Does.Contain("open "));
+            Assert.That(_wrapper.StartInfos[1].Arguments, Does.Contain("custom-report"));
         });
     }
 
@@ -168,7 +162,8 @@ public class AllureWrapperTests
         {
             Assert.That(_wrapper.StartInfos, Has.Count.EqualTo(1));
             Assert.That(_wrapper.StartInfos[0].Arguments, Does.Not.Contain(" generate"));
-            Assert.That(_wrapper.StartInfos[0].Arguments, Does.Contain($"open \"{existingReportDirectory}\""));
+            Assert.That(_wrapper.StartInfos[0].Arguments, Does.Contain("open "));
+            Assert.That(_wrapper.StartInfos[0].Arguments, Does.Contain("existing-report"));
         });
     }
 
