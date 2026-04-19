@@ -193,6 +193,26 @@ public class SessionBuilderTests
     }
 
     [Test]
+    public void StageCrudMethods_WhenStagesIsNull_UseEmptyFallbackWithoutThrowing()
+    {
+        var builder = new SessionBuilder
+        {
+            Stages = null
+        };
+        var stageConfig = new StageConfig(3, 10, 20);
+
+        Assert.DoesNotThrow(() =>
+        {
+            builder.AddStage(stageConfig);
+            builder.UpdateStage(99, new StageConfig(99, 1, 1));
+            builder.RemoveStage(99);
+        });
+
+        Assert.That(builder.Stages, Has.Length.EqualTo(1));
+        Assert.That(builder.Stages[0], Is.SameAs(stageConfig));
+    }
+
+    [Test]
     public void Build_Should_Create_Session_With_All_Builders()
     {
         // Arrange

@@ -443,7 +443,7 @@ public partial class SessionBuilder
     /// <qaas-docs group="Configuration as Code" subgroup="Sessions" />
     public SessionBuilder AddStage(StageConfig stage)
     {
-        Stages = Stages.Append(stage).ToArray();
+        Stages = (Stages ?? []).Append(stage).ToArray();
         return this;
     }
 
@@ -456,13 +456,15 @@ public partial class SessionBuilder
     /// <qaas-docs group="Configuration as Code" subgroup="Sessions" />
     public SessionBuilder UpdateStage(int stageNumber, StageConfig stage)
     {
-        var existingIndex = Array.FindIndex(Stages, configuredStage => configuredStage.StageNumber == stageNumber);
+        var stages = Stages ?? [];
+        var existingIndex = Array.FindIndex(stages, configuredStage => configuredStage.StageNumber == stageNumber);
         if (existingIndex < 0)
         {
             return this;
         }
 
-        Stages[existingIndex] = stage;
+        stages[existingIndex] = stage;
+        Stages = stages;
         return this;
     }
 
@@ -475,7 +477,7 @@ public partial class SessionBuilder
     /// <qaas-docs group="Configuration as Code" subgroup="Sessions" />
     public SessionBuilder RemoveStage(int stageNumber)
     {
-        Stages = Stages.Where(configuredStage => configuredStage.StageNumber != stageNumber).ToArray();
+        Stages = (Stages ?? []).Where(configuredStage => configuredStage.StageNumber != stageNumber).ToArray();
         return this;
     }
 

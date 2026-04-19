@@ -254,6 +254,15 @@ public class AssertionBuilderTests
     }
 
     [Test]
+    public void RemoveLinkAt_WhenLinksIsNull_ThrowsArgumentOutOfRangeExceptionInsteadOfNullReferenceException()
+    {
+        var builder = CreateBuilder();
+        builder.Links = null!;
+
+        Assert.Throws<ArgumentOutOfRangeException>(() => builder.RemoveLinkAt(0));
+    }
+
+    [Test]
     public void UpdateConfiguration_WithIndexedInputNames_ReplacesExistingIndexes()
     {
         var builder = CreateBuilder()

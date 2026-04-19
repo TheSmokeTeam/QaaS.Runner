@@ -126,7 +126,7 @@ public partial class ConsumerBuilder
     /// <qaas-docs group="Configuration as Code" subgroup="Consumers" />
     public ConsumerBuilder AddPolicy(PolicyBuilder policy)
     {
-        var policiesList = Policies.ToList();
+        var policiesList = (Policies ?? []).ToList();
         policiesList.Add(policy);
         Policies = policiesList.ToArray();
         return this;
@@ -141,12 +141,14 @@ public partial class ConsumerBuilder
     /// <qaas-docs group="Configuration as Code" subgroup="Consumers" />
     public ConsumerBuilder UpdatePolicyAt(int index, PolicyBuilder policy)
     {
-        if (index < 0 || index >= Policies.Length)
+        var policies = Policies ?? [];
+        if (index < 0 || index >= policies.Length)
         {
             throw new ArgumentOutOfRangeException(nameof(index));
         }
 
-        Policies[index] = policy;
+        policies[index] = policy;
+        Policies = policies;
         return this;
     }
 
@@ -159,12 +161,13 @@ public partial class ConsumerBuilder
     /// <qaas-docs group="Configuration as Code" subgroup="Consumers" />
     public ConsumerBuilder RemovePolicyAt(int index)
     {
-        if (index < 0 || index >= Policies.Length)
+        var policies = Policies ?? [];
+        if (index < 0 || index >= policies.Length)
         {
             throw new ArgumentOutOfRangeException(nameof(index));
         }
 
-        Policies = Policies.Where((_, i) => i != index).ToArray();
+        Policies = policies.Where((_, i) => i != index).ToArray();
         return this;
     }
 
