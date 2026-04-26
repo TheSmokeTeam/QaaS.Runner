@@ -97,7 +97,7 @@ public class AssertionBuilderTests
         var fileSystem = new System.IO.Abstractions.FileSystem();
         var startTime = new DateTime(2025, 1, 1, 10, 0, 0, DateTimeKind.Utc);
 
-        var reporter = builder.Build(context, startTime, fileSystem);
+        var reporter = builder.Build(ReporterKind.Allure, context, startTime, fileSystem);
         var allureReporter = reporter as AllureReporter;
 
         Assert.That(allureReporter, Is.Not.Null);
@@ -113,6 +113,28 @@ public class AssertionBuilderTests
         Assert.That(allureReporter.FileSystem, Is.SameAs(fileSystem));
         Assert.That(allureReporter.EpochTestSuiteStartTime,
             Is.EqualTo(new DateTimeOffset(startTime, TimeSpan.Zero).ToUnixTimeMilliseconds()));
+    }
+
+    [Test]
+    public void BuildReporter_WithReportPortalKind_BuildsReportPortalReporter()
+    {
+        var builder = CreateBuilder()
+            .Named("assertion-display");
+        var context = new Context
+        {
+            Logger = Globals.Logger,
+            RootConfiguration = new ConfigurationBuilder().Build()
+        };
+
+        var reporter = builder.Build(ReporterKind.ReportPortal, context,
+            new DateTime(2025, 1, 1, 10, 0, 0, DateTimeKind.Utc));
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(reporter, Is.TypeOf<ReportPortalReporter>());
+            Assert.That(reporter.Kind, Is.EqualTo(ReporterKind.ReportPortal));
+            Assert.That(reporter.AssertionName, Is.EqualTo("assertion-display"));
+        });
     }
 
     [Test]
@@ -300,6 +322,4 @@ public class AssertionBuilderTests
         };
     }
 }
-
-
 

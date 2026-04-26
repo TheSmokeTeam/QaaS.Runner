@@ -24,6 +24,7 @@ public abstract class BaseReporter : IReporter
     public IFileSystem FileSystem = default!;
 
     public AssertionSeverity Severity { get; set; }
+    public abstract ReporterKind Kind { get; }
     public string Name { get; set; } = string.Empty;
     public string AssertionName { get; set; } = string.Empty;
     public bool SaveSessionData { get; set; }

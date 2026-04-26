@@ -8,7 +8,7 @@ namespace QaaS.Runner.Options;
 [Verb("execute", HelpText =
     "Executes a yaml execution file that contains a list of other commands to execute in a sequential order. " +
     "The flags of all commands in the execution file that can also be given in the execute command" +
-    " ('s', 'e', 'l', 'g') will be ignored.")]
+    " ('s', 'e', 'l', 'g', 'reporter') will be ignored.")]
 public record ExecuteOptions : LoggerOptions
 {
     [Required]
@@ -17,6 +17,11 @@ public record ExecuteOptions : LoggerOptions
         HelpText =
             "Path to a yaml configuration file that contains a list of QaaS commands to execute in sequential order.")]
     public string? ConfigurationFile { get; init; }
+
+    [Option("reporter",
+        MetaValue = "mode",
+        HelpText = "Reporter backend for this invocation. Supported values: allure, reportportal, both. Defaults to both.")]
+    public string? Reporter { get; set; }
 
     [Option('s', "serve-results",
         MetaValue = "folder",
@@ -60,4 +65,17 @@ Uses a locally installed allure CLI tool, if allure CLI is not installed and add
             "When this flag is used the runner will not terminate the current process after it completes. " +
             "Useful when embedding QaaS.Runner and orchestrating multiple runners in a single host process.")]
     public bool NoProcessExit { get; init; } = false;
+
+    public ReporterMode GetReporterModeOrDefault()
+    {
+        if (string.IsNullOrWhiteSpace(Reporter))
+            return ReporterMode.Both;
+
+        if (Enum.TryParse<ReporterMode>(Reporter.Trim(), ignoreCase: true, out var reporterMode))
+            return reporterMode;
+
+        throw new ArgumentException(
+            $"Unsupported reporter mode '{Reporter}'. Supported values: allure, reportportal, both.",
+            nameof(Reporter));
+    }
 }

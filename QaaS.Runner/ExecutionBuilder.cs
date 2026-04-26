@@ -98,6 +98,9 @@ public class ExecutionBuilder() : BaseExecutionBuilder<InternalContext, Executio
     /// </summary>
     [Description("The metadata for the tests' run")]
     public MetaDataConfig? MetaData { get; internal set; }
+
+    [Description("The reporting mode used for this execution.")]
+    public ReporterMode? ReporterMode { get; internal set; }
     private ExecutionType Type { get; set; }
 
     private bool LoadedContext { get; }
@@ -216,13 +219,16 @@ public class ExecutionBuilder() : BaseExecutionBuilder<InternalContext, Executio
         return assertions;
     }
 
-    private IEnumerable<IReporter> BuildReports()
+    private IEnumerable<IReporter> BuildReports(IReadOnlyCollection<Assertion> builtAssertions)
     {
-        if (Assertions is null) return [];
+        if (builtAssertions.Count == 0) return [];
         var testSuiteStartTimeUtc = DateTime.UtcNow;
-        var resolvedReports = Assertions
-            .GroupBy(assertionReport => assertionReport.GetReporterType())
-            .Select(assertionReportGroup => assertionReportGroup.First().Build(Context, testSuiteStartTimeUtc));
+        var reporterKinds = ResolveReporterKinds().ToArray();
+        var bootstrapAssertionBuilder = Assertions?.FirstOrDefault()
+                                      ?? throw new InvalidOperationException(
+                                          "At least one assertion builder is required to build reporters.");
+        var resolvedReports = reporterKinds.Select(reporterKind =>
+            bootstrapAssertionBuilder.Build(reporterKind, Context, testSuiteStartTimeUtc));
         return resolvedReports;
     }
 
@@ -558,6 +564,15 @@ public class ExecutionBuilder() : BaseExecutionBuilder<InternalContext, Executio
     public ExecutionBuilder WithMetadata(MetaDataConfig metaDataConfig)
     {
         MetaData = metaDataConfig;
+        return this;
+    }
+
+    /// <summary>
+    /// Sets the reporting mode for this execution.
+    /// </summary>
+    public ExecutionBuilder UseReporterMode(ReporterMode reporterMode)
+    {
+        ReporterMode = reporterMode;
         return this;
     }
 
@@ -939,7 +954,7 @@ public class ExecutionBuilder() : BaseExecutionBuilder<InternalContext, Executio
             var builtSessions = BuildSessions(scope).ToList();
             var builtStorages = BuildStorages().ToList();
             var builtAssertions = BuildAssertions(scope).ToList();
-            var builtReports = BuildReports().ToList();
+            var builtReports = BuildReports(builtAssertions).ToList();
             var dataSourceLogic =
                 scope.Resolve<DataSourceLogic>(
                     new TypedParameter(typeof(IList<DataSource>), builtDataSources));
@@ -1003,6 +1018,17 @@ public class ExecutionBuilder() : BaseExecutionBuilder<InternalContext, Executio
     private static T[]? RemoveByName<T>(T[]? items, string key, Func<T, string?> keySelector)
     {
         return items?.Where(item => keySelector(item) != key).ToArray();
+    }
+
+    private IEnumerable<ReporterKind> ResolveReporterKinds()
+    {
+        return (ReporterMode ?? QaaS.Runner.ReporterMode.Both) switch
+        {
+            QaaS.Runner.ReporterMode.Allure => [ReporterKind.Allure],
+            QaaS.Runner.ReporterMode.ReportPortal => [ReporterKind.ReportPortal],
+            QaaS.Runner.ReporterMode.Both => [ReporterKind.Allure, ReporterKind.ReportPortal],
+            _ => throw new ArgumentOutOfRangeException(nameof(ReporterMode), ReporterMode, "Unsupported reporter mode.")
+        };
     }
 
     private static T[]? UpdateAt<T>(T[]? items, int index, T replacement)

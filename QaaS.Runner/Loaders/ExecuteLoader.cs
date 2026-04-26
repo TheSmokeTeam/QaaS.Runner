@@ -80,6 +80,8 @@ public class ExecuteLoader<TRunner> : BaseLoader<ExecuteOptions, TRunner> where 
     /// <returns>A new instance of <typeparamref name="TRunner" /> configured with all required dependencies.</returns>
     public override TRunner GetLoadedRunner()
     {
+        var reporterMode = GetReporterModeOrThrow();
+        ValidateReporterSpecificOptions(reporterMode);
         var executeConfigurationPath = GetExecuteConfigurationPathOrThrow();
 
         ExecuteConfigurations executableYaml;
@@ -104,7 +106,8 @@ public class ExecuteLoader<TRunner> : BaseLoader<ExecuteOptions, TRunner> where 
         // Bootstrap a runner for each command
         var runs = commandsToRun.Select(command =>
         {
-            var stringCommand = CommandLineParser.SplitCommandLineIntoArguments(command.Command!, true).ToArray();
+            var stringCommand = RemoveInvocationScopedOptions(
+                CommandLineParser.SplitCommandLineIntoArguments(command.Command!, true).ToArray());
             if (stringCommand[0] == "execute")
                 throw new ArgumentException(RunnerDiagnosticMessageFormatter.Format(
                     "Execute configurations cannot contain nested execute commands.",
@@ -132,8 +135,107 @@ public class ExecuteLoader<TRunner> : BaseLoader<ExecuteOptions, TRunner> where 
             Options.EmptyAllureDirectory,
             Options.AutoServeTestResults);
         runner.WithServeResultsFolder(Options.AutoServeTestResults ? Options.GetServeResultsFolderOrDefault() : null);
+        runner.WithReporterMode(reporterMode);
         runner.ExitProcessOnCompletion = !Options.NoProcessExit;
         return runner;
+    }
+
+    private static string[] RemoveInvocationScopedOptions(IReadOnlyList<string> commandArguments)
+    {
+        var filteredArguments = new List<string>(commandArguments.Count);
+
+        for (var index = 0; index < commandArguments.Count; index++)
+        {
+            var argument = commandArguments[index];
+
+            if (TryMatchOption(argument, "--reporter"))
+            {
+                if (index + 1 < commandArguments.Count && !IsOption(commandArguments[index + 1]))
+                    index++;
+
+                continue;
+            }
+
+            if (TryMatchOption(argument, "-s", "--serve-results"))
+            {
+                if (index + 1 < commandArguments.Count &&
+                    !IsOption(commandArguments[index + 1]) &&
+                    !LooksLikeConfigurationPath(commandArguments[index + 1]))
+                {
+                    index++;
+                }
+
+                continue;
+            }
+
+            if (TryMatchOption(argument, "-e", "--empty-results-directory", "--empty-allure-directory"))
+                continue;
+
+            filteredArguments.Add(argument);
+        }
+
+        return filteredArguments.ToArray();
+    }
+
+    private static bool TryMatchOption(string argument, params string[] optionNames)
+    {
+        foreach (var optionName in optionNames)
+        {
+            if (string.Equals(argument, optionName, StringComparison.OrdinalIgnoreCase))
+                return true;
+
+            if (optionName.StartsWith("--", StringComparison.Ordinal) &&
+                argument.StartsWith($"{optionName}=", StringComparison.OrdinalIgnoreCase))
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private static bool IsOption(string argument)
+    {
+        return argument.StartsWith("-", StringComparison.Ordinal);
+    }
+
+    private static bool LooksLikeConfigurationPath(string argument)
+    {
+        if (Path.IsPathRooted(argument))
+            return true;
+
+        if (argument.IndexOfAny(['\\', '/']) >= 0)
+            return true;
+
+        var extension = Path.GetExtension(argument);
+        return extension.Equals(".yaml", StringComparison.OrdinalIgnoreCase) ||
+               extension.Equals(".yml", StringComparison.OrdinalIgnoreCase);
+    }
+
+    private ReporterMode GetReporterModeOrThrow()
+    {
+        try
+        {
+            return Options.GetReporterModeOrDefault();
+        }
+        catch (ArgumentException exception)
+        {
+            throw new InvalidConfigurationsException(exception.Message, exception);
+        }
+    }
+
+    private void ValidateReporterSpecificOptions(ReporterMode reporterMode)
+    {
+        if (reporterMode != ReporterMode.ReportPortal)
+            return;
+
+        if (Options.AutoServeTestResults)
+            throw new InvalidConfigurationsException(
+                "The '--serve-results' flag is only valid when Allure reporting is enabled.");
+
+        if (Options.EmptyAllureDirectory)
+            throw new InvalidConfigurationsException(
+                "The '--empty-allure-directory' flag is only valid when Allure reporting is enabled.");
     }
 
     private string GetExecuteConfigurationPathOrThrow()

@@ -555,7 +555,6 @@ public class AssertionBuilder : IYamlConvertible
             SaveTemplate = SaveTemplate,
             DisplayTrace = DisplayTrace,
             Severity = Severity,
-            ReporterType = GetReporterType(),
             AssertionHook = assertions.FirstOrDefault(pair => pair.Key == Name!)
                                 .Value ??
                             throw new ArgumentException($"Assertion {Name} of type" +
@@ -573,8 +572,6 @@ public class AssertionBuilder : IYamlConvertible
         return AssertionInstance;
     }
 
-    internal Type GetReporterType() => Reporter?.GetType() ?? typeof(AllureReporter);
-
     /// <summary>
     ///     Resolves the pre-built <see cref="BaseReporter" /> to a runtime object with access to QaaS'
     ///     <see cref="Context" /> and finalize building the Reporter.
@@ -583,14 +580,12 @@ public class AssertionBuilder : IYamlConvertible
     /// <param name="testSuiteStartTimeUtc"></param>
     /// <param name="fileSystem"></param>
     /// <returns></returns>
-    internal IReporter Build(Context context, DateTime testSuiteStartTimeUtc,
+    internal IReporter Build(ReporterKind reporterKind, Context context, DateTime testSuiteStartTimeUtc,
         IFileSystem? fileSystem = null)
     {
-        Reporter = (BaseReporter?)Activator.CreateInstance(GetReporterType()) ??
-                   throw new InvalidOperationException(
-                       $"Could not create reporter of type {GetReporterType().FullName}.");
+        Reporter = ReporterFactory.Create(reporterKind);
 
-        Reporter.Name = GetReporterType().Name;
+        Reporter.Name = Reporter.GetType().Name;
         Reporter.AssertionName = Name!;
 
         Reporter.DisplayTrace = DisplayTrace;
@@ -610,6 +605,6 @@ public class AssertionBuilder : IYamlConvertible
     internal IEnumerable<IReporter> BuildReporters(Context context, DateTime testSuiteStartTimeUtc,
         IFileSystem? fileSystem = null)
     {
-        yield return Build(context, testSuiteStartTimeUtc, fileSystem);
+        yield return Build(ReporterKind.Allure, context, testSuiteStartTimeUtc, fileSystem);
     }
 }

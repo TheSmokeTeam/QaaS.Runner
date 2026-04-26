@@ -10,6 +10,11 @@ public abstract record
 {
     public const string DefaultServeResultsFolder = "allure-results";
 
+    [Option("reporter",
+        MetaValue = "mode",
+        HelpText = "Reporter backend for this invocation. Supported values: allure, reportportal, both. Defaults to both.")]
+    public string? Reporter { get; set; }
+
     [Option('s', "serve-results",
         MetaValue = "folder",
         HelpText = @"
@@ -38,4 +43,17 @@ Provide a folder name such as 'allure-report' to open a generated report directo
     [Option('e', "empty-results-directory", Default = false,
         HelpText = "If flag is enabled will automatically empty the results directory before running.")]
     public bool EmptyAllureDirectory { get; set; } = false;
+
+    public ReporterMode GetReporterModeOrDefault()
+    {
+        if (string.IsNullOrWhiteSpace(Reporter))
+            return ReporterMode.Both;
+
+        if (Enum.TryParse<ReporterMode>(Reporter.Trim(), ignoreCase: true, out var reporterMode))
+            return reporterMode;
+
+        throw new ArgumentException(
+            $"Unsupported reporter mode '{Reporter}'. Supported values: allure, reportportal, both.",
+            nameof(Reporter));
+    }
 }
