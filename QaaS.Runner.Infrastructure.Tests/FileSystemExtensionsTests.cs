@@ -36,6 +36,14 @@ public class FileSystemExtensionsTests
     }
 
     [Test]
+    public void NormalizeRelativePath_WithBackslashSeparators_ReturnsNormalizedPath()
+    {
+        var result = FileSystemExtensions.NormalizeRelativePath(@"folder\sub\file.json");
+
+        Assert.That(result, Is.EqualTo(Path.Combine("folder", "sub", "file.json")));
+    }
+
+    [Test]
     public void NormalizeRelativePath_WithWhitespace_ReturnsEmptyPath()
     {
         var result = FileSystemExtensions.NormalizeRelativePath("   ");

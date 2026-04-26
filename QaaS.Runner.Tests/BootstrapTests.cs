@@ -142,7 +142,7 @@ public class BootstrapTests
     {
         var normalizedArguments = Bootstrap.NormalizeArguments(
             [],
-            @"C:\temp",
+            Path.GetTempPath(),
             _ => true);
 
         Assert.That(normalizedArguments, Is.Empty);

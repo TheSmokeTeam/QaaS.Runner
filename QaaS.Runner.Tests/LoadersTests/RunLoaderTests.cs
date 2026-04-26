@@ -104,6 +104,21 @@ namespace QaaS.Runner.Tests.LoadersTests
             }
         }
 
+        private static string CreateRelativeTestDataDirectory(string name)
+        {
+            return Path.Combine("TestData", $"{name}-{Guid.NewGuid():N}");
+        }
+
+        private static string? NormalizeCasePath(string? path)
+        {
+            return path?.Replace('\\', '/');
+        }
+
+        private static string[] NormalizeCasePaths(IEnumerable<string?> paths)
+        {
+            return paths.Select(path => NormalizeCasePath(path)!).ToArray();
+        }
+
         private static IEnumerable<TestCaseData> TestBuildContextCaseData()
         {
             // Test Case 1: Basic build context with minimal options
@@ -338,7 +353,7 @@ namespace QaaS.Runner.Tests.LoadersTests
         [Test]
         public void GetLoadedContexts_WithFileCasesAndCaseNameFilter_ReturnsOnlyRequestedCases()
         {
-            var relativeCasesDir = $"TestData\\RunLoaderCases-{Guid.NewGuid():N}";
+            var relativeCasesDir = CreateRelativeTestDataDirectory("RunLoaderCases");
             var absoluteCasesDir = Path.Combine(Environment.CurrentDirectory, relativeCasesDir);
             Directory.CreateDirectory(Path.Combine(absoluteCasesDir, "nested"));
 
@@ -362,8 +377,8 @@ namespace QaaS.Runner.Tests.LoadersTests
                     ((IEnumerable<InternalContext>)GetLoadedContextsMethodInfo.Invoke(loader, null)!).ToList();
 
                 Assert.That(contexts, Has.Count.EqualTo(1));
-                Assert.That(contexts[0].CaseName,
-                    Is.EqualTo(Path.GetRelativePath(Environment.CurrentDirectory, caseA)));
+                Assert.That(NormalizeCasePath(contexts[0].CaseName),
+                    Is.EqualTo(NormalizeCasePath(Path.GetRelativePath(Environment.CurrentDirectory, caseA))));
             }
             finally
             {
@@ -374,7 +389,7 @@ namespace QaaS.Runner.Tests.LoadersTests
         [Test]
         public void GetLoadedContexts_WithUnknownCaseName_ThrowsInvalidOperationException()
         {
-            var relativeCasesDir = $"TestData\\RunLoaderMissingCase-{Guid.NewGuid():N}";
+            var relativeCasesDir = CreateRelativeTestDataDirectory("RunLoaderMissingCase");
             var absoluteCasesDir = Path.Combine(Environment.CurrentDirectory, relativeCasesDir);
             Directory.CreateDirectory(absoluteCasesDir);
             File.WriteAllText(Path.Combine(absoluteCasesDir, "only-case.yaml"), "content");
@@ -407,7 +422,7 @@ namespace QaaS.Runner.Tests.LoadersTests
         [Test]
         public void GetLoadedContexts_WithIgnoredCaseNames_ExcludesIgnoredCases()
         {
-            var relativeCasesDir = $"TestData\\RunLoaderIgnoreExact-{Guid.NewGuid():N}";
+            var relativeCasesDir = CreateRelativeTestDataDirectory("RunLoaderIgnoreExact");
             var absoluteCasesDir = Path.Combine(Environment.CurrentDirectory, relativeCasesDir);
             Directory.CreateDirectory(absoluteCasesDir);
 
@@ -430,9 +445,9 @@ namespace QaaS.Runner.Tests.LoadersTests
                 var contexts =
                     ((IEnumerable<InternalContext>)GetLoadedContextsMethodInfo.Invoke(loader, null)!).ToList();
 
-                Assert.That(contexts.Select(context => context.CaseName).ToArray(), Is.EqualTo(new[]
+                Assert.That(NormalizeCasePaths(contexts.Select(context => context.CaseName)), Is.EqualTo(new[]
                 {
-                    Path.GetRelativePath(Environment.CurrentDirectory, keepCase)
+                    NormalizeCasePath(Path.GetRelativePath(Environment.CurrentDirectory, keepCase))
                 }));
             }
             finally
@@ -444,7 +459,7 @@ namespace QaaS.Runner.Tests.LoadersTests
         [Test]
         public void GetLoadedContexts_WithIgnoredCasePatterns_ExcludesPatternMatches()
         {
-            var relativeCasesDir = $"TestData\\RunLoaderIgnorePattern-{Guid.NewGuid():N}";
+            var relativeCasesDir = CreateRelativeTestDataDirectory("RunLoaderIgnorePattern");
             var absoluteCasesDir = Path.Combine(Environment.CurrentDirectory, relativeCasesDir);
             Directory.CreateDirectory(Path.Combine(absoluteCasesDir, "nested"));
 
@@ -467,9 +482,9 @@ namespace QaaS.Runner.Tests.LoadersTests
                 var contexts =
                     ((IEnumerable<InternalContext>)GetLoadedContextsMethodInfo.Invoke(loader, null)!).ToList();
 
-                Assert.That(contexts.Select(context => context.CaseName).ToArray(), Is.EqualTo(new[]
+                Assert.That(NormalizeCasePaths(contexts.Select(context => context.CaseName)), Is.EqualTo(new[]
                 {
-                    Path.GetRelativePath(Environment.CurrentDirectory, keepCase)
+                    NormalizeCasePath(Path.GetRelativePath(Environment.CurrentDirectory, keepCase))
                 }));
             }
             finally
