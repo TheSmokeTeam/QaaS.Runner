@@ -210,6 +210,8 @@ public class RunLoader<TRunner, TOptions> : BaseLoader<TOptions, TRunner>
     /// </summary>
     public override TRunner GetLoadedRunner()
     {
+        var reporterMode = GetReporterModeOrThrow();
+        ValidateReporterSpecificOptions(reporterMode);
         var executionBuilders = GetLoadedExecutionBuilders().ToList();
         var serveResultsFolder = Options is AssertableOptions assertableOptions && assertableOptions.AutoServeTestResults
             ? assertableOptions.GetServeResultsFolderOrDefault()
@@ -223,8 +225,38 @@ public class RunLoader<TRunner, TOptions> : BaseLoader<TOptions, TRunner>
             Options is AssertableOptions emptyResultsOptions && emptyResultsOptions.EmptyAllureDirectory,
             serveResultsFolder is not null);
         runner.WithServeResultsFolder(serveResultsFolder);
+        runner.WithReporterMode(reporterMode);
         runner.ExitProcessOnCompletion = !Options.NoProcessExit;
         return runner;
+    }
+
+    private ReporterMode GetReporterModeOrThrow()
+    {
+        if (Options is not AssertableOptions assertableOptions)
+            return ReporterMode.Both;
+
+        try
+        {
+            return assertableOptions.GetReporterModeOrDefault();
+        }
+        catch (ArgumentException exception)
+        {
+            throw new InvalidConfigurationsException(exception.Message, exception);
+        }
+    }
+
+    private void ValidateReporterSpecificOptions(ReporterMode reporterMode)
+    {
+        if (Options is not AssertableOptions assertableOptions || reporterMode != ReporterMode.ReportPortal)
+            return;
+
+        if (assertableOptions.AutoServeTestResults)
+            throw new InvalidConfigurationsException(
+                "The '--serve-results' flag is only valid when Allure reporting is enabled.");
+
+        if (assertableOptions.EmptyAllureDirectory)
+            throw new InvalidConfigurationsException(
+                "The '--empty-results-directory' flag is only valid when Allure reporting is enabled.");
     }
 
     protected virtual IReadOnlyList<IExecutionBuilderConfigurator> DiscoverExecutionBuilderConfigurators()

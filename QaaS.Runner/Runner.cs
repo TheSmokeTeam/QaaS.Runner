@@ -3,6 +3,8 @@ using Autofac;
 using Microsoft.Extensions.Logging;
 using QaaS.Framework.Configurations.CustomExceptions;
 using QaaS.Framework.Executions;
+using QaaS.Runner.Assertions;
+using QaaS.Runner.Services;
 using QaaS.Runner.Options;
 using QaaS.Runner.WrappedExternals;
 using ILogger = Microsoft.Extensions.Logging.ILogger;
@@ -26,6 +28,8 @@ public class Runner : IRunner, IDisposable
     private string ServeResultsFolder { get; set; } = AssertableOptions.DefaultServeResultsFolder;
     private bool DisposeSerilogLogger { get; set; } = true;
     private int? BootstrapHandledExitCode { get; set; }
+    private ReportPortalLaunchManager? ReportPortalLaunchManager { get; set; }
+    internal ReporterMode ReporterMode { get; private set; } = ReporterMode.Both;
 
     /// <summary>
     /// Controls whether <see cref="Run" /> terminates the current process after the runner finishes successfully.
@@ -113,6 +117,7 @@ public class Runner : IRunner, IDisposable
     protected virtual void Setup()
     {
         Logger.LogDebug("Runner setup started");
+        SetupReportPortalLaunch();
         if (EmptyResults)
         {
             Logger.LogInformation("Cleaning results directory before execution");
@@ -132,6 +137,7 @@ public class Runner : IRunner, IDisposable
     protected virtual void Teardown()
     {
         Logger.LogDebug("Runner teardown started");
+        FinishReportPortalLaunch();
         if (DisposeSerilogLogger && SerilogLogger is IDisposable disposableLogger)
         {
             Logger.LogDebug("Disposing Serilog logger instance");
@@ -193,6 +199,8 @@ public class Runner : IRunner, IDisposable
     {
         Logger.LogInformation("Building {ExecutionCount} executions", ExecutionBuilders.Count);
         var globalDict = new Dictionary<string, object?>();
+        if (RequiresReportPortal())
+            globalDict[ReportingContextKeys.ReportPortalLaunchAccessor] = ReportPortalLaunchManager;
 
         // Builders share a single global dictionary so metadata and runtime values written by one
         // execution are visible to later executions in the same runner invocation.
@@ -200,6 +208,7 @@ public class Runner : IRunner, IDisposable
         // Autofac would add indirection without improving lifetime management.
         ExecutionBuilders.ForEach(builder => builder.WithGlobalDict(globalDict));
         ExecutionBuilders.ForEach(builder => builder.WithVariablesLoadedIntoGlobalDict(LoadVariablesIntoGlobalDict));
+        ExecutionBuilders.ForEach(builder => builder.UseReporterMode(ReporterMode));
 
         // The logger is also assigned directly because execution builders are plain mutable configuration objects,
         // not services resolved from the Autofac scope.
@@ -207,6 +216,60 @@ public class Runner : IRunner, IDisposable
         var executions = ExecutionBuilders.Select(builder => builder.Build()).ToList();
         Logger.LogInformation("Built {ExecutionCount} executions successfully", executions.Count);
         return executions;
+    }
+
+    private void SetupReportPortalLaunch()
+    {
+        if (!RequiresReportPortal())
+            return;
+
+        ReportPortalLaunchManager = Scope.Resolve<ReportPortalLaunchManager>();
+        ReportPortalLaunchManager.StartLaunch(
+            Logger,
+            BuildReportPortalLaunchName(),
+            BuildReportPortalLaunchDescription(),
+            BuildReportPortalLaunchAttributes());
+    }
+
+    private void FinishReportPortalLaunch()
+    {
+        ReportPortalLaunchManager?.FinishLaunch(Logger);
+    }
+
+    private bool RequiresReportPortal()
+    {
+        return ReporterMode is ReporterMode.ReportPortal or ReporterMode.Both;
+    }
+
+    private string BuildReportPortalLaunchName()
+    {
+        var executionCount = ExecutionBuilders.Count;
+        return executionCount == 1
+            ? $"QaaS Run ({executionCount} execution)"
+            : $"QaaS Run ({executionCount} executions)";
+    }
+
+    private string BuildReportPortalLaunchDescription()
+    {
+        return $"QaaS runner invocation started at {DateTimeOffset.UtcNow:O}";
+    }
+
+    private IEnumerable<KeyValuePair<string, string?>> BuildReportPortalLaunchAttributes()
+    {
+        yield return new KeyValuePair<string, string?>("runner", "QaaS.Runner");
+        yield return new KeyValuePair<string, string?>("backend", ReporterMode.ToString());
+
+        foreach (var executionBuilder in ExecutionBuilders)
+        {
+            yield return new KeyValuePair<string, string?>("executionId",
+                executionBuilder.GetType()
+                    .GetField("_configuredExecutionId", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic)?
+                    .GetValue(executionBuilder)?.ToString());
+            yield return new KeyValuePair<string, string?>("caseName",
+                executionBuilder.GetType()
+                    .GetField("_configuredCaseName", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic)?
+                    .GetValue(executionBuilder)?.ToString());
+        }
     }
 
     /// <summary>
@@ -285,6 +348,12 @@ public class Runner : IRunner, IDisposable
         if (!string.IsNullOrWhiteSpace(serveResultsFolder))
             ServeResultsFolder = serveResultsFolder.Trim();
 
+        return this;
+    }
+
+    internal Runner WithReporterMode(ReporterMode reporterMode)
+    {
+        ReporterMode = reporterMode;
         return this;
     }
 

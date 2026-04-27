@@ -10,6 +10,8 @@ public class BaseReporterTests
 {
     private sealed class TestReporter : BaseReporter
     {
+        public override ReporterKind Kind => ReporterKind.Allure;
+
         public override void WriteTestResults(AssertionResult assertionResult)
         {
         }

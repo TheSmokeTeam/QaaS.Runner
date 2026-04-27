@@ -13,6 +13,7 @@ using QaaS.Framework.SDK.DataSourceObjects;
 using QaaS.Framework.SDK.ExecutionObjects;
 using QaaS.Framework.SDK.Session.SessionDataObjects;
 using QaaS.Framework.SDK.Session.SessionDataObjects.RunningSessionsObjects;
+using QaaS.Runner.Assertions.AssertionObjects;
 using QaaS.Runner.Assertions.ConfigurationObjects;
 using QaaS.Runner.Assertions.ConfigurationObjects.LinkConfigs;
 using QaaS.Runner.Infrastructure;
@@ -915,7 +916,7 @@ public class ExecutionBuilderTests
             .Invoke(builder, [scope])!;
         var builtReports = (System.Collections.IEnumerable)typeof(ExecutionBuilder)
             .GetMethod("BuildReports", BindingFlags.Instance | BindingFlags.NonPublic)!
-            .Invoke(builder, [])!;
+            .Invoke(builder, [Array.Empty<Assertion>()])!;
         var builtStorages = (System.Collections.IEnumerable)typeof(ExecutionBuilder)
             .GetMethod("BuildStorages", BindingFlags.Instance | BindingFlags.NonPublic)!
             .Invoke(builder, [])!;
@@ -1111,7 +1112,6 @@ public class ExecutionBuilderTests
 
     private sealed record LogEntry(LogLevel LogLevel, string Message);
 }
-
 
 
 

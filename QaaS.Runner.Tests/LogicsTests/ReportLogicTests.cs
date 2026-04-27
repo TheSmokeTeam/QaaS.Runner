@@ -31,7 +31,6 @@ public class ReportLogicTests
                     AssertionStatus.Skipped,
                     AssertionStatus.Unknown
                 ],
-                ReporterType = typeof(RecordingReporter),
                 AssertionName = null,
                 AssertionHook = null
             };
@@ -72,7 +71,7 @@ public class ReportLogicTests
     }
 
     [Test]
-    public void TestRun_WithMultipleReporterTypes_WritesOnlyMatchingAssertions()
+    public void TestRun_WithMultipleReporterTypes_WritesAllMatchingAssertionsToEachReporter()
     {
         var firstReporter = new RecordingReporter();
         var secondReporter = new AlternateRecordingReporter();
@@ -89,7 +88,6 @@ public class ReportLogicTests
                     AssertionStatus.Skipped,
                     AssertionStatus.Unknown
                 ],
-                ReporterType = typeof(RecordingReporter),
                 AssertionName = null,
                 AssertionHook = null
             },
@@ -110,7 +108,6 @@ public class ReportLogicTests
                     AssertionStatus.Skipped,
                     AssertionStatus.Unknown
                 ],
-                ReporterType = typeof(AlternateRecordingReporter),
                 AssertionName = null,
                 AssertionHook = null
             },
@@ -129,8 +126,8 @@ public class ReportLogicTests
         Assert.That(result, Is.SameAs(executionData));
         Assert.Multiple(() =>
         {
-            Assert.That(firstReporter.Results, Is.EqualTo(new[] { firstAssertionResult }));
-            Assert.That(secondReporter.Results, Is.EqualTo(new[] { secondAssertionResult }));
+            Assert.That(firstReporter.Results, Is.EqualTo(new[] { firstAssertionResult, secondAssertionResult }));
+            Assert.That(secondReporter.Results, Is.EqualTo(new[] { firstAssertionResult, secondAssertionResult }));
         });
     }
 
@@ -144,7 +141,6 @@ public class ReportLogicTests
             {
                 Name = "AssertionA",
                 StatussesToReport = [AssertionStatus.Failed],
-                ReporterType = typeof(RecordingReporter),
                 AssertionName = null,
                 AssertionHook = null
             },
@@ -164,10 +160,13 @@ public class ReportLogicTests
 
     private class RecordingReporter : IReporter
     {
+        public virtual ReporterKind Kind => ReporterKind.Allure;
         public string Name { get; set; } = nameof(RecordingReporter);
         public string AssertionName { get; set; } = string.Empty;
         public bool SaveSessionData { get; set; }
         public bool SaveAttachments { get; set; }
+        public bool SaveLogs { get; set; }
+        public bool SaveTemplate { get; set; }
         public bool DisplayTrace { get; set; }
         public long EpochTestSuiteStartTime { get; set; }
         public List<AssertionResult> Results { get; } = [];
@@ -180,5 +179,6 @@ public class ReportLogicTests
 
     private sealed class AlternateRecordingReporter : RecordingReporter
     {
+        public override ReporterKind Kind => ReporterKind.ReportPortal;
     }
 }

@@ -543,11 +543,67 @@ namespace QaaS.Runner.Tests.LoadersTests
             var emptyResultsProperty = typeof(Runner).GetProperty("EmptyResults", BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic)!;
             var serveResultsProperty = typeof(Runner).GetProperty("ServeResults", BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic)!;
             var serveResultsFolderProperty = typeof(Runner).GetProperty("ServeResultsFolder", BindingFlags.Instance | BindingFlags.NonPublic)!;
+            var reporterModeProperty = typeof(Runner).GetProperty("ReporterMode", BindingFlags.Instance | BindingFlags.NonPublic)!;
 
             Assert.That((bool)emptyResultsProperty.GetValue(runner)!, Is.True);
             Assert.That((bool)serveResultsProperty.GetValue(runner)!, Is.True);
             Assert.That((string)serveResultsFolderProperty.GetValue(runner)!,
                 Is.EqualTo(AssertableOptions.DefaultServeResultsFolder));
+            Assert.That((ReporterMode)reporterModeProperty.GetValue(runner)!, Is.EqualTo(ReporterMode.Both));
+        }
+
+        [TestCase(null, ReporterMode.Both)]
+        [TestCase("allure", ReporterMode.Allure)]
+        [TestCase("reportportal", ReporterMode.ReportPortal)]
+        public void GetLoadedRunner_WithReporterOption_SetsRunnerReporterMode(string? reporter,
+            ReporterMode expectedMode)
+        {
+            var options = new RunOptions
+            {
+                ConfigurationFile = "test.yaml",
+                SendLogs = false,
+                Reporter = reporter
+            };
+
+            var loader = new TestRunLoader(options, "exec-reporter");
+
+            var runner = loader.GetLoadedRunner();
+            var reporterModeProperty = typeof(Runner).GetProperty("ReporterMode",
+                BindingFlags.Instance | BindingFlags.NonPublic)!;
+
+            Assert.That((ReporterMode)reporterModeProperty.GetValue(runner)!, Is.EqualTo(expectedMode));
+        }
+
+        [Test]
+        public void GetLoadedRunner_WithReportPortalAndServeResults_ThrowsInvalidConfigurationsException()
+        {
+            var loader = new TestRunLoader(new RunOptions
+            {
+                ConfigurationFile = "test.yaml",
+                SendLogs = false,
+                Reporter = "reportportal",
+                AutoServeTestResults = true
+            }, "exec-reportportal-serve");
+
+            var exception = Assert.Throws<InvalidConfigurationsException>(() => loader.GetLoadedRunner());
+
+            Assert.That(exception!.Message, Does.Contain("--serve-results"));
+        }
+
+        [Test]
+        public void GetLoadedRunner_WithReportPortalAndEmptyResults_ThrowsInvalidConfigurationsException()
+        {
+            var loader = new TestRunLoader(new RunOptions
+            {
+                ConfigurationFile = "test.yaml",
+                SendLogs = false,
+                Reporter = "reportportal",
+                EmptyAllureDirectory = true
+            }, "exec-reportportal-empty");
+
+            var exception = Assert.Throws<InvalidConfigurationsException>(() => loader.GetLoadedRunner());
+
+            Assert.That(exception!.Message, Does.Contain("--empty-results-directory"));
         }
 
         [Test]

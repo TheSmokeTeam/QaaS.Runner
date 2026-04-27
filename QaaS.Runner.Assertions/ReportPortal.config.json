@@ -1,0 +1,12 @@
+{
+  "enabled": true,
+  "server": {
+    "url": "http://localhost:8080",
+    "project": "default_personal",
+    "apiKey": "token__dbnZk8NRoqPShjo32HyAeuSEIJi0yvxf8O5m82q3RtylfKHrt0G-O1eJNgWxca1",
+  },
+  "launch": {
+    "name": "Local Run",
+    "description": "Mac execution"
+  }
+}

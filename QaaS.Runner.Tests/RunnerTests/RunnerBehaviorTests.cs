@@ -11,6 +11,8 @@ using QaaS.Framework.SDK.Extensions;
 using QaaS.Framework.SDK.ExecutionObjects;
 using QaaS.Framework.SDK.Session.SessionDataObjects;
 using QaaS.Framework.SDK.Session.SessionDataObjects.RunningSessionsObjects;
+using QaaS.Runner.Assertions;
+using QaaS.Runner.Services;
 using QaaS.Runner.WrappedExternals;
 using Allure.Commons;
 
@@ -386,10 +388,25 @@ public class RunnerBehaviorTests
         var markerFile = CreateAllureMarkerFile();
         using var scope = BuildScope();
         var runner = new ExposedRunner(scope, [], Globals.Logger, new Mock<Serilog.ILogger>().Object, emptyResults: true);
+        runner.WithReporterMode(ReporterMode.Allure);
 
         runner.InvokeSetup();
 
         Assert.That(File.Exists(markerFile), Is.False);
+    }
+
+    [Test]
+    public void Setup_WithAllureMode_DoesNotInitializeReportPortalLaunchManager()
+    {
+        using var scope = BuildScope();
+        var runner = new ExposedRunner(scope, [], Globals.Logger, new Mock<Serilog.ILogger>().Object);
+        runner.WithReporterMode(ReporterMode.Allure);
+
+        runner.InvokeSetup();
+
+        var launchManagerProperty = typeof(Runner).GetProperty("ReportPortalLaunchManager",
+            BindingFlags.Instance | BindingFlags.NonPublic)!;
+        Assert.That(launchManagerProperty.GetValue(runner), Is.Null);
     }
 
     [Test]
@@ -398,6 +415,7 @@ public class RunnerBehaviorTests
         var markerFile = CreateAllureMarkerFile();
         using var scope = BuildScope();
         var runner = new ExposedRunner(scope, [], Globals.Logger, new Mock<Serilog.ILogger>().Object, emptyResults: false);
+        runner.WithReporterMode(ReporterMode.Allure);
 
         runner.InvokeSetup();
 
@@ -545,6 +563,64 @@ public class RunnerBehaviorTests
         Assert.That(firstGlobalDict, Is.SameAs(secondGlobalDict));
         Assert.That(firstLogger, Is.SameAs(logger));
         Assert.That(secondLogger, Is.SameAs(logger));
+    }
+
+    [Test]
+    public void BuildExecutions_PropagatesResolvedReporterModeToEveryBuilder()
+    {
+        using var scope = BuildScope();
+        var builders = new List<ExecutionBuilder>
+        {
+            CreateTemplateExecutionBuilder("case-1"),
+            CreateTemplateExecutionBuilder("case-2")
+        };
+        var runner = new ExposedRunner(scope, builders, Globals.Logger, new Mock<Serilog.ILogger>().Object);
+        runner.WithReporterMode(ReporterMode.ReportPortal);
+
+        _ = runner.InvokeBuildExecutions();
+
+        Assert.That(builders.Select(builder => builder.ReporterMode), Is.All.EqualTo(ReporterMode.ReportPortal));
+    }
+
+    [Test]
+    public void BuildExecutions_WithAllureMode_DoesNotSetReportPortalLaunchAccessorInSharedGlobalDictionary()
+    {
+        using var scope = BuildScope();
+        var builders = new List<ExecutionBuilder>
+        {
+            CreateTemplateExecutionBuilder("case-1")
+        };
+        var runner = new ExposedRunner(scope, builders, Globals.Logger, new Mock<Serilog.ILogger>().Object);
+        runner.WithReporterMode(ReporterMode.Allure);
+
+        _ = runner.InvokeBuildExecutions();
+
+        var globalDictField = typeof(ExecutionBuilder).GetField("_globalDict", BindingFlags.Instance | BindingFlags.NonPublic)!;
+        var sharedGlobalDict = (Dictionary<string, object?>)globalDictField.GetValue(builders[0])!;
+
+        Assert.That(sharedGlobalDict.ContainsKey(ReportingContextKeys.ReportPortalLaunchAccessor), Is.False);
+    }
+
+    [Test]
+    public void BuildExecutions_WithReportPortalMode_SetsReportPortalLaunchAccessorInSharedGlobalDictionary()
+    {
+        using var scope = BuildScope();
+        var builders = new List<ExecutionBuilder>
+        {
+            CreateTemplateExecutionBuilder("case-1")
+        };
+        var runner = new ExposedRunner(scope, builders, Globals.Logger, new Mock<Serilog.ILogger>().Object);
+        runner.WithReporterMode(ReporterMode.ReportPortal);
+        var launchManagerProperty = typeof(Runner).GetProperty("ReportPortalLaunchManager",
+            BindingFlags.Instance | BindingFlags.NonPublic)!;
+        var launchManager = new ReportPortalLaunchManager();
+        launchManagerProperty.SetValue(runner, launchManager);
+        _ = runner.InvokeBuildExecutions();
+
+        var globalDictField = typeof(ExecutionBuilder).GetField("_globalDict", BindingFlags.Instance | BindingFlags.NonPublic)!;
+        var sharedGlobalDict = (Dictionary<string, object?>)globalDictField.GetValue(builders[0])!;
+
+        Assert.That(sharedGlobalDict[ReportingContextKeys.ReportPortalLaunchAccessor], Is.SameAs(launchManager));
     }
 
     [Test]
@@ -808,6 +884,7 @@ public class RunnerBehaviorTests
         var secondExecution = new Mock<Execution>(ExecutionType.Run, context);
         var runner = new PrebuiltExecutionRunner(scope, [], Globals.Logger, new Mock<Serilog.ILogger>().Object,
             [firstExecution.Object, secondExecution.Object]);
+        runner.WithReporterMode(ReporterMode.Allure);
 
         var exitCode = runner.RunAndGetExitCode();
 
@@ -921,6 +998,8 @@ public class RunnerBehaviorTests
         {
             builder.RegisterInstance(allureWrapper).As<AllureWrapper>().SingleInstance();
         }
+
+        builder.RegisterType<ReportPortalLaunchManager>().SingleInstance();
 
         return builder.Build().BeginLifetimeScope();
     }

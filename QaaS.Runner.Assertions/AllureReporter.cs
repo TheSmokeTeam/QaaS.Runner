@@ -23,6 +23,8 @@ namespace QaaS.Runner.Assertions;
 /// <inheritdoc />
 public class AllureReporter : BaseReporter
 {
+    public override ReporterKind Kind => ReporterKind.Allure;
+
     private static readonly IDictionary<AssertionStatus, Status> AssertionStatusToAllureStatusMap =
         new Dictionary<AssertionStatus, Status>
         {

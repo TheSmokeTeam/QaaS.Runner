@@ -12,6 +12,8 @@ public class ExecuteLoaderTests
 {
     private static readonly MethodInfo? GetCommandsToRunMethodInfo = typeof(ExecuteLoader<Runner>).GetMethod(
         "GetCommandsToRun", BindingFlags.NonPublic | BindingFlags.Instance)!;
+    private static readonly MethodInfo? RemoveInvocationScopedOptionsMethodInfo = typeof(ExecuteLoader<Runner>).GetMethod(
+        "RemoveInvocationScopedOptions", BindingFlags.NonPublic | BindingFlags.Static)!;
 
 
     private static IEnumerable<TestCaseData> TestGetCommandsToRunCaseData()
@@ -158,6 +160,57 @@ public class ExecuteLoaderTests
         Assert.That(runner.ExitProcessOnCompletion, Is.False);
     }
 
+    [TestCase(null, ReporterMode.Both)]
+    [TestCase("allure", ReporterMode.Allure)]
+    [TestCase("reportportal", ReporterMode.ReportPortal)]
+    public void GetLoadedRunner_WithReporterOption_SetsRunnerReporterMode(string? reporter, ReporterMode expectedMode)
+    {
+        var loader = new ExecuteLoader<Runner>(new ExecuteOptions
+        {
+            ConfigurationFile = "TestData/executable.yaml",
+            SendLogs = false,
+            Reporter = reporter
+        });
+
+        var runner = loader.GetLoadedRunner();
+        var reporterModeProperty = typeof(Runner).GetProperty("ReporterMode",
+            BindingFlags.Instance | BindingFlags.NonPublic)!;
+
+        Assert.That((ReporterMode)reporterModeProperty.GetValue(runner)!, Is.EqualTo(expectedMode));
+    }
+
+    [Test]
+    public void GetLoadedRunner_WithReportPortalAndServeResults_ThrowsInvalidConfigurationsException()
+    {
+        var loader = new ExecuteLoader<Runner>(new ExecuteOptions
+        {
+            ConfigurationFile = "TestData/executable.yaml",
+            SendLogs = false,
+            Reporter = "reportportal",
+            AutoServeTestResults = true
+        });
+
+        var exception = Assert.Throws<InvalidConfigurationsException>(() => loader.GetLoadedRunner());
+
+        Assert.That(exception!.Message, Does.Contain("--serve-results"));
+    }
+
+    [Test]
+    public void GetLoadedRunner_WithReportPortalAndEmptyAllureDirectory_ThrowsInvalidConfigurationsException()
+    {
+        var loader = new ExecuteLoader<Runner>(new ExecuteOptions
+        {
+            ConfigurationFile = "TestData/executable.yaml",
+            SendLogs = false,
+            Reporter = "reportportal",
+            EmptyAllureDirectory = true
+        });
+
+        var exception = Assert.Throws<InvalidConfigurationsException>(() => loader.GetLoadedRunner());
+
+        Assert.That(exception!.Message, Does.Contain("--empty-allure-directory"));
+    }
+
     [Test]
     public void GetLoadedRunner_WithCustomServeResultsFolder_PassesFolderToRunner()
     {
@@ -177,6 +230,71 @@ public class ExecuteLoaderTests
             Assert.That((bool)serveResultsProperty.GetValue(runner)!, Is.True);
             Assert.That((string)serveResultsFolderProperty.GetValue(runner)!, Is.EqualTo("allure-report"));
         });
+    }
+
+    [Test]
+    public void RemoveInvocationScopedOptions_RemovesNestedReporterAndAllureInvocationFlags()
+    {
+        var originalArguments = new[]
+        {
+            "run",
+            "TestData/test.qaas.yaml",
+            "--reporter",
+            "reportportal",
+            "--serve-results",
+            "allure-report",
+            "-e"
+        };
+
+        var filteredArguments = (string[])RemoveInvocationScopedOptionsMethodInfo!.Invoke(null, [originalArguments])!;
+
+        Assert.That(filteredArguments, Is.EqualTo(new[]
+        {
+            "run",
+            "TestData/test.qaas.yaml"
+        }));
+    }
+
+    [Test]
+    public void RemoveInvocationScopedOptions_KeepsConfigurationFileWhenServeResultsConsumesNoValue()
+    {
+        var originalArguments = new[]
+        {
+            "run",
+            "--serve-results",
+            "TestData/test.qaas.yaml"
+        };
+
+        var filteredArguments = (string[])RemoveInvocationScopedOptionsMethodInfo!.Invoke(null, [originalArguments])!;
+
+        Assert.That(filteredArguments, Is.EqualTo(new[]
+        {
+            "run",
+            "TestData/test.qaas.yaml"
+        }));
+    }
+
+    [Test]
+    public void RemoveInvocationScopedOptions_RemovesInlineReporterAssignment()
+    {
+        var originalArguments = new[]
+        {
+            "assert",
+            "TestData/test.qaas.yaml",
+            "--reporter=allure",
+            "--send-logs",
+            "false"
+        };
+
+        var filteredArguments = (string[])RemoveInvocationScopedOptionsMethodInfo!.Invoke(null, [originalArguments])!;
+
+        Assert.That(filteredArguments, Is.EqualTo(new[]
+        {
+            "assert",
+            "TestData/test.qaas.yaml",
+            "--send-logs",
+            "false"
+        }));
     }
 
     [Test]
