@@ -13,6 +13,7 @@ using QaaS.Framework.Configurations.CustomAttributes;
 using QaaS.Framework.Configurations.CustomExceptions;
 using QaaS.Framework.Configurations.CustomValidationAttributes;
 using QaaS.Framework.Executions;
+using QaaS.Framework.Infrastructure;
 using QaaS.Framework.Providers;
 using QaaS.Framework.Providers.Modules;
 using QaaS.Framework.Providers.ObjectCreation;
@@ -49,8 +50,10 @@ namespace QaaS.Runner;
 /// Builds <see cref="Execution" /> instance
 /// </summary>
 [JsonSchema]
-public class ExecutionBuilder() : BaseExecutionBuilder<InternalContext, ExecutionData>
+public class ExecutionBuilder() : BaseExecutionBuilder<InternalContext, ExecutionData>, ICloneable<ExecutionBuilder>
 {
+    public ExecutionBuilder Clone() => BuilderCloner.DeepClone(this);
+
     /// <summary>
     /// List of all sessions to run.
     /// Sessions contain the actions performed against the tested system and its underlying infrastructure

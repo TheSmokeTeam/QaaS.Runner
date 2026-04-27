@@ -1,6 +1,7 @@
 using System.ComponentModel;
 using System.ComponentModel.DataAnnotations;
 using QaaS.Framework.Configurations;
+using QaaS.Framework.Infrastructure;
 using QaaS.Framework.SDK.ContextObjects;
 using QaaS.Framework.SDK.Extensions;
 using Qaas.Mocker.CommunicationObjects.ConfigurationObjects.Command;
@@ -16,8 +17,10 @@ namespace QaaS.Runner.Sessions.Actions.MockerCommands;
 /// <summary>
 /// Fluent builder for mocker command actions that validates command shape and creates the matching command runtime.
 /// </summary>
-public class MockerCommandBuilder
+public class MockerCommandBuilder : ICloneable<MockerCommandBuilder>
 {
+    public MockerCommandBuilder Clone() => BuilderCloner.DeepClone(this);
+
     [Required]
     [Description("The name of the mocker command")]
     public string? Name { get; internal set; }
