@@ -388,6 +388,7 @@ public class RunnerBehaviorTests
         var markerFile = CreateAllureMarkerFile();
         using var scope = BuildScope();
         var runner = new ExposedRunner(scope, [], Globals.Logger, new Mock<Serilog.ILogger>().Object, emptyResults: true);
+        runner.WithReporterMode(ReporterMode.Allure);
 
         runner.InvokeSetup();
 
@@ -414,6 +415,7 @@ public class RunnerBehaviorTests
         var markerFile = CreateAllureMarkerFile();
         using var scope = BuildScope();
         var runner = new ExposedRunner(scope, [], Globals.Logger, new Mock<Serilog.ILogger>().Object, emptyResults: false);
+        runner.WithReporterMode(ReporterMode.Allure);
 
         runner.InvokeSetup();
 
@@ -882,6 +884,7 @@ public class RunnerBehaviorTests
         var secondExecution = new Mock<Execution>(ExecutionType.Run, context);
         var runner = new PrebuiltExecutionRunner(scope, [], Globals.Logger, new Mock<Serilog.ILogger>().Object,
             [firstExecution.Object, secondExecution.Object]);
+        runner.WithReporterMode(ReporterMode.Allure);
 
         var exitCode = runner.RunAndGetExitCode();
 

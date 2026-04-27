@@ -83,7 +83,7 @@ public class RunnableOptionsTests
     }
 
     [TestCase("invalid")]
-    [TestCase("allure,reportportal")]
+    [TestCase("bothh")]
     public void AssertableOptions_GetReporterModeOrDefault_WithInvalidValue_ThrowsArgumentException(string reporter)
     {
         var options = new RunOptions
@@ -97,7 +97,7 @@ public class RunnableOptionsTests
     }
 
     [TestCase("invalid")]
-    [TestCase("allure,reportportal")]
+    [TestCase("bothh")]
     public void ExecuteOptions_GetReporterModeOrDefault_WithInvalidValue_ThrowsArgumentException(string reporter)
     {
         var options = new ExecuteOptions
