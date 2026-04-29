@@ -13,6 +13,7 @@ using QaaS.Framework.SDK.Hooks.Assertion;
 using YamlDotNet.Core;
 using YamlDotNet.Serialization;
 using Assertion = QaaS.Runner.Assertions.AssertionObjects.Assertion;
+using QaaS.Runner.Assertions.Reporters;
 using AssertionSeverity = QaaS.Runner.Assertions.AssertionObjects.AssertionSeverity;
 
 [assembly: InternalsVisibleTo("QaaS.Runner")]

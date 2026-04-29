@@ -27,7 +27,7 @@ using QaaS.Framework.SDK.Hooks.Generator;
 using QaaS.Framework.SDK.Hooks.Probe;
 using QaaS.Framework.SDK.Session.SessionDataObjects;
 using QaaS.Framework.SDK.Session.SessionDataObjects.RunningSessionsObjects;
-using QaaS.Runner.Assertions;
+using QaaS.Runner.Assertions.Reporters;
 using QaaS.Runner.Assertions.AssertionObjects;
 using QaaS.Runner.Assertions.ConfigurationObjects;
 using QaaS.Runner.Extensions;

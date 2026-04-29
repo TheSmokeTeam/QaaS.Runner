@@ -4,12 +4,11 @@ using Allure.Commons;
 using Microsoft.Extensions.Logging;
 using QaaS.Framework.SDK.Hooks.Assertion;
 using QaaS.Framework.SDK.Session.SessionDataObjects;
-using QaaS.Runner.Infrastructure;
 using RunnerFileSystemExtensions = QaaS.Runner.Infrastructure.FileSystemExtensions;
 using AssertionResult = QaaS.Runner.Assertions.AssertionObjects.AssertionResult;
 using AssertionSeverity = QaaS.Runner.Assertions.AssertionObjects.AssertionSeverity;
 
-namespace QaaS.Runner.Assertions;
+namespace QaaS.Runner.Assertions.Reporters;
 
 /// <inheritdoc />
 public class AllureReporter : BaseReporter

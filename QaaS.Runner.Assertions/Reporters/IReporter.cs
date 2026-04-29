@@ -1,6 +1,6 @@
 ﻿using AssertionResult = QaaS.Runner.Assertions.AssertionObjects.AssertionResult;
 
-namespace QaaS.Runner.Assertions;
+namespace QaaS.Runner.Assertions.Reporters;
 
 public interface IReporter
 {

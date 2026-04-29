@@ -1,7 +1,7 @@
 using System;
 using NUnit.Framework;
 using QaaS.Framework.Serialization;
-using QaaS.Runner.Assertions.AssertionObjects;
+using QaaS.Runner.Assertions.Reporters;
 
 namespace QaaS.Runner.Assertions.Tests;
 

@@ -1,9 +1,7 @@
-using System.Linq;
 using NUnit.Framework;
-using QaaS.Framework.SDK.ContextObjects;
 using QaaS.Framework.SDK.ExecutionObjects;
 using QaaS.Framework.SDK.Hooks.Assertion;
-using QaaS.Runner.Assertions;
+using QaaS.Runner.Assertions.Reporters;
 using QaaS.Runner.Assertions.AssertionObjects;
 using QaaS.Runner.Logics;
 

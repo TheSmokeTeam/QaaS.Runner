@@ -14,6 +14,7 @@ using QaaS.Framework.SDK.Session.SessionDataObjects;
 using QaaS.Framework.Serialization;
 using QaaS.Runner.Assertions.AssertionObjects;
 using QaaS.Runner.Assertions.Tests.Mocks;
+using QaaS.Runner.Assertions.Reporters;
 using QaaS.Runner.Infrastructure;
 
 namespace QaaS.Runner.Assertions.Tests.AssertionResultsWritersTests;

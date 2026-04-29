@@ -1,7 +1,7 @@
 using QaaS.Runner.Assertions.AssertionObjects;
 using QaaS.Framework.SDK.Hooks.Assertion;
 
-namespace QaaS.Runner.Assertions;
+namespace QaaS.Runner.Assertions.Reporters;
 
 public sealed class ReportCase
 {

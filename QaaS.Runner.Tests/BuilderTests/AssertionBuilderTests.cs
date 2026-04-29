@@ -1,4 +1,4 @@
-using QaaS.Runner.Assertions;
+using QaaS.Runner.Assertions.Reporters;
 using QaaS.Runner.Assertions.AssertionObjects;
 using QaaS.Runner.Assertions.ConfigurationObjects;
 

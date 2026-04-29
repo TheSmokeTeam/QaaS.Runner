@@ -6,7 +6,7 @@ using QaaS.Framework.SDK.DataSourceObjects;
 using QaaS.Framework.SDK.Extensions;
 using QaaS.Framework.SDK.Hooks.Assertion;
 using QaaS.Framework.SDK.Session.SessionDataObjects;
-using QaaS.Runner.Assertions;
+using QaaS.Runner.Assertions.Reporters;
 using QaaS.Runner.Assertions.LinkBuilders;
 
 namespace QaaS.Runner.Assertions.AssertionObjects;
