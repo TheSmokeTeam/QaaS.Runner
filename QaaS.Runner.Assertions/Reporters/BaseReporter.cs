@@ -50,6 +50,10 @@ public abstract class BaseReporter : IReporter
         WriteReportCase(BuildReportCase(assertionResult));
     }
 
+    public virtual void FinishReport()
+    {
+    }
+
     protected abstract void WriteReportCase(ReportCase reportCase);
 
     protected virtual string AttachmentRootDirectory => string.Empty;
@@ -76,8 +80,8 @@ public abstract class BaseReporter : IReporter
                 (assertionResult.Flaky.IsFlaky
                     ? ArrangeFlakinessReasons(assertionResult.Flaky.FlakinessReasons)
                     : string.Empty),
-            Start = EpochTestSuiteStartTime,
-            Stop = EpochTestSuiteStartTime + assertionResult.TestDurationMs,
+            Start = ToDateTime(EpochTestSuiteStartTime),
+            Stop = ToDateTime(EpochTestSuiteStartTime).AddMilliseconds(assertionResult.TestDurationMs),
             IsFlaky = assertionResult.Flaky.IsFlaky,
             Links = assertionResult.Links is not null
                 ? assertionResult.Links.Select(link => new ReportLink
@@ -332,8 +336,8 @@ public abstract class BaseReporter : IReporter
             Status = sessionData.SessionFailures.Any()
                 ? AssertionStatus.Failed
                 : AssertionStatus.Passed,
-            Start = new DateTimeOffset(sessionData.UtcStartTime, new TimeSpan(0)).ToUnixTimeMilliseconds(),
-            Stop = new DateTimeOffset(sessionData.UtcEndTime, new TimeSpan(0)).ToUnixTimeMilliseconds(),
+            Start = DateTime.SpecifyKind(sessionData.UtcStartTime, DateTimeKind.Utc),
+            Stop = DateTime.SpecifyKind(sessionData.UtcEndTime, DateTimeKind.Utc),
             Attachments = attachments,
             Steps = sessionData.SessionFailures.Any()
                 ? new List<ReportStep>
@@ -422,6 +426,11 @@ public abstract class BaseReporter : IReporter
   **{nameof(sessionFailure.ActionType)}:** `{sessionFailure.ActionType}`
   **{nameof(sessionFailure.Name)}:** `{sessionFailure.Name}`
   **{nameof(sessionFailure.Reason.Message)}:** `{sessionFailure.Reason.Message}`")));
+    }
+
+    protected static DateTime ToDateTime(long unixTimeMilliseconds)
+    {
+        return DateTimeOffset.FromUnixTimeMilliseconds(unixTimeMilliseconds).UtcDateTime;
     }
 
     private static string BuildAttachmentSegment(string? value, string segmentName)

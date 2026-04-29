@@ -12,8 +12,8 @@ public sealed class ReportCase
     public AssertionSeverity Severity { get; init; }
     public string AssertionType { get; init; } = string.Empty;
     public string Description { get; init; } = string.Empty;
-    public long Start { get; init; }
-    public long Stop { get; init; }
+    public DateTime Start { get; init; }
+    public DateTime Stop { get; init; }
     public bool IsFlaky { get; init; }
     public List<ReportLink> Links { get; init; } = [];
     public List<ReportParameter> Parameters { get; init; } = [];
@@ -27,8 +27,8 @@ public sealed class ReportStep
     public string Name { get; init; } = string.Empty;
     public string? Description { get; init; }
     public AssertionStatus Status { get; init; }
-    public long? Start { get; init; }
-    public long? Stop { get; init; }
+    public DateTime? Start { get; init; }
+    public DateTime? Stop { get; init; }
     public List<ReportParameter> Parameters { get; init; } = [];
     public List<ReportAttachment> Attachments { get; init; } = [];
     public List<ReportStep> Steps { get; init; } = [];

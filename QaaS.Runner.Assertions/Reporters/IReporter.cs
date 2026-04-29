@@ -16,4 +16,6 @@ public interface IReporter
     public long EpochTestSuiteStartTime { get; set; }
 
     public void WriteTestResults(AssertionResult assertionResult);
+
+    public void FinishReport();
 }

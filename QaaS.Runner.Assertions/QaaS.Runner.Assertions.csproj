@@ -29,6 +29,7 @@
 
     <ItemGroup>
         <None Include="..\README.md" Pack="true" PackagePath="\" Link="README.md" />
+        <None Update="ReportPortal.config.json" CopyToOutputDirectory="PreserveNewest" />
     </ItemGroup>
 
 </Project>

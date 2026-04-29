@@ -11,7 +11,7 @@ public class ReportLogicTests
 {
     [TestCase(1)]
     [TestCase(5)]
-    public void TestRun_WithSingleReporterType_WritesMatchingAssertionResults(int assertionCount)
+    public void TestRun_WithSingleConfiguredReporterType_WritesMatchingAssertionResults(int assertionCount)
     {
         var reporter = new RecordingReporter();
         var assertionResults = new List<AssertionResult>();
@@ -29,7 +29,7 @@ public class ReportLogicTests
                     AssertionStatus.Skipped,
                     AssertionStatus.Unknown
                 ],
-                ReporterType = typeof(RecordingReporter),
+                ReporterTypes = [typeof(RecordingReporter)],
                 AssertionName = null,
                 AssertionHook = null
             };
@@ -56,6 +56,7 @@ public class ReportLogicTests
         Assert.That(resultedExecutionData, Is.Not.Null);
         Assert.That(resultedExecutionData, Is.SameAs(executionData));
         Assert.That(reporter.Results, Is.EqualTo(assertionResults));
+        Assert.That(reporter.FinishCount, Is.EqualTo(1));
     }
 
     [Test]
@@ -67,10 +68,11 @@ public class ReportLogicTests
 
         Assert.DoesNotThrow(() => reportLogic.Run(executionData));
         Assert.That(reporter.Results, Is.Empty);
+        Assert.That(reporter.FinishCount, Is.EqualTo(1));
     }
 
     [Test]
-    public void TestRun_WithMultipleReporterTypes_WritesOnlyMatchingAssertions()
+    public void TestRun_WithDifferentReporterTypeSets_WritesOnlyMatchingAssertions()
     {
         var firstReporter = new RecordingReporter();
         var secondReporter = new AlternateRecordingReporter();
@@ -87,7 +89,7 @@ public class ReportLogicTests
                     AssertionStatus.Skipped,
                     AssertionStatus.Unknown
                 ],
-                ReporterType = typeof(RecordingReporter),
+                ReporterTypes = [typeof(RecordingReporter)],
                 AssertionName = null,
                 AssertionHook = null
             },
@@ -108,7 +110,7 @@ public class ReportLogicTests
                     AssertionStatus.Skipped,
                     AssertionStatus.Unknown
                 ],
-                ReporterType = typeof(AlternateRecordingReporter),
+                ReporterTypes = [typeof(AlternateRecordingReporter)],
                 AssertionName = null,
                 AssertionHook = null
             },
@@ -133,6 +135,49 @@ public class ReportLogicTests
     }
 
     [Test]
+    public void TestRun_WithMultipleReporterTypesOnSameAssertion_WritesToAllMatchingReporters()
+    {
+        var firstReporter = new RecordingReporter();
+        var secondReporter = new AlternateRecordingReporter();
+        var assertionResult = new AssertionResult
+        {
+            Assertion = new Assertion
+            {
+                Name = "AssertionOne",
+                StatusesToReport =
+                [
+                    AssertionStatus.Broken,
+                    AssertionStatus.Failed,
+                    AssertionStatus.Passed,
+                    AssertionStatus.Skipped,
+                    AssertionStatus.Unknown
+                ],
+                ReporterTypes = [typeof(RecordingReporter), typeof(AlternateRecordingReporter)],
+                AssertionName = null,
+                AssertionHook = null
+            },
+            AssertionStatus = AssertionStatus.Passed,
+            TestDurationMs = 0,
+            Flaky = null
+        };
+
+        var reportLogic = new ReportLogic([firstReporter, secondReporter], Globals.GetContextWithMetadata());
+        var executionData = new ExecutionData();
+        executionData.AssertionResults.Add(assertionResult);
+
+        var result = reportLogic.Run(executionData);
+
+        Assert.That(result, Is.SameAs(executionData));
+        Assert.Multiple(() =>
+        {
+            Assert.That(firstReporter.Results, Is.EqualTo(new[] { assertionResult }));
+            Assert.That(secondReporter.Results, Is.EqualTo(new[] { assertionResult }));
+            Assert.That(firstReporter.FinishCount, Is.EqualTo(1));
+            Assert.That(secondReporter.FinishCount, Is.EqualTo(1));
+        });
+    }
+
+    [Test]
     public void TestRun_WhenAssertionStatusIsNotConfiguredForReporting_DoesNotWriteResults()
     {
         var reporter = new RecordingReporter();
@@ -142,7 +187,7 @@ public class ReportLogicTests
             {
                 Name = "AssertionA",
                 StatusesToReport = [AssertionStatus.Failed],
-                ReporterType = typeof(RecordingReporter),
+                ReporterTypes = [typeof(RecordingReporter)],
                 AssertionName = null,
                 AssertionHook = null
             },
@@ -158,6 +203,7 @@ public class ReportLogicTests
 
         Assert.That(result, Is.SameAs(executionData));
         Assert.That(reporter.Results, Is.Empty);
+        Assert.That(reporter.FinishCount, Is.EqualTo(1));
     }
 
     private class RecordingReporter : IReporter
@@ -169,10 +215,16 @@ public class ReportLogicTests
         public bool DisplayTrace { get; set; }
         public long EpochTestSuiteStartTime { get; set; }
         public List<AssertionResult> Results { get; } = [];
+        public int FinishCount { get; private set; }
 
         public void WriteTestResults(AssertionResult assertionResult)
         {
             Results.Add(assertionResult);
+        }
+
+        public void FinishReport()
+        {
+            FinishCount++;
         }
     }
 

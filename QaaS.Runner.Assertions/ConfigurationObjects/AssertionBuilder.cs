@@ -556,7 +556,6 @@ public class AssertionBuilder : IYamlConvertible
             SaveTemplate = SaveTemplate,
             DisplayTrace = DisplayTrace,
             Severity = Severity,
-            ReporterType = GetReporterType(),
             AssertionHook = assertions.FirstOrDefault(pair => pair.Key == Name!)
                                 .Value ??
                             throw new ArgumentException($"Assertion {Name} of type" +
@@ -574,24 +573,28 @@ public class AssertionBuilder : IYamlConvertible
         return AssertionInstance;
     }
 
-    internal Type GetReporterType() => Reporter?.GetType() ?? typeof(AllureReporter);
+    internal IReadOnlyCollection<Type> GetReporterTypes() =>
+        Reporter == null
+            ? [typeof(AllureReporter), typeof(ReportPortalReporter)]
+            : [Reporter.GetType()];
 
     /// <summary>
     ///     Resolves the pre-built <see cref="BaseReporter" /> to a runtime object with access to QaaS'
     ///     <see cref="Context" /> and finalize building the Reporter.
     /// </summary>
     /// <param name="context"></param>
+    /// <param name="reporterType"></param>
     /// <param name="testSuiteStartTimeUtc"></param>
     /// <param name="fileSystem"></param>
     /// <returns></returns>
-    internal IReporter Build(Context context, DateTime testSuiteStartTimeUtc,
+    internal IReporter Build(Context context, Type reporterType, DateTime testSuiteStartTimeUtc,
         IFileSystem? fileSystem = null)
     {
-        Reporter = (BaseReporter?)Activator.CreateInstance(GetReporterType()) ??
+        Reporter = (BaseReporter?)Activator.CreateInstance(reporterType) ??
                    throw new InvalidOperationException(
-                       $"Could not create reporter of type {GetReporterType().FullName}.");
+                       $"Could not create reporter of type {reporterType.FullName}.");
 
-        Reporter.Name = GetReporterType().Name;
+        Reporter.Name = reporterType.Name;
         Reporter.AssertionName = Name!;
 
         Reporter.DisplayTrace = DisplayTrace;
@@ -611,6 +614,7 @@ public class AssertionBuilder : IYamlConvertible
     internal IEnumerable<IReporter> BuildReporters(Context context, DateTime testSuiteStartTimeUtc,
         IFileSystem? fileSystem = null)
     {
-        yield return Build(context, testSuiteStartTimeUtc, fileSystem);
+        foreach (var reporterType in GetReporterTypes())
+            yield return Build(context, reporterType, testSuiteStartTimeUtc, fileSystem);
     }
 }

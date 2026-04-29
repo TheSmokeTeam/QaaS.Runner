@@ -62,8 +62,8 @@ public class AllureReporter : BaseReporter
         AllureLifecycle.Instance.StopTestCase(reportCase.UniqueId);
         AllureLifecycle.Instance.UpdateTestCase(reportCase.UniqueId, result =>
         {
-            result.start = reportCase.Start;
-            result.stop = reportCase.Stop;
+            result.start = ToUnixTimeMilliseconds(reportCase.Start);
+            result.stop = ToUnixTimeMilliseconds(reportCase.Stop);
         });
         AllureLifecycle.Instance.WriteTestCase(reportCase.UniqueId);
     }
@@ -172,8 +172,8 @@ public class AllureReporter : BaseReporter
             name = reportStep.Name,
             description = reportStep.Description,
             status = ToAllureStatus(reportStep.Status),
-            start = reportStep.Start ?? 0,
-            stop = reportStep.Stop ?? 0,
+            start = reportStep.Start == null ? 0 : ToUnixTimeMilliseconds(reportStep.Start.Value),
+            stop = reportStep.Stop == null ? 0 : ToUnixTimeMilliseconds(reportStep.Stop.Value),
             parameters = reportStep.Parameters.Select(ToAllureParameter).ToList(),
             attachments = reportStep.Attachments.Count == 0
                 ? null
@@ -298,5 +298,11 @@ public class AllureReporter : BaseReporter
                 }
             ]
         };
+    }
+
+    private static long ToUnixTimeMilliseconds(DateTime dateTime)
+    {
+        return new DateTimeOffset(DateTime.SpecifyKind(dateTime, DateTimeKind.Utc), TimeSpan.Zero)
+            .ToUnixTimeMilliseconds();
     }
 }

@@ -31,30 +31,37 @@ public class ReportLogic(IList<IReporter> reporters, InternalContext context) : 
 
         foreach (var reporter in reporters)
         {
-            var matchingAssertionResults = assertionResults
-                .Where(assertionResult => assertionResult.Assertion.ReporterType == reporter.GetType())
-                .ToList();
-
-            context.Logger.LogDebug(
-                "Reporter type {ReporterType} matched {AssertionCount} assertion results",
-                reporter.GetType().Name,
-                matchingAssertionResults.Count);
-
-            foreach (var assertionResult in matchingAssertionResults)
+            try
             {
+                var matchingAssertionResults = assertionResults
+                    .Where(assertionResult => assertionResult.Assertion.ReporterTypes.Contains(reporter.GetType()))
+                    .ToList();
+
                 context.Logger.LogDebug(
-                    "Routing assertion {AssertionName} with status {AssertionStatus} to reporter type {ReporterType}",
-                    assertionResult.Assertion.Name, assertionResult.AssertionStatus, reporter.GetType().Name);
-                if (assertionResult.Assertion.StatusesToReport.Contains(assertionResult.AssertionStatus))
-                {
-                    reporter.WriteTestResults(assertionResult);
-                }
-                else
+                    "Reporter type {ReporterType} matched {AssertionCount} assertion results",
+                    reporter.GetType().Name,
+                    matchingAssertionResults.Count);
+
+                foreach (var assertionResult in matchingAssertionResults)
                 {
                     context.Logger.LogDebug(
-                        "Skipping reporter type {ReporterType} for assertion {AssertionName} because status {AssertionStatus} is not configured for reporting",
-                        reporter.GetType().Name, assertionResult.Assertion.Name, assertionResult.AssertionStatus);
+                        "Routing assertion {AssertionName} with status {AssertionStatus} to reporter type {ReporterType}",
+                        assertionResult.Assertion.Name, assertionResult.AssertionStatus, reporter.GetType().Name);
+                    if (assertionResult.Assertion.StatusesToReport.Contains(assertionResult.AssertionStatus))
+                    {
+                        reporter.WriteTestResults(assertionResult);
+                    }
+                    else
+                    {
+                        context.Logger.LogDebug(
+                            "Skipping reporter type {ReporterType} for assertion {AssertionName} because status {AssertionStatus} is not configured for reporting",
+                            reporter.GetType().Name, assertionResult.Assertion.Name, assertionResult.AssertionStatus);
+                    }
                 }
+            }
+            finally
+            {
+                reporter.FinishReport();
             }
         }
 
