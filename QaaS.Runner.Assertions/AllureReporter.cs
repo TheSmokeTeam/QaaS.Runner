@@ -1,22 +1,13 @@
 using System.Collections.Concurrent;
 using System.Reflection;
-using System.Text;
-using System.Text.Json;
-using System.Text.Json.Serialization;
 using Allure.Commons;
-using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
-using QaaS.Framework.Configurations;
-using QaaS.Framework.Infrastructure;
 using QaaS.Framework.SDK.Hooks.Assertion;
-using QaaS.Framework.SDK.Session;
 using QaaS.Framework.SDK.Session.SessionDataObjects;
-using QaaS.Framework.Serialization;
 using QaaS.Runner.Infrastructure;
 using RunnerFileSystemExtensions = QaaS.Runner.Infrastructure.FileSystemExtensions;
 using AssertionResult = QaaS.Runner.Assertions.AssertionObjects.AssertionResult;
 using AssertionSeverity = QaaS.Runner.Assertions.AssertionObjects.AssertionSeverity;
-
 
 namespace QaaS.Runner.Assertions;
 
@@ -29,7 +20,8 @@ public class AllureReporter : BaseReporter
             { AssertionStatus.Passed, Status.passed },
             { AssertionStatus.Failed, Status.failed },
             { AssertionStatus.Broken, Status.broken },
-            { AssertionStatus.Unknown, Status.none }
+            { AssertionStatus.Unknown, Status.none },
+            { AssertionStatus.Skipped, Status.skipped }
         };
 
     private static readonly IDictionary<AssertionSeverity, SeverityLevel> AssertionSeverityToAllureSeverityMap =
@@ -43,6 +35,39 @@ public class AllureReporter : BaseReporter
         };
 
     private readonly ConcurrentDictionary<string, byte> _alreadySavedAttachments = new();
+
+    protected override string AttachmentRootDirectory => AllureLifecycle.Instance.ResultsDirectory;
+
+    protected override void WriteReportCase(ReportCase reportCase)
+    {
+        EnsureResultsDirectoryExists();
+
+        var testResult = new TestResult
+        {
+            uuid = reportCase.UniqueId,
+            rerunOf = reportCase.UniqueId,
+            historyId = reportCase.UniqueId,
+            name = reportCase.Name,
+            fullName = reportCase.FullName,
+            links = reportCase.Links.Select(ToAllureLink).ToList(),
+            status = ToAllureStatus(reportCase.Status),
+            description = reportCase.Description,
+            parameters = reportCase.Parameters.Select(ToAllureParameter).ToList(),
+            labels = BuildLabels(reportCase),
+            steps = reportCase.Steps.Select(ToAllureStep).ToList(),
+            attachments = reportCase.Attachments.Select(SaveReportAttachment).ToList(),
+            statusDetails = ToAllureStatusDetails(reportCase.StatusDetails)
+        };
+
+        AllureLifecycle.Instance.StartTestCase(testResult);
+        AllureLifecycle.Instance.StopTestCase(reportCase.UniqueId);
+        AllureLifecycle.Instance.UpdateTestCase(reportCase.UniqueId, result =>
+        {
+            result.start = reportCase.Start;
+            result.stop = reportCase.Stop;
+        });
+        AllureLifecycle.Instance.WriteTestCase(reportCase.UniqueId);
+    }
 
     /// <summary>
     ///     Saves an attachment as a file in the allure results directory, if it was already saved
@@ -80,51 +105,6 @@ public class AllureReporter : BaseReporter
         }
     }
 
-    private static string BuildAttachmentSegment(string? value, string segmentName)
-    {
-        var safeValue = RunnerFileSystemExtensions.MakeValidDirectoryName(value);
-        if (string.IsNullOrWhiteSpace(safeValue))
-            throw new InvalidOperationException($"{segmentName} must be set.");
-
-        return safeValue;
-    }
-
-    private string GetAttachmentDirectory(string baseAttachmentDirectoryInsideAllureDirectory,
-        string? extraSubDirectoryName = null)
-    {
-        var currentAttachmentDirectory = Path.Join(
-            BuildAttachmentSegment(baseAttachmentDirectoryInsideAllureDirectory,
-                nameof(baseAttachmentDirectoryInsideAllureDirectory)),
-            $"{EpochTestSuiteStartTime}");
-        var executionAttachmentsDirectory = Context.ExecutionId == null
-            ? currentAttachmentDirectory
-            : Path.Join(currentAttachmentDirectory,
-                BuildAttachmentSegment(Context.ExecutionId, nameof(Context.ExecutionId)));
-        var caseAttachmentDirectory = Context.CaseName == null
-            ? executionAttachmentsDirectory
-            : Path.Join(executionAttachmentsDirectory,
-                BuildAttachmentSegment(Context.CaseName, nameof(Context.CaseName)));
-        return extraSubDirectoryName == null
-            ? caseAttachmentDirectory
-            : Path.Join(caseAttachmentDirectory,
-                BuildAttachmentSegment(extraSubDirectoryName, nameof(extraSubDirectoryName)));
-    }
-
-    /// <summary>
-    ///     Adds an attachment through the active Allure lifecycle item instead of crafting the
-    ///     attachment file and metadata manually. Allure's report generator only preserves a
-    ///     downloadable attachment source when the lifecycle owns the source creation.
-    /// </summary>
-    private void AddBytesAttachmentToCurrentItem(byte[] data, string fileName, string name, string type)
-    {
-        var safeFileName = RunnerFileSystemExtensions.MakeValidFileName(fileName);
-        if (string.IsNullOrWhiteSpace(safeFileName))
-            throw new InvalidOperationException("Attachment file name must be set.");
-
-        EnsureResultsDirectoryExists();
-        AllureLifecycle.Instance.AddAttachment(name, type, data, ResolveAttachmentExtension(safeFileName, type));
-    }
-
     private void EnsureResultsDirectoryExists()
     {
         var resultsDirectory = Path.GetFullPath(AllureLifecycle.Instance.ResultsDirectory);
@@ -132,331 +112,91 @@ public class AllureReporter : BaseReporter
             FileSystem.Directory.CreateDirectory(resultsDirectory);
     }
 
-    /// <summary>
-    ///     Keeps the legacy folder layout in allure-results for consumers that inspect the raw
-    ///     filesystem, while the lifecycle-managed attachment source remains the one referenced by
-    ///     the generated Allure result JSON.
-    /// </summary>
-    private void SaveLegacyAttachmentCopy(byte[] data, string attachmentDirectory, string fileName)
+    private Attachment SaveReportAttachment(ReportAttachment reportAttachment)
     {
-        EnsureResultsDirectoryExists();
-        SaveAttachmentIfNotAlreadySaved(data, attachmentDirectory, fileName);
-    }
+        if (reportAttachment.Content != null)
+            SaveAttachmentIfNotAlreadySaved(reportAttachment.Content, reportAttachment.Directory,
+                reportAttachment.FileName);
 
-    private static string ResolveAttachmentExtension(string fileName, string attachmentType)
-    {
-        var extension = Path.GetExtension(fileName);
-        if (!string.IsNullOrWhiteSpace(extension))
-            return extension;
-
-        return attachmentType switch
-        {
-            JsonAttachmentType => ".json",
-            YamlAttachmentType => ".yaml",
-            XmlAttachmentType => ".xml",
-            RawDataAttachmentType => ".bin",
-            ProtobufAttachmentType => ".proto",
-            MessagePackAttachmentType => ".mpack",
-            "text/plain" => ".txt",
-            _ => ".bin"
-        };
-    }
-
-    private void AddSessionsDataToCurrentItem(SessionData sessionData)
-    {
-        var serializedSessionData = SessionDataSerialization.SerializeSessionData(sessionData,
-            new JsonSerializerOptions
-            {
-                WriteIndented = true,
-                DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull
-            });
-        Context.Logger.LogDebug("Saving session data for {SessionName} as an Allure attachment", sessionData.Name);
-        AddBytesAttachmentToCurrentItem(
-            serializedSessionData,
-            $"{sessionData.Name}.json",
-            nameof(SessionData),
-            JsonAttachmentType);
-        SaveLegacyAttachmentCopy(serializedSessionData, GetAttachmentDirectory("SessionsData"),
-            $"{sessionData.Name}.json");
-    }
-
-    private void AddConfigurationTemplateToCurrentItem(IConfiguration configuration)
-    {
-        const string attachmentFile = "template.yaml";
-        Context.Logger.LogDebug("Saving the execution configuration template as an Allure attachment");
-        var renderedTemplate = Context.GetRenderedConfigurationTemplate() ??
-                               configuration.BuildConfigurationAsYaml(Infrastructure.Constants.ConfigurationSectionNames);
-        var renderedTemplateBytes = Encoding.UTF8.GetBytes(renderedTemplate);
-        AddBytesAttachmentToCurrentItem(
-            renderedTemplateBytes,
-            attachmentFile,
-            attachmentFile,
-            YamlAttachmentType);
-        SaveLegacyAttachmentCopy(renderedTemplateBytes, GetAttachmentDirectory("Templates"), attachmentFile);
-    }
-
-    private void AddSessionLogToCurrentItem(SessionData sessionData)
-    {
-        const string textAttachmentType = "text/plain";
-        var sessionLog = Context.GetSessionLog(sessionData.Name);
-        if (string.IsNullOrWhiteSpace(sessionLog))
-            return;
-
-        var sessionLogBytes = Encoding.UTF8.GetBytes(sessionLog);
-        Context.Logger.LogDebug("Saving session log for {SessionName} as an Allure attachment", sessionData.Name);
-        AddBytesAttachmentToCurrentItem(
-            sessionLogBytes,
-            $"{sessionData.Name}.log",
-            "SessionLog",
-            textAttachmentType);
-        SaveLegacyAttachmentCopy(sessionLogBytes, GetAttachmentDirectory("SessionLogs"), $"{sessionData.Name}.log");
-    }
-
-    private void AddAssertionAttachmentsToCurrentItem(AssertionResult assertionResult)
-    {
-        const string assertionsAttachmentsDirectory = "AssertionsAttachments";
-        var assertionHook = assertionResult.Assertion.AssertionHook;
-        if (assertionHook?.AssertionAttachments == null)
-            return;
-
-        Context.Logger.LogDebug("Saving custom assertion attachments for {AssertionName}",
-            assertionResult.Assertion.Name);
-
-        // validating unique paths
-        var assertionAttachmentsPaths = assertionResult.Assertion.AssertionHook?.AssertionAttachments
-            .Select(attachment => RunnerFileSystemExtensions.NormalizeRelativePath(attachment.Path));
-        var duplicatePaths = assertionAttachmentsPaths?.GroupBy(path => path, StringComparer.OrdinalIgnoreCase)
-            .Where(paths => paths.Count() > 1)
-            .Select(item => item.Key).ToList();
-        if (duplicatePaths != null && duplicatePaths.Count != 0)
-        {
-            Context.Logger.LogDebug("Duplicate attachment paths found: {Paths}", string.Join(", ", duplicatePaths));
-            throw new InvalidOperationException(
-                $"Found duplicate attachment paths for assertion {assertionResult.Assertion.Name}");
-        }
-
-        foreach (var assertionAttachment in assertionHook.AssertionAttachments)
-        {
-            var attachmentPath = RunnerFileSystemExtensions.NormalizeRelativePath(assertionAttachment.Path);
-            var attachmentFileName = Path.GetFileName(attachmentPath);
-            if (string.IsNullOrWhiteSpace(attachmentFileName))
-                throw new InvalidOperationException("Assertion attachment path must include a file name.");
-
-            var attachmentDirectoryName = Path.GetDirectoryName(attachmentPath) ?? string.Empty;
-
-            var serializer = SerializerFactory.BuildSerializer(assertionAttachment.SerializationType);
-            var assertionData = serializer?.Serialize(assertionAttachment.Data) ??
-                                (assertionAttachment.Data != null ? (byte[])assertionAttachment.Data! : []);
-            AddBytesAttachmentToCurrentItem(assertionData,
-                string.IsNullOrWhiteSpace(attachmentDirectoryName)
-                    ? attachmentFileName
-                    : Path.Join(attachmentDirectoryName, attachmentFileName),
-                attachmentPath,
-                GetAttachmentTypeBySerializationType(assertionAttachment.SerializationType));
-            SaveLegacyAttachmentCopy(assertionData,
-                Path.Join(GetAttachmentDirectory(assertionsAttachmentsDirectory, assertionResult.Assertion.Name),
-                    attachmentDirectoryName),
-                attachmentFileName);
-        }
-    }
-
-    private void AddCoveragesToCurrentItem(AssertionResult assertionResult)
-    {
-        const string coverageDir = "Coverages";
-        var assertionSessionNames = assertionResult.Assertion.SessionDataList.Select(session => session.Name);
-        var contextCoverageFiles = new List<string>();
-        var fullCoverageDirectory = Path.Combine(AllureLifecycle.Instance.ResultsDirectory, coverageDir);
-        if (FileSystem.Directory.Exists(fullCoverageDirectory))
-            contextCoverageFiles = FileSystem.Directory.EnumerateFiles(fullCoverageDirectory)
-                .Select(Path.GetFileName)
-                .Where(fileName => fileName != null)
-                .ToList()!;
-        if (Context.ExecutionId != null)
-            contextCoverageFiles = contextCoverageFiles.Where(fileName => fileName.Contains(Context.ExecutionId))
-                .ToList();
-        if (Context.CaseName != null)
-            contextCoverageFiles =
-                contextCoverageFiles.Where(fileName => fileName.Contains(Context.CaseName)).ToList();
-        foreach (var sessionCoverageFile in assertionSessionNames
-                     .SelectMany(sessionName => contextCoverageFiles.Where(fileName => fileName.Contains(sessionName))))
-        {
-            AddBytesAttachmentToCurrentItem(
-                FileSystem.File.ReadAllBytes(Path.Combine(fullCoverageDirectory, sessionCoverageFile)),
-                sessionCoverageFile,
-                sessionCoverageFile,
-                XmlAttachmentType);
-        }
-    }
-
-    private void AddTestCaseAttachments(AssertionResult assertionResult)
-    {
-        if (ShouldSaveAttachments(assertionResult.Assertion))
-            AddAssertionAttachmentsToCurrentItem(assertionResult);
-        if (ShouldSaveTemplate(assertionResult.Assertion))
-            AddConfigurationTemplateToCurrentItem(Context.RootConfiguration);
-        AddCoveragesToCurrentItem(assertionResult);
-    }
-
-    private Attachment SaveSessionsDataToAllure(SessionData sessionData)
-    {
-        const string sessionAttachmentsDirectory = "SessionsData";
-        var sessionDataAttachmentDirectory = GetAttachmentDirectory(sessionAttachmentsDirectory);
-        var attachmentFile = $"{sessionData.Name}.json";
-        Context.Logger.LogDebug("Saving session data for {SessionName} as an Allure attachment", sessionData.Name);
-        return SaveDataToAllure(data: SessionDataSerialization.SerializeSessionData(sessionData,
-                new JsonSerializerOptions
-                {
-                    WriteIndented = true,
-                    DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull
-                }),
-            attachmentFile,
-            sessionDataAttachmentDirectory,
-            nameof(SessionData),
-            JsonAttachmentType);
-    }
-
-    private Attachment SaveConfigurationTemplateToAllure(IConfiguration configuration)
-    {
-        const string attachmentFile = "template.yaml";
-        const string templateAttachmentsDirectory = "Templates";
-        var templateAttachmentsDirectoryFullPath = GetAttachmentDirectory(templateAttachmentsDirectory);
-        Context.Logger.LogDebug("Saving the execution configuration template as an Allure attachment");
-        var renderedTemplate = Context.GetRenderedConfigurationTemplate() ??
-                               configuration.BuildConfigurationAsYaml(Infrastructure.Constants.ConfigurationSectionNames);
-        return SaveDataToAllure(
-            data: Encoding.UTF8.GetBytes(renderedTemplate),
-            fileName: attachmentFile,
-            attachmentDirectory: templateAttachmentsDirectoryFullPath,
-            name: attachmentFile,
-            type: YamlAttachmentType);
-    }
-
-    private Attachment? SaveSessionLogToAllure(SessionData sessionData)
-    {
-        const string sessionLogsAttachmentsDirectory = "SessionLogs";
-        const string textAttachmentType = "text/plain";
-        var sessionLog = Context.GetSessionLog(sessionData.Name);
-        if (string.IsNullOrWhiteSpace(sessionLog))
-            return null;
-
-        var sessionLogAttachmentDirectory = GetAttachmentDirectory(sessionLogsAttachmentsDirectory);
-        Context.Logger.LogDebug("Saving session log for {SessionName} as an Allure attachment", sessionData.Name);
-        return SaveDataToAllure(
-            data: Encoding.UTF8.GetBytes(sessionLog),
-            fileName: $"{sessionData.Name}.log",
-            attachmentDirectory: sessionLogAttachmentDirectory,
-            name: "SessionLog",
-            type: textAttachmentType);
-    }
-
-    private List<Attachment> SaveAssertionAttachmentsToAllure(AssertionResult assertionResult)
-    {
-        const string assertionsAttachmentsDirectory = "AssertionsAttachments";
-        var specificAssertionAttachmentDirectory = GetAttachmentDirectory(assertionsAttachmentsDirectory,
-            assertionResult.Assertion.Name);
-
-        var attachments = new List<Attachment>();
-        Context.Logger.LogDebug("Saving custom assertion attachments for {AssertionName}",
-            assertionResult.Assertion.Name);
-
-        var assertionAttachmentsPaths = assertionResult.Assertion.AssertionHook?.AssertionAttachments
-            .Select(attachment => RunnerFileSystemExtensions.NormalizeRelativePath(attachment.Path));
-        var duplicatePaths = assertionAttachmentsPaths?.GroupBy(path => path, StringComparer.OrdinalIgnoreCase)
-            .Where(paths => paths.Count() > 1)
-            .Select(item => item.Key)
-            .ToList();
-        if (duplicatePaths != null && duplicatePaths.Count != 0)
-        {
-            Context.Logger.LogDebug("Duplicate attachment paths found: {Paths}", string.Join(", ", duplicatePaths));
-            throw new InvalidOperationException(
-                $"Found duplicate attachment paths for assertion {assertionResult.Assertion.Name}");
-        }
-
-        foreach (var assertionAttachment in assertionResult.Assertion.AssertionHook?.AssertionAttachments ?? [])
-        {
-            var attachmentPath = RunnerFileSystemExtensions.NormalizeRelativePath(assertionAttachment.Path);
-            var attachmentFileName = Path.GetFileName(attachmentPath);
-            if (string.IsNullOrWhiteSpace(attachmentFileName))
-                throw new InvalidOperationException("Assertion attachment path must include a file name.");
-
-            var attachmentDirectoryName = Path.GetDirectoryName(attachmentPath) ?? string.Empty;
-
-            var serializer = SerializerFactory.BuildSerializer(assertionAttachment.SerializationType);
-            var assertionData = serializer?.Serialize(assertionAttachment.Data) ??
-                                (assertionAttachment.Data != null ? (byte[])assertionAttachment.Data! : []);
-
-            attachments.Add(SaveDataToAllure(assertionData, attachmentFileName,
-                Path.Join(specificAssertionAttachmentDirectory, attachmentDirectoryName), attachmentPath,
-                GetAttachmentTypeBySerializationType(assertionAttachment.SerializationType)));
-        }
-
-        return attachments;
-    }
-
-    private Attachment SaveDataToAllure(byte[] data, string fileName, string attachmentDirectory, string name,
-        string type)
-    {
-        var safeAttachmentDirectory = RunnerFileSystemExtensions.NormalizeRelativePath(attachmentDirectory);
-        var safeFileName = RunnerFileSystemExtensions.MakeValidFileName(fileName);
-        if (string.IsNullOrWhiteSpace(safeFileName))
-            throw new InvalidOperationException("Attachment file name must be set.");
-
-        SaveAttachmentIfNotAlreadySaved(data, safeAttachmentDirectory, safeFileName);
         return new Attachment
         {
-            name = name,
-            source = string.IsNullOrEmpty(safeAttachmentDirectory)
-                ? safeFileName
-                : Path.Join(safeAttachmentDirectory, safeFileName),
-            type = type
+            name = reportAttachment.Name,
+            source = reportAttachment.Source,
+            type = reportAttachment.Type
         };
     }
 
-    private List<Attachment> GetCoveragesAsAttachments(AssertionResult assertionResult)
+    private List<Label> BuildLabels(ReportCase reportCase)
     {
-        const string coverageDir = "Coverages";
-        var coverageAttachments = new List<Attachment>();
-        var assertionSessionNames = assertionResult.Assertion.SessionDataList.Select(session => session.Name);
-        var contextCoverageFiles = new List<string>();
-        var fullCoverageDirectory = Path.Combine(AllureLifecycle.Instance.ResultsDirectory, coverageDir);
-        if (Directory.Exists(fullCoverageDirectory))
-            contextCoverageFiles = Directory.EnumerateFiles(fullCoverageDirectory)
-                .Select(Path.GetFileName)
-                .Where(fileName => fileName != null)
-                .ToList()!;
-        if (Context.ExecutionId != null)
-            contextCoverageFiles = contextCoverageFiles.Where(fileName => fileName.Contains(Context.ExecutionId))
-                .ToList();
-        if (Context.CaseName != null)
-            contextCoverageFiles = contextCoverageFiles.Where(fileName => fileName.Contains(Context.CaseName)).ToList();
-        foreach (var sessionName in assertionSessionNames)
+        var labels = AddExecutionIdLabelsIfIsUnderAnExecutionId(
+            AddTestCaseLabelsIfIsPartOfTestCase([
+                Label.TestClass(Context.ExecutionId),
+                Label.TestType(reportCase.AssertionType),
+                Label.Epic(GetParameterValue(reportCase, "Session Names")),
+                Label.Feature(reportCase.AssertionType),
+                Label.Package(Assembly.GetEntryAssembly()?.GetName().Name ?? QaaSTag),
+                Label.Tag(QaaSTag),
+                Label.Tag(reportCase.AssertionType),
+                Label.Host(),
+                Label.Severity(AssertionSeverityToAllureSeverityMap[reportCase.Severity])
+            ]));
+        return labels;
+    }
+
+    private static string GetParameterValue(ReportCase reportCase, string parameterName)
+    {
+        return reportCase.Parameters.FirstOrDefault(parameter => parameter.Name == parameterName)?.Value ?? string.Empty;
+    }
+
+    private static Link ToAllureLink(ReportLink reportLink)
+    {
+        return new Link
         {
-            var sessionCoverageAttachments = contextCoverageFiles.Where(fileName => fileName.Contains(sessionName))
-                .Select(sessionCoverageFile => new Attachment
-                    {
-                        name = sessionCoverageFile,
-                        source = Path.Join(coverageDir, sessionCoverageFile),
-                        type = XmlAttachmentType
-                    }
-                ).ToList();
-            coverageAttachments = coverageAttachments.Concat(sessionCoverageAttachments).ToList();
-        }
-
-        return coverageAttachments;
+            name = reportLink.Name,
+            url = reportLink.Url
+        };
     }
 
-    private List<Attachment> GetAttachmentsForAssertion(AssertionResult assertionResult)
+    private static Parameter ToAllureParameter(ReportParameter reportParameter)
     {
-        var attachments = new List<Attachment>();
-
-        if (ShouldSaveAttachments(assertionResult.Assertion))
-            attachments = attachments.Concat(SaveAssertionAttachmentsToAllure(assertionResult)).ToList();
-        if (ShouldSaveTemplate(assertionResult.Assertion))
-            attachments = attachments.Append(SaveConfigurationTemplateToAllure(Context.RootConfiguration)).ToList();
-
-        attachments = attachments.Concat(GetCoveragesAsAttachments(assertionResult)).ToList();
-        return attachments;
+        return new Parameter
+        {
+            name = reportParameter.Name,
+            value = reportParameter.Value
+        };
     }
+
+    private StepResult ToAllureStep(ReportStep reportStep)
+    {
+        return new StepResult
+        {
+            name = reportStep.Name,
+            description = reportStep.Description,
+            status = ToAllureStatus(reportStep.Status),
+            start = reportStep.Start ?? 0,
+            stop = reportStep.Stop ?? 0,
+            parameters = reportStep.Parameters.Select(ToAllureParameter).ToList(),
+            attachments = reportStep.Attachments.Count == 0
+                ? null
+                : reportStep.Attachments.Select(SaveReportAttachment).ToList(),
+            steps = reportStep.Steps.Count == 0
+                ? null
+                : reportStep.Steps.Select(ToAllureStep).ToList()
+        };
+    }
+
+    private static StatusDetails ToAllureStatusDetails(ReportStatusDetails reportStatusDetails)
+    {
+        return new StatusDetails
+        {
+            message = reportStatusDetails.Message,
+            trace = reportStatusDetails.Trace,
+            flaky = reportStatusDetails.Flaky
+        };
+    }
+
+    private static Status ToAllureStatus(AssertionStatus assertionStatus) =>
+        AssertionStatusToAllureStatusMap[assertionStatus];
 
     private List<Label> AddTestCaseLabelsIfIsPartOfTestCase(List<Label> existingLabels)
     {
@@ -478,159 +218,59 @@ public class AllureReporter : BaseReporter
         }).ToList();
     }
 
-    private StatusDetails GetStatusDetailsAccordingToStatus(AssertionResult assertionResult)
+    private new string GetAttachmentDirectory(string baseAttachmentDirectoryInsideAllureDirectory,
+        string? extraSubDirectoryName = null)
     {
-        var displayTrace = ShouldDisplayTrace(assertionResult.Assertion);
-        var normalStatusDetails = new StatusDetails
-        {
-            message = assertionResult.Assertion.AssertionHook?.AssertionMessage ?? string.Empty,
-            trace = displayTrace
-                ? assertionResult.Assertion.AssertionHook?.AssertionTrace ?? string.Empty
-                : TraceDisplayFalseMessage,
-            flaky = assertionResult.Flaky.IsFlaky
-        };
-        var brokenStatusDetails = new StatusDetails
-        {
-            message = assertionResult.BrokenAssertionException?.Message ?? string.Empty,
-            trace = displayTrace
-                ? assertionResult.BrokenAssertionException?.ToString() ?? string.Empty
-                : TraceDisplayFalseMessage,
-            flaky = assertionResult.Flaky.IsFlaky
-        };
-        return assertionResult.AssertionStatus switch
-        {
-            AssertionStatus.Passed => normalStatusDetails,
-            AssertionStatus.Failed => normalStatusDetails,
-            AssertionStatus.Broken => brokenStatusDetails,
-            AssertionStatus.Unknown => normalStatusDetails,
-            AssertionStatus.Skipped => normalStatusDetails,
-            _ => throw new ArgumentOutOfRangeException(nameof(assertionResult.AssertionStatus),
-                assertionResult.AssertionStatus, null)
-        };
+        return base.GetAttachmentDirectory(baseAttachmentDirectoryInsideAllureDirectory, extraSubDirectoryName);
     }
 
-    public override void WriteTestResults(AssertionResult assertionResult)
+    private Attachment SaveSessionsDataToAllure(SessionData sessionData)
     {
-        EnsureResultsDirectoryExists();
+        Context.Logger.LogDebug("Saving session data for {SessionName} as an Allure attachment", sessionData.Name);
+        return SaveReportAttachment(BuildSessionDataAttachment(sessionData));
+    }
 
-        // Build test result
-        var dataSources =
-            $"[{string.Join(", ", assertionResult.Assertion.DataSourceList?.Select(dataSource => dataSource.Name).ToArray() ?? [])}]";
-        var sessionNames =
-            $"[{string.Join(", ", assertionResult.Assertion.SessionDataList?.Select(session => session.Name).ToArray() ?? [])}]";
-        var testUniqueId = assertionResult.Assertion.Name + Context.ExecutionId + Context.CaseName;
-        var testResult = new TestResult
-        {
-            uuid = testUniqueId,
-            rerunOf = testUniqueId,
-            historyId = testUniqueId,
-            name = assertionResult.Assertion.Name,
-            fullName = assertionResult.Assertion.Name,
-            links = assertionResult.Links is not null
-                ? assertionResult.Links.Select(link => new Link
-                {
-                    name = link.Key,
-                    url = link.Value
-                }).ToList()
-                : Enumerable.Empty<Link>().ToList(),
-            status = AssertionStatusToAllureStatusMap[assertionResult.AssertionStatus],
-            description =
-                $"```yaml\n{assertionResult.Assertion.AssertionConfiguration.BuildConfigurationAsYaml()}\n```" +
-                (assertionResult.Flaky.IsFlaky
-                    ? ArrangeFlakinessReasons(assertionResult.Flaky.FlakinessReasons)
-                    : string.Empty),
-            parameters =
-            [
-                new Parameter
-                {
-                    name = "Session Names",
-                    value = sessionNames
-                },
+    private Attachment SaveConfigurationTemplateToAllure(Microsoft.Extensions.Configuration.IConfiguration configuration)
+    {
+        Context.Logger.LogDebug("Saving the execution configuration template as an Allure attachment");
+        return SaveReportAttachment(BuildConfigurationTemplateAttachment(configuration));
+    }
 
-                new Parameter
-                {
-                    name = "Data Sources",
-                    value = dataSources
-                }
-            ],
-            labels = AddExecutionIdLabelsIfIsUnderAnExecutionId(
-                AddTestCaseLabelsIfIsPartOfTestCase([
-                    Label.TestClass(Context.ExecutionId),
-                    Label.TestType(assertionResult.Assertion.AssertionName),
-                    Label.Epic(sessionNames),
-                    Label.Feature(assertionResult.Assertion.AssertionName),
-                    Label.Package(Assembly.GetEntryAssembly()?.GetName().Name ?? QaaSTag),
-                    Label.Tag(QaaSTag),
-                    Label.Tag(assertionResult.Assertion.AssertionName),
-                    Label.Host(),
-                    Label.Severity(AssertionSeverityToAllureSeverityMap
-                        [ResolveSeverity(assertionResult.Assertion)])
-                ])),
-            steps = assertionResult.Assertion.SessionDataList?
-                .Select(sessionData => CreateSessionStep(sessionData, assertionResult.Assertion))
-                .ToList(),
-            attachments = GetAttachmentsForAssertion(assertionResult),
-            statusDetails = GetStatusDetailsAccordingToStatus(assertionResult)
-        };
+    private Attachment? SaveSessionLogToAllure(SessionData sessionData)
+    {
+        var reportAttachment = BuildSessionLogAttachment(sessionData);
+        return reportAttachment == null ? null : SaveReportAttachment(reportAttachment);
+    }
 
-        // Save test result
-        AllureLifecycle.Instance.StartTestCase(testResult);
-        AllureLifecycle.Instance.StopTestCase(testUniqueId);
-        AllureLifecycle.Instance.UpdateTestCase(testUniqueId, result =>
-        {
-            // update test duration to be total time of all sessions relevant to assertion + assertion
-            result.start = EpochTestSuiteStartTime;
-            result.stop = EpochTestSuiteStartTime + assertionResult.TestDurationMs;
-        });
-        AllureLifecycle.Instance.WriteTestCase(testUniqueId);
+    private List<Attachment> SaveAssertionAttachmentsToAllure(AssertionResult assertionResult)
+    {
+        return BuildAssertionAttachments(assertionResult).Select(SaveReportAttachment).ToList();
+    }
+
+    private Attachment SaveDataToAllure(byte[] data, string fileName, string attachmentDirectory, string name,
+        string type)
+    {
+        return SaveReportAttachment(BuildAttachment(data, fileName, attachmentDirectory, name, type));
+    }
+
+    private List<Attachment> GetCoveragesAsAttachments(AssertionResult assertionResult)
+    {
+        return BuildCoverageAttachments(assertionResult).Select(SaveReportAttachment).ToList();
+    }
+
+    private List<Attachment> GetAttachmentsForAssertion(AssertionResult assertionResult)
+    {
+        return BuildAttachmentsForAssertion(assertionResult).Select(SaveReportAttachment).ToList();
+    }
+
+    private StatusDetails GetStatusDetailsAccordingToStatus(AssertionResult assertionResult)
+    {
+        return ToAllureStatusDetails(BuildStatusDetails(assertionResult));
     }
 
     private StepResult CreateSessionStep(SessionData sessionData, AssertionObjects.Assertion assertion)
     {
-        var attachments = new List<Attachment>();
-        if (ShouldSaveSessionData(assertion))
-            attachments.Add(SaveSessionsDataToAllure(sessionData));
-
-        var sessionLogAttachment = ShouldSaveLogs(assertion) ? SaveSessionLogToAllure(sessionData) : null;
-        if (sessionLogAttachment != null)
-            attachments.Add(sessionLogAttachment);
-
-        return new StepResult
-        {
-            name = sessionData.Name,
-
-            parameters =
-            [
-                new Parameter
-                {
-                    name = nameof(sessionData.Inputs),
-                    value =
-                        $"[{string.Join(", ", sessionData.Inputs?.Select(input => input.Name).ToArray() ?? [])}]"
-                },
-
-                new Parameter
-                {
-                    name = nameof(sessionData.Outputs),
-                    value =
-                        $"[{string.Join(", ", sessionData.Outputs?.Select(output => output.Name).ToArray() ?? [])}]"
-                }
-            ],
-            status = sessionData.SessionFailures.Any() ? Status.failed : Status.passed,
-            start = new DateTimeOffset(sessionData.UtcStartTime, new TimeSpan(0)).ToUnixTimeMilliseconds(),
-            stop = new DateTimeOffset(sessionData.UtcEndTime, new TimeSpan(0)).ToUnixTimeMilliseconds(),
-            attachments = attachments.Count == 0 ? null : attachments,
-            steps = sessionData.SessionFailures.Any()
-                ? new List<StepResult>
-                {
-                    new()
-                    {
-                        name = nameof(sessionData.SessionFailures),
-                        status = Status.failed,
-                        steps = sessionData.SessionFailures.Select(CreateActionFailureStep).ToList()
-                    }
-                }
-                : null
-        };
+        return ToAllureStep(BuildSessionStep(sessionData, assertion));
     }
 
     private static StepResult CreateActionFailureStep(ActionFailure actionFailure)
@@ -647,13 +287,11 @@ public class AllureReporter : BaseReporter
                     name = nameof(actionFailure.Name),
                     value = actionFailure.Name
                 },
-
                 new Parameter
                 {
                     name = nameof(actionFailure.ActionType),
                     value = actionFailure.ActionType
                 },
-
                 new Parameter
                 {
                     name = nameof(actionFailure.Reason.Description),
@@ -662,81 +300,4 @@ public class AllureReporter : BaseReporter
             ]
         };
     }
-
-    private void WriteSessionStep(SessionData sessionData, AssertionObjects.Assertion assertion)
-    {
-        AllureLifecycle.Instance.StartStep(Guid.NewGuid().ToString("N"), CreateSessionStep(sessionData, assertion));
-        try
-        {
-            if (ShouldSaveSessionData(assertion))
-                AddSessionsDataToCurrentItem(sessionData);
-
-            if (ShouldSaveLogs(assertion))
-                AddSessionLogToCurrentItem(sessionData);
-            if (sessionData.SessionFailures.Any())
-                WriteSessionFailureSteps(sessionData.SessionFailures);
-        }
-        finally
-        {
-            AllureLifecycle.Instance.StopStep(step =>
-            {
-                step.status = sessionData.SessionFailures.Any() ? Status.failed : Status.passed;
-                step.start = new DateTimeOffset(sessionData.UtcStartTime, TimeSpan.Zero).ToUnixTimeMilliseconds();
-                step.stop = new DateTimeOffset(sessionData.UtcEndTime, TimeSpan.Zero).ToUnixTimeMilliseconds();
-            });
-        }
-    }
-
-    private void WriteSessionFailureSteps(IReadOnlyCollection<ActionFailure> actionFailures)
-    {
-        AllureLifecycle.Instance.StartStep(Guid.NewGuid().ToString("N"), new StepResult
-        {
-            name = nameof(SessionData.SessionFailures),
-            status = Status.failed
-        });
-
-        try
-        {
-            foreach (var actionFailure in actionFailures)
-            {
-                AllureLifecycle.Instance.StartStep(Guid.NewGuid().ToString("N"), CreateActionFailureStep(actionFailure));
-                AllureLifecycle.Instance.StopStep(step => step.status = Status.failed);
-            }
-        }
-        finally
-        {
-            AllureLifecycle.Instance.StopStep(step => step.status = Status.failed);
-        }
-    }
-
-    private static string ArrangeFlakinessReasons(
-        IEnumerable<KeyValuePair<string, List<ActionFailure>>> flakinessReasons)
-    {
-        return "\n### Flakiness Reasons" + string.Join("\n",
-            flakinessReasons.SelectMany(sessionNameAndFailurePair =>
-                sessionNameAndFailurePair.Value.Select(sessionFailure => $@"
-- **Session {nameof(SessionData.Name)}:** `{sessionNameAndFailurePair.Key}`
-  **{nameof(sessionFailure.Action)}:** `{sessionFailure.Action}`
-  **{nameof(sessionFailure.ActionType)}:** `{sessionFailure.ActionType}`
-  **{nameof(sessionFailure.Name)}:** `{sessionFailure.Name}`
-  **{nameof(sessionFailure.Reason.Message)}:** `{sessionFailure.Reason.Message}`")));
-    }
-
-    private bool ShouldSaveSessionData(AssertionObjects.Assertion assertion) =>
-        assertion.SaveSessionData ?? SaveSessionData;
-
-    private bool ShouldSaveLogs(AssertionObjects.Assertion assertion) =>
-        assertion.SaveLogs ?? SaveLogs;
-
-    private bool ShouldSaveAttachments(AssertionObjects.Assertion assertion) =>
-        assertion.SaveAttachments ?? SaveAttachments;
-
-    private bool ShouldSaveTemplate(AssertionObjects.Assertion assertion) =>
-        assertion.SaveTemplate ?? SaveTemplate;
-
-    private bool ShouldDisplayTrace(AssertionObjects.Assertion assertion) =>
-        assertion.DisplayTrace ?? DisplayTrace;
-
-    private AssertionSeverity ResolveSeverity(AssertionObjects.Assertion assertion) =>
-        assertion.Severity ?? Severity;
 }

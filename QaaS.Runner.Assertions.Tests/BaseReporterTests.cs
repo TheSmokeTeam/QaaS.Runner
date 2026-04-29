@@ -10,7 +10,7 @@ public class BaseReporterTests
 {
     private sealed class TestReporter : BaseReporter
     {
-        public override void WriteTestResults(AssertionResult assertionResult)
+        protected override void WriteReportCase(ReportCase reportCase)
         {
         }
 
