@@ -170,8 +170,7 @@ public class ReportPortalReporterTests
             SaveTemplate = false,
             DisplayTrace = true,
             Severity = AssertionSeverity.Critical,
-            EpochTestSuiteStartTime = new DateTimeOffset(new DateTime(2026, 1, 1, 12, 0, 0, DateTimeKind.Utc))
-                .ToUnixTimeMilliseconds()
+            EpochTestSuiteStartTime = new DateTime(2026, 1, 1, 12, 0, 0, DateTimeKind.Utc)
         };
     }
 

@@ -111,8 +111,7 @@ public class AssertionBuilderTests
         Assert.That(allureReporter.DisplayTrace, Is.False);
         Assert.That(allureReporter.Severity, Is.EqualTo(AssertionSeverity.Critical));
         Assert.That(allureReporter.FileSystem, Is.SameAs(fileSystem));
-        Assert.That(allureReporter.EpochTestSuiteStartTime,
-            Is.EqualTo(new DateTimeOffset(startTime, TimeSpan.Zero).ToUnixTimeMilliseconds()));
+        Assert.That(allureReporter.EpochTestSuiteStartTime, Is.EqualTo(startTime));
     }
 
     [Test]
@@ -133,28 +132,6 @@ public class AssertionBuilderTests
                 Is.EquivalentTo(new[] { typeof(AllureReporter), typeof(ReportPortalReporter) }));
             Assert.That(reporters.Select(reporter => reporter.AssertionName),
                 Is.All.EqualTo("assertion-display"));
-        });
-    }
-
-    [Test]
-    public void BuildReporters_WithCustomReporterOverride_ReturnsOnlyThatReporter()
-    {
-        var builder = CreateBuilder().Named("assertion-display");
-        builder.Reporter = new TestReporter();
-        var context = new Context
-        {
-            Logger = Globals.Logger,
-            RootConfiguration = new ConfigurationBuilder().Build()
-        };
-
-        var reporters = builder.BuildReporters(context, new DateTime(2025, 1, 1, 10, 0, 0, DateTimeKind.Utc))
-            .ToList();
-
-        Assert.Multiple(() =>
-        {
-            Assert.That(reporters, Has.Count.EqualTo(1));
-            Assert.That(reporters.Single(), Is.TypeOf<TestReporter>());
-            Assert.That(reporters.Single().AssertionName, Is.EqualTo("assertion-display"));
         });
     }
 

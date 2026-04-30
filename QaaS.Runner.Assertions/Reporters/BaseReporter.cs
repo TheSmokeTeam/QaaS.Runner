@@ -5,7 +5,6 @@ using System.Text.Json.Serialization;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 using QaaS.Framework.Configurations;
-using QaaS.Framework.Infrastructure;
 using QaaS.Framework.SDK.ContextObjects;
 using QaaS.Framework.SDK.Hooks.Assertion;
 using QaaS.Framework.SDK.Session;
@@ -39,11 +38,11 @@ public abstract class BaseReporter : IReporter
     public string Name { get; set; } = string.Empty;
     public string AssertionName { get; set; } = string.Empty;
     public bool SaveSessionData { get; set; }
-    public bool SaveLogs { get; set; } = true;
+    public bool SaveLogs { get; set; }
     public bool SaveAttachments { get; set; }
     public bool SaveTemplate { get; set; }
     public bool DisplayTrace { get; set; }
-    public long EpochTestSuiteStartTime { get; set; }
+    public DateTime EpochTestSuiteStartTime { get; set; }
 
     public void WriteTestResults(AssertionResult assertionResult)
     {
@@ -80,8 +79,8 @@ public abstract class BaseReporter : IReporter
                 (assertionResult.Flaky.IsFlaky
                     ? ArrangeFlakinessReasons(assertionResult.Flaky.FlakinessReasons)
                     : string.Empty),
-            Start = ToDateTime(EpochTestSuiteStartTime),
-            Stop = ToDateTime(EpochTestSuiteStartTime).AddMilliseconds(assertionResult.TestDurationMs),
+            Start = EpochTestSuiteStartTime,
+            Stop = EpochTestSuiteStartTime.AddMilliseconds(assertionResult.TestDurationMs),
             IsFlaky = assertionResult.Flaky.IsFlaky,
             Links = assertionResult.Links is not null
                 ? assertionResult.Links.Select(link => new ReportLink

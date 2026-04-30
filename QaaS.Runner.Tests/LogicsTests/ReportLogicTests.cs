@@ -29,7 +29,6 @@ public class ReportLogicTests
                     AssertionStatus.Skipped,
                     AssertionStatus.Unknown
                 ],
-                ReporterTypes = [typeof(RecordingReporter)],
                 AssertionName = null,
                 AssertionHook = null
             };
@@ -89,7 +88,6 @@ public class ReportLogicTests
                     AssertionStatus.Skipped,
                     AssertionStatus.Unknown
                 ],
-                ReporterTypes = [typeof(RecordingReporter)],
                 AssertionName = null,
                 AssertionHook = null
             },
@@ -110,7 +108,6 @@ public class ReportLogicTests
                     AssertionStatus.Skipped,
                     AssertionStatus.Unknown
                 ],
-                ReporterTypes = [typeof(AlternateRecordingReporter)],
                 AssertionName = null,
                 AssertionHook = null
             },
@@ -129,8 +126,8 @@ public class ReportLogicTests
         Assert.That(result, Is.SameAs(executionData));
         Assert.Multiple(() =>
         {
-            Assert.That(firstReporter.Results, Is.EqualTo(new[] { firstAssertionResult }));
-            Assert.That(secondReporter.Results, Is.EqualTo(new[] { secondAssertionResult }));
+            Assert.That(firstReporter.Results, Is.EqualTo(new[] { firstAssertionResult, secondAssertionResult }));
+            Assert.That(secondReporter.Results, Is.EqualTo(new[] { firstAssertionResult, secondAssertionResult }));
         });
     }
 
@@ -152,7 +149,6 @@ public class ReportLogicTests
                     AssertionStatus.Skipped,
                     AssertionStatus.Unknown
                 ],
-                ReporterTypes = [typeof(RecordingReporter), typeof(AlternateRecordingReporter)],
                 AssertionName = null,
                 AssertionHook = null
             },
@@ -187,7 +183,6 @@ public class ReportLogicTests
             {
                 Name = "AssertionA",
                 StatusesToReport = [AssertionStatus.Failed],
-                ReporterTypes = [typeof(RecordingReporter)],
                 AssertionName = null,
                 AssertionHook = null
             },
@@ -212,8 +207,9 @@ public class ReportLogicTests
         public string AssertionName { get; set; } = string.Empty;
         public bool SaveSessionData { get; set; }
         public bool SaveAttachments { get; set; }
+        public bool SaveLogs { get; set; }
         public bool DisplayTrace { get; set; }
-        public long EpochTestSuiteStartTime { get; set; }
+        public DateTime EpochTestSuiteStartTime { get; set; }
         public List<AssertionResult> Results { get; } = [];
         public int FinishCount { get; private set; }
 

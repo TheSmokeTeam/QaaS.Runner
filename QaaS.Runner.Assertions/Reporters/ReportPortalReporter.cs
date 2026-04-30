@@ -109,7 +109,7 @@ public class ReportPortalReporter : BaseReporter
             Name = ResolveLaunchName(project),
             Description = "QaaS Runner execution",
             Mode = config.Launch.DebugMode ? LaunchMode.Debug : LaunchMode.Default,
-            StartTime = ToDateTime(EpochTestSuiteStartTime),
+            StartTime = EpochTestSuiteStartTime,
             Attributes = BuildLaunchAttributes(project)
         }).GetAwaiter().GetResult();
 
@@ -183,7 +183,7 @@ public class ReportPortalReporter : BaseReporter
     {
         var metadata = ResolveMetadata();
         var system = string.IsNullOrWhiteSpace(metadata.System) ? "UnknownSystem" : metadata.System;
-        return $"{team} {system} {ToDateTime(EpochTestSuiteStartTime):yyyy-MM-dd HH:mm:ss}";
+        return $"{team} {system} {EpochTestSuiteStartTime:yyyy-MM-dd HH:mm:ss}";
     }
 
     private List<ItemAttribute> BuildLaunchAttributes(string project)
@@ -244,7 +244,7 @@ public class ReportPortalReporter : BaseReporter
             LaunchUuid = launchUuid,
             Name = step.Name,
             Description = step.Description,
-            StartTime = step.Start ?? ToDateTime(EpochTestSuiteStartTime),
+            StartTime = step.Start ?? EpochTestSuiteStartTime,
             Type = TestItemType.Step,
             HasStats = false,
             Parameters = ToParameters(step.Parameters),
@@ -264,7 +264,7 @@ public class ReportPortalReporter : BaseReporter
         {
             LaunchUuid = launchUuid,
             Description = step.Description,
-            EndTime = step.Stop ?? step.Start ?? ToDateTime(EpochTestSuiteStartTime),
+            EndTime = step.Stop ?? step.Start ?? EpochTestSuiteStartTime,
             Status = ToReportPortalStatus(step.Status)
         }).GetAwaiter().GetResult();
     }

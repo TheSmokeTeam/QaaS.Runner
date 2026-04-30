@@ -1,0 +1,10 @@
+{
+  "enabled": true,
+  "server": {
+    "url": "http://localhost:8080",
+    "apiKey": "QaaS_v_XWapIySO2a8gklGbgfz4jd2Yhu4gNfxmNRWtZ-sGPGPGCBH9XLjT6BD-4iAPYm"
+  },
+  "launch": {
+    "debugMode": false
+  }
+}

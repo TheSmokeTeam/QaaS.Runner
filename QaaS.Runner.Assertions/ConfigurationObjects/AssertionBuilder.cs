@@ -37,6 +37,8 @@ public class AssertionBuilder : IYamlConvertible
     /// </summary>
     public required BaseReporter Reporter;
 
+    private readonly List<Type> _reporterTypes = [ typeof(AllureReporter), typeof(ReportPortalReporter) ];
+
     [Required]
     [Description("The name of the assertion to use")]
     public string? Assertion { get; internal set; }
@@ -573,30 +575,24 @@ public class AssertionBuilder : IYamlConvertible
         return AssertionInstance;
     }
 
-    internal IReadOnlyCollection<Type> GetReporterTypes() =>
-        Reporter == null
-            ? [typeof(AllureReporter), typeof(ReportPortalReporter)]
-            : [Reporter.GetType()];
-
     /// <summary>
     ///     Resolves the pre-built <see cref="BaseReporter" /> to a runtime object with access to QaaS'
     ///     <see cref="Context" /> and finalize building the Reporter.
     /// </summary>
+    /// <param name="type"></param>
     /// <param name="context"></param>
-    /// <param name="reporterType"></param>
     /// <param name="testSuiteStartTimeUtc"></param>
     /// <param name="fileSystem"></param>
     /// <returns></returns>
-    internal IReporter Build(Context context, Type reporterType, DateTime testSuiteStartTimeUtc,
+    private IReporter BuildReporter(Type type, Context context, DateTime testSuiteStartTimeUtc,
         IFileSystem? fileSystem = null)
     {
-        Reporter = (BaseReporter?)Activator.CreateInstance(reporterType) ??
+        Reporter = (BaseReporter?)Activator.CreateInstance(type) ??
                    throw new InvalidOperationException(
-                       $"Could not create reporter of type {reporterType.FullName}.");
+                       $"Could not create reporter of type {type.FullName}.");
 
-        Reporter.Name = reporterType.Name;
+        Reporter.Name = type.Name;
         Reporter.AssertionName = Name!;
-
         Reporter.DisplayTrace = DisplayTrace;
         Reporter.SaveSessionData = SaveSessionData;
         Reporter.SaveLogs = SaveLogs;
@@ -604,17 +600,16 @@ public class AssertionBuilder : IYamlConvertible
         Reporter.SaveTemplate = SaveTemplate;
         Reporter.Severity = Severity;
         Reporter.Context = context;
-        Reporter.EpochTestSuiteStartTime =
-            new DateTimeOffset(testSuiteStartTimeUtc, new TimeSpan(0)).ToUnixTimeMilliseconds();
-
+        Reporter.EpochTestSuiteStartTime = testSuiteStartTimeUtc;
         Reporter.FileSystem = fileSystem ?? new FileSystem();
+        
         return Reporter;
     }
 
     internal IEnumerable<IReporter> BuildReporters(Context context, DateTime testSuiteStartTimeUtc,
         IFileSystem? fileSystem = null)
     {
-        foreach (var reporterType in GetReporterTypes())
-            yield return Build(context, reporterType, testSuiteStartTimeUtc, fileSystem);
+        return _reporterTypes.Select(reporterType =>
+            BuildReporter(reporterType, context, testSuiteStartTimeUtc, fileSystem));
     }
 }

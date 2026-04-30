@@ -220,17 +220,8 @@ public class ExecutionBuilder() : BaseExecutionBuilder<InternalContext, Executio
     {
         if (Assertions is null) return [];
         var testSuiteStartTimeUtc = DateTime.UtcNow;
-        var resolvedReports = Assertions
-            .SelectMany(assertionReport => assertionReport.GetReporterTypes()
-                .Select(reporterType => new
-                {
-                    AssertionReport = assertionReport,
-                    ReporterTypeEntry = reporterType
-                }))
-            .GroupBy(assertionReport => assertionReport.ReporterTypeEntry)
-            .Select(assertionReportGroup =>
-                assertionReportGroup.First().AssertionReport.Build(Context, assertionReportGroup.Key,
-                    testSuiteStartTimeUtc));
+        var resolvedReports = Assertions.SelectMany(assertionReport =>
+            assertionReport.BuildReporters(Context, testSuiteStartTimeUtc));
         return resolvedReports;
     }
 

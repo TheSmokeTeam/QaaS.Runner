@@ -6,19 +6,15 @@ using QaaS.Framework.SDK.DataSourceObjects;
 using QaaS.Framework.SDK.Extensions;
 using QaaS.Framework.SDK.Hooks.Assertion;
 using QaaS.Framework.SDK.Session.SessionDataObjects;
-using QaaS.Runner.Assertions.Reporters;
 using QaaS.Runner.Assertions.LinkBuilders;
 
 namespace QaaS.Runner.Assertions.AssertionObjects;
 
 public class Assertion
 {
-    private IReadOnlyCollection<Type> _reporterTypes = [typeof(AllureReporter), typeof(ReportPortalReporter)];
-
     public string Name { get; set; } = string.Empty;
 
     public string AssertionName { get; set; } = string.Empty;
-
 
     public IAssertion AssertionHook { get; set; } = default!;
     
@@ -39,15 +35,6 @@ public class Assertion
     public bool? DisplayTrace { get; set; }
 
     public AssertionSeverity? Severity { get; set; }
-
-    /// <summary>
-    /// Reporter implementation types that should receive this assertion result.
-    /// </summary>
-    public IReadOnlyCollection<Type> ReporterTypes
-    {
-        get => _reporterTypes;
-        set => _reporterTypes = value?.Where(type => type != null).Distinct().ToArray() ?? [];
-    }
 
     /// <summary>
     ///     All Session data that might be relevant to the session according to its configuration
