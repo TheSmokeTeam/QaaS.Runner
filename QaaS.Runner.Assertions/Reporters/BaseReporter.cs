@@ -14,6 +14,7 @@ using QaaS.Runner.Infrastructure;
 using RunnerFileSystemExtensions = QaaS.Runner.Infrastructure.FileSystemExtensions;
 using AssertionResult = QaaS.Runner.Assertions.AssertionObjects.AssertionResult;
 using AssertionSeverity = QaaS.Runner.Assertions.AssertionObjects.AssertionSeverity;
+using ReporterTarget = QaaS.Runner.Assertions.AssertionObjects.ReporterTarget;
 
 
 namespace QaaS.Runner.Assertions.Reporters;
@@ -34,7 +35,8 @@ public abstract class BaseReporter : IReporter
 
     public IFileSystem FileSystem = default!;
 
-    public AssertionSeverity Severity { get; set; }
+    public ReporterTarget Target { get; set; }
+    public AssertionSeverity Severity { get; set; } = AssertionSeverity.Normal;
     public string Name { get; set; } = string.Empty;
     public string AssertionName { get; set; } = string.Empty;
     public bool SaveSessionData { get; set; }
@@ -47,10 +49,6 @@ public abstract class BaseReporter : IReporter
     public void WriteTestResults(AssertionResult assertionResult)
     {
         WriteReportCase(BuildReportCase(assertionResult));
-    }
-
-    public virtual void FinishReport()
-    {
     }
 
     protected abstract void WriteReportCase(ReportCase reportCase);

@@ -216,13 +216,12 @@ public class ExecutionBuilder() : BaseExecutionBuilder<InternalContext, Executio
         return assertions;
     }
 
-    private IEnumerable<IReporter> BuildReports()
+    private IEnumerable<IReporter> BuildReports(ILifetimeScope scope, IEnumerable<Assertion> builtAssertions)
     {
-        if (Assertions is null) return [];
         var testSuiteStartTimeUtc = DateTime.UtcNow;
-        var resolvedReports = Assertions.SelectMany(assertionReport =>
-            assertionReport.BuildReporters(Context, testSuiteStartTimeUtc));
-        return resolvedReports;
+
+        return scope.Resolve<ReporterFactory>()
+            .BuildReporters(builtAssertions, Context, testSuiteStartTimeUtc);
     }
 
     private IEnumerable<IStorage> BuildStorages()
@@ -615,6 +614,14 @@ public class ExecutionBuilder() : BaseExecutionBuilder<InternalContext, Executio
             containerBuilder.RegisterType<AssertionLogic>().As<AssertionLogic>();
             containerBuilder.RegisterType<ReportLogic>().As<ReportLogic>();
             containerBuilder.RegisterType<TemplateLogic>().As<TemplateLogic>();
+            
+            containerBuilder.RegisterType<AllureReporter>().AsSelf().InstancePerLifetimeScope();
+            containerBuilder.RegisterType<ReportPortalReporter>().AsSelf().InstancePerLifetimeScope();
+            containerBuilder.RegisterType<ReporterFactory>().AsSelf().InstancePerLifetimeScope();
+            containerBuilder.RegisterType<ReportPortalLaunchManager>()
+                .As<IReportPortalLaunchManager>()
+                .As<IReportPortalLaunchAccessor>()
+                .InstancePerLifetimeScope();
         });
     }
 
@@ -938,7 +945,7 @@ public class ExecutionBuilder() : BaseExecutionBuilder<InternalContext, Executio
             var builtSessions = BuildSessions(scope).ToList();
             var builtStorages = BuildStorages().ToList();
             var builtAssertions = BuildAssertions(scope).ToList();
-            var builtReports = BuildReports().ToList();
+            var builtReports = BuildReports(scope, builtAssertions).ToList();
             var dataSourceLogic =
                 scope.Resolve<DataSourceLogic>(
                     new TypedParameter(typeof(IList<DataSource>), builtDataSources));
@@ -954,12 +961,12 @@ public class ExecutionBuilder() : BaseExecutionBuilder<InternalContext, Executio
             var reportLogic =
                 scope.Resolve<ReportLogic>(new TypedParameter(typeof(IList<IReporter>), builtReports));
             var templateLogic = scope.Resolve<TemplateLogic>(new TypedParameter(typeof(Context), Context));
-            var reporterTypes = FormatReporterTypes(builtReports);
+            var reporterTargets = FormatReporterTargets(builtReports);
 
             Context.Logger.LogDebug(
-                "Resolved execution components. DataSources={DataSourceCount}, Sessions={SessionCount}, Storages={StorageCount}, Assertions={AssertionCount}, Reporters={ReporterCount}, ReporterTypes={ReporterTypes}",
+                "Resolved execution components. DataSources={DataSourceCount}, Sessions={SessionCount}, Storages={StorageCount}, Assertions={AssertionCount}, Reporters={ReporterCount}, ReporterTargets={ReporterTargets}",
                 builtDataSources.Count, builtSessions.Count, builtStorages.Count, builtAssertions.Count,
-                builtReports.Count, reporterTypes);
+                builtReports.Count, reporterTargets);
 
             Context.Logger.LogInformation(
                 "Finished building {Type} execution with executionId {ExecutionId} and case name {CaseName}", Type,
@@ -1328,14 +1335,14 @@ public class ExecutionBuilder() : BaseExecutionBuilder<InternalContext, Executio
                || property.GetCustomAttributes<DefaultValueAttribute>().Any();
     }
 
-    private static string FormatReporterTypes(IEnumerable<IReporter> reporters)
+    private static string FormatReporterTargets(IEnumerable<IReporter> reporters)
     {
-        var reporterTypes = reporters
-            .Select(reporter => reporter.GetType().Name)
+        var reporterTargets = reporters
+            .Select(reporter => reporter.Target.ToString())
             .Distinct(StringComparer.Ordinal)
-            .OrderBy(reporterType => reporterType, StringComparer.Ordinal)
+            .OrderBy(reporterTarget => reporterTarget, StringComparer.Ordinal)
             .ToArray();
 
-        return reporterTypes.Length == 0 ? "None" : string.Join(", ", reporterTypes);
+        return reporterTargets.Length == 0 ? "None" : string.Join(", ", reporterTargets);
     }
 }

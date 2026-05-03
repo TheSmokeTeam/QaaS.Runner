@@ -60,10 +60,10 @@ public class ReportPortalReporterTests
     {
         var client = new RecordingReportPortalClient();
         var factory = new RecordingReportPortalClientFactory(client);
-        var reporter = CreateReporter(factory);
+        var (reporter, manager) = CreateReporter(factory);
 
         reporter.WriteTestResults(CreateAssertionResult());
-        reporter.FinishReport();
+        manager.Finish();
 
         Assert.Multiple(() =>
         {
@@ -81,11 +81,11 @@ public class ReportPortalReporterTests
     [Test]
     public void WriteTestResults_WithMissingMetadataTeam_ThrowsInvalidOperationException()
     {
-        var reporter = CreateReporter(new RecordingReportPortalClientFactory(new RecordingReportPortalClient()),
-            metadataTeam: string.Empty);
+        var manager = CreateLaunchManager(new RecordingReportPortalClientFactory(new RecordingReportPortalClient()));
+        var context = CreateContext(metadataTeam: string.Empty);
 
         var exception = Assert.Throws<InvalidOperationException>(() =>
-            reporter.WriteTestResults(CreateAssertionResult()));
+            manager.Start(context, TestSuiteStartTime));
 
         Assert.That(exception!.Message, Does.Contain("metadata Team"));
     }
@@ -100,10 +100,11 @@ public class ReportPortalReporterTests
                                          }
                                        }
                                        """);
-        var reporter = CreateReporter(new RecordingReportPortalClientFactory(new RecordingReportPortalClient()));
+        var manager = CreateLaunchManager(new RecordingReportPortalClientFactory(new RecordingReportPortalClient()));
+        var context = CreateContext();
 
         var exception = Assert.Throws<InvalidOperationException>(() =>
-            reporter.WriteTestResults(CreateAssertionResult()));
+            manager.Start(context, TestSuiteStartTime));
 
         Assert.That(exception!.Message, Does.Contain("server URL"));
     }
@@ -112,10 +113,10 @@ public class ReportPortalReporterTests
     public void WriteTestResults_MapsGenericReportCaseToReportPortalRequests()
     {
         var client = new RecordingReportPortalClient();
-        var reporter = CreateReporter(new RecordingReportPortalClientFactory(client));
+        var (reporter, manager) = CreateReporter(new RecordingReportPortalClientFactory(client));
 
         reporter.WriteTestResults(CreateAssertionResult());
-        reporter.FinishReport();
+        manager.Finish();
 
         var testRequest = client.StartTestItemRequests.Single();
         var testFinish = client.FinishTestItemRequests.Last();
@@ -144,7 +145,36 @@ public class ReportPortalReporterTests
         });
     }
 
-    private ReportPortalReporter CreateReporter(RecordingReportPortalClientFactory factory, string metadataTeam = "Smoke")
+    private static readonly DateTime TestSuiteStartTime = new(2026, 1, 1, 12, 0, 0, DateTimeKind.Utc);
+
+    private (ReportPortalReporter Reporter, ReportPortalLaunchManager Manager) CreateReporter(
+        RecordingReportPortalClientFactory factory,
+        string metadataTeam = "Smoke")
+    {
+        var context = CreateContext(metadataTeam);
+        var manager = CreateLaunchManager(factory);
+        manager.Start(context, TestSuiteStartTime);
+
+        return (new ReportPortalReporter(manager)
+        {
+            Context = context,
+            FileSystem = new System.IO.Abstractions.FileSystem(),
+            SaveAttachments = true,
+            SaveLogs = true,
+            SaveSessionData = true,
+            SaveTemplate = false,
+            DisplayTrace = true,
+            Severity = AssertionSeverity.Critical,
+            EpochTestSuiteStartTime = TestSuiteStartTime
+        }, manager);
+    }
+
+    private ReportPortalLaunchManager CreateLaunchManager(RecordingReportPortalClientFactory factory)
+    {
+        return new ReportPortalLaunchManager(factory, new System.IO.Abstractions.FileSystem(), _configPath);
+    }
+
+    private static InternalContext CreateContext(string metadataTeam = "Smoke")
     {
         var context = new InternalContext
         {
@@ -160,18 +190,7 @@ public class ReportPortalReporterTests
         });
         context.AppendSessionLog("session-1", "session log line");
 
-        return new ReportPortalReporter(factory, _configPath)
-        {
-            Context = context,
-            FileSystem = new System.IO.Abstractions.FileSystem(),
-            SaveAttachments = true,
-            SaveLogs = true,
-            SaveSessionData = true,
-            SaveTemplate = false,
-            DisplayTrace = true,
-            Severity = AssertionSeverity.Critical,
-            EpochTestSuiteStartTime = new DateTime(2026, 1, 1, 12, 0, 0, DateTimeKind.Utc)
-        };
+        return context;
     }
 
     private static AssertionResult CreateAssertionResult()

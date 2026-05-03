@@ -11,7 +11,7 @@ public class ReportLogicTests
 {
     [TestCase(1)]
     [TestCase(5)]
-    public void TestRun_WithSingleConfiguredReporterType_WritesMatchingAssertionResults(int assertionCount)
+    public void TestRun_WithSingleReporterTarget_WritesMatchingAssertionResults(int assertionCount)
     {
         var reporter = new RecordingReporter();
         var assertionResults = new List<AssertionResult>();
@@ -71,10 +71,10 @@ public class ReportLogicTests
     }
 
     [Test]
-    public void TestRun_WithDifferentReporterTypeSets_WritesOnlyMatchingAssertions()
+    public void TestRun_WithDifferentReporterTargets_WritesOnlyMatchingAssertions()
     {
-        var firstReporter = new RecordingReporter();
-        var secondReporter = new AlternateRecordingReporter();
+        var firstReporter = new RecordingReporter { Target = ReporterTarget.Allure };
+        var secondReporter = new AlternateRecordingReporter { Target = ReporterTarget.ReportPortal };
         var firstAssertionResult = new AssertionResult
         {
             Assertion = new Assertion
@@ -88,6 +88,7 @@ public class ReportLogicTests
                     AssertionStatus.Skipped,
                     AssertionStatus.Unknown
                 ],
+                ReporterTargets = [ReporterTarget.Allure],
                 AssertionName = null,
                 AssertionHook = null
             },
@@ -108,6 +109,7 @@ public class ReportLogicTests
                     AssertionStatus.Skipped,
                     AssertionStatus.Unknown
                 ],
+                ReporterTargets = [ReporterTarget.ReportPortal],
                 AssertionName = null,
                 AssertionHook = null
             },
@@ -126,16 +128,16 @@ public class ReportLogicTests
         Assert.That(result, Is.SameAs(executionData));
         Assert.Multiple(() =>
         {
-            Assert.That(firstReporter.Results, Is.EqualTo(new[] { firstAssertionResult, secondAssertionResult }));
-            Assert.That(secondReporter.Results, Is.EqualTo(new[] { firstAssertionResult, secondAssertionResult }));
+            Assert.That(firstReporter.Results, Is.EqualTo(new[] { firstAssertionResult }));
+            Assert.That(secondReporter.Results, Is.EqualTo(new[] { secondAssertionResult }));
         });
     }
 
     [Test]
-    public void TestRun_WithMultipleReporterTypesOnSameAssertion_WritesToAllMatchingReporters()
+    public void TestRun_WithMultipleReporterTargetsOnSameAssertion_WritesToAllMatchingReporters()
     {
-        var firstReporter = new RecordingReporter();
-        var secondReporter = new AlternateRecordingReporter();
+        var firstReporter = new RecordingReporter { Target = ReporterTarget.Allure };
+        var secondReporter = new AlternateRecordingReporter { Target = ReporterTarget.ReportPortal };
         var assertionResult = new AssertionResult
         {
             Assertion = new Assertion
@@ -149,6 +151,7 @@ public class ReportLogicTests
                     AssertionStatus.Skipped,
                     AssertionStatus.Unknown
                 ],
+                ReporterTargets = [ReporterTarget.Allure, ReporterTarget.ReportPortal],
                 AssertionName = null,
                 AssertionHook = null
             },
@@ -203,6 +206,7 @@ public class ReportLogicTests
 
     private class RecordingReporter : IReporter
     {
+        public ReporterTarget Target { get; set; } = ReporterTarget.Allure;
         public string Name { get; set; } = nameof(RecordingReporter);
         public string AssertionName { get; set; } = string.Empty;
         public bool SaveSessionData { get; set; }

@@ -1,6 +1,5 @@
 using System.ComponentModel;
 using System.ComponentModel.DataAnnotations;
-using System.IO.Abstractions;
 using System.Runtime.CompilerServices;
 using System.Text;
 using System.Text.Json;
@@ -8,13 +7,12 @@ using Microsoft.Extensions.Configuration;
 using QaaS.Framework.Configurations;
 using QaaS.Framework.Configurations.ConfigurationBindingUtils;
 using QaaS.Framework.Configurations.CustomValidationAttributes;
-using QaaS.Framework.SDK.ContextObjects;
 using QaaS.Framework.SDK.Hooks.Assertion;
 using YamlDotNet.Core;
 using YamlDotNet.Serialization;
 using Assertion = QaaS.Runner.Assertions.AssertionObjects.Assertion;
-using QaaS.Runner.Assertions.Reporters;
 using AssertionSeverity = QaaS.Runner.Assertions.AssertionObjects.AssertionSeverity;
+using ReporterTarget = QaaS.Runner.Assertions.AssertionObjects.ReporterTarget;
 
 [assembly: InternalsVisibleTo("QaaS.Runner")]
 [assembly: InternalsVisibleTo("QaaS.Runner.Assertions.Tests")]
@@ -31,13 +29,6 @@ public class AssertionBuilder : IYamlConvertible
     /// Internal assertion instance
     /// </summary>
     public required Assertion AssertionInstance;
-
-    /// <summary>
-    /// Internal reporter instance
-    /// </summary>
-    public required BaseReporter Reporter;
-
-    private readonly List<Type> _reporterTypes = [ typeof(AllureReporter), typeof(ReportPortalReporter) ];
 
     [Required]
     [Description("The name of the assertion to use")]
@@ -573,43 +564,5 @@ public class AssertionBuilder : IYamlConvertible
         AssertionInstance.AssertionName = Assertion!;
         AssertionInstance.Links = allLinks.ToList();
         return AssertionInstance;
-    }
-
-    /// <summary>
-    ///     Resolves the pre-built <see cref="BaseReporter" /> to a runtime object with access to QaaS'
-    ///     <see cref="Context" /> and finalize building the Reporter.
-    /// </summary>
-    /// <param name="type"></param>
-    /// <param name="context"></param>
-    /// <param name="testSuiteStartTimeUtc"></param>
-    /// <param name="fileSystem"></param>
-    /// <returns></returns>
-    private IReporter BuildReporter(Type type, Context context, DateTime testSuiteStartTimeUtc,
-        IFileSystem? fileSystem = null)
-    {
-        Reporter = (BaseReporter?)Activator.CreateInstance(type) ??
-                   throw new InvalidOperationException(
-                       $"Could not create reporter of type {type.FullName}.");
-
-        Reporter.Name = type.Name;
-        Reporter.AssertionName = Name!;
-        Reporter.DisplayTrace = DisplayTrace;
-        Reporter.SaveSessionData = SaveSessionData;
-        Reporter.SaveLogs = SaveLogs;
-        Reporter.SaveAttachments = SaveAttachments;
-        Reporter.SaveTemplate = SaveTemplate;
-        Reporter.Severity = Severity;
-        Reporter.Context = context;
-        Reporter.EpochTestSuiteStartTime = testSuiteStartTimeUtc;
-        Reporter.FileSystem = fileSystem ?? new FileSystem();
-        
-        return Reporter;
-    }
-
-    internal IEnumerable<IReporter> BuildReporters(Context context, DateTime testSuiteStartTimeUtc,
-        IFileSystem? fileSystem = null)
-    {
-        return _reporterTypes.Select(reporterType =>
-            BuildReporter(reporterType, context, testSuiteStartTimeUtc, fileSystem));
     }
 }

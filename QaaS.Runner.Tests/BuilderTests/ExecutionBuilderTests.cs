@@ -13,6 +13,7 @@ using QaaS.Framework.SDK.DataSourceObjects;
 using QaaS.Framework.SDK.ExecutionObjects;
 using QaaS.Framework.SDK.Session.SessionDataObjects;
 using QaaS.Framework.SDK.Session.SessionDataObjects.RunningSessionsObjects;
+using QaaS.Runner.Assertions.AssertionObjects;
 using QaaS.Runner.Assertions.ConfigurationObjects;
 using QaaS.Runner.Assertions.ConfigurationObjects.LinkConfigs;
 using QaaS.Runner.Infrastructure;
@@ -91,6 +92,27 @@ public class ExecutionBuilderTests
     }
 
     [Test]
+    public void Build_WithThreeDefaultAssertions_CreatesOneReporterPerTarget()
+    {
+        var builder = CreateValidExecutionBuilder();
+        builder.Assertions =
+        [
+            CreateAssertionBuilder("assertion-1"),
+            CreateAssertionBuilder("assertion-2"),
+            CreateAssertionBuilder("assertion-3")
+        ];
+
+        var execution = builder.Build();
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(execution.ReportLogic.Reporters, Has.Count.EqualTo(2));
+            Assert.That(execution.ReportLogic.Reporters.Select(reporter => reporter.Target),
+                Is.EquivalentTo([ReporterTarget.Allure, ReporterTarget.ReportPortal]));
+        });
+    }
+
+    [Test]
     public void Build_WithSessionWithoutConfiguredStage_AssignsIndexAsDefaultStage()
     {
         var builder = new ExecutionBuilder()
@@ -132,7 +154,6 @@ public class ExecutionBuilderTests
             builder.UpdateAssertion("missing", new AssertionBuilder
             {
                 AssertionInstance = null!,
-                Reporter = null!
             });
             builder.RemoveAssertion("missing");
             builder.UpdateStorageAt(0, new StorageBuilder());
@@ -915,7 +936,7 @@ public class ExecutionBuilderTests
             .Invoke(builder, [scope])!;
         var builtReports = (System.Collections.IEnumerable)typeof(ExecutionBuilder)
             .GetMethod("BuildReports", BindingFlags.Instance | BindingFlags.NonPublic)!
-            .Invoke(builder, [])!;
+            .Invoke(builder, [scope, builtAssertions])!;
         var builtStorages = (System.Collections.IEnumerable)typeof(ExecutionBuilder)
             .GetMethod("BuildStorages", BindingFlags.Instance | BindingFlags.NonPublic)!
             .Invoke(builder, [])!;
@@ -964,7 +985,6 @@ public class ExecutionBuilderTests
             Name = "test-assertion",
             Assertion = "Equals",
             AssertionInstance = null,
-            Reporter = null
         }.HookNamed(nameof(TestAssertion));
         builder.AddAssertion(assertionBuilder);
 
@@ -990,6 +1010,16 @@ public class ExecutionBuilderTests
         return builder.SetExecutionId("test").SetCase("valid").WithLogger(Globals.Logger)
             .WithMetadata(new MetaDataConfig { Team = "Smoke", System = "QaaS" })
             .WithGlobalDict(new Dictionary<string, object?>());
+    }
+
+    private static AssertionBuilder CreateAssertionBuilder(string name)
+    {
+        return new AssertionBuilder
+        {
+            Name = name,
+            Assertion = "Equals",
+            AssertionInstance = null
+        }.HookNamed(nameof(TestAssertion));
     }
 
     private ExecutionBuilder CreateExecutionBuilderWithPublisher(PublisherBuilder publisherBuilder)
@@ -1039,7 +1069,6 @@ public class ExecutionBuilderTests
             Name = "test-assertion",
             Assertion = "Equals",
             AssertionInstance = null,
-            Reporter = null
         }.HookNamed(nameof(TestAssertion));
         builder.AddAssertion(assertionBuilder);
 
@@ -1111,7 +1140,3 @@ public class ExecutionBuilderTests
 
     private sealed record LogEntry(LogLevel LogLevel, string Message);
 }
-
-
-
-

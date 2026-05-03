@@ -1,9 +1,12 @@
-﻿using AssertionResult = QaaS.Runner.Assertions.AssertionObjects.AssertionResult;
+﻿using QaaS.Runner.Assertions.AssertionObjects;
+using AssertionResult = QaaS.Runner.Assertions.AssertionObjects.AssertionResult;
 
 namespace QaaS.Runner.Assertions.Reporters;
 
 public interface IReporter
 {
+    public ReporterTarget Target { get; set; }
+
     public string Name { get; set; }
     public string AssertionName { get; set; }
 
@@ -18,6 +21,4 @@ public interface IReporter
     public DateTime EpochTestSuiteStartTime { get; set; }
 
     public void WriteTestResults(AssertionResult assertionResult);
-
-    public void FinishReport();
 }

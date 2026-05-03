@@ -20,6 +20,8 @@ public class Assertion
     
     public IList<AssertionStatus> StatusesToReport { get; set; } = [];
 
+    public IList<ReporterTarget> ReporterTargets = [ReporterTarget.Allure, ReporterTarget.ReportPortal];
+
     public IConfiguration AssertionConfiguration { get; set; } = new ConfigurationBuilder().Build();
 
     public List<BaseLink>? Links { get; set; }
