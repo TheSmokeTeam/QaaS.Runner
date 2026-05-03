@@ -334,7 +334,8 @@ jobs:
           # -p:PublishRepositoryUrl=true: Injects the Git repository URL into the package metadata.
           # -p:ContinuousIntegrationBuild=true: Normalizes file paths so the debugger works on any machine.
           # -p:Deterministic=true: Ensures the build produces the exact same binary hash every time.
-          # -p:IncludeSymbols=false: Prevents the creation of redundant/empty .snupkg files.
+          # -p:IncludeSource=true: Produces a source package so the mirror can serve QaaS source in air-gapped environments.
+          # -p:SymbolPackageFormat=symbols.nupkg: Uses the legacy symbols package because snupkg does not embed source files.
           dotnet pack ${{ env.PROJECT_PATH }} `
             -c Release `
             --no-restore `
@@ -347,19 +348,33 @@ jobs:
             -p:PublishRepositoryUrl=true `
             -p:ContinuousIntegrationBuild=true `
             -p:Deterministic=true `
-            -p:IncludeSymbols=false
+            -p:IncludeSource=true `
+            -p:IncludeSymbols=true `
+            -p:SymbolPackageFormat=symbols.nupkg
 
       - name: Stage packed packages in restored packages artifact
         if: steps.stable_tag.outputs.is_stable_tag == 'true'
         shell: pwsh
         run: |
-          $pattern = '^(?<id>.+?)\.(?<version>\d+(?:\.\d+){1,3}(?:-[0-9A-Za-z][0-9A-Za-z.-]*)?(?:\+[0-9A-Za-z][0-9A-Za-z.-]*)?)\.(?<extension>nupkg|snupkg)$'
+          $pattern = '^(?<id>.+?)\.(?<version>\d+(?:\.\d+){1,3}(?:-[0-9A-Za-z][0-9A-Za-z.-]*)?(?:\+[0-9A-Za-z][0-9A-Za-z.-]*)?)$'
           $packageFiles = Get-ChildItem "${{ env.PACKAGE_OUTPUT_DIRECTORY }}" -File | Where-Object {
             $_.Extension -in '.nupkg', '.snupkg'
           }
 
           foreach ($packageFile in $packageFiles) {
-            $match = [regex]::Match($packageFile.Name, $pattern, [System.Text.RegularExpressions.RegexOptions]::IgnoreCase)
+            $packageSuffix =
+              if ($packageFile.Name.EndsWith('.symbols.nupkg', [System.StringComparison]::OrdinalIgnoreCase)) {
+                '.symbols.nupkg'
+              } elseif ($packageFile.Name.EndsWith('.snupkg', [System.StringComparison]::OrdinalIgnoreCase)) {
+                '.snupkg'
+              } elseif ($packageFile.Name.EndsWith('.nupkg', [System.StringComparison]::OrdinalIgnoreCase)) {
+                '.nupkg'
+              } else {
+                throw "Unsupported package file '$($packageFile.Name)'."
+              }
+
+            $packageIdentity = $packageFile.Name.Substring(0, $packageFile.Name.Length - $packageSuffix.Length)
+            $match = [regex]::Match($packageIdentity, $pattern, [System.Text.RegularExpressions.RegexOptions]::IgnoreCase)
             if (-not $match.Success) {
               throw "Unable to determine package id and version from '$($packageFile.Name)'."
             }
@@ -375,7 +390,22 @@ jobs:
 
       - name: Push package
         if: steps.stable_tag.outputs.is_stable_tag == 'true'
-        run: dotnet nuget push ${{ env.PACKAGE_OUTPUT_DIRECTORY }}\*.nupkg -k ${{ secrets.NUGET_AUTH_TOKEN }} -s https://api.nuget.org/v3/index.json --skip-duplicate
+        shell: pwsh
+        run: |
+          $packages = Get-ChildItem "${{ env.PACKAGE_OUTPUT_DIRECTORY }}" -Filter "*.nupkg" -File | Where-Object {
+            $_.Name -notlike '*.symbols.nupkg'
+          }
+
+          if (@($packages).Count -eq 0) {
+            throw "No NuGet packages were found to publish."
+          }
+
+          foreach ($package in $packages) {
+            dotnet nuget push $package.FullName -k ${{ secrets.NUGET_AUTH_TOKEN }} -s https://api.nuget.org/v3/index.json --skip-duplicate
+            if ($LASTEXITCODE -ne 0) {
+              throw "NuGet push failed for '$($package.Name)'."
+            }
+          }
 
       - name: Write restored packages metadata
         if: steps.stable_tag.outputs.is_stable_tag == 'true'
