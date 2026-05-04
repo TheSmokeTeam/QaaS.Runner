@@ -75,7 +75,7 @@ public class ExecutionTests
             DataSourceLogic = new DataSourceLogic([], context),
             SessionLogic = new SessionLogic([session.Object], context),
             AssertionLogic = new AssertionLogic([], context),
-            ReportLogic = new ReportLogic([], context, Mock.Of<IReportPortalLaunchManager>(), DateTime.UtcNow),
+            ReportLogic = new ReportLogic([], context, DateTime.UtcNow),
             StorageLogic = new StorageLogic([], context, ExecutionType.Assert),
             TemplateLogic = new TemplateLogic(context, TextWriter.Null)
         };
@@ -156,7 +156,7 @@ public class ExecutionTests
             DataSourceLogic = new DataSourceLogic([], context),
             SessionLogic = new SessionLogic([], context),
             AssertionLogic = new AssertionLogic(assertions ?? [], context),
-            ReportLogic = new ReportLogic([], context, Mock.Of<IReportPortalLaunchManager>(), DateTime.UtcNow),
+            ReportLogic = new ReportLogic([], context, DateTime.UtcNow),
             StorageLogic = new StorageLogic(storages ?? [], context, executionType),
             TemplateLogic = new TemplateLogic(context, TextWriter.Null)
         };

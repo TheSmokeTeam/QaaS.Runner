@@ -60,10 +60,10 @@ public class ReportPortalReporterTests
     {
         var client = new RecordingReportPortalClient();
         var factory = new RecordingReportPortalClientFactory(client);
-        var (reporter, manager) = CreateReporter(factory);
+        var reporter = CreateReporter(factory);
 
         reporter.WriteTestResults(CreateAssertionResult());
-        manager.Finish();
+        reporter.FinishReport();
 
         Assert.Multiple(() =>
         {
@@ -75,17 +75,20 @@ public class ReportPortalReporterTests
             Assert.That(client.StartLaunchRequests.Single().Attributes.Select(attribute => attribute.Key),
                 Does.Contain("system"));
             Assert.That(client.FinishLaunchRequests, Has.Count.EqualTo(1));
+            Assert.That(client.Disposed, Is.True);
         });
     }
 
     [Test]
     public void WriteTestResults_WithMissingMetadataTeam_ThrowsInvalidOperationException()
     {
-        var manager = CreateLaunchManager(new RecordingReportPortalClientFactory(new RecordingReportPortalClient()));
         var context = CreateContext(metadataTeam: string.Empty);
+        var reporter = CreateReporter(new RecordingReportPortalClientFactory(new RecordingReportPortalClient()),
+            context: context,
+            startReport: false);
 
         var exception = Assert.Throws<InvalidOperationException>(() =>
-            manager.Start(context, TestSuiteStartTime));
+            reporter.StartReport(context, TestSuiteStartTime));
 
         Assert.That(exception!.Message, Does.Contain("metadata Team"));
     }
@@ -100,23 +103,53 @@ public class ReportPortalReporterTests
                                          }
                                        }
                                        """);
-        var manager = CreateLaunchManager(new RecordingReportPortalClientFactory(new RecordingReportPortalClient()));
         var context = CreateContext();
+        var reporter = CreateReporter(new RecordingReportPortalClientFactory(new RecordingReportPortalClient()),
+            context: context,
+            startReport: false);
 
         var exception = Assert.Throws<InvalidOperationException>(() =>
-            manager.Start(context, TestSuiteStartTime));
+            reporter.StartReport(context, TestSuiteStartTime));
 
         Assert.That(exception!.Message, Does.Contain("server URL"));
+    }
+
+    [Test]
+    public void WriteTestResults_WhenReportPortalIsDisabled_DoesNotStartLaunchOrWriteItems()
+    {
+        File.WriteAllText(_configPath, """
+                                       {
+                                         "enabled": false,
+                                         "server": {
+                                           "url": "http://reportportal.local",
+                                           "apiKey": "rp-token"
+                                         }
+                                       }
+                                       """);
+        var client = new RecordingReportPortalClient();
+        var reporter = CreateReporter(new RecordingReportPortalClientFactory(client), startReport: false);
+
+        reporter.StartReport(reporter.Context, TestSuiteStartTime);
+        reporter.WriteTestResults(CreateAssertionResult());
+        reporter.FinishReport();
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(client.StartLaunchRequests, Is.Empty);
+            Assert.That(client.StartTestItemRequests, Is.Empty);
+            Assert.That(client.FinishLaunchRequests, Is.Empty);
+            Assert.That(client.Disposed, Is.False);
+        });
     }
 
     [Test]
     public void WriteTestResults_MapsGenericReportCaseToReportPortalRequests()
     {
         var client = new RecordingReportPortalClient();
-        var (reporter, manager) = CreateReporter(new RecordingReportPortalClientFactory(client));
+        var reporter = CreateReporter(new RecordingReportPortalClientFactory(client));
 
         reporter.WriteTestResults(CreateAssertionResult());
-        manager.Finish();
+        reporter.FinishReport();
 
         var testRequest = client.StartTestItemRequests.Single();
         var testFinish = client.FinishTestItemRequests.Last();
@@ -147,15 +180,14 @@ public class ReportPortalReporterTests
 
     private static readonly DateTime TestSuiteStartTime = new(2026, 1, 1, 12, 0, 0, DateTimeKind.Utc);
 
-    private (ReportPortalReporter Reporter, ReportPortalLaunchManager Manager) CreateReporter(
+    private ReportPortalReporter CreateReporter(
         RecordingReportPortalClientFactory factory,
-        string metadataTeam = "Smoke")
+        string metadataTeam = "Smoke",
+        InternalContext? context = null,
+        bool startReport = true)
     {
-        var context = CreateContext(metadataTeam);
-        var manager = CreateLaunchManager(factory);
-        manager.Start(context, TestSuiteStartTime);
-
-        return (new ReportPortalReporter(manager)
+        context ??= CreateContext(metadataTeam);
+        var reporter = new ReportPortalReporter(factory, new System.IO.Abstractions.FileSystem(), _configPath)
         {
             Context = context,
             FileSystem = new System.IO.Abstractions.FileSystem(),
@@ -166,12 +198,12 @@ public class ReportPortalReporterTests
             DisplayTrace = true,
             Severity = AssertionSeverity.Critical,
             TestSuiteStartTimeUtc = TestSuiteStartTime
-        }, manager);
-    }
+        };
 
-    private ReportPortalLaunchManager CreateLaunchManager(RecordingReportPortalClientFactory factory)
-    {
-        return new ReportPortalLaunchManager(factory, new System.IO.Abstractions.FileSystem(), _configPath);
+        if (startReport)
+            reporter.StartReport(context, TestSuiteStartTime);
+
+        return reporter;
     }
 
     private static InternalContext CreateContext(string metadataTeam = "Smoke")

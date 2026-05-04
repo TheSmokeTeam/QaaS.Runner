@@ -13,18 +13,15 @@ namespace QaaS.Runner.Logics;
 public class ReportLogic : ILogic
 {
     private readonly InternalContext _context;
-    private readonly IReportPortalLaunchManager _reportPortalLaunchManager;
     private readonly DateTime _testSuiteStartTimeUtc;
 
     public ReportLogic(
         IList<IReporter> reporters,
         InternalContext context,
-        IReportPortalLaunchManager reportPortalLaunchManager,
         DateTime testSuiteStartTimeUtc)
     {
         Reporters = reporters;
         _context = context;
-        _reportPortalLaunchManager = reportPortalLaunchManager;
         _testSuiteStartTimeUtc = testSuiteStartTimeUtc;
     }
 
@@ -46,12 +43,18 @@ public class ReportLogic : ILogic
         var assertionResults = executionData.AssertionResults
             .OfType<AssertionResult>()
             .ToList();
-        var hasReportPortalReporter = Reporters.Any(reporter => reporter.Target == ReporterTarget.ReportPortal);
+        var lifecycleReporters = Reporters
+            .OfType<ILifecycleReporter>()
+            .ToList();
+        var startedLifecycleReporters = new List<ILifecycleReporter>(lifecycleReporters.Count);
 
         try
         {
-            if (hasReportPortalReporter)
-                _reportPortalLaunchManager.Start(_context, _testSuiteStartTimeUtc);
+            foreach (var lifecycleReporter in lifecycleReporters)
+            {
+                lifecycleReporter.StartReport(_context, _testSuiteStartTimeUtc);
+                startedLifecycleReporters.Add(lifecycleReporter);
+            }
 
             foreach (var reporter in Reporters)
             {
@@ -82,8 +85,8 @@ public class ReportLogic : ILogic
         }
         finally
         {
-            if (hasReportPortalReporter)
-                _reportPortalLaunchManager.Finish();
+            foreach (var lifecycleReporter in startedLifecycleReporters)
+                lifecycleReporter.FinishReport();
         }
 
         _context.Logger.LogInformation(

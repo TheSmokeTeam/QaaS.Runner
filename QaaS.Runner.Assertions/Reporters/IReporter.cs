@@ -1,4 +1,5 @@
-﻿using QaaS.Runner.Assertions.AssertionObjects;
+﻿using QaaS.Framework.SDK.ContextObjects;
+using QaaS.Runner.Assertions.AssertionObjects;
 using AssertionResult = QaaS.Runner.Assertions.AssertionObjects.AssertionResult;
 
 namespace QaaS.Runner.Assertions.Reporters;
@@ -21,4 +22,11 @@ public interface IReporter
     public DateTime TestSuiteStartTimeUtc { get; set; }
 
     public void WriteTestResults(AssertionResult assertionResult);
+}
+
+public interface ILifecycleReporter
+{
+    void StartReport(Context context, DateTime testSuiteStartTimeUtc);
+
+    void FinishReport();
 }

@@ -623,10 +623,6 @@ public class ExecutionBuilder() : BaseExecutionBuilder<InternalContext, Executio
             containerBuilder.RegisterType<AllureReporter>().AsSelf().InstancePerLifetimeScope();
             containerBuilder.RegisterType<ReportPortalReporter>().AsSelf().InstancePerLifetimeScope();
             containerBuilder.RegisterType<ReporterFactory>().AsSelf().InstancePerLifetimeScope();
-            containerBuilder.RegisterType<ReportPortalLaunchManager>()
-                .As<IReportPortalLaunchManager>()
-                .As<IReportPortalLaunchAccessor>()
-                .InstancePerLifetimeScope();
         });
     }
 
