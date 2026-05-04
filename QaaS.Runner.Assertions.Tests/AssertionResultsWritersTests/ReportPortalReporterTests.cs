@@ -165,7 +165,7 @@ public class ReportPortalReporterTests
             SaveTemplate = false,
             DisplayTrace = true,
             Severity = AssertionSeverity.Critical,
-            EpochTestSuiteStartTime = TestSuiteStartTime
+            TestSuiteStartTimeUtc = TestSuiteStartTime
         }, manager);
     }
 

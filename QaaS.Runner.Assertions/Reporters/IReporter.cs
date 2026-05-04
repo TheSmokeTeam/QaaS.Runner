@@ -18,7 +18,7 @@ public interface IReporter
 
     public bool DisplayTrace { get; set; }
 
-    public DateTime EpochTestSuiteStartTime { get; set; }
+    public DateTime TestSuiteStartTimeUtc { get; set; }
 
     public void WriteTestResults(AssertionResult assertionResult);
 }

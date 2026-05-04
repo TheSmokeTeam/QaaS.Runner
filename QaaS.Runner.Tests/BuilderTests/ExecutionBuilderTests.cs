@@ -936,7 +936,7 @@ public class ExecutionBuilderTests
             .Invoke(builder, [scope])!;
         var builtReports = (System.Collections.IEnumerable)typeof(ExecutionBuilder)
             .GetMethod("BuildReports", BindingFlags.Instance | BindingFlags.NonPublic)!
-            .Invoke(builder, [scope, builtAssertions])!;
+            .Invoke(builder, [scope, builtAssertions, DateTime.UtcNow])!;
         var builtStorages = (System.Collections.IEnumerable)typeof(ExecutionBuilder)
             .GetMethod("BuildStorages", BindingFlags.Instance | BindingFlags.NonPublic)!
             .Invoke(builder, [])!;

@@ -216,12 +216,17 @@ public class ExecutionBuilder() : BaseExecutionBuilder<InternalContext, Executio
         return assertions;
     }
 
-    private IEnumerable<IReporter> BuildReports(ILifetimeScope scope, IEnumerable<Assertion> builtAssertions)
+    private IEnumerable<IReporter> BuildReports(
+        ILifetimeScope scope,
+        IEnumerable<Assertion> builtAssertions,
+        DateTime testSuiteStartTimeUtc)
     {
-        var testSuiteStartTimeUtc = DateTime.UtcNow;
+        var assertions = builtAssertions.ToList();
+        if (!assertions.Any(assertion => assertion.ReporterTargets.Count > 0))
+            return [];
 
         return scope.Resolve<ReporterFactory>()
-            .BuildReporters(builtAssertions, Context, testSuiteStartTimeUtc);
+            .BuildReporters(assertions, Context, testSuiteStartTimeUtc);
     }
 
     private IEnumerable<IStorage> BuildStorages()
@@ -945,7 +950,8 @@ public class ExecutionBuilder() : BaseExecutionBuilder<InternalContext, Executio
             var builtSessions = BuildSessions(scope).ToList();
             var builtStorages = BuildStorages().ToList();
             var builtAssertions = BuildAssertions(scope).ToList();
-            var builtReports = BuildReports(scope, builtAssertions).ToList();
+            var testSuiteStartTimeUtc = DateTime.UtcNow;
+            var builtReports = BuildReports(scope, builtAssertions, testSuiteStartTimeUtc).ToList();
             var dataSourceLogic =
                 scope.Resolve<DataSourceLogic>(
                     new TypedParameter(typeof(IList<DataSource>), builtDataSources));
@@ -959,7 +965,9 @@ public class ExecutionBuilder() : BaseExecutionBuilder<InternalContext, Executio
                 scope.Resolve<AssertionLogic>(
                     new TypedParameter(typeof(IList<Assertion>), builtAssertions));
             var reportLogic =
-                scope.Resolve<ReportLogic>(new TypedParameter(typeof(IList<IReporter>), builtReports));
+                scope.Resolve<ReportLogic>(
+                    new TypedParameter(typeof(IList<IReporter>), builtReports),
+                    new TypedParameter(typeof(DateTime), testSuiteStartTimeUtc));
             var templateLogic = scope.Resolve<TemplateLogic>(new TypedParameter(typeof(Context), Context));
             var reporterTargets = FormatReporterTargets(builtReports);
 

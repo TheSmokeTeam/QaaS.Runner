@@ -44,7 +44,7 @@ public abstract class BaseReporter : IReporter
     public bool SaveAttachments { get; set; }
     public bool SaveTemplate { get; set; }
     public bool DisplayTrace { get; set; }
-    public DateTime EpochTestSuiteStartTime { get; set; }
+    public DateTime TestSuiteStartTimeUtc { get; set; }
 
     public void WriteTestResults(AssertionResult assertionResult)
     {
@@ -77,8 +77,8 @@ public abstract class BaseReporter : IReporter
                 (assertionResult.Flaky.IsFlaky
                     ? ArrangeFlakinessReasons(assertionResult.Flaky.FlakinessReasons)
                     : string.Empty),
-            Start = EpochTestSuiteStartTime,
-            Stop = EpochTestSuiteStartTime.AddMilliseconds(assertionResult.TestDurationMs),
+            Start = TestSuiteStartTimeUtc,
+            Stop = TestSuiteStartTimeUtc.AddMilliseconds(assertionResult.TestDurationMs),
             IsFlaky = assertionResult.Flaky.IsFlaky,
             Links = assertionResult.Links is not null
                 ? assertionResult.Links.Select(link => new ReportLink
@@ -111,7 +111,7 @@ public abstract class BaseReporter : IReporter
     {
         var currentAttachmentDirectory = Path.Join(
             BuildAttachmentSegment(baseAttachmentDirectory, nameof(baseAttachmentDirectory)),
-            $"{EpochTestSuiteStartTime}");
+            $"{TestSuiteStartTimeUtc}");
         var executionAttachmentsDirectory = Context.ExecutionId == null
             ? currentAttachmentDirectory
             : Path.Join(currentAttachmentDirectory,

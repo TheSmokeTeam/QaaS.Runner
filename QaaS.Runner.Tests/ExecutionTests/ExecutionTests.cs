@@ -12,6 +12,7 @@ using QaaS.Framework.SDK.Hooks.Assertion;
 using QaaS.Framework.SDK.Session.SessionDataObjects;
 using QaaS.Framework.SDK.Session.SessionDataObjects.RunningSessionsObjects;
 using QaaS.Runner.Assertions.AssertionObjects;
+using QaaS.Runner.Assertions.Reporters;
 using QaaS.Runner.Logics;
 using QaaS.Runner.Sessions.Session;
 using QaaS.Runner.Storage;
@@ -74,7 +75,7 @@ public class ExecutionTests
             DataSourceLogic = new DataSourceLogic([], context),
             SessionLogic = new SessionLogic([session.Object], context),
             AssertionLogic = new AssertionLogic([], context),
-            ReportLogic = new ReportLogic([], context),
+            ReportLogic = new ReportLogic([], context, Mock.Of<IReportPortalLaunchManager>(), DateTime.UtcNow),
             StorageLogic = new StorageLogic([], context, ExecutionType.Assert),
             TemplateLogic = new TemplateLogic(context, TextWriter.Null)
         };
@@ -155,7 +156,7 @@ public class ExecutionTests
             DataSourceLogic = new DataSourceLogic([], context),
             SessionLogic = new SessionLogic([], context),
             AssertionLogic = new AssertionLogic(assertions ?? [], context),
-            ReportLogic = new ReportLogic([], context),
+            ReportLogic = new ReportLogic([], context, Mock.Of<IReportPortalLaunchManager>(), DateTime.UtcNow),
             StorageLogic = new StorageLogic(storages ?? [], context, executionType),
             TemplateLogic = new TemplateLogic(context, TextWriter.Null)
         };

@@ -329,14 +329,14 @@ public class AllureReporterTests
         // Arrange
         var getAttachmentDirectoryMethod = Reporter?.GetType()
             .GetMethod("GetAttachmentDirectory", BindingFlags.NonPublic | BindingFlags.Instance)!;
-        var epochTestSuiteStartTimeField = typeof(AllureReporter)
-            .GetProperty("EpochTestSuiteStartTime", BindingFlags.Public | BindingFlags.Instance)!;
+        var testSuiteStartTimeUtcProperty = typeof(AllureReporter)
+            .GetProperty("TestSuiteStartTimeUtc", BindingFlags.Public | BindingFlags.Instance)!;
 
         // Act
         var attachmentDirectory = (string)getAttachmentDirectoryMethod.Invoke(Reporter,
             [baseAttachmentDirectoryInsideAllureDirectory, extraSubDirectoryName])!;
         var expectedAttachmentDirectory = Path.Join(baseAttachmentDirectoryInsideAllureDirectory,
-            epochTestSuiteStartTimeField.GetValue(Reporter)!.ToString(),
+            testSuiteStartTimeUtcProperty.GetValue(Reporter)!.ToString(),
             FileSystemExtensions.MakeValidDirectoryName(executionId),
             FileSystemExtensions.MakeValidDirectoryName(caseName),
             FileSystemExtensions.MakeValidDirectoryName(extraSubDirectoryName));

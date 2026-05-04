@@ -111,7 +111,7 @@ public class ReportPortalReporter : BaseReporter
             LaunchUuid = launchUuid,
             Name = step.Name,
             Description = step.Description,
-            StartTime = step.Start ?? EpochTestSuiteStartTime,
+            StartTime = step.Start ?? TestSuiteStartTimeUtc,
             Type = TestItemType.Step,
             HasStats = false,
             Parameters = ToParameters(step.Parameters),
@@ -131,7 +131,7 @@ public class ReportPortalReporter : BaseReporter
         {
             LaunchUuid = launchUuid,
             Description = step.Description,
-            EndTime = step.Stop ?? step.Start ?? EpochTestSuiteStartTime,
+            EndTime = step.Stop ?? step.Start ?? TestSuiteStartTimeUtc,
             Status = ToReportPortalStatus(step.Status)
         }).GetAwaiter().GetResult();
     }

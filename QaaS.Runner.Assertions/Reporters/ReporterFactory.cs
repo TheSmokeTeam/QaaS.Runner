@@ -74,7 +74,7 @@ public sealed class ReporterFactory(ILifetimeScope scope)
         reporter.Target = target;
         reporter.Name = typeof(TReporter).Name;
         reporter.AssertionName = string.Empty;
-        reporter.EpochTestSuiteStartTime = testSuiteStartTimeUtc;
+        reporter.TestSuiteStartTimeUtc = testSuiteStartTimeUtc;
 
         if (reporter is BaseReporter baseReporter)
         {
