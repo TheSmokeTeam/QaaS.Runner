@@ -71,7 +71,7 @@ public class ReportPortalReporterTests
             Assert.That(factory.ProjectName, Is.EqualTo("Smoke"));
             Assert.That(factory.ApiKey, Is.EqualTo("rp-token"));
             Assert.That(client.StartLaunchRequests.Single().Mode, Is.EqualTo(LaunchMode.Debug));
-            Assert.That(client.StartLaunchRequests.Single().Name, Is.EqualTo("Smoke QaaS 2026-01-01 12:00:00"));
+            Assert.That(client.StartLaunchRequests.Single().Name, Is.EqualTo("Smoke QaaS"));
             Assert.That(client.StartLaunchRequests.Single().Attributes.Select(attribute => attribute.Key),
                 Does.Contain("system"));
             Assert.That(client.FinishLaunchRequests, Has.Count.EqualTo(1));

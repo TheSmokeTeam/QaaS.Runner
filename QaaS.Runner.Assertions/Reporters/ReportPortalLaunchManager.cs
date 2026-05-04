@@ -75,7 +75,7 @@ internal sealed class ReportPortalLaunchManager : IReportPortalLaunchManager
         _client = _clientFactory.Create(config.Server.Url, project, config.Server.ApiKey);
         var launch = _client.StartLaunchAsync(new StartLaunchRequest
         {
-            Name = ResolveLaunchName(metadata, testSuiteStartTimeUtc),
+            Name = ResolveLaunchName(metadata),
             Description = "QaaS Runner execution",
             Mode = config.Launch.DebugMode ? LaunchMode.Debug : LaunchMode.Default,
             StartTime = testSuiteStartTimeUtc,
@@ -163,10 +163,10 @@ internal sealed class ReportPortalLaunchManager : IReportPortalLaunchManager
         return metadata.Team;
     }
 
-    private static string ResolveLaunchName(QaaS.Framework.SDK.MetaDataConfig metadata, DateTime testSuiteStartTimeUtc)
+    private static string ResolveLaunchName(QaaS.Framework.SDK.MetaDataConfig metadata)
     {
         var system = string.IsNullOrWhiteSpace(metadata.System) ? "UnknownSystem" : metadata.System;
-        return $"{metadata.Team} {system} {testSuiteStartTimeUtc:yyyy-MM-dd HH:mm:ss}";
+        return $"{metadata.Team} {system}";
     }
 
     private static List<ItemAttribute> BuildLaunchAttributes(Context context, QaaS.Framework.SDK.MetaDataConfig metadata)
