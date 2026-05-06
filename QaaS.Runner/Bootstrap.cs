@@ -3,6 +3,7 @@ using Autofac;
 using CommandLine;
 using Microsoft.Extensions.Logging;
 using QaaS.Framework.Executions.CommandLineBuilders;
+using QaaS.Runner.Assertions;
 using QaaS.Runner.Loaders;
 using QaaS.Runner.Modules;
 using QaaS.Runner.Options;
@@ -389,6 +390,7 @@ public static class Bootstrap
     {
         var containerBuilder = new ContainerBuilder();
         containerBuilder.RegisterModule<AllureWrapperModule>();
+        containerBuilder.RegisterType<ReportPortalLaunchManager>().SingleInstance();
         return containerBuilder.Build();
     }
 
