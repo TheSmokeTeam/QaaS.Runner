@@ -32,7 +32,7 @@ public class ReportLogic(IList<IReporter> reporters, InternalContext context) : 
         foreach (var reporter in reporters)
         {
             var matchingAssertionResults = assertionResults
-                .Where(assertionResult => assertionResult.Assertion.ReporterType == reporter.GetType())
+                .Where(assertionResult => assertionResult.Assertion.ReporterTypes.Contains(reporter.GetType()))
                 .ToList();
 
             context.Logger.LogDebug(

@@ -31,7 +31,7 @@ public class ReportLogicTests
                     AssertionStatus.Skipped,
                     AssertionStatus.Unknown
                 ],
-                ReporterType = typeof(RecordingReporter),
+                ReporterTypes = [typeof(RecordingReporter)],
                 AssertionName = null,
                 AssertionHook = null
             };
@@ -89,7 +89,7 @@ public class ReportLogicTests
                     AssertionStatus.Skipped,
                     AssertionStatus.Unknown
                 ],
-                ReporterType = typeof(RecordingReporter),
+                ReporterTypes = [typeof(RecordingReporter)],
                 AssertionName = null,
                 AssertionHook = null
             },
@@ -110,7 +110,7 @@ public class ReportLogicTests
                     AssertionStatus.Skipped,
                     AssertionStatus.Unknown
                 ],
-                ReporterType = typeof(AlternateRecordingReporter),
+                ReporterTypes = [typeof(AlternateRecordingReporter)],
                 AssertionName = null,
                 AssertionHook = null
             },
@@ -144,7 +144,7 @@ public class ReportLogicTests
             {
                 Name = "AssertionA",
                 StatussesToReport = [AssertionStatus.Failed],
-                ReporterType = typeof(RecordingReporter),
+                ReporterTypes = [typeof(RecordingReporter)],
                 AssertionName = null,
                 AssertionHook = null
             },

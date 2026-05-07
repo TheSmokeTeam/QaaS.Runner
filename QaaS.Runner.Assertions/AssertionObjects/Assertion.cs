@@ -41,7 +41,7 @@ public class Assertion
     /// <summary>
     /// Reporter implementation type that should receive this assertion result.
     /// </summary>
-    public Type ReporterType { get; set; } = typeof(AllureReporter);
+    public IList<Type> ReporterTypes { get; set; } = [typeof(AllureReporter), typeof(ReportPortalReporter)];
 
     /// <summary>
     ///     All Session data that might be relevant to the session according to its configuration
