@@ -1,13 +1,20 @@
+using System.Collections.Immutable;
+using System.ComponentModel.DataAnnotations;
 using System.Collections.Generic;
 using System.Linq;
+using Microsoft.Extensions.Configuration;
 using Moq;
 using NUnit.Framework;
 using NUnit.Framework.Legacy;
 using QaaS.Framework.Policies;
 using QaaS.Framework.Protocols.Protocols;
+using QaaS.Framework.SDK.ContextObjects;
 using QaaS.Framework.SDK.DataSourceObjects;
+using QaaS.Framework.SDK.Hooks.Generator;
 using QaaS.Framework.SDK.Session;
 using QaaS.Framework.SDK.Session.DataObjects;
+using QaaS.Framework.SDK.Session.SessionDataObjects;
+using QaaS.Framework.Serialization;
 using QaaS.Runner.Sessions.Tests.Actions.Utils;
 using Serilog;
 using Serilog.Events;
@@ -152,5 +159,68 @@ public class TransactionTests
         Assert.That(outputRcd.SerializationType, Is.EqualTo(transaction.GetType()
             .GetMethod("GetOutputCommunicationSerializationType", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance)!
             .Invoke(transaction, null)));
+    }
+
+    [Test]
+    public void Act_WithBinaryOutputDeserializerAndNoSpecificType_DeserializesToOriginalPayloadType()
+    {
+        var payload = new BinaryPayload { Value = "transaction-output" };
+        var serializer = SerializerFactory.BuildSerializer(SerializationType.Binary)!;
+        var transactor = new Mock<ITransactor>();
+        transactor.Setup(instance => instance.Transact(It.IsAny<Data<object>>()))
+            .Returns(new Tuple<DetailedData<object>, DetailedData<object>?>(
+                new DetailedData<object> { Body = "request" },
+                new DetailedData<object> { Body = serializer.Serialize(payload) }));
+        var transaction = new Sessions.Actions.Transactions.Transaction(
+            "BinaryTransaction",
+            transactor.Object,
+            0,
+            new DataFilter { Body = true, Timestamp = true, MetaData = true },
+            new DataFilter { Body = true, Timestamp = true, MetaData = true },
+            null,
+            false,
+            1,
+            0,
+            null,
+            SerializationType.Binary,
+            null,
+            null,
+            ["source-a"],
+            Globals.Logger);
+        var dataSource = new DataSource
+        {
+            Name = "source-a",
+            DataSourceList = ImmutableList<DataSource>.Empty,
+            Generator = new SingleItemGenerator()
+        };
+
+        transaction.InitializeIterableSerializableSaveIterator([], [dataSource]);
+        var actData = transaction.Act();
+
+        var body = actData.Output!.Single()!.Body;
+        Assert.Multiple(() =>
+        {
+            Assert.That(body, Is.TypeOf<BinaryPayload>());
+            Assert.That(((BinaryPayload)body!).Value, Is.EqualTo(payload.Value));
+        });
+    }
+
+    [Serializable]
+    private sealed class BinaryPayload
+    {
+        public string Value { get; set; } = string.Empty;
+    }
+
+    private sealed class SingleItemGenerator : IGenerator
+    {
+        public Context Context { get; set; } = null!;
+
+        public List<ValidationResult>? LoadAndValidateConfiguration(IConfiguration configuration) => [];
+
+        public IEnumerable<Data<object>> Generate(IImmutableList<SessionData> sessionDataList,
+            IImmutableList<DataSource> dataSourceList)
+        {
+            return [new Data<object> { Body = "request" }];
+        }
     }
 }

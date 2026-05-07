@@ -126,14 +126,14 @@ public class PublisherBuilderTests
     }
 
     [Test]
-    public void UpdateAndDeleteDataSourcePattern_ShouldApplyExpectedMutations()
+    public void UpdateAndRemoveDataSourcePattern_ShouldApplyExpectedMutations()
     {
         var builder = new PublisherBuilder()
             .AddDataSourcePattern("pattern1")
             .AddDataSourcePattern("pattern2");
 
         builder.UpdateDataSourcePattern("pattern1", "pattern1-updated");
-        builder.DeleteDataSourcePattern("pattern2");
+        builder.RemoveDataSourcePattern("pattern2");
 
         Assert.That(builder.DataSourcePatterns, Is.EquivalentTo(new[] { "pattern1-updated" }));
     }
@@ -144,7 +144,7 @@ public class PublisherBuilderTests
         var builder = new PublisherBuilder();
 
         Assert.DoesNotThrow(() => builder.UpdateDataSource("missing", "new-value"));
-        Assert.That(builder.ReadDataSources(), Is.Empty);
+        Assert.That(builder.DataSourceNames, Is.Null);
     }
 
     [Test]
@@ -153,25 +153,25 @@ public class PublisherBuilderTests
         var builder = new PublisherBuilder();
 
         Assert.DoesNotThrow(() => builder.UpdateDataSourcePattern("missing", "new-value"));
-        Assert.That(builder.ReadDataSourcePatterns(), Is.Empty);
+        Assert.That(builder.DataSourcePatterns, Is.Null);
     }
 
     [Test]
-    public void DeleteDataSource_WhenCollectionIsNull_DoesNothing()
+    public void RemoveDataSource_WhenCollectionIsNull_DoesNothing()
     {
         var builder = new PublisherBuilder();
 
-        Assert.DoesNotThrow(() => builder.DeleteDataSource("missing"));
-        Assert.That(builder.ReadDataSources(), Is.Empty);
+        Assert.DoesNotThrow(() => builder.RemoveDataSource("missing"));
+        Assert.That(builder.DataSourceNames, Is.Null);
     }
 
     [Test]
-    public void DeleteDataSourcePattern_WhenCollectionIsNull_DoesNothing()
+    public void RemoveDataSourcePattern_WhenCollectionIsNull_DoesNothing()
     {
         var builder = new PublisherBuilder();
 
-        Assert.DoesNotThrow(() => builder.DeleteDataSourcePattern("missing"));
-        Assert.That(builder.ReadDataSourcePatterns(), Is.Empty);
+        Assert.DoesNotThrow(() => builder.RemoveDataSourcePattern("missing"));
+        Assert.That(builder.DataSourcePatterns, Is.Null);
     }
 
     [Test]
@@ -213,13 +213,28 @@ public class PublisherBuilderTests
     }
 
     [Test]
-    public void DeletePolicyAt_WithValidIndex_RemovesPolicy()
+    public void AddPolicy_WhenPoliciesIsNull_InitializesCollectionAndAddsPolicy()
+    {
+        var builder = new PublisherBuilder
+        {
+            Policies = null!
+        };
+        var policy = new PolicyBuilder();
+
+        builder.AddPolicy(policy);
+
+        Assert.That(builder.Policies, Has.Length.EqualTo(1));
+        Assert.That(builder.Policies[0], Is.SameAs(policy));
+    }
+
+    [Test]
+    public void RemovePolicyAt_WithValidIndex_RemovesPolicy()
     {
         var builder = new PublisherBuilder()
             .AddPolicy(new PolicyBuilder())
             .AddPolicy(new PolicyBuilder());
 
-        builder.DeletePolicyAt(0);
+        builder.RemovePolicyAt(0);
 
         Assert.That(builder.Policies.Length, Is.EqualTo(1));
     }
@@ -233,11 +248,11 @@ public class PublisherBuilderTests
     }
 
     [Test]
-    public void DeletePolicyAt_WithInvalidIndex_ThrowsArgumentOutOfRangeException()
+    public void RemovePolicyAt_WithInvalidIndex_ThrowsArgumentOutOfRangeException()
     {
         var builder = new PublisherBuilder();
 
-        Assert.Throws<ArgumentOutOfRangeException>(() => builder.DeletePolicyAt(0));
+        Assert.Throws<ArgumentOutOfRangeException>(() => builder.RemovePolicyAt(0));
     }
 
     [Test]
@@ -267,7 +282,7 @@ public class PublisherBuilderTests
     {
         var builder = new PublisherBuilder().Configure(config);
 
-        Assert.That(builder.ReadConfiguration(), Is.SameAs(config));
+        Assert.That(builder.Configuration, Is.SameAs(config));
     }
 
     [Test]
@@ -275,7 +290,7 @@ public class PublisherBuilderTests
     {
         var builder = new PublisherBuilder();
 
-        Assert.That(builder.ReadConfiguration(), Is.Null);
+        Assert.That(builder.Configuration, Is.Null);
     }
 
     [Test]
@@ -360,15 +375,18 @@ public class PublisherBuilderTests
     {
         var builder = new PublisherBuilder();
 
-        Assert.Throws<InvalidOperationException>(() => builder.UpdateConfiguration(config => config));
+        Assert.Throws<InvalidOperationException>(() => builder.UpdateConfiguration(new { Host = "rabbit.local" }));
     }
 
     [Test]
-    public void UpdateConfiguration_WithConfigurationWithoutExistingConfiguration_ThrowsInvalidOperationException()
+    public void UpdateConfiguration_WithConfigurationWithoutExistingConfiguration_ConfiguresIncomingType()
     {
         var builder = new PublisherBuilder();
+        var config = new RabbitMqSenderConfig();
 
-        Assert.Throws<InvalidOperationException>(() => builder.UpdateConfiguration(new RabbitMqSenderConfig()));
+        builder.UpdateConfiguration(config);
+
+        Assert.That(builder.Configuration, Is.SameAs(config));
     }
 
     [Test]
@@ -586,3 +604,5 @@ public class PublisherBuilderTests
             : [];
     }
 }
+
+

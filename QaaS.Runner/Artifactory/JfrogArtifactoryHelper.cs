@@ -17,7 +17,12 @@ public class JfrogArtifactoryHelper : IJfrogArtifactoryHelper
     /// <returns> The url to the storage api of the jfrog artifactory folder </returns>
     public static string ParseArtifactoryFolderUrlToStorageApiUrl(string url)
     {
-        var uri = new Uri(url);
+        if (!Uri.TryCreate(url, UriKind.Absolute, out var uri) ||
+            (uri.Scheme != Uri.UriSchemeHttp && uri.Scheme != Uri.UriSchemeHttps))
+        {
+            throw new UriFormatException("Artifactory URL must be an absolute HTTP or HTTPS URI.");
+        }
+
         var segments = uri.Segments.ToList();
         var indexOfArtifactorySegment = segments.IndexOf(ArtifactorySegment);
         if (indexOfArtifactorySegment == -1)

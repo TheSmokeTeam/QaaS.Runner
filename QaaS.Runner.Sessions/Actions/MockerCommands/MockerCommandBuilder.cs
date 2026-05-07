@@ -33,6 +33,11 @@ public class MockerCommandBuilder
     [Required]
     [Description("The command action to commit")]
     public MockerCommandConfig? Command { get; internal set; }
+    public MockerCommandConfig? Configuration
+    {
+        get => Command;
+        internal set => Command = value;
+    }
     [Description("The duration the runner will try to request the mocker server instances")]
     [DefaultValue(3000)]
     public int RequestDurationMs { get; internal set; } = 3000;
@@ -131,83 +136,6 @@ public class MockerCommandBuilder
     }
 
     /// <summary>
-    /// Configures command on the current Runner mocker command builder instance.
-    /// </summary>
-    /// <remarks>
-    /// Use this method when working with the documented Runner mocker command builder API surface in code. The change is stored on the current builder instance and is consumed by later build, validation, or execution steps.
-    /// </remarks>
-    /// <qaas-docs group="Configuration as Code" subgroup="Mocker Commands" />
-    public MockerCommandBuilder WithCommand(MockerCommandConfig command)
-    {
-        return Configure(command);
-    }
-
-    /// <summary>
-    /// Sets the configuration currently stored on the Runner mocker command builder instance.
-    /// </summary>
-    /// <remarks>
-    /// Use this method when working with the documented Runner mocker command builder API surface in code. The change is stored on the current builder instance and is consumed by later build, validation, or execution steps.
-    /// </remarks>
-    /// <qaas-docs group="Configuration as Code" subgroup="Mocker Commands" />
-    public MockerCommandBuilder CreateConfiguration(MockerCommandConfig command)
-    {
-        return Configure(command);
-    }
-
-    /// <summary>
-    /// Sets the configuration currently stored on the Runner mocker command builder instance.
-    /// </summary>
-    /// <remarks>
-    /// Use this method when working with the documented Runner mocker command builder API surface in code. The change is stored on the current builder instance and is consumed by later build, validation, or execution steps.
-    /// </remarks>
-    /// <qaas-docs group="Configuration as Code" subgroup="Mocker Commands" />
-    public MockerCommandBuilder Create(MockerCommandConfig command)
-    {
-        return CreateConfiguration(command);
-    }
-
-    /// <summary>
-    /// Returns the configuration currently stored on the Runner mocker command builder instance.
-    /// </summary>
-    /// <remarks>
-    /// Use this method when working with the documented Runner mocker command builder API surface in code. Use it to inspect the current configured state without rebuilding the surrounding collection or runtime object graph.
-    /// </remarks>
-    /// <qaas-docs group="Configuration as Code" subgroup="Mocker Commands" />
-    public MockerCommandConfig? ReadConfiguration()
-    {
-        return Command;
-    }
-
-    /// <summary>
-    /// Updates the configuration currently stored on the Runner mocker command builder instance.
-    /// </summary>
-    /// <remarks>
-    /// Use this method when working with the documented Runner mocker command builder API surface in code. The change is stored on the current builder instance and is consumed by later build, validation, or execution steps.
-    /// </remarks>
-    /// <qaas-docs group="Configuration as Code" subgroup="Mocker Commands" />
-    public MockerCommandBuilder UpdateConfiguration(Func<MockerCommandConfig, MockerCommandConfig> update)
-    {
-        var currentConfig = ReadConfiguration() ??
-                            throw new InvalidOperationException("Command configuration is not set");
-        return UpdateConfiguration(update(currentConfig));
-    }
-
-    /// <summary>
-    /// Updates the configuration currently stored on the Runner mocker command builder instance.
-    /// </summary>
-    /// <remarks>
-    /// Use this method when working with the documented Runner mocker command builder API surface in code. The change is stored on the current builder instance and is consumed by later build, validation, or execution steps.
-    /// </remarks>
-    /// <qaas-docs group="Configuration as Code" subgroup="Mocker Commands" />
-    public MockerCommandBuilder UpdateConfiguration(MockerCommandConfig command)
-    {
-        var currentConfig = ReadConfiguration() ??
-                            throw new InvalidOperationException("Command configuration is not set");
-        Command = ConfigurationUpdateExtensions.UpdateConfiguration(currentConfig, command);
-        return this;
-    }
-
-    /// <summary>
     /// Updates the configuration currently stored on the Runner mocker command builder instance.
     /// </summary>
     /// <remarks>
@@ -216,25 +144,21 @@ public class MockerCommandBuilder
     /// <qaas-docs group="Configuration as Code" subgroup="Mocker Commands" />
     public MockerCommandBuilder UpdateConfiguration(object configuration)
     {
-        var currentConfig = ReadConfiguration() ??
-                            throw new InvalidOperationException("Command configuration is not set");
-        Command = ConfigurationUpdateExtensions.UpdateConfiguration(currentConfig, configuration);
+        ArgumentNullException.ThrowIfNull(configuration);
+
+        var currentConfig = Configuration;
+        if (configuration is MockerCommandConfig typedConfiguration)
+        {
+            Command = currentConfig == null
+                ? typedConfiguration
+                : currentConfig.UpdateConfiguration(typedConfiguration);
+            return this;
+        }
+
+        currentConfig ??= new MockerCommandConfig();
+        Command = currentConfig.UpdateConfiguration(configuration);
         return this;
     }
-
-    /// <summary>
-    /// Clears the configuration currently stored on the Runner mocker command builder instance.
-    /// </summary>
-    /// <remarks>
-    /// Use this method when working with the documented Runner mocker command builder API surface in code. The change is stored on the current builder instance and is consumed by later build, validation, or execution steps.
-    /// </remarks>
-    /// <qaas-docs group="Configuration as Code" subgroup="Mocker Commands" />
-    public MockerCommandBuilder DeleteConfiguration()
-    {
-        Command = null;
-        return this;
-    }
-
 
     /// <summary>
     /// Builds the configured mocker command type and writes recoverable build failures to <paramref name="actionFailures"/>.

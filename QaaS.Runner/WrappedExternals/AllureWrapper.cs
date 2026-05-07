@@ -75,7 +75,7 @@ public class AllureWrapper
     ///     Starts the configured process and forwards its standard output and error streams to the current console.
     /// </summary>
     /// <param name="startInfo">The start info for the child process.</param>
-    private void RunProcess(ProcessStartInfo startInfo)
+    protected virtual void RunProcess(ProcessStartInfo startInfo)
     {
         using var process = StartProcess(startInfo);
 

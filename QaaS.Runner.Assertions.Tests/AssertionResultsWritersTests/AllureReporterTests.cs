@@ -60,6 +60,16 @@ public class AllureReporterTests
     private static readonly IFileSystem FileSystem = new FileSystem();
     private const string AllureResultsFolder = AllureConstants.DEFAULT_RESULTS_FOLDER;
 
+    private static string NormalizePathSeparators(string value)
+    {
+        return value.Replace('\\', '/');
+    }
+
+    private static void AssertContentContainsPathSegment(string contents, string expectedPathSegment)
+    {
+        Assert.That(NormalizePathSeparators(contents), Does.Contain(expectedPathSegment));
+    }
+
 
     private static IEnumerable<TestCaseData> TestWriteTestResultsEnumerableCaseSource()
     {
@@ -501,7 +511,7 @@ public class AllureReporterTests
         Assert.Multiple(() =>
         {
             Assert.That(File.ReadAllText(resultFile), Does.Contain("SessionLog"));
-            Assert.That(File.ReadAllText(resultFile), Does.Contain("SessionLogs\\"));
+            AssertContentContainsPathSegment(File.ReadAllText(resultFile), "SessionLogs/");
             Assert.That(Directory.GetFiles(AllureResultsFolder, "*-attachment*", SearchOption.TopDirectoryOnly), Is.Empty);
             Assert.That(File.Exists(logAttachmentPath), Is.True);
             Assert.That(File.ReadAllText(logAttachmentPath), Does.Contain("Starting session test-session"));
@@ -600,9 +610,9 @@ public class AllureReporterTests
 
         Assert.Multiple(() =>
         {
-            Assert.That(contents, Does.Contain("SessionsData\\"));
-            Assert.That(contents, Does.Contain("SessionLogs\\"));
-            Assert.That(contents, Does.Contain("Templates\\"));
+            AssertContentContainsPathSegment(contents, "SessionsData/");
+            AssertContentContainsPathSegment(contents, "SessionLogs/");
+            AssertContentContainsPathSegment(contents, "Templates/");
             Assert.That(Directory.GetFiles(AllureResultsFolder, "*-attachment*", SearchOption.TopDirectoryOnly), Is.Empty);
             Assert.That(File.ReadAllText(sessionsDataCopy), Does.Contain("\"Name\": \"test-session\""));
             Assert.That(File.ReadAllText(sessionLogCopy), Does.Contain("session-log-entry"));
@@ -650,7 +660,7 @@ public class AllureReporterTests
 
         Assert.Multiple(() =>
         {
-            Assert.That(contents, Does.Contain("AssertionsAttachments\\"));
+            AssertContentContainsPathSegment(contents, "AssertionsAttachments/");
             Assert.That(Directory.GetFiles(AllureResultsFolder, "*-attachment*", SearchOption.TopDirectoryOnly), Is.Empty);
             Assert.That(File.ReadAllText(legacyAttachmentCopy), Does.Contain("\"Value\":5"));
         });
@@ -1261,6 +1271,12 @@ public class AllureReporterTests
     public void CreateSessionStep_WithNoFailuresOrArtifacts_ReturnsPassedStepWithoutNestedSteps()
     {
         Reporter!.SaveSessionData = false;
+        Reporter.SaveLogs = false;
+        var assertion = new Assertion
+        {
+            SaveSessionData = false,
+            SaveLogs = false
+        };
         var sessionData = new SessionData
         {
             Name = "clean-session",
@@ -1271,7 +1287,7 @@ public class AllureReporterTests
 
         var step = (StepResult)Reporter.GetType()
             .GetMethod("CreateSessionStep", BindingFlags.NonPublic | BindingFlags.Instance)!
-            .Invoke(Reporter, [sessionData])!;
+            .Invoke(Reporter, [sessionData, assertion])!;
 
         Assert.Multiple(() =>
         {

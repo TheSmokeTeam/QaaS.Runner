@@ -15,7 +15,7 @@ public partial class ConsumerBuilder : IValidatableObject
     {
         ArgumentNullException.ThrowIfNull(validationContext);
 
-        var configuredProtocol = ReadConfiguration();
+        var configuredProtocol = Configuration;
         if (configuredProtocol == null)
         {
             return [];

@@ -213,11 +213,14 @@ public class TransactionBuilderTests
     }
 
     [Test]
-    public void UpdateConfiguration_WithConfigurationWithoutExistingConfiguration_ThrowsInvalidOperationException()
+    public void UpdateConfiguration_WithConfigurationWithoutExistingConfiguration_ConfiguresIncomingType()
     {
         var builder = new TransactionBuilder();
+        var config = new HttpTransactorConfig();
 
-        Assert.Throws<InvalidOperationException>(() => builder.UpdateConfiguration(new HttpTransactorConfig()));
+        builder.UpdateConfiguration(config);
+
+        Assert.That(builder.Configuration, Is.SameAs(config));
     }
 
     [Test]
@@ -333,11 +336,26 @@ public class TransactionBuilderTests
     }
 
     [Test]
-    public void DeletePolicyAt_WithInvalidIndex_ThrowsArgumentOutOfRangeException()
+    public void RemovePolicyAt_WithInvalidIndex_ThrowsArgumentOutOfRangeException()
     {
         var builder = new TransactionBuilder();
 
-        Assert.Throws<ArgumentOutOfRangeException>(() => builder.DeletePolicyAt(0));
+        Assert.Throws<ArgumentOutOfRangeException>(() => builder.RemovePolicyAt(0));
+    }
+
+    [Test]
+    public void AddPolicy_WhenPoliciesIsNull_InitializesCollectionAndAddsPolicy()
+    {
+        var builder = new TransactionBuilder
+        {
+            Policies = null!
+        };
+        var policy = new PolicyBuilder();
+
+        builder.AddPolicy(policy);
+
+        Assert.That(builder.Policies, Has.Length.EqualTo(1));
+        Assert.That(builder.Policies[0], Is.SameAs(policy));
     }
 
     [Test]
@@ -346,7 +364,7 @@ public class TransactionBuilderTests
         var builder = new TransactionBuilder();
 
         Assert.DoesNotThrow(() => builder.UpdateDataSource("a", "b"));
-        Assert.That(builder.ReadDataSources(), Is.Empty);
+        Assert.That(builder.DataSourceNames, Is.Null);
     }
 
     [Test]
@@ -355,7 +373,7 @@ public class TransactionBuilderTests
         var builder = new TransactionBuilder();
 
         Assert.DoesNotThrow(() => builder.UpdateDataSourcePattern("a", "b"));
-        Assert.That(builder.ReadDataSourcePatterns(), Is.Empty);
+        Assert.That(builder.DataSourcePatterns, Is.Null);
     }
 
     [Test]
@@ -406,3 +424,5 @@ public class TransactionBuilderTests
         }
     }
 }
+
+

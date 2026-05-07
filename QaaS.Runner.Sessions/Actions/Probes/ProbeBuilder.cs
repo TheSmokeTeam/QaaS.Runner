@@ -40,6 +40,11 @@ public class ProbeBuilder : IYamlConvertible
     [Description("Implementation configuration for the probe, " +
                  "the configuration given here is loaded into the provided probe dynamically.")]
     public IConfiguration ProbeConfiguration { get; internal set; } = new ConfigurationBuilder().Build();
+    public IConfiguration Configuration
+    {
+        get => ProbeConfiguration;
+        internal set => ProbeConfiguration = value ?? new ConfigurationBuilder().Build();
+    }
     /// <summary>
     /// Reads the serialized configuration for the current Runner probe builder instance.
     /// </summary>
@@ -128,70 +133,29 @@ public class ProbeBuilder : IYamlConvertible
     }
 
     /// <summary>
-    /// Creates or adds the configured data source name entry on the current Runner probe builder instance.
-    /// </summary>
-    /// <remarks>
-    /// Use this method when working with the documented Runner probe builder API surface in code. The change is stored on the current builder instance and is consumed by later build, validation, or execution steps.
-    /// </remarks>
-    /// <qaas-docs group="Configuration as Code" subgroup="Probes" />
-    public ProbeBuilder CreateDataSourceName(string dataSourceName)
-    {
-        return AddDataSourceName(dataSourceName);
-    }
-
-    /// <summary>
-    /// Returns the configured data source names currently stored on the Runner probe builder instance.
-    /// </summary>
-    /// <remarks>
-    /// Use this method when working with the documented Runner probe builder API surface in code. Use it to inspect the current configured state without rebuilding the surrounding collection or runtime object graph.
-    /// </remarks>
-    /// <qaas-docs group="Configuration as Code" subgroup="Probes" />
-    public IReadOnlyList<string> ReadDataSourceNames()
-    {
-        return DataSourceNames;
-    }
-
-    /// <summary>
-    /// Updates the configured data source name stored on the current Runner probe builder instance.
-    /// </summary>
-    /// <remarks>
-    /// Use this method when working with the documented Runner probe builder API surface in code. The change is stored on the current builder instance and is consumed by later build, validation, or execution steps.
-    /// </remarks>
-    /// <qaas-docs group="Configuration as Code" subgroup="Probes" />
-    public ProbeBuilder UpdateDataSourceName(string existingValue, string newValue)
-    {
-        var index = Array.IndexOf(DataSourceNames, existingValue);
-        if (index >= 0)
-        {
-            DataSourceNames[index] = newValue;
-        }
-
-        return this;
-    }
-
-    /// <summary>
     /// Removes the configured data source name from the current Runner probe builder instance.
     /// </summary>
     /// <remarks>
     /// Use this method when working with the documented Runner probe builder API surface in code. The change is stored on the current builder instance and is consumed by later build, validation, or execution steps.
     /// </remarks>
     /// <qaas-docs group="Configuration as Code" subgroup="Probes" />
-    public ProbeBuilder DeleteDataSourceName(string dataSourceName)
+    public ProbeBuilder RemoveDataSourceName(string dataSourceName)
     {
-        DataSourceNames = DataSourceNames.Where(value => value != dataSourceName).ToArray();
+        DataSourceNames = (DataSourceNames ?? []).Where(value => value != dataSourceName).ToArray();
         return this;
     }
 
     /// <summary>
-    /// Configures remove data source name on the current Runner probe builder instance.
+    /// Removes the configured data source name at the specified index from the current Runner probe builder instance.
     /// </summary>
     /// <remarks>
-    /// Use this method when working with the documented Runner probe builder API surface in code. The behavior exposed here is part of the public surface that the generated function documentation groups under 'Configuration as Code / Probes'.
+    /// Use this method when working with the documented Runner probe builder API surface in code. The change is stored on the current builder instance and is consumed by later build, validation, or execution steps.
     /// </remarks>
     /// <qaas-docs group="Configuration as Code" subgroup="Probes" />
-    public ProbeBuilder RemoveDataSourceName(string dataSourceName)
+    public ProbeBuilder RemoveDataSourceNameAt(int index)
     {
-        return DeleteDataSourceName(dataSourceName);
+        DataSourceNames = RemoveAt(DataSourceNames, index);
+        return this;
     }
 
     /// <summary>
@@ -210,70 +174,29 @@ public class ProbeBuilder : IYamlConvertible
     }
 
     /// <summary>
-    /// Creates or adds the configured data source pattern entry on the current Runner probe builder instance.
-    /// </summary>
-    /// <remarks>
-    /// Use this method when working with the documented Runner probe builder API surface in code. The change is stored on the current builder instance and is consumed by later build, validation, or execution steps.
-    /// </remarks>
-    /// <qaas-docs group="Configuration as Code" subgroup="Probes" />
-    public ProbeBuilder CreateDataSourcePattern(string dataSourcePattern)
-    {
-        return AddDataSourcePattern(dataSourcePattern);
-    }
-
-    /// <summary>
-    /// Returns the configured data source patterns currently stored on the Runner probe builder instance.
-    /// </summary>
-    /// <remarks>
-    /// Use this method when working with the documented Runner probe builder API surface in code. Use it to inspect the current configured state without rebuilding the surrounding collection or runtime object graph.
-    /// </remarks>
-    /// <qaas-docs group="Configuration as Code" subgroup="Probes" />
-    public IReadOnlyList<string> ReadDataSourcePatterns()
-    {
-        return DataSourcePatterns;
-    }
-
-    /// <summary>
-    /// Updates the configured data source pattern stored on the current Runner probe builder instance.
-    /// </summary>
-    /// <remarks>
-    /// Use this method when working with the documented Runner probe builder API surface in code. The change is stored on the current builder instance and is consumed by later build, validation, or execution steps.
-    /// </remarks>
-    /// <qaas-docs group="Configuration as Code" subgroup="Probes" />
-    public ProbeBuilder UpdateDataSourcePattern(string existingValue, string newValue)
-    {
-        var index = Array.IndexOf(DataSourcePatterns, existingValue);
-        if (index >= 0)
-        {
-            DataSourcePatterns[index] = newValue;
-        }
-
-        return this;
-    }
-
-    /// <summary>
     /// Removes the configured data source pattern from the current Runner probe builder instance.
     /// </summary>
     /// <remarks>
     /// Use this method when working with the documented Runner probe builder API surface in code. The change is stored on the current builder instance and is consumed by later build, validation, or execution steps.
     /// </remarks>
     /// <qaas-docs group="Configuration as Code" subgroup="Probes" />
-    public ProbeBuilder DeleteDataSourcePattern(string dataSourcePattern)
+    public ProbeBuilder RemoveDataSourcePattern(string dataSourcePattern)
     {
-        DataSourcePatterns = DataSourcePatterns.Where(value => value != dataSourcePattern).ToArray();
+        DataSourcePatterns = (DataSourcePatterns ?? []).Where(value => value != dataSourcePattern).ToArray();
         return this;
     }
 
     /// <summary>
-    /// Configures remove data source pattern on the current Runner probe builder instance.
+    /// Removes the configured data source pattern at the specified index from the current Runner probe builder instance.
     /// </summary>
     /// <remarks>
-    /// Use this method when working with the documented Runner probe builder API surface in code. The behavior exposed here is part of the public surface that the generated function documentation groups under 'Configuration as Code / Probes'.
+    /// Use this method when working with the documented Runner probe builder API surface in code. The change is stored on the current builder instance and is consumed by later build, validation, or execution steps.
     /// </remarks>
     /// <qaas-docs group="Configuration as Code" subgroup="Probes" />
-    public ProbeBuilder RemoveDataSourcePattern(string dataSourcePattern)
+    public ProbeBuilder RemoveDataSourcePatternAt(int index)
     {
-        return DeleteDataSourcePattern(dataSourcePattern);
+        DataSourcePatterns = RemoveAt(DataSourcePatterns, index);
+        return this;
     }
 
     /// <summary>
@@ -297,45 +220,10 @@ public class ProbeBuilder : IYamlConvertible
     /// Use this method when working with the documented Runner probe builder API surface in code. The change is stored on the current builder instance and is consumed by later build, validation, or execution steps.
     /// </remarks>
     /// <qaas-docs group="Configuration as Code" subgroup="Probes" />
-    public ProbeBuilder CreateConfiguration(object configuration)
-    {
-        return Configure(configuration);
-    }
-
-    /// <summary>
-    /// Sets the configuration currently stored on the Runner probe builder instance.
-    /// </summary>
-    /// <remarks>
-    /// Use this method when working with the documented Runner probe builder API surface in code. The change is stored on the current builder instance and is consumed by later build, validation, or execution steps.
-    /// </remarks>
-    /// <qaas-docs group="Configuration as Code" subgroup="Probes" />
-    public ProbeBuilder Create(object configuration)
-    {
-        return CreateConfiguration(configuration);
-    }
-
-    /// <summary>
-    /// Returns the configuration currently stored on the Runner probe builder instance.
-    /// </summary>
-    /// <remarks>
-    /// Use this method when working with the documented Runner probe builder API surface in code. Use it to inspect the current configured state without rebuilding the surrounding collection or runtime object graph.
-    /// </remarks>
-    /// <qaas-docs group="Configuration as Code" subgroup="Probes" />
-    public IConfiguration ReadConfiguration()
-    {
-        return ProbeConfiguration;
-    }
-
-    /// <summary>
-    /// Updates the configuration currently stored on the Runner probe builder instance.
-    /// </summary>
-    /// <remarks>
-    /// Use this method when working with the documented Runner probe builder API surface in code. The change is stored on the current builder instance and is consumed by later build, validation, or execution steps.
-    /// </remarks>
-    /// <qaas-docs group="Configuration as Code" subgroup="Probes" />
     public ProbeBuilder UpdateConfiguration(object configuration)
     {
-        ProbeConfiguration = ConfigurationUpdateExtensions.UpdateConfiguration(ProbeConfiguration, configuration);
+        ProbeConfiguration = (ProbeConfiguration ?? new ConfigurationBuilder().Build())
+            .UpdateConfiguration(configuration);
         return this;
     }
 
@@ -346,10 +234,25 @@ public class ProbeBuilder : IYamlConvertible
     /// Use this method when working with the documented Runner probe builder API surface in code. The change is stored on the current builder instance and is consumed by later build, validation, or execution steps.
     /// </remarks>
     /// <qaas-docs group="Configuration as Code" subgroup="Probes" />
-    public ProbeBuilder DeleteConfiguration()
+    public ProbeBuilder RemoveConfiguration()
     {
         ProbeConfiguration = new ConfigurationBuilder().Build();
         return this;
+    }
+
+    private static T[] RemoveAt<T>(T[]? values, int index)
+    {
+        if (values == null)
+        {
+            return [];
+        }
+
+        if (index < 0 || index >= values.Length)
+        {
+            throw new ArgumentOutOfRangeException(nameof(index));
+        }
+
+        return values.Where((_, i) => i != index).ToArray();
     }
 
     /// <summary>
@@ -393,5 +296,33 @@ public class ProbeBuilder : IYamlConvertible
         ArgumentException.ThrowIfNullOrWhiteSpace(sessionName);
         ArgumentException.ThrowIfNullOrWhiteSpace(probeName);
         return $"{sessionName.Length}:{sessionName}{probeName}";
+    }
+
+    internal static (string SessionName, string ProbeName) ParseScopedHookName(string scopedHookName)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(scopedHookName);
+
+        var delimiterIndex = scopedHookName.IndexOf(':');
+        if (delimiterIndex <= 0 ||
+            !int.TryParse(scopedHookName[..delimiterIndex], out var sessionNameLength) ||
+            sessionNameLength < 0)
+        {
+            throw new FormatException($"Probe scoped hook name '{scopedHookName}' is not in the expected format.");
+        }
+
+        var sessionNameStartIndex = delimiterIndex + 1;
+        if (scopedHookName.Length < sessionNameStartIndex + sessionNameLength)
+        {
+            throw new FormatException($"Probe scoped hook name '{scopedHookName}' is truncated.");
+        }
+
+        var sessionName = scopedHookName.Substring(sessionNameStartIndex, sessionNameLength);
+        var probeName = scopedHookName[(sessionNameStartIndex + sessionNameLength)..];
+        if (string.IsNullOrWhiteSpace(probeName))
+        {
+            throw new FormatException($"Probe scoped hook name '{scopedHookName}' is missing the probe name.");
+        }
+
+        return (sessionName, probeName);
     }
 }

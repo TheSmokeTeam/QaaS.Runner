@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using NUnit.Framework;
 using QaaS.Framework.SDK.ContextObjects;
@@ -43,7 +43,7 @@ public class MockerCommandBuilderTests
     {
         var builder = new MockerCommandBuilder()
             .Named("MockerCommandWithoutType")
-            .WithCommand(new MockerCommandConfig());
+            .Configure(new MockerCommandConfig());
 
         var result = builder.Build(_context, _actionFailures, SessionName);
 
@@ -57,7 +57,7 @@ public class MockerCommandBuilderTests
     {
         var builder = new MockerCommandBuilder()
             .Named("MockerCommandWithConflicts")
-            .WithCommand(new MockerCommandConfig
+            .Configure(new MockerCommandConfig
             {
                 ChangeActionStub = new ChangeActionStub(),
                 TriggerAction = new TriggerAction()
@@ -75,7 +75,7 @@ public class MockerCommandBuilderTests
     {
         var builder = new MockerCommandBuilder()
             .Named("MockerCommandWithSingleType")
-            .WithCommand(commandConfig)
+            .Configure(commandConfig)
             .WithServerName("test-server");
 
         var result = builder.Build(_context, _actionFailures, SessionName);
@@ -87,54 +87,62 @@ public class MockerCommandBuilderTests
     }
 
     [Test]
-    public void UpdateConfiguration_WithoutExistingConfiguration_ThrowsInvalidOperationException()
+    public void UpdateConfiguration_WithObjectPatchWithoutExistingConfiguration_CreatesCommandConfiguration()
     {
         var builder = new MockerCommandBuilder();
 
-        Assert.Throws<InvalidOperationException>(() => builder.UpdateConfiguration(command =>
+        builder.UpdateConfiguration(new
         {
-            command.TriggerAction = new TriggerAction();
-            return command;
-        }));
+            TriggerAction = new TriggerAction()
+        });
+
+        Assert.That(builder.Configuration!.TriggerAction, Is.Not.Null);
     }
 
     [Test]
-    public void UpdateConfiguration_WithConfigurationWithoutExistingConfiguration_ThrowsInvalidOperationException()
+    public void UpdateConfiguration_WithConfigurationWithoutExistingConfiguration_ConfiguresIncomingType()
     {
         var builder = new MockerCommandBuilder();
+        var config = new MockerCommandConfig { TriggerAction = new TriggerAction() };
 
-        Assert.Throws<InvalidOperationException>(() =>
-            builder.UpdateConfiguration(new MockerCommandConfig { TriggerAction = new TriggerAction() }));
+        builder.UpdateConfiguration(config);
+
+        Assert.That(builder.Configuration, Is.SameAs(config));
     }
 
     [Test]
-    public void CreateReadUpdateDeleteConfiguration_PerformsExpectedCrudFlow()
+    public void ConfigureUpdateConfiguration_PerformsExpectedFlow()
     {
         var builder = new MockerCommandBuilder();
         var initialCommand = new MockerCommandConfig { TriggerAction = new TriggerAction() };
 
-        builder.CreateConfiguration(initialCommand);
-        Assert.That(builder.ReadConfiguration(), Is.SameAs(initialCommand));
+        builder.Configure(initialCommand);
+        Assert.That(builder.Configuration, Is.SameAs(initialCommand));
 
-        builder.UpdateConfiguration(command =>
+        builder.UpdateConfiguration(new
         {
-            command.TriggerAction = null;
-            command.ChangeActionStub = new ChangeActionStub();
-            return command;
+            TriggerAction = new
+            {
+                TimeoutMs = 5
+            }
         });
 
-        Assert.That(builder.ReadConfiguration()!.ChangeActionStub, Is.Not.Null);
-        Assert.That(builder.ReadConfiguration()!.TriggerAction, Is.Null);
+        Assert.That(builder.Configuration!.TriggerAction!.TimeoutMs, Is.EqualTo(5));
 
-        builder.DeleteConfiguration();
-        Assert.That(builder.ReadConfiguration(), Is.Null);
+        builder.Configure(new MockerCommandConfig
+        {
+            ChangeActionStub = new ChangeActionStub()
+        });
+        Assert.That(builder.Configuration, Is.Not.Null);
+        Assert.That(builder.Configuration!.ChangeActionStub, Is.Not.Null);
+        Assert.That(builder.Configuration!.TriggerAction, Is.Null);
     }
 
     [Test]
     public void UpdateConfiguration_WithConfiguration_MergesSameTypeAndPreservesExistingFields()
     {
         var builder = new MockerCommandBuilder()
-            .CreateConfiguration(new MockerCommandConfig
+            .Configure(new MockerCommandConfig
             {
                 Consume = new ConsumeCommandConfig
                 {
@@ -158,9 +166,9 @@ public class MockerCommandBuilderTests
 
         Assert.Multiple(() =>
         {
-            Assert.That(builder.ReadConfiguration()!.Consume, Is.Not.Null);
-            Assert.That(builder.ReadConfiguration()!.Consume!.InputDeserialize!.Deserializer, Is.EqualTo(SerializationType.Json));
-            Assert.That(builder.ReadConfiguration()!.Consume!.OutputDeserialize!.Deserializer, Is.EqualTo(SerializationType.Binary));
+            Assert.That(builder.Configuration!.Consume, Is.Not.Null);
+            Assert.That(builder.Configuration!.Consume!.InputDeserialize!.Deserializer, Is.EqualTo(SerializationType.Json));
+            Assert.That(builder.Configuration!.Consume!.OutputDeserialize!.Deserializer, Is.EqualTo(SerializationType.Binary));
         });
     }
 
@@ -191,4 +199,5 @@ public class MockerCommandBuilderTests
         yield return new MockerCommandConfig { Consume = new ConsumeCommandConfig() };
     }
 }
+
 

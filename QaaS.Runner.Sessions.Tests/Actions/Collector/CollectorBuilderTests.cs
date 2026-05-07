@@ -138,17 +138,19 @@ public class CollectorBuilderTests
             .Named("TestCollector");
 
         Assert.Throws<InvalidOperationException>(() =>
-            builder.UpdateConfiguration(config => config));
+            builder.UpdateConfiguration(new { Url = "https://prometheus.local" }));
     }
 
     [Test]
-    public void UpdateConfiguration_WithConfigurationWithoutExistingConfiguration_Should_Throw()
+    public void UpdateConfiguration_WithConfigurationWithoutExistingConfiguration_ShouldConfigureIncomingType()
     {
         var builder = new CollectorBuilder()
             .Named("TestCollector");
+        var config = new PrometheusFetcherConfig();
 
-        Assert.Throws<InvalidOperationException>(() =>
-            builder.UpdateConfiguration(new PrometheusFetcherConfig()));
+        builder.UpdateConfiguration(config);
+
+        Assert.That(builder.Configuration, Is.SameAs(config));
     }
 
     [Test]
@@ -163,7 +165,7 @@ public class CollectorBuilderTests
 
         var builder = new CollectorBuilder()
             .Named("TestCollector")
-            .CreateConfiguration(new PrometheusFetcherConfig { Url = "https://promql:8080", Expression = "sum ()" });
+            .Configure(new PrometheusFetcherConfig { Url = "https://promql:8080", Expression = "sum ()" });
 
         var result = builder.Build(context, _actionFailures, _sessionName);
         var fetcherField = typeof(global::QaaS.Runner.Sessions.Actions.Collectors.Collector)
@@ -183,7 +185,7 @@ public class CollectorBuilderTests
         });
         var builder = new CollectorBuilder()
             .Named("TestCollector")
-            .CreateConfiguration(new PrometheusFetcherConfig { Url = "https://promql:8080", Expression = "sum ()" });
+            .Configure(new PrometheusFetcherConfig { Url = "https://promql:8080", Expression = "sum ()" });
 
         var result = builder.Build(context, _actionFailures, _sessionName);
 
@@ -192,3 +194,4 @@ public class CollectorBuilderTests
         Assert.That(_actionFailures[0].Reason.Message, Does.Contain("override failed"));
     }
 }
+

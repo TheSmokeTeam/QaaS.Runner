@@ -17,26 +17,34 @@ public class ReportLogic(IList<IReporter> reporters, InternalContext context) : 
     /// </summary>
     /// <param name="executionData">The mutable execution context containing assertion results.</param>
     /// <returns>The same <paramref name="executionData" /> instance after reporting completes.</returns>
-    /// <exception cref="ArgumentException">
-    /// Thrown when a configured reporter does not have a matching assertion result.
-    /// </exception>
     public ExecutionData Run(ExecutionData executionData)
     {
+        var reporterTypes = FormatReporterTypes(reporters);
         context.Logger.LogInformation("Running {Reports} Logic", "Reports");
-        context.Logger.LogInformation("Started writing assertion results using {ReporterCount} reporters",
-            reporters.Count);
+        context.Logger.LogInformation(
+            "Started writing assertion results using {ReporterCount} reporters. ReporterTypes={ReporterTypes}",
+            reporters.Count, reporterTypes);
 
-        var assertionResultsByName = executionData.AssertionResults
+        var assertionResults = executionData.AssertionResults
             .OfType<AssertionResult>()
-            .ToDictionary(result => result.Assertion.Name, StringComparer.Ordinal);
+            .ToList();
 
         foreach (var reporter in reporters)
         {
-            if (assertionResultsByName.TryGetValue(reporter.AssertionName, out var assertionResult))
+            var matchingAssertionResults = assertionResults
+                .Where(assertionResult => assertionResult.Assertion.ReporterType == reporter.GetType())
+                .ToList();
+
+            context.Logger.LogDebug(
+                "Reporter type {ReporterType} matched {AssertionCount} assertion results",
+                reporter.GetType().Name,
+                matchingAssertionResults.Count);
+
+            foreach (var assertionResult in matchingAssertionResults)
             {
                 context.Logger.LogDebug(
-                    "Routing assertion {AssertionName} with status {AssertionStatus} to reporter {ReporterName}",
-                    assertionResult.Assertion.Name, assertionResult.AssertionStatus, reporter.Name);
+                    "Routing assertion {AssertionName} with status {AssertionStatus} to reporter type {ReporterType}",
+                    assertionResult.Assertion.Name, assertionResult.AssertionStatus, reporter.GetType().Name);
                 if (assertionResult.Assertion.StatussesToReport.Contains(assertionResult.AssertionStatus))
                 {
                     reporter.WriteTestResults(assertionResult);
@@ -44,20 +52,27 @@ public class ReportLogic(IList<IReporter> reporters, InternalContext context) : 
                 else
                 {
                     context.Logger.LogDebug(
-                        "Skipping reporter {ReporterName} for assertion {AssertionName} because status {AssertionStatus} is not configured for reporting",
-                        reporter.Name, assertionResult.Assertion.Name, assertionResult.AssertionStatus);
+                        "Skipping reporter type {ReporterType} for assertion {AssertionName} because status {AssertionStatus} is not configured for reporting",
+                        reporter.GetType().Name, assertionResult.Assertion.Name, assertionResult.AssertionStatus);
                 }
-            }
-            else
-            {
-                throw new ArgumentException(
-                    $"Could not find an assertion result for reporter '{reporter.Name}' targeting assertion '{reporter.AssertionName}'.");
             }
         }
 
-        context.Logger.LogInformation("Finished writing assertion results using {ReporterCount} reporters",
-            reporters.Count);
+        context.Logger.LogInformation(
+            "Finished writing assertion results using {ReporterCount} reporters. ReporterTypes={ReporterTypes}",
+            reporters.Count, reporterTypes);
 
         return executionData;
+    }
+
+    private static string FormatReporterTypes(IEnumerable<IReporter> reporters)
+    {
+        var reporterTypes = reporters
+            .Select(reporter => reporter.GetType().Name)
+            .Distinct(StringComparer.Ordinal)
+            .OrderBy(reporterType => reporterType, StringComparer.Ordinal)
+            .ToArray();
+
+        return reporterTypes.Length == 0 ? "None" : string.Join(", ", reporterTypes);
     }
 }

@@ -5,6 +5,12 @@
 /// </summary>
 public static class FileSystemExtensions
 {
+    private static readonly char[] InvalidPathSegmentChars =
+        Path.GetInvalidFileNameChars()
+            .Concat(['<', '>', ':', '"', '/', '\\', '|', '?', '*'])
+            .Distinct()
+            .ToArray();
+
     /// <summary>
     /// Sanitizes a value so it can safely be used as a single directory name segment on the current OS.
     /// </summary>
@@ -32,7 +38,7 @@ public static class FileSystemExtensions
         if (Path.IsPathRooted(path))
             throw new InvalidOperationException($"Path '{path}' must be relative.");
 
-        var segments = path.Split([Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar],
+        var segments = path.Split(['/', '\\'],
             StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
 
         if (segments.Any(segment => segment is "." or ".."))
@@ -86,7 +92,7 @@ public static class FileSystemExtensions
         if (name.Length == 0)
             return name;
 
-        var sanitized = new string(name.Select(ch => Path.GetInvalidFileNameChars().Contains(ch) ? '_' : ch).ToArray())
+        var sanitized = new string(name.Select(ch => InvalidPathSegmentChars.Contains(ch) ? '_' : ch).ToArray())
             .TrimEnd('.', ' ');
 
         if (sanitized.Length == 0)

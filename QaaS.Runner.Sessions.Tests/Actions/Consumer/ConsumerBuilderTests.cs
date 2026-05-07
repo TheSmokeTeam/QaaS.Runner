@@ -247,6 +247,21 @@ public class ConsumerBuilderTests
     }
 
     [Test]
+    public void AddPolicy_WhenPoliciesIsNull_InitializesCollectionAndAddsPolicy()
+    {
+        var builder = new ConsumerBuilder
+        {
+            Policies = null!
+        };
+        var policy = new PolicyBuilder();
+
+        builder.AddPolicy(policy);
+
+        Assert.That(builder.Policies, Has.Length.EqualTo(1));
+        Assert.That(builder.Policies[0], Is.SameAs(policy));
+    }
+
+    [Test]
     public void Configure_With_RabbitMqReaderConfig_Should_Set_RabbitMq()
     {
         // Arrange
@@ -482,7 +497,7 @@ public class ConsumerBuilderTests
     {
         var builder = new ConsumerBuilder().Configure(config);
 
-        Assert.That(builder.ReadConfiguration(), Is.SameAs(config));
+        Assert.That(builder.Configuration, Is.SameAs(config));
     }
 
     [Test]
@@ -490,7 +505,7 @@ public class ConsumerBuilderTests
     {
         var builder = new ConsumerBuilder();
 
-        Assert.That(builder.ReadConfiguration(), Is.Null);
+        Assert.That(builder.Configuration, Is.Null);
     }
 
     [Test]
@@ -532,6 +547,34 @@ public class ConsumerBuilderTests
             .Named("TestConsumer")
             .AtStage(1)
             .WithTimeout(1000)
+            .FilterData(new DataFilter())
+            .Configure(config);
+
+        // Act
+        var result = builder.Build(Globals.GetContextWithMetadata(), _actionFailures!, _sessionName!);
+
+        // Assert
+        Assert.That(result, Is.Not.Null);
+        Assert.That(result!.Name, Is.EqualTo("TestConsumer"));
+    }
+    
+    [Test]
+    public void Build_With_Valid_KafkaTopic_Config_And_InitialTimeout_Should_Create_Consumer()
+    {
+        // Arrange
+        var config = new KafkaTopicReaderConfig
+        {
+            TopicName = "test",
+            GroupId = "test",
+            HostNames = ["host1:8080", "host2:8081"],
+            Username = "test",
+            Password = "test"
+        };
+        var builder = new ConsumerBuilder()
+            .Named("TestConsumer")
+            .AtStage(1)
+            .WithTimeout(1000)
+            .WithInitialTimeout(1000)
             .FilterData(new DataFilter())
             .Configure(config);
 
@@ -753,6 +796,33 @@ public class ConsumerBuilderTests
         Assert.That(result, Is.Not.Null);
         Assert.That(result!.Name, Is.EqualTo("TestConsumer"));
     }
+    
+    [Test]
+    public void Build_With_Valid_S3Bucket_Config_And_InitialTimeout_Should_Create_Consumer()
+    {
+        // Arrange
+        var config = new S3BucketReaderConfig
+        {
+            StorageBucket = "test",
+            ServiceURL = "url",
+            AccessKey = "test",
+            SecretKey = "test"
+        };
+        var builder = new ConsumerBuilder()
+            .Named("TestConsumer")
+            .AtStage(1)
+            .WithTimeout(1000)
+            .WithInitialTimeout(1000)
+            .FilterData(new DataFilter())
+            .Configure(config);
+
+        // Act
+        var result = builder.Build(Globals.GetContextWithMetadata(), _actionFailures, _sessionName);
+
+        // Assert
+        Assert.That(result, Is.Not.Null);
+        Assert.That(result!.Name, Is.EqualTo("TestConsumer"));
+    }
 
     [Test]
     [TestCaseSource(nameof(ReaderConfigurationsWhichCreateSingleConsumers))]
@@ -862,15 +932,18 @@ public class ConsumerBuilderTests
     {
         var builder = new ConsumerBuilder();
 
-        Assert.Throws<InvalidOperationException>(() => builder.UpdateConfiguration(config => config));
+        Assert.Throws<InvalidOperationException>(() => builder.UpdateConfiguration(new { Host = "rabbit.local" }));
     }
 
     [Test]
-    public void UpdateConfiguration_WithConfigurationWithoutExistingConfiguration_ThrowsInvalidOperationException()
+    public void UpdateConfiguration_WithConfigurationWithoutExistingConfiguration_ConfiguresIncomingType()
     {
         var builder = new ConsumerBuilder();
+        var config = new RabbitMqReaderConfig();
 
-        Assert.Throws<InvalidOperationException>(() => builder.UpdateConfiguration(new RabbitMqReaderConfig()));
+        builder.UpdateConfiguration(config);
+
+        Assert.That(builder.Configuration, Is.SameAs(config));
     }
 
     [Test]
@@ -896,11 +969,11 @@ public class ConsumerBuilderTests
     }
 
     [Test]
-    public void DeletePolicyAt_WithInvalidIndex_ThrowsArgumentOutOfRangeException()
+    public void RemovePolicyAt_WithInvalidIndex_ThrowsArgumentOutOfRangeException()
     {
         var builder = new ConsumerBuilder();
 
-        Assert.Throws<ArgumentOutOfRangeException>(() => builder.DeletePolicyAt(0));
+        Assert.Throws<ArgumentOutOfRangeException>(() => builder.RemovePolicyAt(0));
     }
 
     [Test]
@@ -929,3 +1002,4 @@ public class ConsumerBuilderTests
         Assert.That(_actionFailures, Is.Not.Empty);
     }
 }
+

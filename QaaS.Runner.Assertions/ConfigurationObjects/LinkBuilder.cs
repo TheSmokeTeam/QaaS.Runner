@@ -22,6 +22,20 @@ public class LinkBuilder
     public PrometheusLinkConfig? Prometheus { get; internal set; }
     [Description("Links the grafana dashboard filtered for the test's session times to each test result.")]
     public GrafanaLinkConfig? Grafana { get; internal set; }
+    public ILinkConfig? Configuration
+    {
+        get => GetConfiguration();
+        internal set
+        {
+            if (value == null)
+            {
+                Reset();
+                return;
+            }
+
+            Configure(value);
+        }
+    }
     /// <summary>
     /// Sets the name used for the current Runner link builder instance.
     /// </summary>
@@ -36,80 +50,6 @@ public class LinkBuilder
     }
 
     /// <summary>
-    /// Sets the configuration currently stored on the Runner link builder instance.
-    /// </summary>
-    /// <remarks>
-    /// Use this method when working with the documented Runner link builder API surface in code. The change is stored on the current builder instance and is consumed by later build, validation, or execution steps.
-    /// </remarks>
-    /// <qaas-docs group="Configuration as Code" subgroup="Links" />
-    public LinkBuilder Create(ILinkConfig config)
-    {
-        return CreateConfiguration(config);
-    }
-
-    /// <summary>
-    /// Sets the configuration currently stored on the Runner link builder instance.
-    /// </summary>
-    /// <remarks>
-    /// Use this method when working with the documented Runner link builder API surface in code. The change is stored on the current builder instance and is consumed by later build, validation, or execution steps.
-    /// </remarks>
-    /// <qaas-docs group="Configuration as Code" subgroup="Links" />
-    public LinkBuilder CreateConfiguration(ILinkConfig config)
-    {
-        return Configure(config);
-    }
-
-    /// <summary>
-    /// Returns the configuration currently stored on the Runner link builder instance.
-    /// </summary>
-    /// <remarks>
-    /// Use this method when working with the documented Runner link builder API surface in code. Use it to inspect the current configured state without rebuilding the surrounding collection or runtime object graph.
-    /// </remarks>
-    /// <qaas-docs group="Configuration as Code" subgroup="Links" />
-    public ILinkConfig? ReadConfiguration()
-    {
-        if (Kibana != null)
-        {
-            return Kibana;
-        }
-
-        if (Prometheus != null)
-        {
-            return Prometheus;
-        }
-
-        return Grafana;
-    }
-
-    /// <summary>
-    /// Updates the configuration currently stored on the Runner link builder instance.
-    /// </summary>
-    /// <remarks>
-    /// Use this method when working with the documented Runner link builder API surface in code. The change is stored on the current builder instance and is consumed by later build, validation, or execution steps.
-    /// </remarks>
-    /// <qaas-docs group="Configuration as Code" subgroup="Links" />
-    public LinkBuilder UpdateConfiguration(Func<ILinkConfig, ILinkConfig> update)
-    {
-        var currentConfig = ReadConfiguration() ??
-                            throw new InvalidOperationException("Link configuration is not set");
-        return UpdateConfiguration(update(currentConfig));
-    }
-
-    /// <summary>
-    /// Updates the configuration currently stored on the Runner link builder instance.
-    /// </summary>
-    /// <remarks>
-    /// Use this method when working with the documented Runner link builder API surface in code. The change is stored on the current builder instance and is consumed by later build, validation, or execution steps.
-    /// </remarks>
-    /// <qaas-docs group="Configuration as Code" subgroup="Links" />
-    public LinkBuilder UpdateConfiguration(ILinkConfig config)
-    {
-        var currentConfig = ReadConfiguration() ??
-                            throw new InvalidOperationException("Link configuration is not set");
-        return Configure(currentConfig.UpdateConfiguration(config));
-    }
-
-    /// <summary>
     /// Updates the configuration currently stored on the Runner link builder instance.
     /// </summary>
     /// <remarks>
@@ -118,23 +58,22 @@ public class LinkBuilder
     /// <qaas-docs group="Configuration as Code" subgroup="Links" />
     public LinkBuilder UpdateConfiguration(object configuration)
     {
-        var currentConfig = ReadConfiguration() ??
-                            throw new InvalidOperationException("Link configuration is not set");
+        ArgumentNullException.ThrowIfNull(configuration);
+
+        var currentConfig = Configuration;
+        if (configuration is ILinkConfig typedConfiguration)
+        {
+            return Configure(currentConfig == null
+                ? typedConfiguration
+                : currentConfig.UpdateConfiguration(typedConfiguration));
+        }
+
+        if (currentConfig == null)
+            throw new InvalidOperationException(
+                "Link configuration is not set and cannot be inferred from an object patch. Configure a concrete link configuration first.");
         return Configure(currentConfig.UpdateConfiguration(configuration));
     }
 
-    /// <summary>
-    /// Clears the configuration currently stored on the Runner link builder instance.
-    /// </summary>
-    /// <remarks>
-    /// Use this method when working with the documented Runner link builder API surface in code. The change is stored on the current builder instance and is consumed by later build, validation, or execution steps.
-    /// </remarks>
-    /// <qaas-docs group="Configuration as Code" subgroup="Links" />
-    public LinkBuilder DeleteConfiguration()
-    {
-        return Reset();
-    }
-    
     private LinkBuilder Reset()
     {
         Kibana = null;
@@ -167,6 +106,28 @@ public class LinkBuilder
         }
 
         return this;
+    }
+
+    /// <summary>
+    /// Returns the configuration currently stored on the Runner link builder instance.
+    /// </summary>
+    /// <remarks>
+    /// Use this method when working with the documented Runner link builder API surface in code. Use it to inspect the current configured state without rebuilding the surrounding collection or runtime object graph.
+    /// </remarks>
+    /// <qaas-docs group="Configuration as Code" subgroup="Links" />
+    private ILinkConfig? GetConfiguration()
+    {
+        if (Kibana != null)
+        {
+            return Kibana;
+        }
+
+        if (Prometheus != null)
+        {
+            return Prometheus;
+        }
+
+        return Grafana;
     }
 
     /// <summary>

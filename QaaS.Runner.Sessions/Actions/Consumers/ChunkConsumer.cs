@@ -11,9 +11,9 @@ public sealed class ChunkConsumer : BaseConsumer
 {
     private readonly IChunkReader? _chunkReader;
 
-    public ChunkConsumer(string name, IChunkReader? chunkReader, TimeSpan timeoutMs, int stage, Policy? policies,
+    public ChunkConsumer(string name, IChunkReader? chunkReader, TimeSpan timeoutMs, TimeSpan? initialTimeOutMs, int stage, Policy? policies,
         DataFilter dataFilter, SerializationType? serializationType, Type? deserializerSpecificType,
-        ILogger logger) : base(name, timeoutMs, stage, policies, dataFilter, serializationType,
+        ILogger logger) : base(name, timeoutMs, initialTimeOutMs, stage, policies, dataFilter, serializationType,
         deserializerSpecificType, logger)
     {
         _chunkReader = chunkReader;
@@ -46,9 +46,13 @@ public sealed class ChunkConsumer : BaseConsumer
             if (Policies?.RunChain() != false) continue;
             break;
         }
+        
+        TerminateConsumer();
+    }
 
-
-        RunningCommunicationData.Data.CompleteAdding();
+    protected override bool InitialConsume(InternalCommunicationData<object> actData)
+    {
+        return true;
     }
 
     protected override SerializationType? GetCommunicationSerializationType() =>

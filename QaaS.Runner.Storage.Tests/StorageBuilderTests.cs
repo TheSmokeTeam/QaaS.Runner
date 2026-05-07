@@ -23,7 +23,7 @@ public class StorageBuilderTests
     public void Build_WithFileSystemConfiguration_ReturnsFileSystemStorageAndSetsContext()
     {
         var builder = new StorageBuilder()
-            .CreateConfiguration(new FilesInFileSystemConfig { Path = "some/path" });
+            .Configure(new FilesInFileSystemConfig { Path = "some/path" });
 
         var storage = InvokeBuild(builder, Globals.Context);
 
@@ -35,7 +35,7 @@ public class StorageBuilderTests
     public void Build_WithS3Configuration_ReturnsS3StorageAndSetsContext()
     {
         var builder = new StorageBuilder()
-            .CreateConfiguration(new S3Config());
+            .Configure(new S3Config());
 
         var storage = InvokeBuild(builder, Globals.Context);
 
@@ -47,7 +47,7 @@ public class StorageBuilderTests
     public void Configure_WhenCalledMultipleTimes_ResetsPreviousConfiguration()
     {
         var builder = new StorageBuilder()
-            .CreateConfiguration(new S3Config())
+            .Configure(new S3Config())
             .Configure(new FilesInFileSystemConfig { Path = "some/path" });
 
         var storage = InvokeBuild(builder, Globals.Context);
@@ -71,16 +71,18 @@ public class StorageBuilderTests
         var builder = new StorageBuilder();
 
         Assert.Throws<InvalidOperationException>(() =>
-            builder.UpdateConfiguration(config => config));
+            builder.UpdateConfiguration(new { Path = "some/path" }));
     }
 
     [Test]
-    public void UpdateConfiguration_WithConfigurationWithoutExistingConfiguration_ThrowsInvalidOperationException()
+    public void UpdateConfiguration_WithConfigurationWithoutExistingConfiguration_ConfiguresIncomingType()
     {
         var builder = new StorageBuilder();
+        var config = new FilesInFileSystemConfig { Path = "some/path" };
 
-        Assert.Throws<InvalidOperationException>(() =>
-            builder.UpdateConfiguration(new FilesInFileSystemConfig { Path = "some/path" }));
+        builder.UpdateConfiguration(config);
+
+        Assert.That(builder.Configuration, Is.SameAs(config));
     }
 
     private static IStorage InvokeBuild(StorageBuilder builder, Context context)
@@ -90,3 +92,4 @@ public class StorageBuilderTests
         return (IStorage)buildMethod!.Invoke(builder, [context])!;
     }
 }
+

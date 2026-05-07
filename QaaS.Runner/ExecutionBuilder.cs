@@ -126,8 +126,7 @@ public class ExecutionBuilder() : BaseExecutionBuilder<InternalContext, Executio
     private string? _configuredCaseName;
     private string? _configuredExecutionId;
     private Dictionary<string, object?> _globalDict = new();
-    private ReportPortalLaunchManager? _reportPortalLaunchManager;
-    private ReportPortalRunDescriptor? _reportPortalRunDescriptor;
+    private bool _loadVariablesIntoGlobalDict = true;
     private readonly IConfiguration? _templateSourceConfiguration;
     private const BindingFlags ValidationBindingFlags =
         BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance;
@@ -228,16 +227,10 @@ public class ExecutionBuilder() : BaseExecutionBuilder<InternalContext, Executio
     private IEnumerable<IReporter> BuildReports()
     {
         if (Assertions is null) return [];
-        var reportPortalRunDescriptor = _reportPortalRunDescriptor ?? new ReportPortalRunDescriptor(
-            MetaData?.Team,
-            MetaData?.System,
-            ReadSessions().Select(session => session.Name).Where(sessionName => !string.IsNullOrWhiteSpace(sessionName))
-                .Select(sessionName => sessionName!).ToArray(),
-            Type.ToString().ToLowerInvariant(),
-            DateTimeOffset.Now);
-        var reportPortalSettings = ReportPortalConfig.Resolve(ReportPortal, reportPortalRunDescriptor);
-        var resolvedReports = Assertions.SelectMany(assertionReport =>
-            assertionReport.BuildReporters(Context, DateTime.UtcNow, reportPortalSettings, _reportPortalLaunchManager));
+        var testSuiteStartTimeUtc = DateTime.UtcNow;
+        var resolvedReports = Assertions
+            .GroupBy(assertionReport => assertionReport.GetReporterType())
+            .Select(assertionReportGroup => assertionReportGroup.First().Build(Context, testSuiteStartTimeUtc));
         return resolvedReports;
     }
 
@@ -263,6 +256,15 @@ public class ExecutionBuilder() : BaseExecutionBuilder<InternalContext, Executio
     }
 
     /// <summary>
+    /// Controls whether the root <c>variables</c> configuration section is copied into the runtime global dictionary under <c>Variables</c> during build.
+    /// </summary>
+    internal ExecutionBuilder WithVariablesLoadedIntoGlobalDict(bool loadVariablesIntoGlobalDict)
+    {
+        _loadVariablesIntoGlobalDict = loadVariablesIntoGlobalDict;
+        return this;
+    }
+
+    /// <summary>
     /// Adds the supplied session to the current Runner execution builder instance.
     /// </summary>
     /// <remarks>
@@ -273,30 +275,6 @@ public class ExecutionBuilder() : BaseExecutionBuilder<InternalContext, Executio
     {
         Sessions = Sessions is null ? [sessionBuilder] : Sessions.Append(sessionBuilder).ToArray();
         return this;
-    }
-
-    /// <summary>
-    /// Creates or adds the configured session entry on the current Runner execution builder instance.
-    /// </summary>
-    /// <remarks>
-    /// Use this method when working with the documented Runner execution builder API surface in code. The change is stored on the current builder instance and is consumed by later build, validation, or execution steps.
-    /// </remarks>
-    /// <qaas-docs group="Configuration as Code" subgroup="Executions" />
-    public ExecutionBuilder CreateSession(SessionBuilder sessionBuilder)
-    {
-        return AddSession(sessionBuilder);
-    }
-
-    /// <summary>
-    /// Returns the configured sessions currently stored on the Runner execution builder instance.
-    /// </summary>
-    /// <remarks>
-    /// Use this method when working with the documented Runner execution builder API surface in code. Use it to inspect the current configured state without rebuilding the surrounding collection or runtime object graph.
-    /// </remarks>
-    /// <qaas-docs group="Configuration as Code" subgroup="Executions" />
-    public IReadOnlyList<SessionBuilder> ReadSessions()
-    {
-        return Sessions ?? [];
     }
 
     /// <summary>
@@ -319,9 +297,22 @@ public class ExecutionBuilder() : BaseExecutionBuilder<InternalContext, Executio
     /// Use this method when working with the documented Runner execution builder API surface in code. The change is stored on the current builder instance and is consumed by later build, validation, or execution steps.
     /// </remarks>
     /// <qaas-docs group="Configuration as Code" subgroup="Executions" />
-    public ExecutionBuilder DeleteSession(string sessionName)
+    public ExecutionBuilder RemoveSession(string sessionName)
     {
-        Sessions = DeleteByName(Sessions, sessionName, session => session.Name);
+        Sessions = RemoveByName(Sessions, sessionName, session => session.Name);
+        return this;
+    }
+
+    /// <summary>
+    /// Removes the configured session at the specified index from the current Runner execution builder instance.
+    /// </summary>
+    /// <remarks>
+    /// Use this method when working with the documented Runner execution builder API surface in code. The change is stored on the current builder instance and is consumed by later build, validation, or execution steps.
+    /// </remarks>
+    /// <qaas-docs group="Configuration as Code" subgroup="Executions" />
+    public ExecutionBuilder RemoveSessionAt(int index)
+    {
+        Sessions = RemoveAt(Sessions, index);
         return this;
     }
 
@@ -336,30 +327,6 @@ public class ExecutionBuilder() : BaseExecutionBuilder<InternalContext, Executio
     {
         Assertions = Assertions is null ? [assertionBuilder] : Assertions.Append(assertionBuilder).ToArray();
         return this;
-    }
-
-    /// <summary>
-    /// Creates or adds the configured assertion entry on the current Runner execution builder instance.
-    /// </summary>
-    /// <remarks>
-    /// Use this method when working with the documented Runner execution builder API surface in code. The change is stored on the current builder instance and is consumed by later build, validation, or execution steps.
-    /// </remarks>
-    /// <qaas-docs group="Configuration as Code" subgroup="Executions" />
-    public ExecutionBuilder CreateAssertion(AssertionBuilder assertionBuilder)
-    {
-        return AddAssertion(assertionBuilder);
-    }
-
-    /// <summary>
-    /// Returns the configured assertions currently stored on the Runner execution builder instance.
-    /// </summary>
-    /// <remarks>
-    /// Use this method when working with the documented Runner execution builder API surface in code. Use it to inspect the current configured state without rebuilding the surrounding collection or runtime object graph.
-    /// </remarks>
-    /// <qaas-docs group="Configuration as Code" subgroup="Executions" />
-    public IReadOnlyList<AssertionBuilder> ReadAssertions()
-    {
-        return Assertions ?? [];
     }
 
     /// <summary>
@@ -382,9 +349,22 @@ public class ExecutionBuilder() : BaseExecutionBuilder<InternalContext, Executio
     /// Use this method when working with the documented Runner execution builder API surface in code. The change is stored on the current builder instance and is consumed by later build, validation, or execution steps.
     /// </remarks>
     /// <qaas-docs group="Configuration as Code" subgroup="Executions" />
-    public ExecutionBuilder DeleteAssertion(string assertionName)
+    public ExecutionBuilder RemoveAssertion(string assertionName)
     {
-        Assertions = DeleteByName(Assertions, assertionName, assertion => assertion.Name);
+        Assertions = RemoveByName(Assertions, assertionName, assertion => assertion.Name);
+        return this;
+    }
+
+    /// <summary>
+    /// Removes the configured assertion at the specified index from the current Runner execution builder instance.
+    /// </summary>
+    /// <remarks>
+    /// Use this method when working with the documented Runner execution builder API surface in code. The change is stored on the current builder instance and is consumed by later build, validation, or execution steps.
+    /// </remarks>
+    /// <qaas-docs group="Configuration as Code" subgroup="Executions" />
+    public ExecutionBuilder RemoveAssertionAt(int index)
+    {
+        Assertions = RemoveAt(Assertions, index);
         return this;
     }
 
@@ -399,30 +379,6 @@ public class ExecutionBuilder() : BaseExecutionBuilder<InternalContext, Executio
     {
         Storages = Storages is null ? [storageBuilder] : Storages.Append(storageBuilder).ToArray();
         return this;
-    }
-
-    /// <summary>
-    /// Creates or adds the configured storage entry on the current Runner execution builder instance.
-    /// </summary>
-    /// <remarks>
-    /// Use this method when working with the documented Runner execution builder API surface in code. The change is stored on the current builder instance and is consumed by later build, validation, or execution steps.
-    /// </remarks>
-    /// <qaas-docs group="Configuration as Code" subgroup="Executions" />
-    public ExecutionBuilder CreateStorage(StorageBuilder storageBuilder)
-    {
-        return AddStorage(storageBuilder);
-    }
-
-    /// <summary>
-    /// Returns the configured storages currently stored on the Runner execution builder instance.
-    /// </summary>
-    /// <remarks>
-    /// Use this method when working with the documented Runner execution builder API surface in code. Use it to inspect the current configured state without rebuilding the surrounding collection or runtime object graph.
-    /// </remarks>
-    /// <qaas-docs group="Configuration as Code" subgroup="Executions" />
-    public IReadOnlyList<StorageBuilder> ReadStorages()
-    {
-        return Storages ?? [];
     }
 
     /// <summary>
@@ -445,9 +401,9 @@ public class ExecutionBuilder() : BaseExecutionBuilder<InternalContext, Executio
     /// Use this method when working with the documented Runner execution builder API surface in code. The change is stored on the current builder instance and is consumed by later build, validation, or execution steps.
     /// </remarks>
     /// <qaas-docs group="Configuration as Code" subgroup="Executions" />
-    public ExecutionBuilder DeleteStorageAt(int index)
+    public ExecutionBuilder RemoveStorageAt(int index)
     {
-        Storages = DeleteAt(Storages, index);
+        Storages = RemoveAt(Storages, index);
         return this;
     }
 
@@ -462,30 +418,6 @@ public class ExecutionBuilder() : BaseExecutionBuilder<InternalContext, Executio
     {
         DataSources = DataSources is null ? [dataSourceBuilder] : DataSources.Append(dataSourceBuilder).ToArray();
         return this;
-    }
-
-    /// <summary>
-    /// Creates or adds the configured data source entry on the current Runner execution builder instance.
-    /// </summary>
-    /// <remarks>
-    /// Use this method when working with the documented Runner execution builder API surface in code. The change is stored on the current builder instance and is consumed by later build, validation, or execution steps.
-    /// </remarks>
-    /// <qaas-docs group="Configuration as Code" subgroup="Executions" />
-    public ExecutionBuilder CreateDataSource(DataSourceBuilder dataSourceBuilder)
-    {
-        return AddDataSource(dataSourceBuilder);
-    }
-
-    /// <summary>
-    /// Returns the configured data sources currently stored on the Runner execution builder instance.
-    /// </summary>
-    /// <remarks>
-    /// Use this method when working with the documented Runner execution builder API surface in code. Use it to inspect the current configured state without rebuilding the surrounding collection or runtime object graph.
-    /// </remarks>
-    /// <qaas-docs group="Configuration as Code" subgroup="Executions" />
-    public IReadOnlyList<DataSourceBuilder> ReadDataSources()
-    {
-        return DataSources ?? [];
     }
 
     /// <summary>
@@ -508,9 +440,22 @@ public class ExecutionBuilder() : BaseExecutionBuilder<InternalContext, Executio
     /// Use this method when working with the documented Runner execution builder API surface in code. The change is stored on the current builder instance and is consumed by later build, validation, or execution steps.
     /// </remarks>
     /// <qaas-docs group="Configuration as Code" subgroup="Executions" />
-    public ExecutionBuilder DeleteDataSource(string dataSourceName)
+    public ExecutionBuilder RemoveDataSource(string dataSourceName)
     {
-        DataSources = DeleteByName(DataSources, dataSourceName, source => source.Name);
+        DataSources = RemoveByName(DataSources, dataSourceName, source => source.Name);
+        return this;
+    }
+
+    /// <summary>
+    /// Removes the configured data source at the specified index from the current Runner execution builder instance.
+    /// </summary>
+    /// <remarks>
+    /// Use this method when working with the documented Runner execution builder API surface in code. The change is stored on the current builder instance and is consumed by later build, validation, or execution steps.
+    /// </remarks>
+    /// <qaas-docs group="Configuration as Code" subgroup="Executions" />
+    public ExecutionBuilder RemoveDataSourceAt(int index)
+    {
+        DataSources = RemoveAt(DataSources, index);
         return this;
     }
 
@@ -528,42 +473,6 @@ public class ExecutionBuilder() : BaseExecutionBuilder<InternalContext, Executio
     }
 
     /// <summary>
-    /// Creates or adds the configured link entry on the current Runner execution builder instance.
-    /// </summary>
-    /// <remarks>
-    /// Use this method when working with the documented Runner execution builder API surface in code. The change is stored on the current builder instance and is consumed by later build, validation, or execution steps.
-    /// </remarks>
-    /// <qaas-docs group="Configuration as Code" subgroup="Executions" />
-    public ExecutionBuilder CreateLink(LinkBuilder linkBuilder)
-    {
-        return AddLink(linkBuilder);
-    }
-
-    /// <summary>
-    /// Returns the configured links currently stored on the Runner execution builder instance.
-    /// </summary>
-    /// <remarks>
-    /// Use this method when working with the documented Runner execution builder API surface in code. Use it to inspect the current configured state without rebuilding the surrounding collection or runtime object graph.
-    /// </remarks>
-    /// <qaas-docs group="Configuration as Code" subgroup="Executions" />
-    public IReadOnlyList<LinkBuilder> ReadLinks()
-    {
-        return Links ?? [];
-    }
-
-    /// <summary>
-    /// Returns the metadata currently stored on the Runner execution builder instance.
-    /// </summary>
-    /// <remarks>
-    /// Use this method when working with the documented Runner execution builder API surface in code. Use it to inspect the current configured state without rebuilding the surrounding collection or runtime object graph.
-    /// </remarks>
-    /// <qaas-docs group="Configuration as Code" subgroup="Executions" />
-    public MetaDataConfig? ReadMetaData()
-    {
-        return MetaData;
-    }
-
-    /// <summary>
     /// Updates the configured link at the specified index on the current Runner execution builder instance.
     /// </summary>
     /// <remarks>
@@ -577,15 +486,28 @@ public class ExecutionBuilder() : BaseExecutionBuilder<InternalContext, Executio
     }
 
     /// <summary>
+    /// Removes the configured link from the current Runner execution builder instance.
+    /// </summary>
+    /// <remarks>
+    /// Use this method when working with the documented Runner execution builder API surface in code. The change is stored on the current builder instance and is consumed by later build, validation, or execution steps.
+    /// </remarks>
+    /// <qaas-docs group="Configuration as Code" subgroup="Executions" />
+    public ExecutionBuilder RemoveLink(string linkName)
+    {
+        Links = RemoveByName(Links, linkName, link => link.Name);
+        return this;
+    }
+
+    /// <summary>
     /// Removes the configured link at the specified index from the current Runner execution builder instance.
     /// </summary>
     /// <remarks>
     /// Use this method when working with the documented Runner execution builder API surface in code. The change is stored on the current builder instance and is consumed by later build, validation, or execution steps.
     /// </remarks>
     /// <qaas-docs group="Configuration as Code" subgroup="Executions" />
-    public ExecutionBuilder DeleteLinkAt(int index)
+    public ExecutionBuilder RemoveLinkAt(int index)
     {
-        Links = DeleteAt(Links, index);
+        Links = RemoveAt(Links, index);
         return this;
     }
 
@@ -799,6 +721,8 @@ public class ExecutionBuilder() : BaseExecutionBuilder<InternalContext, Executio
                 throw;
             }
 
+            var (sessionName, probeName) = ProbeBuilder.ParseScopedHookName(hookData.Name);
+            using var probeExecutionScope = ProbeExecutionScope.Enter(sessionName, probeName);
             var configurationsValidationResults = (hook.LoadAndValidateConfiguration(
                 hookData.Configuration) ?? Enumerable.Empty<ValidationResult>()).ToList();
             foreach (var validationResult in configurationsValidationResults)
@@ -878,9 +802,46 @@ public class ExecutionBuilder() : BaseExecutionBuilder<InternalContext, Executio
 
         // saved context's metadata in globalDict
         Context.InsertValueIntoGlobalDictionary(Context.GetMetaDataPath(), metaData);
+        LoadVariablesIntoGlobalDictionary(rootConfiguration);
         Context.Logger.LogDebug(
             "Initialized execution context. LoadedContext={LoadedContext}, ExecutionId={ExecutionId}, CaseName={CaseName}, GlobalKeys={GlobalKeyCount}",
             LoadedContext, Context.ExecutionId, Context.CaseName, Context.InternalGlobalDict.Count);
+    }
+
+    private void LoadVariablesIntoGlobalDictionary(IConfiguration rootConfiguration)
+    {
+        if (!_loadVariablesIntoGlobalDict)
+            return;
+
+        var variablesSection = rootConfiguration.GetSection("variables");
+        if (!variablesSection.Exists())
+            return;
+
+        var loadedVariables = ConvertConfigurationSectionToGlobalValue(variablesSection);
+        Context.InsertValueIntoGlobalDictionary(["Variables"], loadedVariables);
+        _globalDict["Variables"] = loadedVariables;
+    }
+
+    private static object? ConvertConfigurationSectionToGlobalValue(IConfigurationSection configurationSection)
+    {
+        var children = configurationSection.GetChildren().ToList();
+        if (children.Count == 0)
+        {
+            return configurationSection.Value;
+        }
+
+        if (children.All(child => int.TryParse(child.Key, out _)))
+        {
+            return children
+                .OrderBy(child => int.Parse(child.Key))
+                .Select(ConvertConfigurationSectionToGlobalValue)
+                .ToList();
+        }
+
+        return children.ToDictionary(
+            child => child.Key,
+            ConvertConfigurationSectionToGlobalValue,
+            StringComparer.Ordinal);
     }
 
     /// <summary>
@@ -1029,11 +990,12 @@ public class ExecutionBuilder() : BaseExecutionBuilder<InternalContext, Executio
             var reportLogic =
                 scope.Resolve<ReportLogic>(new TypedParameter(typeof(IList<IReporter>), builtReports));
             var templateLogic = scope.Resolve<TemplateLogic>(new TypedParameter(typeof(Context), Context));
+            var reporterTypes = FormatReporterTypes(builtReports);
 
             Context.Logger.LogDebug(
-                "Resolved execution components. DataSources={DataSourceCount}, Sessions={SessionCount}, Storages={StorageCount}, Assertions={AssertionCount}, Reporters={ReporterCount}",
+                "Resolved execution components. DataSources={DataSourceCount}, Sessions={SessionCount}, Storages={StorageCount}, Assertions={AssertionCount}, Reporters={ReporterCount}, ReporterTypes={ReporterTypes}",
                 builtDataSources.Count, builtSessions.Count, builtStorages.Count, builtAssertions.Count,
-                builtReports.Count);
+                builtReports.Count, reporterTypes);
 
             Context.Logger.LogInformation(
                 "Finished building {Type} execution with executionId {ExecutionId} and case name {CaseName}", Type,
@@ -1073,7 +1035,7 @@ public class ExecutionBuilder() : BaseExecutionBuilder<InternalContext, Executio
         return items;
     }
 
-    private static T[]? DeleteByName<T>(T[]? items, string key, Func<T, string?> keySelector)
+    private static T[]? RemoveByName<T>(T[]? items, string key, Func<T, string?> keySelector)
     {
         return items?.Where(item => keySelector(item) != key).ToArray();
     }
@@ -1094,7 +1056,7 @@ public class ExecutionBuilder() : BaseExecutionBuilder<InternalContext, Executio
         return items;
     }
 
-    private static T[]? DeleteAt<T>(T[]? items, int index)
+    private static T[]? RemoveAt<T>(T[]? items, int index)
     {
         if (items == null)
         {
@@ -1400,5 +1362,16 @@ public class ExecutionBuilder() : BaseExecutionBuilder<InternalContext, Executio
         return property.GetCustomAttributes<ValidationAttribute>().Any()
                || property.GetCustomAttributes<DescriptionAttribute>().Any()
                || property.GetCustomAttributes<DefaultValueAttribute>().Any();
+    }
+
+    private static string FormatReporterTypes(IEnumerable<IReporter> reporters)
+    {
+        var reporterTypes = reporters
+            .Select(reporter => reporter.GetType().Name)
+            .Distinct(StringComparer.Ordinal)
+            .OrderBy(reporterType => reporterType, StringComparer.Ordinal)
+            .ToArray();
+
+        return reporterTypes.Length == 0 ? "None" : string.Join(", ", reporterTypes);
     }
 }

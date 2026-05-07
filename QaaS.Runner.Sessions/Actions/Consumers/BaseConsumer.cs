@@ -19,13 +19,15 @@ public abstract class BaseConsumer : StagedAction
     private readonly Type? _deserializerSpecificType;
     protected readonly SerializationType? SerializationType;
     protected readonly TimeSpan TimeoutMs;
+    protected readonly TimeSpan? InitialTimeoutMs;
     protected RunningCommunicationData<object> RunningCommunicationData = default!;
 
-    protected BaseConsumer(string name, TimeSpan timeoutMs, int stage, Policy? policies, DataFilter dataFilter,
+    protected BaseConsumer(string name, TimeSpan timeoutMs, TimeSpan? initialTimeOutMs, int stage, Policy? policies, DataFilter dataFilter,
         SerializationType? serializationType, Type? deserializerSpecificType, ILogger logger) : base(name, stage,
         policies, logger)
     {
         TimeoutMs = timeoutMs;
+        InitialTimeoutMs = initialTimeOutMs;
         DataFilter = dataFilter;
         SerializationType = serializationType;
         _deserializer = DeserializerFactory.BuildDeserializer(SerializationType);
@@ -37,6 +39,12 @@ public abstract class BaseConsumer : StagedAction
     /// </summary>
     /// <param name="actData">Object to store the consumed data under the Output list.</param>
     protected abstract void Consume(InternalCommunicationData<object> actData);
+    
+    /// <summary>
+    /// Should consume data initially with specialized timeout using configured Reader and save it to the actData.
+    /// </summary>
+    /// <param name="actData">Object to store the consumed data under the Output list.</param>
+    protected abstract bool InitialConsume(InternalCommunicationData<object> actData);
 
     protected abstract SerializationType? GetCommunicationSerializationType();
 
@@ -55,11 +63,13 @@ public abstract class BaseConsumer : StagedAction
 
         Policies?.SetupChain();
         Logger.LogDebug(
-            "Starting consumer {ActionName}. TimeoutMs={TimeoutMs}, SerializationType={SerializationType}",
-            Name, TimeoutMs.TotalMilliseconds, SerializationType);
-        Consume(data);
-
-        RunningCommunicationData.Data.CompleteAdding();
+            "Starting consumer {ActionName}. InitialTimeoutMs={InitialTimeoutMs}, TimeoutMs={TimeoutMs}, SerializationType={SerializationType}",
+            Name, InitialTimeoutMs?.TotalMilliseconds, TimeoutMs.TotalMilliseconds, SerializationType);
+        
+        if (InitialConsume(data))
+            Consume(data);
+        TerminateConsumer();
+        
         Logger.LogDebug("Finished consumer {ActionName}. CollectedOutputCount={OutputCount}",
             Name, data.Output?.Count ?? 0);
         return data;
@@ -82,12 +92,6 @@ public abstract class BaseConsumer : StagedAction
 
     private DetailedData<object> GetDeserializedData(DetailedData<object> readData)
     {
-        if (_deserializerSpecificType is null &&
-            SerializationType == QaaS.Framework.Serialization.SerializationType.Binary)
-        {
-            return readData;
-        }
-
         return new DetailedData<object>
         {
             Body = _deserializer!.Deserialize(readData.CastObjectData<byte[]>().Body, _deserializerSpecificType),
@@ -99,4 +103,6 @@ public abstract class BaseConsumer : StagedAction
 
     internal override void ExportRunningCommunicationData(InternalContext context, string sessionName)
         => context.GetRunningSession(sessionName).Outputs!.Add(RunningCommunicationData);
+    
+    protected void TerminateConsumer() => RunningCommunicationData.Data.CompleteAdding();
 }
