@@ -14,6 +14,7 @@ using QaaS.Framework.SDK.Session.SessionDataObjects.RunningSessionsObjects;
 using QaaS.Runner.Assertions;
 using QaaS.Runner.WrappedExternals;
 using Allure.Commons;
+using QaaS.Runner.Assertions.Reporters;
 
 namespace QaaS.Runner.Tests.RunnerTests;
 

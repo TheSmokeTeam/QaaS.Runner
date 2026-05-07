@@ -5,7 +5,7 @@ using ReportPortal.Client.Abstractions.Models;
 using ReportPortal.Client.Abstractions.Requests;
 using QaaS.Runner.Assertions.ConfigurationObjects;
 
-namespace QaaS.Runner.Assertions;
+namespace QaaS.Runner.Assertions.Reporters;
 
 /// <summary>
 /// Owns the ReportPortal launches used by one runner invocation. QaaS opens at most one launch per

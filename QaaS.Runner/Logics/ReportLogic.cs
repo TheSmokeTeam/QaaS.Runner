@@ -4,6 +4,7 @@ using QaaS.Framework.SDK.ContextObjects;
 using QaaS.Framework.SDK.ExecutionObjects;
 using QaaS.Runner.Assertions;
 using QaaS.Runner.Assertions.AssertionObjects;
+using QaaS.Runner.Assertions.Reporters;
 
 namespace QaaS.Runner.Logics;
 

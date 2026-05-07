@@ -1,5 +1,6 @@
 using System.ComponentModel;
 using ReportPortal.Client.Abstractions.Models;
+using QaaS.Runner.Assertions.Reporters;
 
 namespace QaaS.Runner.Assertions.ConfigurationObjects;
 

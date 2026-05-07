@@ -10,7 +10,7 @@ using QaaS.Runner.Assertions.ConfigurationObjects;
 using AssertionSeverity = QaaS.Runner.Assertions.AssertionObjects.AssertionSeverity;
 using ReportPortalLogLevel = ReportPortal.Client.Abstractions.Models.LogLevel;
 
-namespace QaaS.Runner.Assertions;
+namespace QaaS.Runner.Assertions.Reporters;
 
 /// <summary>
 /// Publishes QaaS runner assertion results into ReportPortal while preserving the existing Allure writer. Publishing is

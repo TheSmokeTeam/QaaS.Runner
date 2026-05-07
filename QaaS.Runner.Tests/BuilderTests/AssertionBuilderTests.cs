@@ -1,6 +1,7 @@
 using QaaS.Runner.Assertions;
 using QaaS.Runner.Assertions.AssertionObjects;
 using QaaS.Runner.Assertions.ConfigurationObjects;
+using QaaS.Runner.Assertions.Reporters;
 
 namespace QaaS.Runner.Tests.BuilderTests;
 

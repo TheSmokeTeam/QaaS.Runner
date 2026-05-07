@@ -5,7 +5,7 @@ using System.Text.Json;
 using Microsoft.Extensions.Logging;
 using QaaS.Runner.Assertions.ConfigurationObjects;
 
-namespace QaaS.Runner.Assertions;
+namespace QaaS.Runner.Assertions.Reporters;
 
 /// <summary>
 /// Validates the minimum ReportPortal prerequisites required for QaaS to publish results. The validator never creates

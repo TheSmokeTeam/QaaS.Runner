@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using NUnit.Framework;
 using QaaS.Runner.Assertions;
+using QaaS.Runner.Assertions.Reporters;
 
 namespace QaaS.Runner.Assertions.Tests;
 

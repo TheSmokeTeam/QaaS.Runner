@@ -4,6 +4,7 @@ using System.Linq;
 using NUnit.Framework;
 using QaaS.Runner.Assertions;
 using QaaS.Runner.Assertions.ConfigurationObjects;
+using QaaS.Runner.Assertions.Reporters;
 
 namespace QaaS.Runner.Assertions.Tests.ConfigurationObjectsTests;
 

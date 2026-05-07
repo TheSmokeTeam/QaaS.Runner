@@ -4,9 +4,9 @@ using Microsoft.Extensions.Logging;
 using QaaS.Framework.Configurations;
 using QaaS.Framework.Configurations.CustomExceptions;
 using QaaS.Framework.Executions;
-using QaaS.Runner.Assertions;
 using QaaS.Runner.Options;
 using QaaS.Runner.Assertions.ConfigurationObjects;
+using QaaS.Runner.Assertions.Reporters;
 using QaaS.Runner.WrappedExternals;
 using ILogger = Microsoft.Extensions.Logging.ILogger;
 

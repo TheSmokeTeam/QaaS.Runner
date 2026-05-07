@@ -16,7 +16,7 @@ using QaaS.Runner.Infrastructure;
 using AssertionResult = QaaS.Runner.Assertions.AssertionObjects.AssertionResult;
 using AssertionSeverity = QaaS.Runner.Assertions.AssertionObjects.AssertionSeverity;
 
-namespace QaaS.Runner.Assertions;
+namespace QaaS.Runner.Assertions.Reporters;
 
 /// <inheritdoc />
 public abstract class BaseReporter : IReporter

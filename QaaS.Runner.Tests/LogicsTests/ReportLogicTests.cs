@@ -5,6 +5,7 @@ using QaaS.Framework.SDK.ExecutionObjects;
 using QaaS.Framework.SDK.Hooks.Assertion;
 using QaaS.Runner.Assertions;
 using QaaS.Runner.Assertions.AssertionObjects;
+using QaaS.Runner.Assertions.Reporters;
 using QaaS.Runner.Logics;
 
 namespace QaaS.Runner.Tests.LogicsTests;
@@ -131,6 +132,72 @@ public class ReportLogicTests
         {
             Assert.That(firstReporter.Results, Is.EqualTo(new[] { firstAssertionResult }));
             Assert.That(secondReporter.Results, Is.EqualTo(new[] { secondAssertionResult }));
+        });
+    }
+
+    [Test]
+    public void TestRun_WithReporterNotInAssertionReporterTypes_DoesNotWriteResult()
+    {
+        var allureReporter = new RecordingReporter();
+        var reportPortalReporter = new AlternateRecordingReporter();
+        var assertionResult = new AssertionResult
+        {
+            Assertion = new Assertion
+            {
+                Name = "AssertionOne",
+                StatussesToReport = [AssertionStatus.Passed],
+                ReporterTypes = [typeof(RecordingReporter)],
+                AssertionName = null,
+                AssertionHook = null
+            },
+            AssertionStatus = AssertionStatus.Passed,
+            TestDurationMs = 0,
+            Flaky = null
+        };
+        var executionData = new ExecutionData();
+        executionData.AssertionResults.Add(assertionResult);
+        var reportLogic = new ReportLogic([allureReporter, reportPortalReporter], Globals.GetContextWithMetadata());
+
+        var result = reportLogic.Run(executionData);
+
+        Assert.That(result, Is.SameAs(executionData));
+        Assert.Multiple(() =>
+        {
+            Assert.That(allureReporter.Results, Is.EqualTo(new[] { assertionResult }));
+            Assert.That(reportPortalReporter.Results, Is.Empty);
+        });
+    }
+
+    [Test]
+    public void TestRun_WithReporterInAssertionReporterTypes_WritesResult()
+    {
+        var allureReporter = new RecordingReporter();
+        var reportPortalReporter = new AlternateRecordingReporter();
+        var assertionResult = new AssertionResult
+        {
+            Assertion = new Assertion
+            {
+                Name = "AssertionOne",
+                StatussesToReport = [AssertionStatus.Passed],
+                ReporterTypes = [typeof(RecordingReporter), typeof(AlternateRecordingReporter)],
+                AssertionName = null,
+                AssertionHook = null
+            },
+            AssertionStatus = AssertionStatus.Passed,
+            TestDurationMs = 0,
+            Flaky = null
+        };
+        var executionData = new ExecutionData();
+        executionData.AssertionResults.Add(assertionResult);
+        var reportLogic = new ReportLogic([allureReporter, reportPortalReporter], Globals.GetContextWithMetadata());
+
+        var result = reportLogic.Run(executionData);
+
+        Assert.That(result, Is.SameAs(executionData));
+        Assert.Multiple(() =>
+        {
+            Assert.That(allureReporter.Results, Is.EqualTo(new[] { assertionResult }));
+            Assert.That(reportPortalReporter.Results, Is.EqualTo(new[] { assertionResult }));
         });
     }
 

@@ -9,6 +9,7 @@ using QaaS.Framework.SDK.Hooks.Assertion;
 using QaaS.Runner.Assertions.AssertionObjects;
 using QaaS.Runner.Assertions.ConfigurationObjects;
 using QaaS.Runner.Assertions.ConfigurationObjects.LinkConfigs;
+using QaaS.Runner.Assertions.Reporters;
 using QaaS.Runner.Assertions.Tests.Mocks;
 
 namespace QaaS.Runner.Assertions.Tests.ConfigurationObjectsTests;

@@ -13,6 +13,7 @@ using QaaS.Framework.SDK.Hooks.Assertion;
 using QaaS.Framework.SDK.Session.SessionDataObjects;
 using QaaS.Framework.Serialization;
 using QaaS.Runner.Assertions.AssertionObjects;
+using QaaS.Runner.Assertions.Reporters;
 using QaaS.Runner.Assertions.Tests.Mocks;
 using QaaS.Runner.Infrastructure;
 
