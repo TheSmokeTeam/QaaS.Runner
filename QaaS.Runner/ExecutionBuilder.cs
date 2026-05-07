@@ -125,6 +125,8 @@ public class ExecutionBuilder() : BaseExecutionBuilder<InternalContext, Executio
     private ILogger _configuredLogger = default!;
     private string? _configuredCaseName;
     private string? _configuredExecutionId;
+    private ReportPortalLaunchManager? _reportPortalLaunchManager;
+    private ReportPortalRunDescriptor? _reportPortalRunDescriptor;
     private Dictionary<string, object?> _globalDict = new();
     private bool _loadVariablesIntoGlobalDict = true;
     private readonly IConfiguration? _templateSourceConfiguration;
@@ -228,9 +230,14 @@ public class ExecutionBuilder() : BaseExecutionBuilder<InternalContext, Executio
     {
         if (Assertions is null) return [];
         var testSuiteStartTimeUtc = DateTime.UtcNow;
+        var reportPortalSettings = ReportPortalConfig.Resolve(ReportPortal, _reportPortalRunDescriptor);
         var resolvedReports = Assertions
             .GroupBy(assertionReport => assertionReport.GetReporterType())
-            .Select(assertionReportGroup => assertionReportGroup.First().Build(Context, testSuiteStartTimeUtc));
+            .SelectMany(assertionReportGroup => assertionReportGroup.First().BuildReporters(
+                Context,
+                testSuiteStartTimeUtc,
+                reportPortalSettings,
+                _reportPortalLaunchManager));
         return resolvedReports;
     }
 
@@ -545,6 +552,11 @@ public class ExecutionBuilder() : BaseExecutionBuilder<InternalContext, Executio
     internal ExecutionType ReadExecutionType()
     {
         return Type;
+    }
+
+    internal IReadOnlyList<SessionBuilder> ReadSessions()
+    {
+        return Sessions ?? [];
     }
 
     internal string? ReadCase()

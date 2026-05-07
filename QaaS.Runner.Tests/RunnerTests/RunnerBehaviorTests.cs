@@ -539,7 +539,7 @@ public class RunnerBehaviorTests
     }
 
     [Test]
-    public void StartExecutions_WithNoExecutions_ReturnsZero()
+    public void BuildExecutions_AssignsSharedReportPortalLaunchManagerWhenRegistered()
     {
         using var scope = BuildScope(registerReportPortalLaunchManager: true);
         var builders = new List<ExecutionBuilder>
@@ -592,6 +592,22 @@ public class RunnerBehaviorTests
         };
         var runner = new ExposedRunner(scope, builders, Globals.Logger, new Mock<Serilog.ILogger>().Object);
 
+        _ = runner.InvokeBuildExecutions();
+
+        var descriptorField = typeof(ExecutionBuilder)
+            .GetField("_reportPortalRunDescriptor", BindingFlags.Instance | BindingFlags.NonPublic)!;
+        var firstDescriptor = (ReportPortalRunDescriptor?)descriptorField.GetValue(builders[0]);
+        var secondDescriptor = (ReportPortalRunDescriptor?)descriptorField.GetValue(builders[1]);
+
+        Assert.That(firstDescriptor, Is.Not.Null);
+        Assert.That(secondDescriptor, Is.Not.Null);
+        Assert.That(secondDescriptor, Is.Not.SameAs(firstDescriptor));
+        Assert.That(firstDescriptor!.TeamName, Is.EqualTo("Smoke"));
+        Assert.That(secondDescriptor!.TeamName, Is.EqualTo("AnotherTeam"));
+        Assert.That(firstDescriptor.SystemName, Is.EqualTo("QaaS"));
+        Assert.That(secondDescriptor.SystemName, Is.EqualTo("QaaS"));
+    }
+
     [Test]
     public void RunAndGetExitCode_WhenBuildExecutionsThrowsInvalidConfigurationsException_ReturnsFailureExitCode()
     {
@@ -628,18 +644,11 @@ public class RunnerBehaviorTests
         var runner = new PrebuiltExecutionRunner(scope, [], Globals.Logger, new Mock<Serilog.ILogger>().Object,
             [firstExecution.Object, secondExecution.Object]);
 
-        var descriptorField = typeof(ExecutionBuilder)
-            .GetField("_reportPortalRunDescriptor", BindingFlags.Instance | BindingFlags.NonPublic)!;
-        var firstDescriptor = (ReportPortalRunDescriptor?)descriptorField.GetValue(builders[0]);
-        var secondDescriptor = (ReportPortalRunDescriptor?)descriptorField.GetValue(builders[1]);
+        var exitCode = runner.RunAndGetExitCode();
 
-        Assert.That(firstDescriptor, Is.Not.Null);
-        Assert.That(secondDescriptor, Is.Not.Null);
-        Assert.That(secondDescriptor, Is.Not.SameAs(firstDescriptor));
-        Assert.That(firstDescriptor!.TeamName, Is.EqualTo("Smoke"));
-        Assert.That(secondDescriptor!.TeamName, Is.EqualTo("AnotherTeam"));
-        Assert.That(firstDescriptor.SystemName, Is.EqualTo("QaaS"));
-        Assert.That(secondDescriptor.SystemName, Is.EqualTo("QaaS"));
+        Assert.That(exitCode, Is.Zero);
+        firstExecution.Verify(execution => execution.Dispose(), Times.Once);
+        secondExecution.Verify(execution => execution.Dispose(), Times.Once);
     }
 
     [Test]
@@ -722,7 +731,11 @@ public class RunnerBehaviorTests
         return markerFile;
     }
 
-    private static ExecutionBuilder CreateTemplateExecutionBuilder(string caseName, IConfiguration? rootConfiguration = null)
+    private static ExecutionBuilder CreateTemplateExecutionBuilder(
+        string caseName,
+        IConfiguration? rootConfiguration = null,
+        string team = "Smoke",
+        string system = "QaaS")
     {
         var context = new InternalContext
         {
@@ -734,8 +747,8 @@ public class RunnerBehaviorTests
         };
         context.InsertValueIntoGlobalDictionary(context.GetMetaDataPath(), new MetaDataConfig
         {
-            Team = "Smoke",
-            System = "QaaS"
+            Team = team,
+            System = system
         });
 
         return new ExecutionBuilder(context, ExecutionType.Template, null, null, null, null)
