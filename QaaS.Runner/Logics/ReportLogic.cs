@@ -2,7 +2,6 @@ using Microsoft.Extensions.Logging;
 using QaaS.Framework.Executions.Logics;
 using QaaS.Framework.SDK.ContextObjects;
 using QaaS.Framework.SDK.ExecutionObjects;
-using QaaS.Runner.Assertions;
 using QaaS.Runner.Assertions.AssertionObjects;
 using QaaS.Runner.Assertions.Reporters;
 

@@ -24,7 +24,7 @@ public class ReportPortalReporter : BaseReporter
             { AssertionStatus.Passed, Status.Passed },
             { AssertionStatus.Failed, Status.Failed },
             { AssertionStatus.Broken, Status.Interrupted },
-            { AssertionStatus.Unknown, Status.Skipped },
+            { AssertionStatus.Unknown, Status.Info },
             { AssertionStatus.Skipped, Status.Skipped }
         };
 

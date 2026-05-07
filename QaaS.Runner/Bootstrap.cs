@@ -3,7 +3,6 @@ using Autofac;
 using CommandLine;
 using Microsoft.Extensions.Logging;
 using QaaS.Framework.Executions.CommandLineBuilders;
-using QaaS.Runner.Assertions;
 using QaaS.Runner.Assertions.Reporters;
 using QaaS.Runner.Loaders;
 using QaaS.Runner.Modules;
