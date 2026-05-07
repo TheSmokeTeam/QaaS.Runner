@@ -561,7 +561,7 @@ public class AssertionBuilder : IYamlConvertible
                             throw new ArgumentException($"Assertion {Name} of type" +
                                                         $" {Assertion} was not found" +
                                                         " in provided assertions."),
-            StatussesToReport = StatusesToReport,
+            StatusesToReport = StatusesToReport,
             AssertionName = string.Empty
         };
 

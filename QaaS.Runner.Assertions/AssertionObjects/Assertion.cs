@@ -20,7 +20,7 @@ public class Assertion
 
     public IAssertion AssertionHook { get; set; } = default!;
     
-    public IList<AssertionStatus> StatussesToReport { get; set; } = [];
+    public IList<AssertionStatus> StatusesToReport { get; set; } = [];
 
     public IConfiguration AssertionConfiguration { get; set; } = new ConfigurationBuilder().Build();
 

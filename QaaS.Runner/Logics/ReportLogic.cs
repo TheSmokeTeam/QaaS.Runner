@@ -46,7 +46,7 @@ public class ReportLogic(IList<IReporter> reporters, InternalContext context) : 
                 context.Logger.LogDebug(
                     "Routing assertion {AssertionName} with status {AssertionStatus} to reporter type {ReporterType}",
                     assertionResult.Assertion.Name, assertionResult.AssertionStatus, reporter.GetType().Name);
-                if (assertionResult.Assertion.StatussesToReport.Contains(assertionResult.AssertionStatus))
+                if (assertionResult.Assertion.StatusesToReport.Contains(assertionResult.AssertionStatus))
                 {
                     reporter.WriteTestResults(assertionResult);
                 }

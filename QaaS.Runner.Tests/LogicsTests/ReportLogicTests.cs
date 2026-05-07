@@ -24,7 +24,7 @@ public class ReportLogicTests
             var assertion = new Assertion
             {
                 Name = $"Assertion{i + 1}",
-                StatussesToReport =
+                StatusesToReport =
                 [
                     AssertionStatus.Broken,
                     AssertionStatus.Failed,
@@ -82,7 +82,7 @@ public class ReportLogicTests
             Assertion = new Assertion
             {
                 Name = "AssertionOne",
-                StatussesToReport =
+                StatusesToReport =
                 [
                     AssertionStatus.Broken,
                     AssertionStatus.Failed,
@@ -103,7 +103,7 @@ public class ReportLogicTests
             Assertion = new Assertion
             {
                 Name = "AssertionTwo",
-                StatussesToReport =
+                StatusesToReport =
                 [
                     AssertionStatus.Broken,
                     AssertionStatus.Failed,
@@ -145,7 +145,7 @@ public class ReportLogicTests
             Assertion = new Assertion
             {
                 Name = "AssertionOne",
-                StatussesToReport = [AssertionStatus.Passed],
+                StatusesToReport = [AssertionStatus.Passed],
                 ReporterTypes = [typeof(RecordingReporter)],
                 AssertionName = null,
                 AssertionHook = null
@@ -178,7 +178,7 @@ public class ReportLogicTests
             Assertion = new Assertion
             {
                 Name = "AssertionOne",
-                StatussesToReport = [AssertionStatus.Passed],
+                StatusesToReport = [AssertionStatus.Passed],
                 ReporterTypes = [typeof(RecordingReporter), typeof(AlternateRecordingReporter)],
                 AssertionName = null,
                 AssertionHook = null
@@ -210,7 +210,7 @@ public class ReportLogicTests
             Assertion = new Assertion
             {
                 Name = "AssertionA",
-                StatussesToReport = [AssertionStatus.Failed],
+                StatusesToReport = [AssertionStatus.Failed],
                 ReporterTypes = [typeof(RecordingReporter)],
                 AssertionName = null,
                 AssertionHook = null

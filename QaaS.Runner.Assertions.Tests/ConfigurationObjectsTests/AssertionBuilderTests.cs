@@ -74,7 +74,7 @@ public class AssertionBuilderTests
         Assert.That(builtAssertion._sessionPatterns, Is.EquivalentTo(["^session-.*$"]));
         Assert.That(builtAssertion._dataSourceNames, Is.EquivalentTo(["source-1"]));
         Assert.That(builtAssertion._dataSourcePatterns, Is.EquivalentTo(["^source-.*$"]));
-        Assert.That(builtAssertion.StatussesToReport, Is.EquivalentTo([AssertionStatus.Passed, AssertionStatus.Failed]));
+        Assert.That(builtAssertion.StatusesToReport, Is.EquivalentTo([AssertionStatus.Passed, AssertionStatus.Failed]));
         Assert.That(builtAssertion.Links, Has.Count.EqualTo(2));
     }
 
