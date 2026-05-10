@@ -6,6 +6,7 @@ using QaaS.Framework.Executions;
 using QaaS.Runner.Options;
 using QaaS.Runner.Assertions.ConfigurationObjects;
 using QaaS.Runner.Assertions.Reporters;
+using QaaS.Runner.Assertions.Reporters.ReportPortal;
 using QaaS.Runner.WrappedExternals;
 using ILogger = Microsoft.Extensions.Logging.ILogger;
 
