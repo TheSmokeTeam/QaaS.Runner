@@ -52,7 +52,7 @@ public abstract class BaseReporter : IReporter
     /// </summary>
     protected IReadOnlyList<ReportArtifact> BuildAssertionArtifacts(AssertionResult assertionResult)
     {
-        if (!SaveAttachments)
+        if (!ShouldSaveAttachments(assertionResult.Assertion))
             return [];
 
         var artifacts = new List<ReportArtifact>();
@@ -74,9 +74,9 @@ public abstract class BaseReporter : IReporter
     /// <summary>
     /// Builds a YAML artifact containing the effective execution template when template export is enabled.
     /// </summary>
-    protected ReportArtifact? BuildTemplateArtifact()
+    protected ReportArtifact? BuildTemplateArtifact(Assertion assertion)
     {
-        if (!SaveTemplate)
+        if (!ShouldSaveTemplate(assertion))
             return null;
 
         return new ReportArtifact(
@@ -91,9 +91,9 @@ public abstract class BaseReporter : IReporter
     /// <summary>
     /// Builds a JSON artifact containing one session payload when session export is enabled.
     /// </summary>
-    protected ReportArtifact? BuildSessionArtifact(SessionData sessionData)
+    protected ReportArtifact? BuildSessionArtifact(SessionData sessionData, Assertion assertion)
     {
-        if (!SaveSessionData)
+        if (!ShouldSaveSessionData(assertion))
             return null;
 
         return new ReportArtifact(
@@ -163,7 +163,7 @@ public abstract class BaseReporter : IReporter
                 assertionResult.Assertion.Name,
                 assertionResult.Assertion.AssertionName,
                 Status = assertionResult.AssertionStatus.ToString(),
-                Severity = Severity.ToString(),
+                Severity = ResolveSeverity(assertionResult.Assertion).ToString(),
                 Flaky = assertionResult.Flaky.IsFlaky,
                 DurationMs = assertionResult.TestDurationMs
             },
@@ -234,17 +234,35 @@ public abstract class BaseReporter : IReporter
         {
             return new AssertionTextDetails(
                 assertionResult.BrokenAssertionException?.Message ?? "Broken assertion",
-                DisplayTrace
+                ShouldDisplayTrace(assertionResult.Assertion)
                     ? assertionResult.BrokenAssertionException?.ToString() ?? string.Empty
                     : TraceDisplayFalseMessage);
         }
 
         return new AssertionTextDetails(
             assertionResult.Assertion.AssertionHook?.AssertionMessage ?? string.Empty,
-            DisplayTrace
+            ShouldDisplayTrace(assertionResult.Assertion)
                 ? assertionResult.Assertion.AssertionHook?.AssertionTrace ?? string.Empty
                 : TraceDisplayFalseMessage);
     }
+
+    protected bool ShouldSaveSessionData(Assertion assertion) =>
+        assertion.SaveSessionData ?? SaveSessionData;
+
+    protected bool ShouldSaveLogs(Assertion assertion) =>
+        assertion.SaveLogs ?? SaveLogs;
+
+    protected bool ShouldSaveAttachments(Assertion assertion) =>
+        assertion.SaveAttachments ?? SaveAttachments;
+
+    protected bool ShouldSaveTemplate(Assertion assertion) =>
+        assertion.SaveTemplate ?? SaveTemplate;
+
+    protected bool ShouldDisplayTrace(Assertion assertion) =>
+        assertion.DisplayTrace ?? DisplayTrace;
+
+    protected AssertionSeverity ResolveSeverity(Assertion assertion) =>
+        assertion.Severity ?? Severity;
 
     /// <summary>
     /// Builds the common textual session summary used by downstream reporters.

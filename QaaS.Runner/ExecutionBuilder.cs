@@ -30,6 +30,7 @@ using QaaS.Framework.SDK.Session.SessionDataObjects.RunningSessionsObjects;
 using QaaS.Runner.Assertions.AssertionObjects;
 using QaaS.Runner.Assertions.ConfigurationObjects;
 using QaaS.Runner.Assertions.Reporters;
+using QaaS.Runner.Assertions.Reporters.ReportPortal;
 using QaaS.Runner.Extensions;
 using QaaS.Runner.Infrastructure;
 using QaaS.Runner.Sessions.Actions.Probes;
@@ -227,17 +228,14 @@ public class ExecutionBuilder() : BaseExecutionBuilder<InternalContext, Executio
 
     private IEnumerable<IReporter> BuildReports()
     {
-        if (Assertions is null) return [];
+        if (Assertions is null || Assertions.Length == 0) return [];
         var testSuiteStartTimeUtc = DateTime.UtcNow;
         var reportPortalSettings = ReportPortalConfig.Resolve(ReportPortal, _reportPortalRunDescriptor);
-        var resolvedReports = Assertions
-            .GroupBy(assertionReport => assertionReport.GetReporterType())
-            .SelectMany(assertionReportGroup => assertionReportGroup.First().BuildReporters(
-                Context,
-                testSuiteStartTimeUtc,
-                reportPortalSettings,
-                _reportPortalLaunchManager));
-        return resolvedReports;
+        return ReporterFactory.CreateReporters(
+            Context,
+            testSuiteStartTimeUtc,
+            reportPortalSettings,
+            _reportPortalLaunchManager);
     }
 
     private IEnumerable<IStorage> BuildStorages()

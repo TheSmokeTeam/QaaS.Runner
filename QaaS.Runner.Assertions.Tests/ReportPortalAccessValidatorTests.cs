@@ -8,6 +8,7 @@ using System.Threading.Tasks;
 using NUnit.Framework;
 using QaaS.Runner.Assertions.ConfigurationObjects;
 using QaaS.Runner.Assertions.Reporters;
+using QaaS.Runner.Assertions.Reporters.ReportPortal;
 
 namespace QaaS.Runner.Assertions.Tests;
 

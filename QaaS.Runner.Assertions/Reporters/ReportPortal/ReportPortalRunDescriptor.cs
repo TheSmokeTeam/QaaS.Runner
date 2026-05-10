@@ -1,4 +1,4 @@
-namespace QaaS.Runner.Assertions.Reporters;
+namespace QaaS.Runner.Assertions.Reporters.ReportPortal;
 
 /// <summary>
 /// Captures the runner-scoped identity for a single ReportPortal launch.

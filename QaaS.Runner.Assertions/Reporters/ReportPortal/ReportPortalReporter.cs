@@ -1,16 +1,15 @@
-using Microsoft.Extensions.Logging;
 using System.Text;
-using ReportPortal.Client.Abstractions.Models;
-using ReportPortal.Client.Abstractions.Requests;
+using Microsoft.Extensions.Logging;
 using QaaS.Framework.Configurations;
 using QaaS.Framework.SDK.Hooks.Assertion;
-using QaaS.Framework.SDK.Session.SessionDataObjects;
 using QaaS.Runner.Assertions.AssertionObjects;
 using QaaS.Runner.Assertions.ConfigurationObjects;
+using ReportPortal.Client.Abstractions.Models;
+using ReportPortal.Client.Abstractions.Requests;
 using AssertionSeverity = QaaS.Runner.Assertions.AssertionObjects.AssertionSeverity;
 using ReportPortalLogLevel = ReportPortal.Client.Abstractions.Models.LogLevel;
 
-namespace QaaS.Runner.Assertions.Reporters;
+namespace QaaS.Runner.Assertions.Reporters.ReportPortal;
 
 /// <summary>
 /// Publishes QaaS runner assertion results into ReportPortal while preserving the existing Allure writer. Publishing is
@@ -98,7 +97,7 @@ public class ReportPortalReporter : BaseReporter
             WriteAssertionOutcomeLog(launch, itemUuid, assertionResult);
             WriteLinksLog(launch, itemUuid, assertionResult);
             WriteSessionLogs(launch, itemUuid, assertionResult);
-            WriteTemplateAttachment(launch, itemUuid);
+            WriteTemplateAttachment(launch, itemUuid, assertionResult);
             WriteAssertionAttachments(launch, itemUuid, assertionResult);
 
             launch.Service.TestItem.FinishAsync(itemUuid, new FinishTestItemRequest
@@ -191,7 +190,7 @@ public class ReportPortalReporter : BaseReporter
         foreach (var sessionData in assertionResult.Assertion.SessionDataList)
         {
             var summary = BuildSessionSummaryText(sessionData);
-            var sessionArtifact = BuildSessionArtifact(sessionData);
+            var sessionArtifact = BuildSessionArtifact(sessionData, assertionResult.Assertion);
             CreateLogItem(launch, itemUuid,
                 sessionData.SessionFailures.Any() ? ReportPortalLogLevel.Error : ReportPortalLogLevel.Info,
                 summary,
@@ -205,9 +204,10 @@ public class ReportPortalReporter : BaseReporter
         }
     }
 
-    private void WriteTemplateAttachment(ReportPortalLaunchContext launch, string itemUuid)
+    private void WriteTemplateAttachment(ReportPortalLaunchContext launch, string itemUuid,
+        AssertionResult assertionResult)
     {
-        var templateArtifact = BuildTemplateArtifact();
+        var templateArtifact = BuildTemplateArtifact(assertionResult.Assertion);
         if (templateArtifact is null)
             return;
 
@@ -303,7 +303,7 @@ public class ReportPortalReporter : BaseReporter
             new()
             {
                 Key = "severity",
-                Value = AssertionSeverityToAttributeValueMap[Severity]
+                Value = AssertionSeverityToAttributeValueMap[ResolveSeverity(assertionResult.Assertion)]
             }
         };
 

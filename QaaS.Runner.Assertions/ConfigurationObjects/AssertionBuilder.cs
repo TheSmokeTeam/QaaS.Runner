@@ -1,6 +1,5 @@
 using System.ComponentModel;
 using System.ComponentModel.DataAnnotations;
-using System.IO.Abstractions;
 using System.Runtime.CompilerServices;
 using System.Text;
 using System.Text.Json;
@@ -8,9 +7,7 @@ using Microsoft.Extensions.Configuration;
 using QaaS.Framework.Configurations;
 using QaaS.Framework.Configurations.ConfigurationBindingUtils;
 using QaaS.Framework.Configurations.CustomValidationAttributes;
-using QaaS.Framework.SDK.ContextObjects;
 using QaaS.Framework.SDK.Hooks.Assertion;
-using QaaS.Runner.Assertions.Reporters;
 using YamlDotNet.Core;
 using YamlDotNet.Serialization;
 using Assertion = QaaS.Runner.Assertions.AssertionObjects.Assertion;
@@ -31,11 +28,6 @@ public class AssertionBuilder : IYamlConvertible
     /// Internal assertion instance
     /// </summary>
     public required Assertion AssertionInstance;
-
-    /// <summary>
-    /// Internal reporter instance
-    /// </summary>
-    public required BaseReporter Reporter;
 
     [Required]
     [Description("The name of the assertion to use")]
@@ -573,65 +565,4 @@ public class AssertionBuilder : IYamlConvertible
         return AssertionInstance;
     }
 
-    internal Type GetReporterType() => Reporter?.GetType() ?? typeof(AllureReporter);
-
-    /// <summary>
-    ///     Resolves the pre-built <see cref="BaseReporter" /> to a runtime object with access to QaaS'
-    ///     <see cref="Context" /> and finalize building the Reporter.
-    /// </summary>
-    /// <param name="context"></param>
-    /// <param name="testSuiteStartTimeUtc"></param>
-    /// <param name="fileSystem"></param>
-    /// <returns></returns>
-    internal IReporter Build(Context context, DateTime testSuiteStartTimeUtc,
-        IFileSystem? fileSystem = null)
-    {
-        Reporter = (BaseReporter?)Activator.CreateInstance(GetReporterType()) ??
-                   throw new InvalidOperationException(
-                       $"Could not create reporter of type {GetReporterType().FullName}.");
-
-        Reporter.Name = GetReporterType().Name;
-        Reporter.AssertionName = Name!;
-
-        Reporter.DisplayTrace = DisplayTrace;
-        Reporter.SaveSessionData = SaveSessionData;
-        Reporter.SaveLogs = SaveLogs;
-        Reporter.SaveAttachments = SaveAttachments;
-        Reporter.SaveTemplate = SaveTemplate;
-        Reporter.Severity = Severity;
-        Reporter.Context = context;
-        Reporter.EpochTestSuiteStartTime =
-            new DateTimeOffset(testSuiteStartTimeUtc, new TimeSpan(0)).ToUnixTimeMilliseconds();
-
-        Reporter.FileSystem = fileSystem ?? new FileSystem();
-        return Reporter;
-    }
-
-    internal IEnumerable<IReporter> BuildReporters(Context context, DateTime testSuiteStartTimeUtc,
-        ReportPortalSettings? reportPortalSettings = null,
-        ReportPortalLaunchManager? reportPortalLaunchManager = null,
-        IFileSystem? fileSystem = null)
-    {
-        yield return Build(context, testSuiteStartTimeUtc, fileSystem);
-        if (reportPortalSettings is { Enabled: true } && reportPortalLaunchManager is not null)
-        {
-            yield return new ReportPortalReporter
-            {
-                Name = $"{Name!} (ReportPortal)",
-                AssertionName = Name!,
-                DisplayTrace = DisplayTrace,
-                SaveSessionData = SaveSessionData,
-                SaveLogs = SaveLogs,
-                SaveAttachments = SaveAttachments,
-                SaveTemplate = SaveTemplate,
-                Severity = Severity,
-                Context = context,
-                EpochTestSuiteStartTime =
-                    new DateTimeOffset(testSuiteStartTimeUtc, new TimeSpan(0)).ToUnixTimeMilliseconds(),
-                FileSystem = fileSystem ?? new FileSystem(),
-                Settings = reportPortalSettings,
-                LaunchManager = reportPortalLaunchManager
-            };
-        }
-    }
 }

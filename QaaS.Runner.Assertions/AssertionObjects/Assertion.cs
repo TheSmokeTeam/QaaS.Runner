@@ -7,7 +7,8 @@ using QaaS.Framework.SDK.Extensions;
 using QaaS.Framework.SDK.Hooks.Assertion;
 using QaaS.Framework.SDK.Session.SessionDataObjects;
 using QaaS.Runner.Assertions.LinkBuilders;
-using QaaS.Runner.Assertions.Reporters;
+using QaaS.Runner.Assertions.Reporters.Allure;
+using QaaS.Runner.Assertions.Reporters.ReportPortal;
 
 namespace QaaS.Runner.Assertions.AssertionObjects;
 
@@ -16,8 +17,7 @@ public class Assertion
     public string Name { get; set; } = string.Empty;
 
     public string AssertionName { get; set; } = string.Empty;
-
-
+    
     public IAssertion AssertionHook { get; set; } = default!;
     
     public IList<AssertionStatus> StatusesToReport { get; set; } = [];

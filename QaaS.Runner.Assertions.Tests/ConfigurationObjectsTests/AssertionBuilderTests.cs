@@ -10,6 +10,8 @@ using QaaS.Runner.Assertions.AssertionObjects;
 using QaaS.Runner.Assertions.ConfigurationObjects;
 using QaaS.Runner.Assertions.ConfigurationObjects.LinkConfigs;
 using QaaS.Runner.Assertions.Reporters;
+using QaaS.Runner.Assertions.Reporters.Allure;
+using QaaS.Runner.Assertions.Reporters.ReportPortal;
 using QaaS.Runner.Assertions.Tests.Mocks;
 
 namespace QaaS.Runner.Assertions.Tests.ConfigurationObjectsTests;
@@ -79,17 +81,8 @@ public class AssertionBuilderTests
     }
 
     [Test]
-    public void BuildReporter_AppliesRuntimePropertiesToReporter()
+    public void ReporterFactory_CreateReporters_AppliesRuntimePropertiesToAllureReporter()
     {
-        var builder = CreateBuilder()
-            .Named("assertion-display")
-            .ShouldSaveSessionData(false)
-            .ShouldSaveLogs(false)
-            .ShouldSaveAttachments(false)
-            .ShouldSaveConfigurationTemplate(false)
-            .ShouldDisplayTrace(false)
-            .WithSeverity(AssertionSeverity.Critical);
-
         var context = new Context
         {
             Logger = Globals.Logger,
@@ -98,38 +91,84 @@ public class AssertionBuilderTests
         var fileSystem = new System.IO.Abstractions.FileSystem();
         var startTime = new DateTime(2025, 1, 1, 10, 0, 0, DateTimeKind.Utc);
 
-        var reporter = builder.Build(context, startTime, fileSystem);
-        var allureReporter = reporter as AllureReporter;
+        var reporters = ReporterFactory.CreateReporters(context, startTime, fileSystem: fileSystem);
+        var allureReporter = reporters.OfType<AllureReporter>().Single();
 
-        Assert.That(allureReporter, Is.Not.Null);
-        Assert.That(allureReporter!.Name, Is.EqualTo(nameof(AllureReporter)));
-        Assert.That(allureReporter.AssertionName, Is.EqualTo("assertion-display"));
+        Assert.That(reporters, Has.Count.EqualTo(1));
+        Assert.That(allureReporter.Name, Is.EqualTo(nameof(AllureReporter)));
+        Assert.That(allureReporter.AssertionName, Is.EqualTo(nameof(AllureReporter)));
         Assert.That(allureReporter.Context, Is.SameAs(context));
         Assert.That(allureReporter.SaveSessionData, Is.False);
         Assert.That(allureReporter.SaveLogs, Is.False);
         Assert.That(allureReporter.SaveAttachments, Is.False);
         Assert.That(allureReporter.SaveTemplate, Is.False);
         Assert.That(allureReporter.DisplayTrace, Is.False);
-        Assert.That(allureReporter.Severity, Is.EqualTo(AssertionSeverity.Critical));
+        Assert.That(allureReporter.Severity, Is.EqualTo(AssertionSeverity.Normal));
         Assert.That(allureReporter.FileSystem, Is.SameAs(fileSystem));
         Assert.That(allureReporter.EpochTestSuiteStartTime,
             Is.EqualTo(new DateTimeOffset(startTime, TimeSpan.Zero).ToUnixTimeMilliseconds()));
     }
 
     [Test]
-    public void BuildReporters_ReturnsSingleReporterTargetingTheAssertion()
+    public void ReporterFactory_CreateReporters_WithoutReportPortalLaunchManager_ReturnsAllureReporterOnly()
     {
-        var builder = CreateBuilder().Named("assertion-display");
         var context = new Context
         {
             Logger = Globals.Logger,
             RootConfiguration = new ConfigurationBuilder().Build()
         };
+        var reportPortalSettings = CreateReportPortalSettings(enabled: true);
 
-        var reporters = builder.BuildReporters(context, new DateTime(2025, 1, 1, 10, 0, 0, DateTimeKind.Utc)).ToList();
+        var reporters = ReporterFactory.CreateReporters(context,
+            new DateTime(2025, 1, 1, 10, 0, 0, DateTimeKind.Utc),
+            reportPortalSettings).ToList();
 
         Assert.That(reporters, Has.Count.EqualTo(1));
-        Assert.That(reporters[0].AssertionName, Is.EqualTo("assertion-display"));
+        Assert.That(reporters[0], Is.TypeOf<AllureReporter>());
+    }
+
+    [Test]
+    public void ReporterFactory_CreateReporters_WithDisabledReportPortal_ReturnsAllureReporterOnly()
+    {
+        var context = new Context
+        {
+            Logger = Globals.Logger,
+            RootConfiguration = new ConfigurationBuilder().Build()
+        };
+        var reportPortalSettings = CreateReportPortalSettings(enabled: false);
+        using var reportPortalLaunchManager = new ReportPortalLaunchManager();
+
+        var reporters = ReporterFactory.CreateReporters(context,
+            new DateTime(2025, 1, 1, 10, 0, 0, DateTimeKind.Utc),
+            reportPortalSettings,
+            reportPortalLaunchManager).ToList();
+
+        Assert.That(reporters, Has.Count.EqualTo(1));
+        Assert.That(reporters[0], Is.TypeOf<AllureReporter>());
+    }
+
+    [Test]
+    public void ReporterFactory_CreateReporters_WithEnabledReportPortal_ReturnsAllureAndReportPortalReporters()
+    {
+        var context = new Context
+        {
+            Logger = Globals.Logger,
+            RootConfiguration = new ConfigurationBuilder().Build()
+        };
+        var reportPortalSettings = CreateReportPortalSettings(enabled: true);
+        using var reportPortalLaunchManager = new ReportPortalLaunchManager();
+
+        var reporters = ReporterFactory.CreateReporters(context,
+            new DateTime(2025, 1, 1, 10, 0, 0, DateTimeKind.Utc),
+            reportPortalSettings,
+            reportPortalLaunchManager).ToList();
+        var reportPortalReporter = reporters.OfType<ReportPortalReporter>().Single();
+
+        Assert.That(reporters, Has.Count.EqualTo(2));
+        Assert.That(reporters.OfType<AllureReporter>(), Has.Exactly(1).Items);
+        Assert.That(reportPortalReporter.Name, Is.EqualTo(nameof(ReportPortalReporter)));
+        Assert.That(reportPortalReporter.Settings, Is.SameAs(reportPortalSettings));
+        Assert.That(reportPortalReporter.LaunchManager, Is.SameAs(reportPortalLaunchManager));
     }
 
     [Test]
@@ -296,11 +335,24 @@ public class AssertionBuilderTests
     {
         return new AssertionBuilder
         {
-            AssertionInstance = null!,
-            Reporter = null!
+            AssertionInstance = null!
         };
     }
+
+    private static ReportPortalSettings CreateReportPortalSettings(bool enabled)
+    {
+        return new ReportPortalSettings(
+            enabled,
+            "https://reportportal.local/api/",
+            "api-key",
+            "Smoke",
+            "QaaS",
+            [],
+            null,
+            null,
+            false,
+            new Dictionary<string, string>(),
+            null);
+    }
 }
-
-
 
