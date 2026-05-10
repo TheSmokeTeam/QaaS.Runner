@@ -1,7 +1,6 @@
 using System.Runtime.ExceptionServices;
 using Autofac;
 using Microsoft.Extensions.Logging;
-using QaaS.Framework.Configurations;
 using QaaS.Framework.Configurations.CustomExceptions;
 using QaaS.Framework.Executions;
 using QaaS.Runner.Options;
@@ -135,11 +134,11 @@ public class Runner : IRunner, IDisposable
     protected virtual void Teardown()
     {
         Logger.LogDebug("Runner teardown started");
+        
         if (Scope.IsRegistered<ReportPortalLaunchManager>())
         {
-            var reportPortalLaunchManager = Scope.Resolve<ReportPortalLaunchManager>();
             Logger.LogDebug("Finishing ReportPortal launch before teardown completes");
-            reportPortalLaunchManager.FinishLaunchAsync(Logger).GetAwaiter().GetResult();
+            FinishLaunchInReportPortal();
         }
 
         if (DisposeSerilogLogger && SerilogLogger is IDisposable disposableLogger)
@@ -159,6 +158,15 @@ public class Runner : IRunner, IDisposable
         }
 
         Logger.LogDebug("Runner teardown completed");
+    }
+
+    /// <summary>
+    /// Finishes the ReportPortal launch if a launch manager is registered in the scope.
+    /// </summary>
+    private void FinishLaunchInReportPortal()
+    {
+        var reportPortalLaunchManager = Scope.Resolve<ReportPortalLaunchManager>();
+        reportPortalLaunchManager.FinishLaunchAsync(Logger).GetAwaiter().GetResult();
     }
 
     /// <summary>
@@ -203,6 +211,7 @@ public class Runner : IRunner, IDisposable
     {
         Logger.LogInformation("Building {ExecutionCount} executions", ExecutionBuilders.Count);
         var globalDict = new Dictionary<string, object?>();
+        
         var reportPortalLaunchManager = Scope.IsRegistered<ReportPortalLaunchManager>()
             ? Scope.Resolve<ReportPortalLaunchManager>()
             : null;
@@ -218,10 +227,12 @@ public class Runner : IRunner, IDisposable
         // The logger is also assigned directly because execution builders are plain mutable configuration objects,
         // not services resolved from the Autofac scope.
         ExecutionBuilders.ForEach(builder => builder.WithLogger(Logger));
+        
         if (reportPortalLaunchManager is not null)
             ExecutionBuilders.ForEach(builder => builder.WithReportPortalLaunchManager(reportPortalLaunchManager));
         foreach (var runDescriptorPair in reportPortalRunDescriptors)
             runDescriptorPair.Key.WithReportPortalRunDescriptor(runDescriptorPair.Value);
+        
         var executions = ExecutionBuilders.Select(builder => builder.Build()).ToList();
         Logger.LogInformation("Built {ExecutionCount} executions successfully", executions.Count);
         return executions;
@@ -310,6 +321,7 @@ public class Runner : IRunner, IDisposable
     /// Builds grouped ReportPortal launch descriptors so every execution builder targeting the same team project and
     /// system reuses one shared launch name/description contract.
     /// </summary>
+    /// <returns>A dictionary mapping each execution builder to its assigned ReportPortal run descriptor.</returns>
     private Dictionary<ExecutionBuilder, ReportPortalRunDescriptor> BuildReportPortalRunDescriptors()
     {
         var startedAtLocal = DateTimeOffset.Now;

@@ -37,7 +37,6 @@ using QaaS.Runner.Logics;
 using QaaS.Runner.Sessions.Session;
 using QaaS.Runner.Sessions.Session.Builders;
 using QaaS.Runner.Storage;
-using QaaS.Runner.Storage.ConfigurationObjects;
 using ILogger = Microsoft.Extensions.Logging.ILogger;
 
 [assembly: InternalsVisibleTo("QaaS.Runner.Tests")]

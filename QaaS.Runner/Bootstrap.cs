@@ -389,8 +389,10 @@ public static class Bootstrap
     internal static ILifetimeScope CreateRunnerScope()
     {
         var containerBuilder = new ContainerBuilder();
+        
         containerBuilder.RegisterModule<AllureWrapperModule>();
         containerBuilder.RegisterType<ReportPortalLaunchManager>().SingleInstance();
+        
         return containerBuilder.Build();
     }
 
