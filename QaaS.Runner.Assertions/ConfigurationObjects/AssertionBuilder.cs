@@ -8,6 +8,7 @@ using Microsoft.Extensions.Configuration;
 using QaaS.Framework.Configurations;
 using QaaS.Framework.Configurations.ConfigurationBindingUtils;
 using QaaS.Framework.Configurations.CustomValidationAttributes;
+using QaaS.Framework.Infrastructure;
 using QaaS.Framework.SDK.ContextObjects;
 using QaaS.Framework.SDK.Hooks.Assertion;
 using YamlDotNet.Core;
@@ -24,8 +25,10 @@ namespace QaaS.Runner.Assertions.ConfigurationObjects;
 /// <summary>
 /// Builder for configuring and creating assertion instances
 /// </summary>
-public class AssertionBuilder : IYamlConvertible
+public class AssertionBuilder : IYamlConvertible, ICloneable<AssertionBuilder>
 {
+    public AssertionBuilder Clone() => BuilderCloner.DeepClone(this);
+
     /// <summary>
     /// Internal assertion instance
     /// </summary>

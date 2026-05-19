@@ -1,6 +1,7 @@
 using System.ComponentModel;
 using System.ComponentModel.DataAnnotations;
 using QaaS.Framework.Configurations;
+using QaaS.Framework.Infrastructure;
 using QaaS.Framework.Protocols.ConfigurationObjects;
 using QaaS.Framework.Protocols.ConfigurationObjects.Prometheus;
 using QaaS.Framework.Protocols.Protocols.Factories;
@@ -18,8 +19,10 @@ namespace QaaS.Runner.Sessions.Actions.Collectors;
 /// <summary>
 /// Fluent builder for collector actions and their fetcher configuration.
 /// </summary>
-public class CollectorBuilder
+public class CollectorBuilder : ICloneable<CollectorBuilder>
 {
+    public CollectorBuilder Clone() => BuilderCloner.DeepClone(this);
+
     [Required]
     [Description("The name of the collector")]
     public string? Name { get; internal set; }

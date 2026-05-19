@@ -2,6 +2,7 @@ using System.ComponentModel;
 using System.ComponentModel.DataAnnotations;
 using QaaS.Framework.Configurations;
 using QaaS.Framework.Configurations.CustomValidationAttributes;
+using QaaS.Framework.Infrastructure;
 using QaaS.Framework.Policies;
 using QaaS.Framework.Protocols.ConfigurationObjects;
 using QaaS.Framework.Protocols.ConfigurationObjects.Grpc;
@@ -17,8 +18,10 @@ using QaaS.Runner.Sessions.RuntimeOverrides;
 
 namespace QaaS.Runner.Sessions.Actions.Transactions.Builders;
 
-public class TransactionBuilder
+public class TransactionBuilder : ICloneable<TransactionBuilder>
 {
+    public TransactionBuilder Clone() => BuilderCloner.DeepClone(this);
+
     [Required]
     [Description("The communication action's name which acts as a unique identifier," +
                  " used as the name of the communication action's produced input/output")]

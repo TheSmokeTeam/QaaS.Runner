@@ -1,5 +1,6 @@
 using System.ComponentModel;
 using System.ComponentModel.DataAnnotations;
+using QaaS.Framework.Infrastructure;
 using QaaS.Framework.Policies;
 using QaaS.Framework.Protocols.ConfigurationObjects.Elastic;
 using QaaS.Framework.Protocols.ConfigurationObjects.IbmMq;
@@ -14,8 +15,10 @@ using QaaS.Runner.Sessions.ConfigurationObjects;
 
 namespace QaaS.Runner.Sessions.Actions.Consumers.Builders;
 
-public partial class ConsumerBuilder
+public partial class ConsumerBuilder : ICloneable<ConsumerBuilder>
 {
+    public ConsumerBuilder Clone() => BuilderCloner.DeepClone(this);
+
     [Required]
     [Description("The name of the consumer")]
     public string? Name { get; internal set; }

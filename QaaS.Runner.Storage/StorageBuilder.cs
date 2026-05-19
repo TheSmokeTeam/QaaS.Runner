@@ -3,6 +3,7 @@ using System.IO.Abstractions;
 using System.Runtime.CompilerServices;
 using QaaS.Framework.Configurations;
 using QaaS.Framework.Configurations.CommonConfigurationObjects;
+using QaaS.Framework.Infrastructure;
 using QaaS.Framework.SDK.ContextObjects;
 using QaaS.Runner.Storage.ConfigurationObjects;
 using QaaS.Runner.Storage.ConfigurationObjects.StorageConfigs;
@@ -14,8 +15,10 @@ namespace QaaS.Runner.Storage;
 /// <summary>
 /// Builder class for IStorage implementations - using Configured properties for constructing the builders.
 /// </summary>
-public class StorageBuilder
+public class StorageBuilder : ICloneable<StorageBuilder>
 {
+    public StorageBuilder Clone() => BuilderCloner.DeepClone(this);
+
     [Description("The storage format used when storing jsons. Options: " +
                  "[`Indented` - Formats the json with indents, more readable but less memory efficient /" +
                  "`None` - Formats the json without indents, less readable but more memory efficient ]")]
