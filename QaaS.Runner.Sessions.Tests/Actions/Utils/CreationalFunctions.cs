@@ -202,7 +202,7 @@ public static class CreationalFunctions
             new DataFilter() {Body = true, Timestamp = true, MetaData = false},
             new DataFilter() {Body = true, Timestamp = true, MetaData = false},
             new CountPolicy(maxAmountOfMessages).Add(new LoadBalancePolicy(msgPerSec, 1000)),
-            true, 0, 0,
+            true, null, 0, 0,
             null, 
             null,
             null,

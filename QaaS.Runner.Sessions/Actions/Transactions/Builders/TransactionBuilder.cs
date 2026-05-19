@@ -14,6 +14,7 @@ using QaaS.Framework.Serialization;
 using QaaS.Runner.Sessions.ConfigurationObjects;
 using QaaS.Runner.Sessions.Extensions;
 using QaaS.Runner.Sessions.RuntimeOverrides;
+using Parallel = QaaS.Runner.Sessions.ConfigurationObjects.Parallel;
 
 namespace QaaS.Runner.Sessions.Actions.Transactions.Builders;
 
@@ -39,6 +40,8 @@ public class TransactionBuilder
     [Description("Whether to publish in loop")]
     [DefaultValue(false)]
     public bool Loop { get; internal set; }
+    [Description("Whether to run the transaction in a specified parallelism")]
+    public Parallel? Parallel { get; internal set; }
     [Range(ulong.MinValue, ulong.MaxValue),
      Description("The time to sleep in milliseconds in between iterations"), DefaultValue(0)]
     public ulong SleepTimeMs { get; internal set; } = 0;
@@ -223,6 +226,19 @@ public class TransactionBuilder
     public TransactionBuilder InLoops()
     {
         Loop = true;
+        return this;
+    }
+
+    /// <summary>
+    /// Configures the transaction to run with the supplied parallelism.
+    /// </summary>
+    /// <remarks>
+    /// Use this method when working with the documented Runner transaction builder API surface in code. The change is stored on the current builder instance and is consumed by later build, validation, or execution steps.
+    /// </remarks>
+    /// <qaas-docs group="Configuration as Code" subgroup="Transactions" />
+    public TransactionBuilder WithParallelism(int parallelism)
+    {
+        Parallel = new Parallel { Parallelism = parallelism };
         return this;
     }
 
@@ -500,7 +516,7 @@ public class TransactionBuilder
                              ?? TransactorFactory.CreateTransactor(type, context.Logger, timeout);
 
             return new Transaction(Name!, transactor, Stage, InputDataFilter, OutputDataFilter,
-                PolicyBuilder.BuildPolicies(Policies), Loop, Iterations, SleepTimeMs,
+                PolicyBuilder.BuildPolicies(Policies), Loop, Parallel?.Parallelism, Iterations, SleepTimeMs,
                 InputSerialize?.Serializer, OutputDeserialize?.Deserializer, deserializerSpecificType,
                 DataSourcePatterns, DataSourceNames, context.Logger);
         }
