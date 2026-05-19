@@ -63,13 +63,6 @@ dotnet add package QaaS.Runner --version <target-version>
 dotnet restore
 ```
 
-For repository builds, `NuGet.config` reads `QAAS_NUGET_SOURCE_URL`:
-
-```bash
-export QAAS_NUGET_SOURCE_URL=https://api.nuget.org/v3/index.json
-dotnet restore QaaS.Runner.sln --source "$QAAS_NUGET_SOURCE_URL"
-```
-
 ## Documentation
 - Official docs: [thesmoketeam.github.io/qaas-docs](https://thesmoketeam.github.io/qaas-docs/)
 - CI workflow: [`.github/workflows/ci.yml`](./.github/workflows/ci.yml)
