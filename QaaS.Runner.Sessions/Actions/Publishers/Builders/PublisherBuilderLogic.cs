@@ -95,7 +95,7 @@ public partial class PublisherBuilder
     }
 
     /// <summary>
-    /// Sets how many iterations the transaction should execute.
+    /// Sets how many iterations the publisher should execute.
     /// </summary>
     /// <remarks>
     /// Use this method when working with the documented Runner publisher builder API surface in code. The change is stored on the current builder instance and is consumed by later build, validation, or execution steps.
