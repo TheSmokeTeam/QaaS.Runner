@@ -141,4 +141,55 @@ public class CloneSmokeTest
             Assert.That(policyBuilder.Count!.Count, Is.EqualTo(3));
         });
     }
+
+    [Test]
+    public void Clone_ExecutionBuilder_MutatingNestedClone_DoesNotChangeOriginal()
+    {
+        var originalTransactionPolicy = new PolicyBuilder().Configure(new CountPolicyConfig { Count = 2 });
+        var originalTransaction = new TransactionBuilder
+        {
+            Name = "original-transaction",
+            TimeoutMs = 5000,
+            DataSourceNames = ["original-source"],
+            Policies = [originalTransactionPolicy],
+        };
+        var originalSession = new SessionBuilder
+        {
+            Name = "original-session",
+            Stage = 1,
+            Transactions = [originalTransaction],
+        };
+        var originalExecution = new ExecutionBuilder
+        {
+            Sessions = [originalSession],
+        };
+
+        var clonedExecution = originalExecution.Clone();
+        var originalSessions = originalExecution.Sessions!;
+        var clonedSessions = clonedExecution.Sessions!;
+        var originalTransactions = originalSessions[0].Transactions!;
+        var clonedTransactions = clonedSessions[0].Transactions!;
+
+        clonedSessions[0].Name = "cloned-session";
+        clonedTransactions[0].Name = "cloned-transaction";
+        clonedTransactions[0].DataSourceNames![0] = "cloned-source";
+        clonedTransactions[0].Policies[0].Count!.Count = 9;
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(clonedExecution.Sessions, Is.Not.SameAs(originalExecution.Sessions));
+            Assert.That(clonedSessions[0], Is.Not.SameAs(originalSessions[0]));
+            Assert.That(clonedTransactions, Is.Not.SameAs(originalTransactions));
+            Assert.That(clonedTransactions[0], Is.Not.SameAs(originalTransactions[0]));
+            Assert.That(clonedTransactions[0].DataSourceNames, Is.Not.SameAs(originalTransactions[0].DataSourceNames));
+            Assert.That(clonedTransactions[0].Policies, Is.Not.SameAs(originalTransactions[0].Policies));
+            Assert.That(clonedTransactions[0].Policies[0], Is.Not.SameAs(originalTransactions[0].Policies[0]));
+            Assert.That(clonedTransactions[0].Policies[0].Count, Is.Not.SameAs(originalTransactions[0].Policies[0].Count));
+
+            Assert.That(originalSessions[0].Name, Is.EqualTo("original-session"));
+            Assert.That(originalTransactions[0].Name, Is.EqualTo("original-transaction"));
+            Assert.That(originalTransactions[0].DataSourceNames![0], Is.EqualTo("original-source"));
+            Assert.That(originalTransactions[0].Policies[0].Count!.Count, Is.EqualTo(2));
+        });
+    }
 }
