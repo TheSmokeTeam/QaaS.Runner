@@ -5,26 +5,19 @@ using Microsoft.Extensions.Logging;
 namespace QaaS.Runner.Loaders;
 
 /// <summary>
-/// Resolves the set of assemblies that may contain QaaS plugins by walking the reverse
-/// dependency graph rooted at a contract anchor assembly via <see cref="DependencyContext"/>.
-/// Falls back to scanning every DLL in the base directory only when the dependency manifest
-/// cannot answer the question. Successful manifest-driven results are cached for the
-/// process lifetime; fallback results are not cached so a later call can recover.
+/// Resolves the assemblies that may contain QaaS plugin types by walking the reverse
+/// dependency graph rooted at a contract anchor via <see cref="DependencyContext"/>.
+/// Falls back to a base-directory DLL scan only when the dependency manifest is
+/// unusable. Successful manifest-driven results are cached for the process lifetime.
 /// </summary>
-/// <remarks>
-/// The legacy bin-folder scan opens every DLL next to the entry exe. On machines running
-/// on-access AV (Trellix, McAfee, etc.) that serialises a virus scan per file and dominates
-/// cold-start time. The manifest-driven walk touches only the small reverse-closure of the
-/// contract assembly, cutting startup from minutes to seconds in those environments.
-/// </remarks>
 internal static class PluginAssemblyDiscovery
 {
-    private static readonly object CacheLock = new();
+    private static readonly Lock CacheLock = new();
     private static volatile IReadOnlyList<Assembly>? _configuratorCache;
 
     /// <summary>
-    /// Returns plugin-candidate assemblies anchored at <see cref="IExecutionBuilderConfigurator"/>.
-    /// Cached for the process lifetime on success; fallback results bypass the cache.
+    /// Returns candidate plugin assemblies anchored at <see cref="IExecutionBuilderConfigurator"/>.
+    /// Cached after the first manifest-driven discovery; fallback results bypass the cache.
     /// </summary>
     public static IReadOnlyList<Assembly> GetCandidateAssemblies(ILogger logger)
     {
@@ -33,8 +26,8 @@ internal static class PluginAssemblyDiscovery
 
         lock (CacheLock)
         {
-            if (_configuratorCache is { } cached2)
-                return cached2;
+            if (_configuratorCache is { } existing)
+                return existing;
 
             var (result, fromManifest) = Discover(
                 DependencyContext.Default,
@@ -49,8 +42,7 @@ internal static class PluginAssemblyDiscovery
     }
 
     /// <summary>
-    /// Resolves plugin-candidate assemblies for an arbitrary contract anchor. Not cached.
-    /// Intended for tests and future callers (e.g. hook discovery) that need a different anchor.
+    /// Resolves candidate assemblies for an arbitrary contract anchor. Not cached.
     /// </summary>
     public static IReadOnlyList<Assembly> DiscoverFor(Assembly contractAnchor, ILogger logger)
     {
@@ -63,139 +55,136 @@ internal static class PluginAssemblyDiscovery
         Assembly contractAnchor,
         ILogger logger)
     {
-        var contractAssemblyName = contractAnchor.GetName().Name;
-        if (string.IsNullOrEmpty(contractAssemblyName))
-            return (Fallback(logger, "Contract anchor assembly has no simple name."), FromManifest: false);
+        var contractName = contractAnchor.GetName().Name;
+        if (string.IsNullOrEmpty(contractName))
+        {
+            logger.LogInformation("Plugin discovery falling back: contract anchor has no simple name.");
+            return (Fallback(logger), FromManifest: false);
+        }
 
         if (dependencyContext is null)
-            return (Fallback(logger, "DependencyContext.Default is unavailable."), FromManifest: false);
+        {
+            logger.LogInformation("Plugin discovery falling back: DependencyContext.Default is unavailable.");
+            return (Fallback(logger), FromManifest: false);
+        }
 
         IReadOnlySet<string> closure;
         try
         {
-            closure = ComputeReverseDependencyClosure(dependencyContext, contractAssemblyName);
+            closure = ComputeReverseDependencyClosure(dependencyContext, contractName);
         }
-        catch (Exception exception)
+        catch (Exception exception) when (!IsFatalException(exception))
         {
-            logger.LogWarning(
-                exception,
-                "Reverse-dependency walk over dependency manifest failed; falling back to bin-folder scan.");
-            return (Fallback(logger, "Reverse-dependency walk threw."), FromManifest: false);
+            logger.LogWarning(exception, "Reverse-dependency walk failed; falling back to base-directory scan.");
+            return (Fallback(logger), FromManifest: false);
         }
 
         if (closure.Count == 0)
-            return (Fallback(logger, $"Contract assembly {contractAssemblyName} not present in dependency manifest."),
-                FromManifest: false);
+        {
+            logger.LogInformation(
+                "Plugin discovery falling back: contract assembly {ContractAssembly} not present in dependency manifest.",
+                contractName);
+            return (Fallback(logger), FromManifest: false);
+        }
 
         var assemblies = SeedFromAppDomain();
-
-        foreach (var simpleName in closure)
+        foreach (var name in closure)
         {
-            if (ContainsAssembly(assemblies, simpleName))
+            if (assemblies.ContainsSimpleName(name))
                 continue;
 
             try
             {
-                AddAssembly(assemblies, Assembly.Load(new AssemblyName(simpleName)));
+                assemblies.Add(Assembly.Load(new AssemblyName(name)));
             }
-            catch (Exception exception)
+            catch (Exception exception) when (!IsFatalException(exception))
             {
                 logger.LogWarning(
                     exception,
-                    "Could not load candidate plugin assembly {AssemblyName} resolved from the dependency manifest; it will be skipped.",
-                    simpleName);
+                    "Could not load candidate plugin assembly {AssemblyName}; skipping.",
+                    name);
             }
         }
 
         logger.LogDebug(
-            "Plugin discovery resolved {ResolvedCount} candidate assemblies from {ClosureCount} manifest entries reverse-dependent on {ContractAssembly}.",
+            "Plugin discovery resolved {Count} candidate assemblies for {ContractAssembly}.",
             assemblies.Count,
-            closure.Count,
-            contractAssemblyName);
+            contractName);
 
-        return (assemblies.Values.ToArray(), FromManifest: true);
+        return (assemblies.Snapshot(), FromManifest: true);
     }
 
-    /// <summary>
-    /// Computes the set of assembly simple names that depend (transitively) on
-    /// <paramref name="contractAssemblyName"/>. The closure is keyed by assembly name
-    /// (not package name) — runtime asset paths from each <see cref="RuntimeLibrary"/>
-    /// are extracted so packages whose ID differs from their assembly file name are handled.
-    /// </summary>
     internal static IReadOnlySet<string> ComputeReverseDependencyClosure(
         DependencyContext dependencyContext,
         string contractAssemblyName)
     {
-        var assembliesByLibrary = new Dictionary<string, List<string>>(StringComparer.OrdinalIgnoreCase);
-        var libraryOwningAssembly = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+        var assembliesByLibrary = new Dictionary<string, IReadOnlyList<string>>(StringComparer.OrdinalIgnoreCase);
+        var librariesOwningAssembly = new Dictionary<string, List<string>>(StringComparer.OrdinalIgnoreCase);
 
         foreach (var library in dependencyContext.RuntimeLibraries)
         {
-            var names = ExtractRuntimeAssemblyNames(library);
+            var names = ExtractRuntimeAssemblyNames(library, dependencyContext);
             assembliesByLibrary[library.Name] = names;
             foreach (var name in names)
-                libraryOwningAssembly.TryAdd(name, library.Name);
-        }
-
-        if (!libraryOwningAssembly.TryGetValue(contractAssemblyName, out var contractLibraryName))
-            return new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-
-        var reverseEdges = new Dictionary<string, List<string>>(StringComparer.OrdinalIgnoreCase);
-        foreach (var library in dependencyContext.RuntimeLibraries)
-        {
-            foreach (var dependency in library.Dependencies)
             {
-                if (!reverseEdges.TryGetValue(dependency.Name, out var dependents))
-                {
-                    dependents = new List<string>();
-                    reverseEdges[dependency.Name] = dependents;
-                }
-                dependents.Add(library.Name);
+                if (!librariesOwningAssembly.TryGetValue(name, out var owners))
+                    librariesOwningAssembly[name] = owners = [];
+                owners.Add(library.Name);
             }
         }
 
-        var libraryClosure = new HashSet<string>(StringComparer.OrdinalIgnoreCase) { contractLibraryName };
-        var queue = new Queue<string>();
-        queue.Enqueue(contractLibraryName);
+        if (!librariesOwningAssembly.TryGetValue(contractAssemblyName, out var contractOwners))
+            return new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 
-        while (queue.Count > 0)
+        var reverseEdges = new Dictionary<string, List<string>>(StringComparer.OrdinalIgnoreCase);
+        AppendEdges(reverseEdges, dependencyContext.RuntimeLibraries.Select(l => (l.Name, l.Dependencies)));
+        AppendEdges(reverseEdges, dependencyContext.CompileLibraries.Select(l => (l.Name, l.Dependencies)));
+
+        var libraryClosure = new HashSet<string>(contractOwners, StringComparer.OrdinalIgnoreCase);
+        var queue = new Queue<string>(contractOwners);
+        while (queue.TryDequeue(out var current))
         {
-            var current = queue.Dequeue();
             if (!reverseEdges.TryGetValue(current, out var dependents))
                 continue;
 
             foreach (var dependent in dependents)
-            {
                 if (libraryClosure.Add(dependent))
                     queue.Enqueue(dependent);
-            }
         }
 
         var assemblyClosure = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         foreach (var libraryName in libraryClosure)
-        {
-            if (!assembliesByLibrary.TryGetValue(libraryName, out var names))
-                continue;
-
-            foreach (var name in names)
-                assemblyClosure.Add(name);
-        }
+            if (assembliesByLibrary.TryGetValue(libraryName, out var names))
+                foreach (var name in names)
+                    assemblyClosure.Add(name);
 
         return assemblyClosure;
     }
 
-    private static List<string> ExtractRuntimeAssemblyNames(RuntimeLibrary library)
+    private static void AppendEdges(
+        Dictionary<string, List<string>> reverseEdges,
+        IEnumerable<(string Name, IReadOnlyList<Dependency> Dependencies)> libraries)
     {
-        var names = new List<string>();
-        foreach (var group in library.RuntimeAssemblyGroups)
-        {
-            foreach (var assetPath in group.AssetPaths)
+        foreach (var (name, dependencies) in libraries)
+            foreach (var dependency in dependencies)
             {
-                var name = Path.GetFileNameWithoutExtension(assetPath);
-                if (!string.IsNullOrEmpty(name))
-                    names.Add(name);
+                if (!reverseEdges.TryGetValue(dependency.Name, out var dependents))
+                    reverseEdges[dependency.Name] = dependents = [];
+                dependents.Add(name);
             }
-        }
+    }
+
+    private static IReadOnlyList<string> ExtractRuntimeAssemblyNames(RuntimeLibrary library, DependencyContext context)
+    {
+        var runtime = context.Target.Runtime;
+        var resolved = string.IsNullOrEmpty(runtime)
+            ? library.GetDefaultAssemblyNames(context)
+            : library.GetRuntimeAssemblyNames(context, runtime);
+
+        var names = new List<string>();
+        foreach (var assemblyName in resolved)
+            if (!string.IsNullOrEmpty(assemblyName.Name))
+                names.Add(assemblyName.Name);
 
         if (names.Count == 0)
             names.Add(library.Name);
@@ -203,68 +192,76 @@ internal static class PluginAssemblyDiscovery
         return names;
     }
 
-    private static IReadOnlyList<Assembly> Fallback(ILogger logger, string reason)
+    private static IReadOnlyList<Assembly> Fallback(ILogger logger)
     {
-        logger.LogInformation("Falling back to bin-folder plugin scan: {Reason}", reason);
-
         var assemblies = SeedFromAppDomain();
         var baseDirectory = AppDomain.CurrentDomain.BaseDirectory;
         if (string.IsNullOrEmpty(baseDirectory) || !Directory.Exists(baseDirectory))
-            return assemblies.Values.ToArray();
+            return assemblies.Snapshot();
 
-        foreach (var assemblyPath in Directory.GetFiles(baseDirectory, "*.dll"))
+        foreach (var path in Directory.EnumerateFiles(baseDirectory, "*.dll"))
         {
             try
             {
-                var assemblyName = AssemblyName.GetAssemblyName(assemblyPath);
-                if (ContainsAssembly(assemblies, assemblyName.Name ?? assemblyName.FullName))
+                var name = AssemblyName.GetAssemblyName(path);
+                if (assemblies.ContainsSimpleName(name.Name ?? string.Empty))
                     continue;
 
-                AddAssembly(assemblies, Assembly.LoadFrom(assemblyPath));
+                assemblies.Add(Assembly.LoadFrom(path));
             }
-            catch (Exception exception)
+            catch (Exception exception) when (!IsFatalException(exception))
             {
-                logger.LogDebug(
-                    exception,
-                    "Skipping unloadable assembly at {AssemblyPath} during fallback bin scan.",
-                    assemblyPath);
+                logger.LogDebug(exception, "Skipping unloadable assembly at {AssemblyPath}.", path);
             }
         }
 
-        return assemblies.Values.ToArray();
+        return assemblies.Snapshot();
     }
 
-    private static Dictionary<string, Assembly> SeedFromAppDomain()
+    private static AssemblyCollection SeedFromAppDomain()
     {
-        var assemblies = new Dictionary<string, Assembly>(StringComparer.OrdinalIgnoreCase);
-        AddAssembly(assemblies, Assembly.GetEntryAssembly());
+        var assemblies = new AssemblyCollection();
+        assemblies.Add(Assembly.GetEntryAssembly());
         foreach (var loaded in AppDomain.CurrentDomain.GetAssemblies())
-            AddAssembly(assemblies, loaded);
+            assemblies.Add(loaded);
         return assemblies;
     }
 
-    private static void AddAssembly(IDictionary<string, Assembly> assemblies, Assembly? assembly)
-    {
-        if (assembly is null || assembly.IsDynamic)
-            return;
-
-        var key = assembly.GetName().Name ?? assembly.FullName;
-        if (string.IsNullOrWhiteSpace(key) || assemblies.ContainsKey(key))
-            return;
-
-        assemblies[key] = assembly;
-    }
-
-    private static bool ContainsAssembly(IDictionary<string, Assembly> assemblies, string? simpleName)
-    {
-        return !string.IsNullOrWhiteSpace(simpleName) && assemblies.ContainsKey(simpleName);
-    }
+    private static bool IsFatalException(Exception exception) =>
+        exception is OutOfMemoryException
+            or StackOverflowException
+            or AccessViolationException
+            or ThreadAbortException;
 
     internal static void ResetCacheForTesting()
     {
         lock (CacheLock)
-        {
             _configuratorCache = null;
+    }
+
+    private sealed class AssemblyCollection
+    {
+        private readonly Dictionary<string, Assembly> _byFullName = new(StringComparer.OrdinalIgnoreCase);
+        private readonly HashSet<string> _simpleNames = new(StringComparer.OrdinalIgnoreCase);
+
+        public int Count => _byFullName.Count;
+
+        public void Add(Assembly? assembly)
+        {
+            if (assembly is null || assembly.IsDynamic)
+                return;
+
+            var fullName = assembly.FullName;
+            if (string.IsNullOrEmpty(fullName) || !_byFullName.TryAdd(fullName, assembly))
+                return;
+
+            var simpleName = assembly.GetName().Name;
+            if (!string.IsNullOrEmpty(simpleName))
+                _simpleNames.Add(simpleName);
         }
+
+        public bool ContainsSimpleName(string simpleName) => _simpleNames.Contains(simpleName);
+
+        public IReadOnlyList<Assembly> Snapshot() => [.._byFullName.Values];
     }
 }
