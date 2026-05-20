@@ -9,8 +9,7 @@ namespace QaaS.Runner.Tests.LoadersTests;
 [TestFixture]
 public class PluginAssemblyDiscoveryTests
 {
-    private static readonly string ContractAssemblyName =
-        typeof(IExecutionBuilderConfigurator).Assembly.GetName().Name!;
+    private const string Contract = "Contract.Anchor";
 
     [SetUp]
     public void ResetCache() => PluginAssemblyDiscovery.ResetCacheForTesting();
@@ -18,60 +17,132 @@ public class PluginAssemblyDiscoveryTests
     [Test]
     public void Discover_WhenDependencyContextIsNull_FallsBackToBinScan()
     {
-        var logger = Mock.Of<ILogger>();
+        var (assemblies, fromManifest) = PluginAssemblyDiscovery.Discover(
+            dependencyContext: null,
+            contractAnchor: typeof(IExecutionBuilderConfigurator).Assembly,
+            logger: Mock.Of<ILogger>());
 
-        var result = PluginAssemblyDiscovery.Discover(null, logger);
-
-        Assert.That(result, Is.Not.Empty);
+        Assert.That(fromManifest, Is.False);
+        Assert.That(assemblies, Is.Not.Empty);
         Assert.That(
-            result.Any(assembly => assembly == typeof(IExecutionBuilderConfigurator).Assembly),
+            assemblies.Any(assembly => assembly == typeof(IExecutionBuilderConfigurator).Assembly),
             Is.True);
     }
 
     [Test]
     public void Discover_WhenContractAssemblyAbsentFromManifest_FallsBackToBinScan()
     {
-        var context = BuildContext(
-            Library("Some.Unrelated.Lib"),
-            Library("Some.Other.Lib", "Some.Unrelated.Lib"));
-        var logger = Mock.Of<ILogger>();
+        var context = BuildContext(Library("Some.Unrelated.Lib"), Library("Some.Other.Lib", "Some.Unrelated.Lib"));
 
-        var result = PluginAssemblyDiscovery.Discover(context, logger);
+        var (assemblies, fromManifest) = PluginAssemblyDiscovery.Discover(
+            context,
+            typeof(IExecutionBuilderConfigurator).Assembly,
+            Mock.Of<ILogger>());
 
+        Assert.That(fromManifest, Is.False);
         Assert.That(
-            result.Any(assembly => assembly == typeof(IExecutionBuilderConfigurator).Assembly),
+            assemblies.Any(assembly => assembly == typeof(IExecutionBuilderConfigurator).Assembly),
             Is.True,
             "Fallback bin scan should still discover the contract assembly.");
     }
 
     [Test]
-    public void Discover_WhenContractAssemblyPresent_ResolvesContractAssemblyFromManifest()
+    public void ComputeReverseDependencyClosure_WalksTransitively()
     {
         var context = BuildContext(
-            Library(ContractAssemblyName),
-            Library("Plugin.A", ContractAssemblyName),
+            Library(Contract),
+            Library("Plugin.A", Contract),
             Library("Plugin.B", "Plugin.A"),
-            Library("Unrelated.Lib", "System.Runtime"));
-        var logger = Mock.Of<ILogger>();
+            Library("Plugin.C", "Plugin.B"),
+            Library("Unrelated", "System.Runtime"));
 
-        var result = PluginAssemblyDiscovery.Discover(context, logger);
+        var closure = PluginAssemblyDiscovery.ComputeReverseDependencyClosure(context, Contract);
 
-        Assert.That(
-            result.Any(assembly => assembly == typeof(IExecutionBuilderConfigurator).Assembly),
-            Is.True);
-        Assert.That(
-            result.Any(assembly =>
-                string.Equals(assembly.GetName().Name, "Unrelated.Lib", StringComparison.Ordinal)),
-            Is.False);
+        Assert.That(closure, Is.EquivalentTo(new[] { Contract, "Plugin.A", "Plugin.B", "Plugin.C" }));
     }
 
     [Test]
-    public void GetCandidateAssemblies_IsCachedAcrossCalls()
+    public void ComputeReverseDependencyClosure_HandlesBranchingGraph()
     {
-        var logger = Mock.Of<ILogger>();
+        var context = BuildContext(
+            Library(Contract),
+            Library("Branch.Left", Contract),
+            Library("Branch.Right", Contract),
+            Library("Branch.LeftChild", "Branch.Left"));
 
-        var first = PluginAssemblyDiscovery.GetCandidateAssemblies(logger);
-        var second = PluginAssemblyDiscovery.GetCandidateAssemblies(logger);
+        var closure = PluginAssemblyDiscovery.ComputeReverseDependencyClosure(context, Contract);
+
+        Assert.That(closure, Is.EquivalentTo(new[]
+        {
+            Contract,
+            "Branch.Left",
+            "Branch.Right",
+            "Branch.LeftChild"
+        }));
+    }
+
+    [Test]
+    public void ComputeReverseDependencyClosure_HandlesCyclesWithoutInfiniteLoop()
+    {
+        var context = BuildContext(
+            Library(Contract),
+            Library("Cycle.A", Contract, "Cycle.B"),
+            Library("Cycle.B", "Cycle.A"));
+
+        var closure = PluginAssemblyDiscovery.ComputeReverseDependencyClosure(context, Contract);
+
+        Assert.That(closure, Is.EquivalentTo(new[] { Contract, "Cycle.A", "Cycle.B" }));
+    }
+
+    [Test]
+    public void ComputeReverseDependencyClosure_ExcludesDisconnectedLibraries()
+    {
+        var context = BuildContext(
+            Library(Contract),
+            Library("Plugin", Contract),
+            Library("Disconnected", "System.Runtime"),
+            Library("Disconnected.Child", "Disconnected"));
+
+        var closure = PluginAssemblyDiscovery.ComputeReverseDependencyClosure(context, Contract);
+
+        Assert.That(closure, Is.EquivalentTo(new[] { Contract, "Plugin" }));
+        Assert.That(closure, Does.Not.Contain("Disconnected"));
+        Assert.That(closure, Does.Not.Contain("Disconnected.Child"));
+    }
+
+    [Test]
+    public void ComputeReverseDependencyClosure_HandlesPackageIdDifferentFromAssemblyName()
+    {
+        var context = BuildContext(
+            LibraryWithAssemblies("Contract.Package", Contract),
+            LibraryWithAssemblies("Acme.Plugin.Package", "Acme.Plugin.Core")
+                .WithDependency("Contract.Package"));
+
+        var closure = PluginAssemblyDiscovery.ComputeReverseDependencyClosure(context, Contract);
+
+        Assert.That(closure, Does.Contain(Contract));
+        Assert.That(closure, Does.Contain("Acme.Plugin.Core"));
+    }
+
+    [Test]
+    public void ComputeReverseDependencyClosure_IsCaseInsensitive()
+    {
+        var context = BuildContext(
+            Library(Contract),
+            Library("UPPER.Plugin", Contract.ToLower()),
+            Library("lower.plugin", Contract.ToUpper()));
+
+        var closure = PluginAssemblyDiscovery.ComputeReverseDependencyClosure(context, Contract);
+
+        Assert.That(closure, Does.Contain("UPPER.Plugin"));
+        Assert.That(closure, Does.Contain("lower.plugin"));
+    }
+
+    [Test]
+    public void GetCandidateAssemblies_CachesSuccessfulManifestResults()
+    {
+        var first = PluginAssemblyDiscovery.GetCandidateAssemblies(Mock.Of<ILogger>());
+        var second = PluginAssemblyDiscovery.GetCandidateAssemblies(Mock.Of<ILogger>());
 
         Assert.That(second, Is.SameAs(first));
     }
@@ -93,6 +164,44 @@ public class PluginAssemblyDiscoveryTests
             runtimeAssemblyGroups: Array.Empty<RuntimeAssetGroup>(),
             nativeLibraryGroups: Array.Empty<RuntimeAssetGroup>(),
             resourceAssemblies: Array.Empty<ResourceAssembly>(),
-            dependencies: dependencies.Select(name => new Dependency(name, "1.0.0")).ToArray(),
+            dependencies: dependencies.Select(d => new Dependency(d, "1.0.0")).ToArray(),
             serviceable: true);
+
+    private static LibraryBuilder LibraryWithAssemblies(string packageId, params string[] assemblyNames) =>
+        new(packageId, assemblyNames);
+
+    private sealed class LibraryBuilder
+    {
+        private readonly string _packageId;
+        private readonly string[] _assemblyNames;
+        private readonly List<string> _dependencies = new();
+
+        public LibraryBuilder(string packageId, string[] assemblyNames)
+        {
+            _packageId = packageId;
+            _assemblyNames = assemblyNames;
+        }
+
+        public LibraryBuilder WithDependency(string packageId)
+        {
+            _dependencies.Add(packageId);
+            return this;
+        }
+
+        public static implicit operator RuntimeLibrary(LibraryBuilder builder) => new(
+            type: "package",
+            name: builder._packageId,
+            version: "1.0.0",
+            hash: string.Empty,
+            runtimeAssemblyGroups: new[]
+            {
+                new RuntimeAssetGroup(
+                    string.Empty,
+                    builder._assemblyNames.Select(name => $"lib/net10.0/{name}.dll").ToArray())
+            },
+            nativeLibraryGroups: Array.Empty<RuntimeAssetGroup>(),
+            resourceAssemblies: Array.Empty<ResourceAssembly>(),
+            dependencies: builder._dependencies.Select(d => new Dependency(d, "1.0.0")).ToArray(),
+            serviceable: true);
+    }
 }
