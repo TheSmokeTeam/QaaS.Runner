@@ -7,7 +7,10 @@ internal static class ExecutionBuilderConfiguratorLoader
 {
     public static IReadOnlyList<IExecutionBuilderConfigurator> Load(ILogger logger)
     {
-        return Load(logger, Assembly.GetEntryAssembly(), GetCandidateAssemblies());
+        return Load(
+            logger,
+            Assembly.GetEntryAssembly(),
+            PluginAssemblyDiscovery.GetCandidateAssemblies(logger));
     }
 
     internal static IReadOnlyList<IExecutionBuilderConfigurator> Load(
@@ -18,7 +21,7 @@ internal static class ExecutionBuilderConfiguratorLoader
         return Load(
             logger,
             entryAssembly,
-            candidateAssemblies.SelectMany(GetLoadableTypes));
+            candidateAssemblies.SelectMany(assembly => GetLoadableTypes(assembly, logger)));
     }
 
     internal static IReadOnlyList<IExecutionBuilderConfigurator> Load(
@@ -35,47 +38,7 @@ internal static class ExecutionBuilderConfiguratorLoader
             .ToArray();
     }
 
-    private static IEnumerable<Assembly> GetCandidateAssemblies()
-    {
-        var assemblies = new Dictionary<string, Assembly>(StringComparer.Ordinal);
-
-        AddAssembly(assemblies, Assembly.GetEntryAssembly());
-
-        foreach (var loadedAssembly in AppDomain.CurrentDomain.GetAssemblies())
-            AddAssembly(assemblies, loadedAssembly);
-
-        foreach (var assemblyPath in Directory.GetFiles(AppDomain.CurrentDomain.BaseDirectory, "*.dll"))
-        {
-            try
-            {
-                var assemblyName = AssemblyName.GetAssemblyName(assemblyPath);
-                if (assemblies.ContainsKey(assemblyName.FullName ?? assemblyName.Name!))
-                    continue;
-
-                AddAssembly(assemblies, Assembly.LoadFrom(assemblyPath));
-            }
-            catch
-            {
-                // Ignore broken or unloadable binaries while scanning for configurators.
-            }
-        }
-
-        return assemblies.Values;
-    }
-
-    private static void AddAssembly(IDictionary<string, Assembly> assemblies, Assembly? assembly)
-    {
-        if (assembly is null || assembly.IsDynamic)
-            return;
-
-        var key = assembly.FullName ?? assembly.GetName().Name;
-        if (string.IsNullOrWhiteSpace(key) || assemblies.ContainsKey(key))
-            return;
-
-        assemblies[key] = assembly;
-    }
-
-    private static IEnumerable<Type> GetLoadableTypes(Assembly assembly)
+    private static IEnumerable<Type> GetLoadableTypes(Assembly assembly, ILogger logger)
     {
         try
         {
@@ -83,6 +46,10 @@ internal static class ExecutionBuilderConfiguratorLoader
         }
         catch (ReflectionTypeLoadException exception)
         {
+            logger.LogDebug(
+                exception,
+                "Partially loaded assembly {AssemblyFullName} while scanning for configurators; continuing with the types that did load.",
+                assembly.FullName);
             return exception.Types.Where(type => type is not null)!;
         }
     }
