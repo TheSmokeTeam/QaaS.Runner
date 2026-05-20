@@ -54,7 +54,7 @@ public class PluginAssemblyDiscoverySideBySideAssemblyTests
 
             var context = BuildContext(Library(simpleName));
 
-            var (assemblies, fromManifest) = PluginAssemblyDiscovery.Discover(
+            var (assemblies, fromManifest) = PluginAssemblyDiscovery.FindCandidateAssemblies(
                 context,
                 first,
                 Mock.Of<ILogger>());

@@ -10,7 +10,7 @@ public class PluginAssemblyDiscoveryManifestQuirksTests
     private const string ContractAssembly = "Contract.Anchor";
 
     [Test]
-    public void ComputeReverseDependencyClosure_WhenDependencyPathGoesThroughCompilationOnlyLibrary_KeepsRuntimePlugin()
+    public void FindAssembliesReferencingContract_WhenDependencyPathGoesThroughCompilationOnlyLibrary_KeepsRuntimePlugin()
     {
         var contract = RuntimeLibraryProducing(
             packageId: "Contract.Package",
@@ -25,7 +25,7 @@ public class PluginAssemblyDiscoveryManifestQuirksTests
 
         var context = BuildContext(new[] { compileOnlyAdapter }, contract, plugin);
 
-        var closure = PluginAssemblyDiscovery.ComputeReverseDependencyClosure(context, ContractAssembly);
+        var closure = PluginAssemblyDiscovery.FindAssembliesReferencingContract(context, ContractAssembly);
 
         Assert.That(
             closure,

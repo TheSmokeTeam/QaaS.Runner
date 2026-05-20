@@ -19,7 +19,7 @@ public class PluginAssemblyDiscoveryLoggingTests
         var logger = new Mock<ILogger>();
         var contractAssemblyName = typeof(IExecutionBuilderConfigurator).Assembly.GetName().Name!;
 
-        PluginAssemblyDiscovery.Discover(
+        PluginAssemblyDiscovery.FindCandidateAssemblies(
             context,
             typeof(IExecutionBuilderConfigurator).Assembly,
             logger.Object);

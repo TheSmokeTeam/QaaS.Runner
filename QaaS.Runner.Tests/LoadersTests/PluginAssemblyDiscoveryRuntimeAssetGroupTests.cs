@@ -10,7 +10,7 @@ public class PluginAssemblyDiscoveryRuntimeAssetGroupTests
     private const string ContractAssembly = "Contract.Anchor";
 
     [Test]
-    public void ComputeReverseDependencyClosure_WhenTargetHasRid_UsesSelectedRuntimeAssemblyGroup()
+    public void FindAssembliesReferencingContract_WhenTargetHasRid_UsesSelectedRuntimeAssemblyGroup()
     {
         var contractLibrary = LibraryProducing(
             packageId: "Contract.Package",
@@ -31,7 +31,7 @@ public class PluginAssemblyDiscoveryRuntimeAssetGroupTests
 
         var context = BuildContext(contractLibrary, pluginLibrary);
 
-        var closure = PluginAssemblyDiscovery.ComputeReverseDependencyClosure(context, ContractAssembly);
+        var closure = PluginAssemblyDiscovery.FindAssembliesReferencingContract(context, ContractAssembly);
 
         Assert.That(
             closure,

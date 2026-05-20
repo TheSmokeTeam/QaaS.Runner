@@ -37,7 +37,7 @@ public class PluginAssemblyDiscoveryExceptionTests
         try
         {
             Assert.That(
-                () => PluginAssemblyDiscovery.Discover(context, contractAnchor, Mock.Of<ILogger>()),
+                () => PluginAssemblyDiscovery.FindCandidateAssemblies(context, contractAnchor, Mock.Of<ILogger>()),
                 Throws.TypeOf<OutOfMemoryException>()
                     .With.Message.EqualTo("Synthetic fatal assembly load failure."));
         }

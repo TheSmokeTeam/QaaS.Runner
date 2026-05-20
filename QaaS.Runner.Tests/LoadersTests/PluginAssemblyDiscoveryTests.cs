@@ -17,7 +17,7 @@ public class PluginAssemblyDiscoveryTests
     [Test]
     public void Discover_WhenDependencyContextIsNull_FallsBackToBinScan()
     {
-        var (assemblies, fromManifest) = PluginAssemblyDiscovery.Discover(
+        var (assemblies, fromManifest) = PluginAssemblyDiscovery.FindCandidateAssemblies(
             dependencyContext: null,
             contractAnchor: typeof(IExecutionBuilderConfigurator).Assembly,
             logger: Mock.Of<ILogger>());
@@ -34,7 +34,7 @@ public class PluginAssemblyDiscoveryTests
     {
         var context = BuildContext(Library("Some.Unrelated.Lib"), Library("Some.Other.Lib", "Some.Unrelated.Lib"));
 
-        var (assemblies, fromManifest) = PluginAssemblyDiscovery.Discover(
+        var (assemblies, fromManifest) = PluginAssemblyDiscovery.FindCandidateAssemblies(
             context,
             typeof(IExecutionBuilderConfigurator).Assembly,
             Mock.Of<ILogger>());
@@ -47,7 +47,7 @@ public class PluginAssemblyDiscoveryTests
     }
 
     [Test]
-    public void ComputeReverseDependencyClosure_WalksTransitively()
+    public void FindAssembliesReferencingContract_WalksTransitively()
     {
         var context = BuildContext(
             Library(Contract),
@@ -56,13 +56,13 @@ public class PluginAssemblyDiscoveryTests
             Library("Plugin.C", "Plugin.B"),
             Library("Unrelated", "System.Runtime"));
 
-        var closure = PluginAssemblyDiscovery.ComputeReverseDependencyClosure(context, Contract);
+        var closure = PluginAssemblyDiscovery.FindAssembliesReferencingContract(context, Contract);
 
         Assert.That(closure, Is.EquivalentTo(new[] { Contract, "Plugin.A", "Plugin.B", "Plugin.C" }));
     }
 
     [Test]
-    public void ComputeReverseDependencyClosure_HandlesBranchingGraph()
+    public void FindAssembliesReferencingContract_HandlesBranchingGraph()
     {
         var context = BuildContext(
             Library(Contract),
@@ -70,7 +70,7 @@ public class PluginAssemblyDiscoveryTests
             Library("Branch.Right", Contract),
             Library("Branch.LeftChild", "Branch.Left"));
 
-        var closure = PluginAssemblyDiscovery.ComputeReverseDependencyClosure(context, Contract);
+        var closure = PluginAssemblyDiscovery.FindAssembliesReferencingContract(context, Contract);
 
         Assert.That(closure, Is.EquivalentTo(new[]
         {
@@ -82,20 +82,20 @@ public class PluginAssemblyDiscoveryTests
     }
 
     [Test]
-    public void ComputeReverseDependencyClosure_HandlesCyclesWithoutInfiniteLoop()
+    public void FindAssembliesReferencingContract_HandlesCyclesWithoutInfiniteLoop()
     {
         var context = BuildContext(
             Library(Contract),
             Library("Cycle.A", Contract, "Cycle.B"),
             Library("Cycle.B", "Cycle.A"));
 
-        var closure = PluginAssemblyDiscovery.ComputeReverseDependencyClosure(context, Contract);
+        var closure = PluginAssemblyDiscovery.FindAssembliesReferencingContract(context, Contract);
 
         Assert.That(closure, Is.EquivalentTo(new[] { Contract, "Cycle.A", "Cycle.B" }));
     }
 
     [Test]
-    public void ComputeReverseDependencyClosure_ExcludesDisconnectedLibraries()
+    public void FindAssembliesReferencingContract_ExcludesDisconnectedLibraries()
     {
         var context = BuildContext(
             Library(Contract),
@@ -103,7 +103,7 @@ public class PluginAssemblyDiscoveryTests
             Library("Disconnected", "System.Runtime"),
             Library("Disconnected.Child", "Disconnected"));
 
-        var closure = PluginAssemblyDiscovery.ComputeReverseDependencyClosure(context, Contract);
+        var closure = PluginAssemblyDiscovery.FindAssembliesReferencingContract(context, Contract);
 
         Assert.That(closure, Is.EquivalentTo(new[] { Contract, "Plugin" }));
         Assert.That(closure, Does.Not.Contain("Disconnected"));
@@ -111,28 +111,28 @@ public class PluginAssemblyDiscoveryTests
     }
 
     [Test]
-    public void ComputeReverseDependencyClosure_HandlesPackageIdDifferentFromAssemblyName()
+    public void FindAssembliesReferencingContract_HandlesPackageIdDifferentFromAssemblyName()
     {
         var context = BuildContext(
             LibraryWithAssemblies("Contract.Package", Contract),
             LibraryWithAssemblies("Acme.Plugin.Package", "Acme.Plugin.Core")
                 .WithDependency("Contract.Package"));
 
-        var closure = PluginAssemblyDiscovery.ComputeReverseDependencyClosure(context, Contract);
+        var closure = PluginAssemblyDiscovery.FindAssembliesReferencingContract(context, Contract);
 
         Assert.That(closure, Does.Contain(Contract));
         Assert.That(closure, Does.Contain("Acme.Plugin.Core"));
     }
 
     [Test]
-    public void ComputeReverseDependencyClosure_IsCaseInsensitive()
+    public void FindAssembliesReferencingContract_IsCaseInsensitive()
     {
         var context = BuildContext(
             Library(Contract),
             Library("UPPER.Plugin", Contract.ToLower()),
             Library("lower.plugin", Contract.ToUpper()));
 
-        var closure = PluginAssemblyDiscovery.ComputeReverseDependencyClosure(context, Contract);
+        var closure = PluginAssemblyDiscovery.FindAssembliesReferencingContract(context, Contract);
 
         Assert.That(closure, Does.Contain("UPPER.Plugin"));
         Assert.That(closure, Does.Contain("lower.plugin"));

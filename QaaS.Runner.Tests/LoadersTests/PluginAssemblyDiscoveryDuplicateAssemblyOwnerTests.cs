@@ -23,7 +23,7 @@ public class PluginAssemblyDiscoveryDuplicateAssemblyOwnerTests
     private const string ContractAssembly = "Contract.Anchor";
 
     [Test]
-    public void ComputeReverseDependencyClosure_WhenContractAssemblyIsOwnedByTwoLibraries_WalksBothSubgraphs()
+    public void FindAssembliesReferencingContract_WhenContractAssemblyIsOwnedByTwoLibraries_WalksBothSubgraphs()
     {
         // Two packages each ship lib/net10.0/Contract.Anchor.dll.
         var contractPrimary = LibraryProducing(
@@ -49,7 +49,7 @@ public class PluginAssemblyDiscoveryDuplicateAssemblyOwnerTests
 
         var context = BuildContext(contractPrimary, contractShim, pluginPrimary, pluginShim);
 
-        var closure = PluginAssemblyDiscovery.ComputeReverseDependencyClosure(context, ContractAssembly);
+        var closure = PluginAssemblyDiscovery.FindAssembliesReferencingContract(context, ContractAssembly);
 
         Assert.That(closure, Does.Contain("Plugin.Primary"),
             "Plugin.Primary depends on Contract.Primary which ships the contract assembly; it must be in the closure.");
