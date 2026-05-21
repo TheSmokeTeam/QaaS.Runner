@@ -127,21 +127,20 @@ public class PluginAssemblyDiscoverySideBySideAssemblyTests
             }
             """);
 
-        var buildResult = RunDotnetBuild(projectFile);
+        var outputDirectory = Path.Combine(projectDirectory, "bin", "Debug", "net10.0");
+        var buildResult = RunDotnetBuild(projectFile, outputDirectory);
         Assert.That(buildResult.ExitCode, Is.EqualTo(0), buildResult.Output);
 
-        var assemblyPath = Path.Combine(
-            projectDirectory,
-            "bin",
-            "Debug",
-            "net10.0",
-            $"{simpleName}.dll");
-        Assert.That(File.Exists(assemblyPath), Is.True, $"Expected test assembly at {assemblyPath}.");
+        var assemblyPath = Path.Combine(outputDirectory, $"{simpleName}.dll");
+        Assert.That(
+            File.Exists(assemblyPath),
+            Is.True,
+            $"Expected test assembly at {assemblyPath}.{Environment.NewLine}Build output:{Environment.NewLine}{buildResult.Output}");
 
         return loadContext.LoadFromAssemblyPath(assemblyPath);
     }
 
-    private static (int ExitCode, string Output) RunDotnetBuild(string projectFile)
+    private static (int ExitCode, string Output) RunDotnetBuild(string projectFile, string outputDirectory)
     {
         using var process = Process.Start(new ProcessStartInfo(GetDotnetExecutable())
         {
@@ -152,9 +151,14 @@ public class PluginAssemblyDiscoverySideBySideAssemblyTests
             {
                 "build",
                 projectFile,
+                "--configuration",
+                "Debug",
+                "--output",
+                outputDirectory,
                 "-nologo",
                 "-clp:ErrorsOnly",
-                "/p:RestoreIgnoreFailedSources=true"
+                "/p:RestoreIgnoreFailedSources=true",
+                "/p:UseSharedCompilation=false"
             }
         });
 
