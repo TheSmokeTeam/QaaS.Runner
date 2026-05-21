@@ -15,4 +15,57 @@
   <PropertyGroup Condition="'$(IsTestProject)' == 'true'">
     <NoWarn>$(NoWarn);CS8625</NoWarn>
   </PropertyGroup>
+
+  <!-- ===== Compiler / JIT optimization ===== -->
+  <PropertyGroup Condition="'$(IsTestProject)' != 'true'">
+    <TieredCompilation>true</TieredCompilation>
+    <TieredPGO>true</TieredPGO>
+    <TC_QuickJit>true</TC_QuickJit>
+    <TC_QuickJitForLoops>true</TC_QuickJitForLoops>
+    <Optimize Condition=" '$(Configuration)' == 'Release' ">true</Optimize>
+    <Deterministic>true</Deterministic>
+    <MetadataUpdaterSupport>false</MetadataUpdaterSupport>
+    <ProduceReferenceAssembly>true</ProduceReferenceAssembly>
+  </PropertyGroup>
+
+  <!-- ===== ReadyToRun for libraries published in composite mode by consumers ===== -->
+  <PropertyGroup Condition="'$(IsTestProject)' != 'true'">
+    <PublishReadyToRun>true</PublishReadyToRun>
+    <PublishReadyToRunComposite>true</PublishReadyToRunComposite>
+    <PublishReadyToRunEmitSymbols>false</PublishReadyToRunEmitSymbols>
+  </PropertyGroup>
+
+  <!-- ===== Source generators that replace reflection with compile-time code ===== -->
+  <PropertyGroup Condition="'$(IsTestProject)' != 'true'">
+    <EnableConfigurationBindingGenerator>true</EnableConfigurationBindingGenerator>
+  </PropertyGroup>
+
+  <!-- ===== Drop runtime features qaas does not need ===== -->
+  <PropertyGroup Condition="'$(IsTestProject)' != 'true'">
+    <EventSourceSupport>false</EventSourceSupport>
+    <HttpActivityPropagationSupport>false</HttpActivityPropagationSupport>
+    <MetricsSupport>false</MetricsSupport>
+    <UseSystemResourceKeys>true</UseSystemResourceKeys>
+    <EnableUnsafeBinaryFormatterSerialization>false</EnableUnsafeBinaryFormatterSerialization>
+    <EnableUnsafeUTF7Encoding>false</EnableUnsafeUTF7Encoding>
+  </PropertyGroup>
+
+  <!-- ===== Crossgen2: aggressive optimization + target AVX2 baseline (covers ~95% of x64 CPUs since ~2013) ===== -->
+  <PropertyGroup Condition="'$(IsTestProject)' != 'true'">
+    <PublishReadyToRunCrossgen2ExtraArgs>--instruction-set:avx2</PublishReadyToRunCrossgen2ExtraArgs>
+  </PropertyGroup>
+
+  <ItemGroup Condition="'$(IsTestProject)' != 'true'">
+    <RuntimeHostConfigurationOption Include="System.Runtime.TieredCompilation.CallCountThreshold" Value="20" Trim="true" />
+  </ItemGroup>
+
+  <!-- ===== Runtime host hints inherited by consumers (Server GC, tiered JIT) ===== -->
+  <ItemGroup Condition="'$(IsTestProject)' != 'true'">
+    <RuntimeHostConfigurationOption Include="System.GC.Server" Value="true" Trim="true" />
+    <RuntimeHostConfigurationOption Include="System.GC.Concurrent" Value="true" Trim="true" />
+    <RuntimeHostConfigurationOption Include="System.Runtime.TieredCompilation" Value="true" Trim="true" />
+    <RuntimeHostConfigurationOption Include="System.Runtime.TieredCompilation.QuickJit" Value="true" Trim="true" />
+    <RuntimeHostConfigurationOption Include="System.Runtime.TieredCompilation.QuickJitForLoops" Value="true" Trim="true" />
+    <RuntimeHostConfigurationOption Include="System.Runtime.TieredPGO" Value="true" Trim="true" />
+  </ItemGroup>
 </Project>
