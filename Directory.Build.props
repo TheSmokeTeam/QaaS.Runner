@@ -49,14 +49,6 @@
     <EnableUnsafeUTF7Encoding>false</EnableUnsafeUTF7Encoding>
   </PropertyGroup>
 
-  <!-- ===== Crossgen2: aggressive optimization + target AVX2 baseline (covers ~95% of x64 CPUs since ~2013) ===== -->
-  <PropertyGroup Condition="'$(IsTestProject)' != 'true'">
-    <PublishReadyToRunCrossgen2ExtraArgs>--instruction-set:avx2</PublishReadyToRunCrossgen2ExtraArgs>
-  </PropertyGroup>
-
-  <ItemGroup Condition="'$(IsTestProject)' != 'true'">
-    <RuntimeHostConfigurationOption Include="System.Runtime.TieredCompilation.CallCountThreshold" Value="20" Trim="true" />
-  </ItemGroup>
 
   <!-- ===== Runtime host hints inherited by consumers (Server GC, tiered JIT) ===== -->
   <ItemGroup Condition="'$(IsTestProject)' != 'true'">
