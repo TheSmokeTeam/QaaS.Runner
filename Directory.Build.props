@@ -19,12 +19,11 @@
   <!-- ===== Compiler / JIT optimization ===== -->
   <PropertyGroup Condition="'$(IsTestProject)' != 'true'">
     <TieredCompilation>true</TieredCompilation>
-    <TieredPGO>true</TieredPGO>
-    <TC_QuickJit>true</TC_QuickJit>
-    <TC_QuickJitForLoops>true</TC_QuickJitForLoops>
+    <TieredCompilationQuickJit>true</TieredCompilationQuickJit>
+    <TieredCompilationQuickJitForLoops>true</TieredCompilationQuickJitForLoops>
+    <TieredPGO>false</TieredPGO>
     <Optimize Condition=" '$(Configuration)' == 'Release' ">true</Optimize>
     <Deterministic>true</Deterministic>
-    <MetadataUpdaterSupport>false</MetadataUpdaterSupport>
     <ProduceReferenceAssembly>true</ProduceReferenceAssembly>
   </PropertyGroup>
 
