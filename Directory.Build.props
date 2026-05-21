@@ -21,7 +21,6 @@
     <TieredCompilation>true</TieredCompilation>
     <TieredCompilationQuickJit>true</TieredCompilationQuickJit>
     <TieredCompilationQuickJitForLoops>true</TieredCompilationQuickJitForLoops>
-    <TieredPGO>false</TieredPGO>
     <Optimize Condition=" '$(Configuration)' == 'Release' ">true</Optimize>
     <Deterministic>true</Deterministic>
     <ProduceReferenceAssembly>true</ProduceReferenceAssembly>
