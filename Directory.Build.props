@@ -31,6 +31,7 @@
     <PublishReadyToRun>true</PublishReadyToRun>
     <PublishReadyToRunComposite>true</PublishReadyToRunComposite>
     <PublishReadyToRunEmitSymbols>false</PublishReadyToRunEmitSymbols>
+    <PublishReadyToRunCrossgen2ExtraArgs>--compilebubblegenerics</PublishReadyToRunCrossgen2ExtraArgs>
   </PropertyGroup>
 
   <!-- ===== Source generators that replace reflection with compile-time code ===== -->
