@@ -16,41 +16,33 @@
     <NoWarn>$(NoWarn);CS8625</NoWarn>
   </PropertyGroup>
 
-  <!-- ===== Compiler / JIT optimization ===== -->
+  <!--
+    Compile / JIT settings. These are explicit declarations of .NET 10 defaults; we list them
+    so the intent is documented and a future SDK that flips a default won't silently regress us.
+  -->
   <PropertyGroup Condition="'$(IsTestProject)' != 'true'">
     <TieredCompilation>true</TieredCompilation>
     <TieredCompilationQuickJit>true</TieredCompilationQuickJit>
     <TieredCompilationQuickJitForLoops>true</TieredCompilationQuickJitForLoops>
     <Optimize Condition=" '$(Configuration)' == 'Release' ">true</Optimize>
     <Deterministic>true</Deterministic>
-    <ProduceReferenceAssembly>true</ProduceReferenceAssembly>
   </PropertyGroup>
 
-  <!-- ===== ReadyToRun for libraries published in composite mode by consumers ===== -->
+  <!--
+    ReadyToRun settings. Inert for `dotnet build` / `dotnet run` / `dotnet pack` / `dotnet test`.
+    Only fire when a consumer publishes with `dotnet publish -p:PublishReadyToRun=true`.
+  -->
   <PropertyGroup Condition="'$(IsTestProject)' != 'true'">
     <PublishReadyToRun>true</PublishReadyToRun>
     <PublishReadyToRunComposite>true</PublishReadyToRunComposite>
     <PublishReadyToRunEmitSymbols>false</PublishReadyToRunEmitSymbols>
-    <PublishReadyToRunCrossgen2ExtraArgs>--compilebubblegenerics</PublishReadyToRunCrossgen2ExtraArgs>
   </PropertyGroup>
 
-  <!-- ===== Source generators that replace reflection with compile-time code ===== -->
-  <PropertyGroup Condition="'$(IsTestProject)' != 'true'">
-    <EnableConfigurationBindingGenerator>true</EnableConfigurationBindingGenerator>
-  </PropertyGroup>
-
-  <!-- ===== Drop runtime features qaas does not need ===== -->
-  <PropertyGroup Condition="'$(IsTestProject)' != 'true'">
-    <EventSourceSupport>false</EventSourceSupport>
-    <HttpActivityPropagationSupport>false</HttpActivityPropagationSupport>
-    <MetricsSupport>false</MetricsSupport>
-    <UseSystemResourceKeys>true</UseSystemResourceKeys>
-    <EnableUnsafeBinaryFormatterSerialization>false</EnableUnsafeBinaryFormatterSerialization>
-    <EnableUnsafeUTF7Encoding>false</EnableUnsafeUTF7Encoding>
-  </PropertyGroup>
-
-
-  <!-- ===== Runtime host hints inherited by consumers (Server GC, tiered JIT) ===== -->
+  <!--
+    Runtime host hints. These end up in this library's own .runtimeconfig.json (used by
+    `dotnet test` here). They do NOT propagate to a consumer's executable runtime config —
+    consumers need to set their own. Listed here as documentation of intended defaults.
+  -->
   <ItemGroup Condition="'$(IsTestProject)' != 'true'">
     <RuntimeHostConfigurationOption Include="System.GC.Server" Value="true" Trim="true" />
     <RuntimeHostConfigurationOption Include="System.GC.Concurrent" Value="true" Trim="true" />
