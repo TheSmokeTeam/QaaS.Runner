@@ -17,8 +17,14 @@
   </PropertyGroup>
 
   <!--
-    ReadyToRun for consumers that publish with `dotnet publish -p:PublishReadyToRun=true`.
+    ReadyToRun settings for THIS repo's own publish flow (CI builds, internal smoke tests).
     Inert for `dotnet build` / `dotnet run` / `dotnet pack` / `dotnet test`.
+
+    Note: these properties do NOT propagate to NuGet consumers. Directory.Build.props is a
+    repo-local MSBuild convention; it is not packed into the published NuGet package and
+    therefore is not imported by a consumer's project. To get the same R2R behaviour, a
+    consumer must add these to their own csproj and publish with
+    `-p:PublishReadyToRun=true -p:PublishReadyToRunComposite=true`.
   -->
   <PropertyGroup Condition="'$(IsTestProject)' != 'true'">
     <PublishReadyToRun>true</PublishReadyToRun>
