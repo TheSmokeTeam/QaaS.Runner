@@ -17,38 +17,11 @@
   </PropertyGroup>
 
   <!--
-    Compile / JIT settings. These are explicit declarations of .NET 10 defaults; we list them
-    so the intent is documented and a future SDK that flips a default won't silently regress us.
-  -->
-  <PropertyGroup Condition="'$(IsTestProject)' != 'true'">
-    <TieredCompilation>true</TieredCompilation>
-    <TieredCompilationQuickJit>true</TieredCompilationQuickJit>
-    <TieredCompilationQuickJitForLoops>true</TieredCompilationQuickJitForLoops>
-    <Optimize Condition=" '$(Configuration)' == 'Release' ">true</Optimize>
-    <Deterministic>true</Deterministic>
-  </PropertyGroup>
-
-  <!--
-    ReadyToRun settings. Inert for `dotnet build` / `dotnet run` / `dotnet pack` / `dotnet test`.
-    Only fire when a consumer publishes with `dotnet publish -p:PublishReadyToRun=true`.
+    ReadyToRun for consumers that publish with `dotnet publish -p:PublishReadyToRun=true`.
+    Inert for `dotnet build` / `dotnet run` / `dotnet pack` / `dotnet test`.
   -->
   <PropertyGroup Condition="'$(IsTestProject)' != 'true'">
     <PublishReadyToRun>true</PublishReadyToRun>
     <PublishReadyToRunComposite>true</PublishReadyToRunComposite>
-    <PublishReadyToRunEmitSymbols>false</PublishReadyToRunEmitSymbols>
   </PropertyGroup>
-
-  <!--
-    Runtime host hints. These end up in this library's own .runtimeconfig.json (used by
-    `dotnet test` here). They do NOT propagate to a consumer's executable runtime config —
-    consumers need to set their own. Listed here as documentation of intended defaults.
-  -->
-  <ItemGroup Condition="'$(IsTestProject)' != 'true'">
-    <RuntimeHostConfigurationOption Include="System.GC.Server" Value="true" Trim="true" />
-    <RuntimeHostConfigurationOption Include="System.GC.Concurrent" Value="true" Trim="true" />
-    <RuntimeHostConfigurationOption Include="System.Runtime.TieredCompilation" Value="true" Trim="true" />
-    <RuntimeHostConfigurationOption Include="System.Runtime.TieredCompilation.QuickJit" Value="true" Trim="true" />
-    <RuntimeHostConfigurationOption Include="System.Runtime.TieredCompilation.QuickJitForLoops" Value="true" Trim="true" />
-    <RuntimeHostConfigurationOption Include="System.Runtime.TieredPGO" Value="true" Trim="true" />
-  </ItemGroup>
 </Project>
