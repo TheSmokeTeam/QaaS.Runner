@@ -35,13 +35,11 @@ public abstract class BaseReporter : IReporter
     public IFileSystem FileSystem = default!;
 
     public AssertionSeverity Severity { get; set; }
-    public string Name { get; set; } = string.Empty;
-    public string AssertionName { get; set; } = string.Empty;
-    public bool SaveSessionData { get; set; }
-    public bool SaveLogs { get; set; }
-    public bool SaveAttachments { get; set; }
-    public bool SaveTemplate { get; set; }
-    public bool DisplayTrace { get; set; }
+    public bool? SaveSessionData { get; set; }
+    public bool? SaveLogs { get; set; }
+    public bool? SaveAttachments { get; set; }
+    public bool? SaveTemplate { get; set; }
+    public bool? DisplayTrace { get; set; }
     public long EpochTestSuiteStartTime { get; set; }
 
     public abstract void WriteTestResults(AssertionResult assertionResult);
@@ -246,20 +244,15 @@ public abstract class BaseReporter : IReporter
                 : TraceDisplayFalseMessage);
     }
 
-    protected bool ShouldSaveSessionData(Assertion assertion) =>
-        assertion.SaveSessionData ?? SaveSessionData;
+    protected bool ShouldSaveSessionData(Assertion assertion) => SaveSessionData ?? assertion.SaveSessionData;
+    
+    protected bool ShouldSaveLogs(Assertion assertion) => SaveLogs ?? assertion.SaveLogs;
 
-    protected bool ShouldSaveLogs(Assertion assertion) =>
-        assertion.SaveLogs ?? SaveLogs;
+    protected bool ShouldSaveAttachments(Assertion assertion) => SaveAttachments ?? assertion.SaveAttachments;
 
-    protected bool ShouldSaveAttachments(Assertion assertion) =>
-        assertion.SaveAttachments ?? SaveAttachments;
+    protected bool ShouldSaveTemplate(Assertion assertion) => SaveTemplate ?? assertion.SaveTemplate;
 
-    protected bool ShouldSaveTemplate(Assertion assertion) =>
-        assertion.SaveTemplate ?? SaveTemplate;
-
-    protected bool ShouldDisplayTrace(Assertion assertion) =>
-        assertion.DisplayTrace ?? DisplayTrace;
+    protected bool ShouldDisplayTrace(Assertion assertion) => DisplayTrace ?? assertion.DisplayTrace;
 
     protected AssertionSeverity ResolveSeverity(Assertion assertion) =>
         assertion.Severity ?? Severity;

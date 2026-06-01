@@ -26,15 +26,15 @@ public class Assertion
 
     public List<BaseLink>? Links { get; set; }
 
-    public bool? SaveSessionData { get; set; }
+    public bool SaveSessionData { get; set; }
 
-    public bool? SaveLogs { get; set; }
+    public bool SaveLogs { get; set; }
 
-    public bool? SaveAttachments { get; set; }
+    public bool SaveAttachments { get; set; }
 
-    public bool? SaveTemplate { get; set; }
+    public bool SaveTemplate { get; set; }
 
-    public bool? DisplayTrace { get; set; }
+    public bool DisplayTrace { get; set; }
 
     public AssertionSeverity? Severity { get; set; }
 

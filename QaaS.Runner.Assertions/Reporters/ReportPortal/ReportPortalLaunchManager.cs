@@ -1,5 +1,5 @@
 using Microsoft.Extensions.Logging;
-using QaaS.Runner.Assertions.ConfigurationObjects;
+using QaaS.Runner.Assertions.ConfigurationObjects.ReporterConfigs;
 using ReportPortal.Client;
 using ReportPortal.Client.Abstractions;
 using ReportPortal.Client.Abstractions.Models;

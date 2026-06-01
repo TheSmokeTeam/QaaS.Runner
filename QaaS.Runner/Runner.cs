@@ -4,7 +4,6 @@ using Microsoft.Extensions.Logging;
 using QaaS.Framework.Configurations.CustomExceptions;
 using QaaS.Framework.Executions;
 using QaaS.Runner.Options;
-using QaaS.Runner.Assertions.ConfigurationObjects;
 using QaaS.Runner.Assertions.Reporters;
 using QaaS.Runner.Assertions.Reporters.ReportPortal;
 using QaaS.Runner.WrappedExternals;
@@ -330,9 +329,9 @@ public class Runner : IRunner, IDisposable
             .Select(builder => new
             {
                 Builder = builder,
-                Settings = ReportPortalConfig.Resolve(builder.ReportPortal, BuildSingleBuilderRunDescriptor(builder, startedAtLocal))
+                Settings = builder.Reporters?.ReportPortal?.Resolve(BuildSingleBuilderRunDescriptor(builder, startedAtLocal))
             })
-            .Where(item => item.Settings.Enabled)
+            .Where(item => item.Settings is { Enabled: true })
             .ToList();
 
         if (builderSettings.Count == 0)
@@ -344,8 +343,8 @@ public class Runner : IRunner, IDisposable
         var descriptors = new Dictionary<ExecutionBuilder, ReportPortalRunDescriptor>();
         foreach (var builderGroup in builderSettings.GroupBy(item => new
                  {
-                     Team = item.Settings.Team?.Trim().ToLowerInvariant() ?? string.Empty,
-                     System = item.Settings.System.Trim().ToLowerInvariant()
+                     Team = item.Settings?.Team?.Trim().ToLowerInvariant() ?? string.Empty,
+                     System = item.Settings?.System.Trim().ToLowerInvariant()
                  }))
         {
             var sessionNames = builderGroup
@@ -362,10 +361,10 @@ public class Runner : IRunner, IDisposable
                 .ToList();
             var executionMode = executionModes.Count == 1 ? executionModes[0] : "mixed";
             var teamName = builderGroup
-                .Select(item => item.Settings.Team)
+                .Select(item => item.Settings?.Team)
                 .FirstOrDefault(team => !string.IsNullOrWhiteSpace(team));
             var systemName = builderGroup
-                .Select(item => item.Settings.System)
+                .Select(item => item.Settings?.System)
                 .FirstOrDefault(system => !string.IsNullOrWhiteSpace(system)) ?? "Unknown System";
             var descriptor = new ReportPortalRunDescriptor(
                 teamName,

@@ -67,6 +67,7 @@ public class ExecutionBuilder() : BaseExecutionBuilder<InternalContext, Executio
                  " performed against the tested system and its underlying infrastructure in order to receive" +
                  " response data from the tested system to assert on.")]
     public SessionBuilder[]? Sessions { get; internal set; } = [];
+    
     /// <summary>
     /// External storages qaas inner objects can be stored in or retrieved from when
     /// using the `qaas act` (to create and store) or `qaas assert` (to retrieve and use) commands
@@ -74,8 +75,8 @@ public class ExecutionBuilder() : BaseExecutionBuilder<InternalContext, Executio
     [Description(
         "External storages qaas inner objects can be stored in or retrieved from when using " +
         "the `qaas act` (to create and store) or `qaas assert` (to retrieve and use) commands")]
-
     public StorageBuilder[]? Storages { get; internal set; } = [];
+    
     /// <summary>
     /// The list of assertions performed on the sessions' results in order to decide the test's status,
     /// each assertion produces a different test result.
@@ -85,6 +86,7 @@ public class ExecutionBuilder() : BaseExecutionBuilder<InternalContext, Executio
         "The list of assertions performed on the sessions' results in order to decide the test's status," +
         " each assertion produces a different test result.")]
     public AssertionBuilder[]? Assertions { get; internal set; } = [];
+    
     /// <summary>
     /// The links generated on test results, used to view observability data outputted by the tested application.
     /// These links are generated per test result to be relevant specifically to that test and the time it ran at
@@ -93,6 +95,7 @@ public class ExecutionBuilder() : BaseExecutionBuilder<InternalContext, Executio
         "The links generated on test results, used to view observability data outputted by the tested application. " +
         "These links are generated per test result to be relevant specifically to that test and the time it ran at")]
     public LinkBuilder[]? Links { get; internal set; } = [];
+    
     /// <summary>
     /// The metadata for the tests' run
     /// </summary>
@@ -100,10 +103,10 @@ public class ExecutionBuilder() : BaseExecutionBuilder<InternalContext, Executio
     public MetaDataConfig? MetaData { get; internal set; }
 
     /// <summary>
-    /// Optional configuration for publishing the same assertion results to ReportPortal.
+    /// The reporters used to report the test results
     /// </summary>
-    [Description("Optional configuration for publishing the same assertion results to ReportPortal.")]
-    public ReportPortalConfig? ReportPortal { get; internal set; }
+    [Description("The reporters used to report the test results")]
+    public ReporterBuilder? Reporters { get; internal set; } = new();
 
     private ExecutionType Type { get; set; }
 
@@ -151,7 +154,7 @@ public class ExecutionBuilder() : BaseExecutionBuilder<InternalContext, Executio
         Sessions = blankRunBuilderFromContext.Sessions;
         Links = blankRunBuilderFromContext.Links;
         MetaData = blankRunBuilderFromContext.MetaData;
-        ReportPortal = blankRunBuilderFromContext.ReportPortal;
+        Reporters = blankRunBuilderFromContext.Reporters;
 
         _sessionNamesToRun = sessionNamesToRun != null && !sessionNamesToRun.Any() ? null : sessionNamesToRun;
         _sessionCategoriesToRun = sessionCategoriesToRun != null && !sessionCategoriesToRun.Any()
@@ -228,14 +231,16 @@ public class ExecutionBuilder() : BaseExecutionBuilder<InternalContext, Executio
 
     private IEnumerable<IReporter> BuildReports()
     {
-        if (Assertions is null || Assertions.Length == 0) return [];
+        if (Assertions is null || Assertions.Length == 0 || Reporters is null) return [];
         var testSuiteStartTimeUtc = DateTime.UtcNow;
-        var reportPortalSettings = ReportPortalConfig.Resolve(ReportPortal, _reportPortalRunDescriptor);
-        return ReporterFactory.CreateReporters(
-            Context,
-            testSuiteStartTimeUtc,
-            reportPortalSettings,
-            _reportPortalLaunchManager);
+        
+        if (_reportPortalLaunchManager != null && _reportPortalRunDescriptor != null)
+        {
+            Reporters.WithReportPortalLaunchManager(_reportPortalLaunchManager);
+            Reporters.WithReportPortalRunDescriptor(_reportPortalRunDescriptor);   
+        }
+        
+        return Reporters.Build(Context, testSuiteStartTimeUtc);
     }
 
     private IEnumerable<IStorage> BuildStorages()
@@ -917,7 +922,8 @@ public class ExecutionBuilder() : BaseExecutionBuilder<InternalContext, Executio
                 new KeyValuePair<string, object?>("Sessions", Sessions),
                 new KeyValuePair<string, object?>("Assertions", Assertions),
                 new KeyValuePair<string, object?>("Links", Links),
-                new KeyValuePair<string, object?>("MetaData", MetaData)
+                new KeyValuePair<string, object?>("MetaData", MetaData),
+                new KeyValuePair<string, object?>("Reporters", Reporters)
             ],
             Infrastructure.Constants.ConfigurationSectionNames,
             includedSessionNames,
@@ -1083,7 +1089,7 @@ public class ExecutionBuilder() : BaseExecutionBuilder<InternalContext, Executio
     private void ValidateConfiguredSections()
     {
         TryValidateConfiguredMembers(nameof(DataSources), nameof(Storages), nameof(Assertions), nameof(Links),
-            nameof(MetaData), nameof(Sessions));
+            nameof(MetaData), nameof(Sessions), nameof(Reporters));
 
         ValidateCollection(DataSources, nameof(DataSources));
         ValidateCollection(Storages, nameof(Storages));
@@ -1093,6 +1099,7 @@ public class ExecutionBuilder() : BaseExecutionBuilder<InternalContext, Executio
 
         _ = TryValidateConfiguredObjectRecursive(MetaData ?? new MetaDataConfig(), _validationResults,
             nameof(MetaData));
+        _ = TryValidateConfiguredObjectRecursive(Reporters, _validationResults, nameof(Reporters));
     }
 
     private void ValidateCollection<T>(IEnumerable<T>? items, string parentPath)

@@ -3,7 +3,7 @@ using System.Net;
 using System.Net.Http.Headers;
 using System.Text.Json;
 using Microsoft.Extensions.Logging;
-using QaaS.Runner.Assertions.ConfigurationObjects;
+using QaaS.Runner.Assertions.ConfigurationObjects.ReporterConfigs;
 
 namespace QaaS.Runner.Assertions.Reporters.ReportPortal;
 

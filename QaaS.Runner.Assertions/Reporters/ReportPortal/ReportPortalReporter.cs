@@ -3,7 +3,7 @@ using Microsoft.Extensions.Logging;
 using QaaS.Framework.Configurations;
 using QaaS.Framework.SDK.Hooks.Assertion;
 using QaaS.Runner.Assertions.AssertionObjects;
-using QaaS.Runner.Assertions.ConfigurationObjects;
+using QaaS.Runner.Assertions.ConfigurationObjects.ReporterConfigs;
 using ReportPortal.Client.Abstractions.Models;
 using ReportPortal.Client.Abstractions.Requests;
 using AssertionSeverity = QaaS.Runner.Assertions.AssertionObjects.AssertionSeverity;
@@ -36,7 +36,7 @@ public class ReportPortalReporter : BaseReporter
             { AssertionSeverity.Critical, "critical" },
             { AssertionSeverity.Blocker, "blocker" }
         };
-
+    
     public required ReportPortalSettings Settings { get; init; }
     public required ReportPortalLaunchManager LaunchManager { get; init; }
 

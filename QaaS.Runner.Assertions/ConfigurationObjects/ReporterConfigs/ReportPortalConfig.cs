@@ -2,13 +2,13 @@ using System.ComponentModel;
 using ReportPortal.Client.Abstractions.Models;
 using QaaS.Runner.Assertions.Reporters.ReportPortal;
 
-namespace QaaS.Runner.Assertions.ConfigurationObjects;
+namespace QaaS.Runner.Assertions.ConfigurationObjects.ReporterConfigs;
 
 /// <summary>
 /// Defines the passive ReportPortal settings used by QaaS to publish assertion results without provisioning or mutating
 /// ReportPortal resources.
 /// </summary>
-public class ReportPortalConfig
+public class ReportPortalConfig : IReporterConfig
 {
     public const string EnabledEnvironmentVariable = "QAAS_REPORTPORTAL_ENABLED";
     public const string EndpointEnvironmentVariable = "QAAS_REPORTPORTAL_ENDPOINT";
@@ -46,26 +46,24 @@ public class ReportPortalConfig
     /// missing endpoint, missing API key, or missing team metadata are handled later as warnings so QaaS can continue the
     /// run without affecting the exit code.
     /// </summary>
-    internal static ReportPortalSettings Resolve(ReportPortalConfig? config, ReportPortalRunDescriptor? runDescriptor)
+    internal ReportPortalSettings Resolve(ReportPortalRunDescriptor? runDescriptor)
     {
-        var enabled = ReadBooleanValue(EnabledEnvironmentVariable, config?.Enabled ?? true);
+        var enabled = ReadBooleanValue(EnabledEnvironmentVariable, Enabled);
         var endpoint = ReadStringValue(EndpointEnvironmentVariable);
         var apiKey = ReadStringValue(ApiKeyEnvironmentVariable);
-        var ignoredProjectOverride = ReadStringValue(ProjectEnvironmentVariable) ?? config?.Project;
-        var launchName = string.IsNullOrWhiteSpace(config?.LaunchName)
+        var ignoredProjectOverride = ReadStringValue(ProjectEnvironmentVariable) ?? Project;
+        var launchName = string.IsNullOrWhiteSpace(LaunchName)
             ? runDescriptor?.BuildDefaultLaunchName()
-            : config!.LaunchName!.Trim();
-        var description = string.IsNullOrWhiteSpace(config?.Description)
+            : LaunchName.Trim();
+        var description = string.IsNullOrWhiteSpace(Description)
             ? runDescriptor?.BuildDefaultDescription()
-            : config!.Description!.Trim();
+            : Description.Trim();
         var attributes = new Dictionary<string, string>(runDescriptor?.LaunchAttributes ??
                                                         new Dictionary<string, string>(),
             StringComparer.OrdinalIgnoreCase);
-        if (config?.Attributes is not null)
-        {
-            foreach (var attribute in config.Attributes.Where(attribute => !string.IsNullOrWhiteSpace(attribute.Key)))
-                attributes[attribute.Key] = attribute.Value;
-        }
+
+        foreach (var attribute in Attributes.Where(attribute => !string.IsNullOrWhiteSpace(attribute.Key)))
+            attributes[attribute.Key] = attribute.Value;
 
         return new ReportPortalSettings(
             enabled,
@@ -76,7 +74,7 @@ public class ReportPortalConfig
             runDescriptor?.SessionNames ?? [],
             launchName,
             description,
-            config?.DebugMode ?? false,
+            DebugMode,
             attributes,
             ignoredProjectOverride?.Trim());
     }
