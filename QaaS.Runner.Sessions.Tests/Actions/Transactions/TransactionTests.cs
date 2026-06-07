@@ -2,6 +2,8 @@ using System.Collections.Immutable;
 using System.ComponentModel.DataAnnotations;
 using System.Collections.Generic;
 using System.Linq;
+using System.Reflection;
+using System.Threading;
 using Microsoft.Extensions.Configuration;
 using Moq;
 using NUnit.Framework;
@@ -15,6 +17,8 @@ using QaaS.Framework.SDK.Session;
 using QaaS.Framework.SDK.Session.DataObjects;
 using QaaS.Framework.SDK.Session.SessionDataObjects;
 using QaaS.Framework.Serialization;
+using QaaS.Runner.Sessions.Actions;
+using QaaS.Runner.Sessions.Extensions;
 using QaaS.Runner.Sessions.Tests.Actions.Utils;
 using Serilog;
 using Serilog.Events;
@@ -73,7 +77,7 @@ public class TransactionTests
             new DataFilter() { Body = true, Timestamp = true, MetaData = false },
             new DataFilter() { Body = true, Timestamp = true, MetaData = false },
             new LoadBalancePolicy(msgPerSec, 1000),
-            false, numberOfIterations, 0,
+            false, null, numberOfIterations, 0,
             null,
             null,
             null,
@@ -179,6 +183,7 @@ public class TransactionTests
             new DataFilter { Body = true, Timestamp = true, MetaData = true },
             null,
             false,
+            null,
             1,
             0,
             null,
@@ -203,6 +208,71 @@ public class TransactionTests
             Assert.That(body, Is.TypeOf<BinaryPayload>());
             Assert.That(((BinaryPayload)body!).Value, Is.EqualTo(payload.Value));
         });
+    }
+
+    private const int TimeoutMsForWork = 10;
+
+    private static readonly FieldInfo IterableSerializableSaveIteratorField =
+        typeof(Sessions.Actions.Transactions.Transaction).GetField("_iterableSerializableSaveIterator",
+            BindingFlags.NonPublic | BindingFlags.Instance)!;
+
+    [Test,
+     TestCase(1, 5),
+     TestCase(5, 5),
+     TestCase(10, 5),
+     TestCase(100, 5),
+     TestCase(10, 50),
+     TestCase(10, 100),
+     TestCase(2, 5)]
+    public void TestTransact_CallTransactionWithDifferentParallelism_ExpectToTransactAllItemsInMatchingParallelism(
+        int parallelism, int numberOfItems)
+    {
+        // arrange
+        var activeThreads = 0;
+        var maxActiveThreads = 0;
+        var dataToTransact = Enumerable.Range(0, numberOfItems)
+            .Select(i => new Data<object> { Body = $"item-{i}" })
+            .ToArray();
+        var transactor = new Mock<ITransactor>();
+        transactor.Setup(t => t.Transact(It.IsAny<Data<object>>()))
+            .Returns<Data<object>>(input =>
+            {
+                Interlocked.Increment(ref activeThreads);
+                if (maxActiveThreads < activeThreads)
+                    Interlocked.Exchange(ref maxActiveThreads, activeThreads);
+                Thread.Sleep(TimeoutMsForWork);
+                Interlocked.Decrement(ref activeThreads);
+                return new Tuple<DetailedData<object>, DetailedData<object>?>(
+                    new DetailedData<object> { Body = input.Body },
+                    new DetailedData<object> { Body = input.Body });
+            });
+
+        var transaction = new Sessions.Actions.Transactions.Transaction(
+            "ParallelTransaction", transactor.Object, 0,
+            new DataFilter { Body = true, Timestamp = true, MetaData = true },
+            new DataFilter { Body = true, Timestamp = true, MetaData = true },
+            null, false, parallelism, 1, 0, null, null, null, [], [], Globals.Logger);
+        var actData = new InternalCommunicationData<object>
+        {
+            Input = [],
+            InputSerializationType = SerializationType.Json,
+            Output = [],
+            OutputSerializationType = SerializationType.Json
+        };
+        IterableSerializableSaveIteratorField.SetValue(transaction,
+            new IterableSerializableDataIterator(dataToTransact, null));
+
+        // act
+        typeof(Sessions.Actions.Transactions.Transaction)
+            .GetMethod("Transact", BindingFlags.NonPublic | BindingFlags.Instance)!
+            .Invoke(transaction, [actData]);
+
+        // assert
+        transactor.Verify(t => t.Transact(It.IsAny<Data<object>>()), Times.Exactly(numberOfItems));
+        Assert.That(actData.Input!.Count, Is.EqualTo(numberOfItems));
+        Assert.That(actData.Output!.Count, Is.EqualTo(numberOfItems));
+        var expectedMaxConcurrency = Math.Min(numberOfItems, parallelism);
+        Assert.That(maxActiveThreads, Is.InRange(1, expectedMaxConcurrency));
     }
 
     [Serializable]

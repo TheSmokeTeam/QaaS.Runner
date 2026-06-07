@@ -2,6 +2,7 @@ using System.ComponentModel;
 using System.ComponentModel.DataAnnotations;
 using System.Runtime.CompilerServices;
 using QaaS.Framework.Configurations.CustomValidationAttributes;
+using QaaS.Framework.Infrastructure;
 using QaaS.Framework.Policies;
 using QaaS.Framework.Protocols.ConfigurationObjects.Elastic;
 using QaaS.Framework.Protocols.ConfigurationObjects.Kafka;
@@ -21,8 +22,10 @@ using Parallel = QaaS.Runner.Sessions.ConfigurationObjects.Parallel;
 
 namespace QaaS.Runner.Sessions.Actions.Publishers.Builders;
 
-public partial class PublisherBuilder
+public partial class PublisherBuilder : ICloneable<PublisherBuilder>
 {
+    public PublisherBuilder Clone() => BuilderCloner.DeepClone(this);
+
     [Required]
     [Description("The name of the publisher")]
     public string? Name { get; internal set; }
