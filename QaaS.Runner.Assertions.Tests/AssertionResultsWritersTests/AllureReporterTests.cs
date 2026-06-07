@@ -45,8 +45,7 @@ public class AllureReporterTests
             },
             SaveLogs = true,
             SaveAttachments = true,
-            FileSystem = new FileSystem(),
-            Name = null
+            FileSystem = new FileSystem()
         };
     }
 
@@ -296,8 +295,7 @@ public class AllureReporterTests
                 SaveAttachments = false,
                 SaveTemplate = saveTemplate,
                 SaveSessionData = saveSessionData,
-                FileSystem = new FileSystem(),
-                Name = null
+                FileSystem = new FileSystem()
             });
 
         // Act

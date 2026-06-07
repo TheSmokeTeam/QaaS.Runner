@@ -4,6 +4,7 @@ using System.Linq;
 using NUnit.Framework;
 using QaaS.Runner.Assertions;
 using QaaS.Runner.Assertions.ConfigurationObjects;
+using QaaS.Runner.Assertions.ConfigurationObjects.ReporterConfigs;
 using QaaS.Runner.Assertions.Reporters;
 using QaaS.Runner.Assertions.Reporters.ReportPortal;
 
@@ -44,7 +45,7 @@ public class ReportPortalConfigTests
     [Test]
     public void Resolve_WithNoOverrides_DefaultsToPassiveEnabledConfiguration()
     {
-        var settings = ReportPortalConfig.Resolve(null, CreateRunDescriptor());
+        var settings = new ReportPortalConfig().Resolve(CreateRunDescriptor());
 
         Assert.That(settings.Enabled, Is.True);
         Assert.That(settings.Endpoint, Is.Null);
@@ -61,11 +62,11 @@ public class ReportPortalConfigTests
     {
         Environment.SetEnvironmentVariable(ReportPortalConfig.EndpointEnvironmentVariable, "http://localhost:8080");
 
-        var settings = ReportPortalConfig.Resolve(new ReportPortalConfig
+        var settings = new ReportPortalConfig
         {
             Project = "QaaS",
             ApiKey = "local-api-key"
-        }, CreateRunDescriptor());
+        }.Resolve(CreateRunDescriptor());
 
         var succeeded = settings.TryGetEndpointUri(out var endpointUri, out var failureReason);
 
@@ -78,11 +79,11 @@ public class ReportPortalConfigTests
     [Test]
     public void Resolve_WithEndpointAndApiKeyOnlyInYaml_IgnoresThemBecauseRuntimeUsesEnvironmentVariables()
     {
-        var settings = ReportPortalConfig.Resolve(new ReportPortalConfig
+        var settings = new ReportPortalConfig
         {
             Endpoint = "http://from-yaml.local",
             ApiKey = "yaml-api-key"
-        }, CreateRunDescriptor());
+        }.Resolve(CreateRunDescriptor());
 
         Assert.That(settings.Endpoint, Is.Null);
         Assert.That(settings.ApiKey, Is.Null);
@@ -96,13 +97,13 @@ public class ReportPortalConfigTests
         Environment.SetEnvironmentVariable(ReportPortalConfig.ProjectEnvironmentVariable, "IgnoredProject");
         Environment.SetEnvironmentVariable(ReportPortalConfig.ApiKeyEnvironmentVariable, "env-api-key");
 
-        var settings = ReportPortalConfig.Resolve(new ReportPortalConfig
+        var settings = new ReportPortalConfig
         {
             Enabled = false,
             Endpoint = "http://ignored.local",
             Project = "Ignored",
             ApiKey = "ignored-api-key"
-        }, CreateRunDescriptor());
+        }.Resolve(CreateRunDescriptor());
 
         Assert.That(settings.Enabled, Is.True);
         Assert.That(settings.Endpoint, Is.EqualTo("http://localhost:8080"));
@@ -114,10 +115,10 @@ public class ReportPortalConfigTests
     [Test]
     public void Resolve_WithExplicitDisable_ReturnsDisabledSettingsWithoutNeedingMetadata()
     {
-        var settings = ReportPortalConfig.Resolve(new ReportPortalConfig
+        var settings = new ReportPortalConfig
         {
             Enabled = false
-        }, null);
+        }.Resolve(null);
 
         Assert.That(settings.Enabled, Is.False);
         Assert.That(settings.Endpoint, Is.Null);
@@ -127,14 +128,12 @@ public class ReportPortalConfigTests
     [Test]
     public void Resolve_WhenProjectCannotBeDerived_DoesNotThrowAndLeavesRequestedProjectNameNull()
     {
-        var settings = ReportPortalConfig.Resolve(
-            new ReportPortalConfig
-            {
-                Enabled = true,
-                Endpoint = "http://localhost:8080"
-            },
-            new ReportPortalLaunchDescriptor(null, "QaaS", ["Session A"], "run",
-                new DateTimeOffset(2025, 1, 1, 10, 0, 0, TimeSpan.Zero)));
+        var settings = new ReportPortalConfig
+        {
+            Enabled = true,
+            Endpoint = "http://localhost:8080"
+        }.Resolve(new ReportPortalLaunchDescriptor(null, "QaaS", ["Session A"], "run",
+            new DateTimeOffset(2025, 1, 1, 10, 0, 0, TimeSpan.Zero)));
 
         Assert.That(settings.RequestedProjectName, Is.Null);
         Assert.That(settings.System, Is.EqualTo("QaaS"));
@@ -143,10 +142,10 @@ public class ReportPortalConfigTests
     [Test]
     public void TryGetEndpointUri_WithMissingEndpoint_ReturnsFailureReason()
     {
-        var settings = ReportPortalConfig.Resolve(new ReportPortalConfig
+        var settings = new ReportPortalConfig
         {
             Enabled = true
-        }, CreateRunDescriptor());
+        }.Resolve(CreateRunDescriptor());
 
         var succeeded = settings.TryGetEndpointUri(out var endpointUri, out var failureReason);
 
@@ -158,14 +157,14 @@ public class ReportPortalConfigTests
     [Test]
     public void BuildLaunchAttributes_IncludesTeamSystemSessionsAndStaticAttributes()
     {
-        var settings = ReportPortalConfig.Resolve(new ReportPortalConfig
+        var settings = new ReportPortalConfig
         {
             Attributes = new Dictionary<string, string>
             {
                 ["Component"] = "Auth",
                 ["Owner"] = "Smoke Team"
             }
-        }, CreateRunDescriptor());
+        }.Resolve(CreateRunDescriptor());
 
         var attributes = settings.BuildLaunchAttributes();
 

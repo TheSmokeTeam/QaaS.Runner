@@ -10,6 +10,7 @@ using QaaS.Framework.SDK.Hooks.Assertion;
 using QaaS.Framework.SDK.Session.SessionDataObjects;
 using QaaS.Runner.Assertions.AssertionObjects;
 using QaaS.Runner.Assertions.ConfigurationObjects;
+using QaaS.Runner.Assertions.ConfigurationObjects.ReporterConfigs;
 using QaaS.Runner.Assertions.Reporters;
 using QaaS.Runner.Assertions.Reporters.ReportPortal;
 using QaaS.Runner.Assertions.Tests.Mocks;
@@ -66,11 +67,6 @@ public class ReportPortalReporterTests
                 Logger = Globals.Logger,
                 RootConfiguration = new ConfigurationBuilder().Build()
             },
-            SaveSessionData = true,
-            SaveLogs = true,
-            SaveAttachments = true,
-            SaveTemplate = true,
-            DisplayTrace = true,
             Severity = AssertionSeverity.Normal
         };
     }

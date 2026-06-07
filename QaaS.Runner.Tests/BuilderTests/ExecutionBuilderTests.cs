@@ -956,7 +956,6 @@ public class ExecutionBuilderTests
 
         Assert.That(builtReports, Has.Count.EqualTo(1));
         Assert.That(builtReports[0], Is.TypeOf<AllureReporter>());
-        Assert.That(builtReports[0].AssertionName, Is.EqualTo(nameof(AllureReporter)));
     }
 
     [Test]
@@ -1137,6 +1136,5 @@ public class ExecutionBuilderTests
 
     private sealed record LogEntry(LogLevel LogLevel, string Message);
 }
-
 
 
