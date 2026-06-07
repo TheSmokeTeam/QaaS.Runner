@@ -52,7 +52,25 @@ namespace QaaS.Runner;
 [JsonSchema]
 public class ExecutionBuilder() : BaseExecutionBuilder<InternalContext, ExecutionData>, ICloneable<ExecutionBuilder>
 {
-    public ExecutionBuilder Clone() => BuilderCloner.DeepClone(this);
+    public ExecutionBuilder Clone()
+    {
+        var originalContext = Context;
+        var originalLogger = _configuredLogger;
+        Context = null!;
+        _configuredLogger = null!;
+        try
+        {
+            var clone = BuilderCloner.DeepClone(this);
+            clone.Context = originalContext;
+            clone._configuredLogger = originalLogger;
+            return clone;
+        }
+        finally
+        {
+            Context = originalContext;
+            _configuredLogger = originalLogger;
+        }
+    }
 
     /// <summary>
     /// List of all sessions to run.
