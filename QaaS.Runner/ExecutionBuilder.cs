@@ -129,7 +129,7 @@ public class ExecutionBuilder() : BaseExecutionBuilder<InternalContext, Executio
     private string? _configuredCaseName;
     private string? _configuredExecutionId;
     private ReportPortalLaunchManager? _reportPortalLaunchManager;
-    private ReportPortalRunDescriptor? _reportPortalRunDescriptor;
+    private ReportPortalLaunchDescriptor? _reportPortalRunDescriptor;
     private Dictionary<string, object?> _globalDict = new();
     private bool _loadVariablesIntoGlobalDict = true;
     private readonly IConfiguration? _templateSourceConfiguration;
@@ -545,9 +545,9 @@ public class ExecutionBuilder() : BaseExecutionBuilder<InternalContext, Executio
         return this;
     }
 
-    internal ExecutionBuilder WithReportPortalRunDescriptor(ReportPortalRunDescriptor reportPortalRunDescriptor)
+    internal ExecutionBuilder WithReportPortalRunDescriptor(ReportPortalLaunchDescriptor reportPortalLaunchDescriptor)
     {
-        _reportPortalRunDescriptor = reportPortalRunDescriptor;
+        _reportPortalRunDescriptor = reportPortalLaunchDescriptor;
         return this;
     }
 

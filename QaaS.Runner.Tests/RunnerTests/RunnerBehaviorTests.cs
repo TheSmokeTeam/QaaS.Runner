@@ -598,8 +598,8 @@ public class RunnerBehaviorTests
 
         var descriptorField = typeof(ExecutionBuilder)
             .GetField("_reportPortalRunDescriptor", BindingFlags.Instance | BindingFlags.NonPublic)!;
-        var firstDescriptor = (ReportPortalRunDescriptor?)descriptorField.GetValue(builders[0]);
-        var secondDescriptor = (ReportPortalRunDescriptor?)descriptorField.GetValue(builders[1]);
+        var firstDescriptor = (ReportPortalLaunchDescriptor?)descriptorField.GetValue(builders[0]);
+        var secondDescriptor = (ReportPortalLaunchDescriptor?)descriptorField.GetValue(builders[1]);
 
         Assert.That(firstDescriptor, Is.Not.Null);
         Assert.That(secondDescriptor, Is.Not.Null);
@@ -668,8 +668,8 @@ public class RunnerBehaviorTests
 
         var descriptorField = typeof(ExecutionBuilder)
             .GetField("_reportPortalRunDescriptor", BindingFlags.Instance | BindingFlags.NonPublic)!;
-        var firstDescriptor = (ReportPortalRunDescriptor?)descriptorField.GetValue(builders[0]);
-        var secondDescriptor = (ReportPortalRunDescriptor?)descriptorField.GetValue(builders[1]);
+        var firstDescriptor = (ReportPortalLaunchDescriptor?)descriptorField.GetValue(builders[0]);
+        var secondDescriptor = (ReportPortalLaunchDescriptor?)descriptorField.GetValue(builders[1]);
 
         Assert.That(firstDescriptor, Is.Not.Null);
         Assert.That(secondDescriptor, Is.Not.Null);

@@ -322,7 +322,7 @@ public class Runner : IRunner, IDisposable
     /// system reuses one shared launch name/description contract.
     /// </summary>
     /// <returns>A dictionary mapping each execution builder to its assigned ReportPortal run descriptor.</returns>
-    private Dictionary<ExecutionBuilder, ReportPortalRunDescriptor> BuildReportPortalRunDescriptors()
+    private Dictionary<ExecutionBuilder, ReportPortalLaunchDescriptor> BuildReportPortalRunDescriptors()
     {
         var startedAtLocal = DateTimeOffset.Now;
         var builderSettings = ExecutionBuilders
@@ -337,10 +337,10 @@ public class Runner : IRunner, IDisposable
         if (builderSettings.Count == 0)
         {
             Logger.LogDebug("ReportPortal is disabled for all execution builders in this runner invocation.");
-            return new Dictionary<ExecutionBuilder, ReportPortalRunDescriptor>();
+            return new Dictionary<ExecutionBuilder, ReportPortalLaunchDescriptor>();
         }
 
-        var descriptors = new Dictionary<ExecutionBuilder, ReportPortalRunDescriptor>();
+        var descriptors = new Dictionary<ExecutionBuilder, ReportPortalLaunchDescriptor>();
         foreach (var builderGroup in builderSettings.GroupBy(item => new
                  {
                      Team = item.Settings?.Team?.Trim().ToLowerInvariant() ?? string.Empty,
@@ -366,7 +366,7 @@ public class Runner : IRunner, IDisposable
             var systemName = builderGroup
                 .Select(item => item.Settings?.System)
                 .FirstOrDefault(system => !string.IsNullOrWhiteSpace(system)) ?? "Unknown System";
-            var descriptor = new ReportPortalRunDescriptor(
+            var descriptor = new ReportPortalLaunchDescriptor(
                 teamName,
                 systemName,
                 sessionNames,
@@ -389,7 +389,7 @@ public class Runner : IRunner, IDisposable
         return descriptors;
     }
 
-    private static ReportPortalRunDescriptor BuildSingleBuilderRunDescriptor(ExecutionBuilder builder,
+    private static ReportPortalLaunchDescriptor BuildSingleBuilderRunDescriptor(ExecutionBuilder builder,
         DateTimeOffset startedAtLocal)
     {
         var sessionNames = builder.ReadSessions()
@@ -398,7 +398,7 @@ public class Runner : IRunner, IDisposable
             .Select(sessionName => sessionName!)
             .ToArray();
 
-        return new ReportPortalRunDescriptor(
+        return new ReportPortalLaunchDescriptor(
             builder.MetaData?.Team,
             builder.MetaData?.System,
             sessionNames,

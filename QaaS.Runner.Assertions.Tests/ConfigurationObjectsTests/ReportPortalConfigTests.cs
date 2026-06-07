@@ -133,7 +133,7 @@ public class ReportPortalConfigTests
                 Enabled = true,
                 Endpoint = "http://localhost:8080"
             },
-            new ReportPortalRunDescriptor(null, "QaaS", ["Session A"], "run",
+            new ReportPortalLaunchDescriptor(null, "QaaS", ["Session A"], "run",
                 new DateTimeOffset(2025, 1, 1, 10, 0, 0, TimeSpan.Zero)));
 
         Assert.That(settings.RequestedProjectName, Is.Null);
@@ -177,9 +177,9 @@ public class ReportPortalConfigTests
         Assert.That(attributes.Any(attribute => attribute.Key == "Owner" && attribute.Value == "Smoke Team"), Is.True);
     }
 
-    private static ReportPortalRunDescriptor CreateRunDescriptor()
+    private static ReportPortalLaunchDescriptor CreateRunDescriptor()
     {
-        return new ReportPortalRunDescriptor(
+        return new ReportPortalLaunchDescriptor(
             "Smoke",
             "QaaS",
             ["Session A", "Session B"],

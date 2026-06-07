@@ -30,7 +30,7 @@ public class ReporterBuilder
     public ReportPortalConfig? ReportPortal { get; internal set; } = new();
     
     internal ReportPortalLaunchManager? ReportPortalLaunchManager { get; set; }
-    internal ReportPortalRunDescriptor? ReportPortalRunDescriptor { get; set; }
+    internal ReportPortalLaunchDescriptor? ReportPortalRunDescriptor { get; set; }
     
     /// <summary>
     /// Configure the ReportPortal settings for this reporter. If not set, the default ReportPortal configuration will be used.
@@ -47,7 +47,7 @@ public class ReporterBuilder
         return this;
     }
     
-    internal ReporterBuilder WithReportPortalRunDescriptor(ReportPortalRunDescriptor descriptor)
+    internal ReporterBuilder WithReportPortalRunDescriptor(ReportPortalLaunchDescriptor descriptor)
     {
         ReportPortalRunDescriptor = descriptor;
         return this;

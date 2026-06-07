@@ -46,7 +46,7 @@ public class ReportPortalConfig : IReporterConfig
     /// missing endpoint, missing API key, or missing team metadata are handled later as warnings so QaaS can continue the
     /// run without affecting the exit code.
     /// </summary>
-    internal ReportPortalSettings Resolve(ReportPortalRunDescriptor? runDescriptor)
+    internal ReportPortalSettings Resolve(ReportPortalLaunchDescriptor? runDescriptor)
     {
         var enabled = ReadBooleanValue(EnabledEnvironmentVariable, Enabled);
         var endpoint = ReadStringValue(EndpointEnvironmentVariable);

@@ -5,7 +5,7 @@ namespace QaaS.Runner.Assertions.Reporters.ReportPortal;
 /// The descriptor is built once before executions start so all assertions share one consistent launch title,
 /// description, and session/system context.
 /// </summary>
-public sealed class ReportPortalRunDescriptor(
+public sealed class ReportPortalLaunchDescriptor(
     string? teamName,
     string? systemName,
     IReadOnlyList<string> sessionNames,

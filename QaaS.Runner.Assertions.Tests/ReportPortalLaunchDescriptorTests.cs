@@ -8,12 +8,12 @@ using QaaS.Runner.Assertions.Reporters.ReportPortal;
 namespace QaaS.Runner.Assertions.Tests;
 
 [TestFixture]
-public class ReportPortalRunDescriptorTests
+public class ReportPortalLaunchDescriptorTests
 {
     [Test]
     public void BuildDefaultLaunchName_UsesStableTeamSystemAndSessionIdentity()
     {
-        var descriptor = new ReportPortalRunDescriptor(
+        var descriptor = new ReportPortalLaunchDescriptor(
             "Smoke",
             "QaaS",
             ["Session A", "Session B"],
@@ -28,7 +28,7 @@ public class ReportPortalRunDescriptorTests
     [Test]
     public void BuildDefaultLaunchName_FallsBackToSystemAndSessionsWhenTeamIsMissing()
     {
-        var descriptor = new ReportPortalRunDescriptor(
+        var descriptor = new ReportPortalLaunchDescriptor(
             null,
             "Crawler",
             ["Session A"],
@@ -43,7 +43,7 @@ public class ReportPortalRunDescriptorTests
     [Test]
     public void BuildDefaultDescription_IncludesExecutionModeSessionsAndLaunchAttributes()
     {
-        var descriptor = new ReportPortalRunDescriptor(
+        var descriptor = new ReportPortalLaunchDescriptor(
             "Smoke",
             "QaaS",
             ["Session A", "Session B"],
