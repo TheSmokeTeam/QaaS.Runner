@@ -43,9 +43,16 @@ public static class RunnerCaseExpansionExtensions
     /// <param name="baseBuilder">The base execution builder to clone from.</param>
     /// <param name="cases">The cases to expand.</param>
     /// <returns>The runner instance for fluent chaining.</returns>
-    public static Runner AddTestCases(this Runner runner, ExecutionBuilder baseBuilder, params ITestCase[] cases)
+    public static Runner AddTestCases(
+        this Runner runner,
+        ExecutionBuilder baseBuilder,
+        params ITestCase[] cases)
     {
+        ArgumentNullException.ThrowIfNull(runner);
+        ArgumentNullException.ThrowIfNull(baseBuilder);
+
         runner.ExecutionBuilders ??= new List<ExecutionBuilder>();
+        runner.ExecutionBuilders.Clear();
 
         if (cases == null || cases.Length == 0)
         {
@@ -56,7 +63,9 @@ public static class RunnerCaseExpansionExtensions
 
         foreach (var testCase in cases)
         {
+            ArgumentNullException.ThrowIfNull(testCase);
             var caseBuilder = baseBuilder.Clone();
+            caseBuilder.SetCase(testCase.Name);
             testCase.SetupExecutionBuilder(caseBuilder);
             runner.ExecutionBuilders.Add(caseBuilder);
         }

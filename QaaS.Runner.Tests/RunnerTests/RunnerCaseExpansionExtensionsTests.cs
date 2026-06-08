@@ -13,16 +13,16 @@ public class RunnerCaseExpansionExtensionsTests
 {
     private class DummyTestCase : TestCase
     {
-        private readonly string _sessionName;
-
         public DummyTestCase(string sessionName)
         {
-            _sessionName = sessionName;
+            Name = sessionName;
         }
+
+        public override string Name { get; }
 
         public override void SetupExecutionBuilder(ExecutionBuilder builder)
         {
-            builder.AddSession(new SessionBuilder().Named(_sessionName));
+            builder.AddSession(new SessionBuilder().Named(Name));
         }
     }
 

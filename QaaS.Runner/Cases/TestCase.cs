@@ -6,5 +6,8 @@ namespace QaaS.Runner.Cases;
 public abstract class TestCase : ITestCase
 {
     /// <inheritdoc />
+    public abstract string Name { get; }
+
+    /// <inheritdoc />
     public abstract void SetupExecutionBuilder(ExecutionBuilder builder);
 }
