@@ -10,25 +10,39 @@ namespace QaaS.Runner.Cases;
 public static class RunnerCaseExpansionExtensions
 {
     /// <summary>
-    /// Extracts the first execution builder (usually loaded from YAML via Bootstrap.New) to serve as a base.
-    /// It removes it from the Runner so it can be safely branched into multiple cases.
+    /// Extracts a single execution builder (by position) to serve as a base for case expansion.
+    /// Only the selected builder is removed from the Runner; any other builders created by
+    /// <c>Bootstrap.New</c> are left in place so they can keep running alongside the generated cases.
     /// </summary>
     /// <param name="runner">The runner instance.</param>
+    /// <param name="index">
+    /// The index of the execution builder to use as the base. Defaults to the first builder.
+    /// </param>
     /// <param name="setupBase">Optional configuration block to run over the extracted base builder.</param>
-    /// <returns>The extracted execution builder, or a new instance if none was present.</returns>
-    public static ExecutionBuilder ExtractBaseBuilder(this Runner runner, Action<ExecutionBuilder>? setupBase = null)
+    /// <returns>The extracted execution builder, or a new instance if the list was empty.</returns>
+    public static ExecutionBuilder ExtractBaseBuilder(
+        this Runner runner,
+        int index = 0,
+        Action<ExecutionBuilder>? setupBase = null)
     {
+        ArgumentNullException.ThrowIfNull(runner);
         runner.ExecutionBuilders ??= new List<ExecutionBuilder>();
 
         ExecutionBuilder baseBuilder;
-        if (runner.ExecutionBuilders.Count > 0)
+        if (runner.ExecutionBuilders.Count == 0)
         {
-            baseBuilder = runner.ExecutionBuilders[0];
-            runner.ExecutionBuilders.RemoveAt(0);
+            baseBuilder = new ExecutionBuilder();
         }
         else
         {
-            baseBuilder = new ExecutionBuilder();
+            if (index < 0 || index >= runner.ExecutionBuilders.Count)
+                throw new ArgumentOutOfRangeException(
+                    nameof(index),
+                    index,
+                    $"The runner has {runner.ExecutionBuilders.Count} execution builder(s); cannot extract index {index}.");
+
+            baseBuilder = runner.ExecutionBuilders[index];
+            runner.ExecutionBuilders.RemoveAt(index);
         }
 
         setupBase?.Invoke(baseBuilder);
@@ -36,8 +50,17 @@ public static class RunnerCaseExpansionExtensions
     }
 
     /// <summary>
-    /// Clones the provided base builder for each test case, applies the case's configuration, 
-    /// and attaches the resulting builders back to the Runner.
+    /// Extracts the first execution builder to serve as a base and applies the supplied configuration block.
+    /// </summary>
+    /// <param name="runner">The runner instance.</param>
+    /// <param name="setupBase">Configuration block to run over the extracted base builder.</param>
+    /// <returns>The extracted execution builder, or a new instance if the list was empty.</returns>
+    public static ExecutionBuilder ExtractBaseBuilder(this Runner runner, Action<ExecutionBuilder> setupBase) =>
+        runner.ExtractBaseBuilder(0, setupBase);
+
+    /// <summary>
+    /// Clones the provided base builder for each test case, applies the case's configuration,
+    /// and stacks the resulting builders onto the Runner's existing execution builders.
     /// </summary>
     /// <param name="runner">The runner instance.</param>
     /// <param name="baseBuilder">The base execution builder to clone from.</param>
@@ -52,11 +75,10 @@ public static class RunnerCaseExpansionExtensions
         ArgumentNullException.ThrowIfNull(baseBuilder);
 
         runner.ExecutionBuilders ??= new List<ExecutionBuilder>();
-        runner.ExecutionBuilders.Clear();
 
         if (cases == null || cases.Length == 0)
         {
-            // If there are no cases, we assume the base builder itself is the only case we want to run.
+            // If there are no cases, the base builder itself is added back onto the list to run.
             runner.ExecutionBuilders.Add(baseBuilder);
             return runner;
         }
