@@ -14,6 +14,8 @@ public class ReporterBuilder : ICloneable<ReporterBuilder>
     public ReporterBuilder Clone() 
     {
         var clone = BuilderCloner.DeepClone(this);
+        clone.ReportPortalLaunchManager = ReportPortalLaunchManager;
+        clone.ReportPortalRunDescriptor = ReportPortalRunDescriptor;
         clone.ReportPortal = ReportPortal;
         return clone;
     }
