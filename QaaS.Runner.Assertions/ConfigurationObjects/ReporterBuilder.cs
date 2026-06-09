@@ -1,5 +1,6 @@
 using System.ComponentModel;
 using System.IO.Abstractions;
+using QaaS.Framework.Infrastructure;
 using QaaS.Framework.SDK.ContextObjects;
 using QaaS.Runner.Assertions.ConfigurationObjects.ReporterConfigs;
 using QaaS.Runner.Assertions.Reporters;
@@ -8,8 +9,15 @@ using QaaS.Runner.Assertions.Reporters.ReportPortal;
 
 namespace QaaS.Runner.Assertions.ConfigurationObjects;
 
-public class ReporterBuilder
+public class ReporterBuilder : ICloneable<ReporterBuilder>
 {
+    public ReporterBuilder Clone() 
+    {
+        var clone = BuilderCloner.DeepClone(this);
+        clone.ReportPortal = ReportPortal;
+        return clone;
+    }
+    
     [Description("Whether to save the session logs belonging to the assertion in the test report")]
     public bool? SaveLogs { get; internal set; }
 
