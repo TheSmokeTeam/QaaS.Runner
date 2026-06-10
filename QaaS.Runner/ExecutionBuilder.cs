@@ -109,7 +109,7 @@ public class ExecutionBuilder() : BaseExecutionBuilder<InternalContext, Executio
     /// The reporters used to report the test results
     /// </summary>
     [Description("The reporters used to report the test results")]
-    public ReporterBuilder? Reporters { get; internal set; } = new();
+    public ReporterBuilder? Reporters { get; internal set; }
 
     private ExecutionType Type { get; set; }
 

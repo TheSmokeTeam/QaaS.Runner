@@ -391,7 +391,7 @@ public static class Bootstrap
         var containerBuilder = new ContainerBuilder();
         
         containerBuilder.RegisterModule<AllureWrapperModule>();
-        containerBuilder.RegisterType<ReportPortalLaunchManager>().SingleInstance();
+        containerBuilder.RegisterModule<ReportPortalLaunchManagerModule>();
         
         return containerBuilder.Build();
     }
