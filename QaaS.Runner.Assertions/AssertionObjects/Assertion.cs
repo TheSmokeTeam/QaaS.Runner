@@ -6,8 +6,9 @@ using QaaS.Framework.SDK.DataSourceObjects;
 using QaaS.Framework.SDK.Extensions;
 using QaaS.Framework.SDK.Hooks.Assertion;
 using QaaS.Framework.SDK.Session.SessionDataObjects;
-using QaaS.Runner.Assertions;
 using QaaS.Runner.Assertions.LinkBuilders;
+using QaaS.Runner.Assertions.Reporters.Allure;
+using QaaS.Runner.Assertions.Reporters.ReportPortal;
 
 namespace QaaS.Runner.Assertions.AssertionObjects;
 
@@ -16,32 +17,31 @@ public class Assertion
     public string Name { get; set; } = string.Empty;
 
     public string AssertionName { get; set; } = string.Empty;
-
-
+    
     public IAssertion AssertionHook { get; set; } = default!;
     
-    public IList<AssertionStatus> StatussesToReport { get; set; } = [];
+    public IList<AssertionStatus> StatusesToReport { get; set; } = [];
 
     public IConfiguration AssertionConfiguration { get; set; } = new ConfigurationBuilder().Build();
 
     public List<BaseLink>? Links { get; set; }
 
-    public bool? SaveSessionData { get; set; }
+    public bool SaveSessionData { get; set; }
 
-    public bool? SaveLogs { get; set; }
+    public bool SaveLogs { get; set; }
 
-    public bool? SaveAttachments { get; set; }
+    public bool SaveAttachments { get; set; }
 
-    public bool? SaveTemplate { get; set; }
+    public bool SaveTemplate { get; set; }
 
-    public bool? DisplayTrace { get; set; }
+    public bool DisplayTrace { get; set; }
 
     public AssertionSeverity? Severity { get; set; }
 
     /// <summary>
     /// Reporter implementation type that should receive this assertion result.
     /// </summary>
-    public Type ReporterType { get; set; } = typeof(AllureReporter);
+    public IList<Type> ReporterTypes { get; set; } = [typeof(AllureReporter), typeof(ReportPortalReporter)];
 
     /// <summary>
     ///     All Session data that might be relevant to the session according to its configuration

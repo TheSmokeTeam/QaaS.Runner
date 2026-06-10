@@ -1,0 +1,121 @@
+MetaData:
+  Team: Wonder
+  System: Britian
+  ExtraLabels:
+    Component: Reporting
+    Area: Export
+    Owner: Wonder
+    Environment: Lab
+    Scenario: Baseline
+
+ReportPortal:
+  Attributes:
+    Variation: WonderBritian
+    Suite: ReportPortalE2E
+    Profile: Baseline
+    Visibility: Core
+
+DataSources:
+  - Name: WonderBritianPayloads
+    Generator: ReportPortalPayloadGenerator
+    GeneratorConfiguration:
+      Count: 2
+      PayloadPrefix: wonder-britian
+      Component: Reporting
+      Area: Export
+      Owner: Wonder
+      EnvironmentName: Lab
+      Capability: ExportFlow
+      Region: IL
+      Scenario: Baseline
+      EvidenceCount: 2
+      Tags:
+        - Wonder
+        - Britian
+        - Reporting
+        - Export
+
+Sessions:
+  - Name: Wonder Britian Session
+    Probes:
+      - Name: WonderBritianProbe
+        Probe: ReportPortalDiagnosticProbe
+        ProbeConfiguration:
+          StepName: Wonder Britian Diagnostics
+          TraceMessage: Wonder Britian diagnostics completed without failure.
+          DelayMilliseconds: 85
+          Notes:
+            - export staging completed
+
+  - Name: Wonder Britian Failure Session
+    Probes:
+      - Name: WonderBritianFailureProbe
+        Probe: ReportPortalDiagnosticProbe
+        ProbeConfiguration:
+          StepName: Wonder Britian Failure
+          TraceMessage: Wonder Britian failure generated for action history validation.
+          DelayMilliseconds: 105
+          ThrowOnRun: true
+          Notes:
+            - export archive step timed out
+            - checksum verification aborted
+
+Assertions:
+  - Name: WonderBritianPassed
+    Assertion: ReportPortalRichAssertion
+    Severity: Critical
+    SessionNamePatterns:
+      - Wonder.*Session
+    DataSourceNames:
+      - WonderBritianPayloads
+    Links:
+      - Name: Export Throughput
+        Prometheus:
+          Url: https://prometheus.example.local
+          Expressions:
+            - sum(rate(wonder_export_jobs_total[5m]))
+            - max_over_time(wonder_export_backlog[15m])
+    AssertionConfiguration:
+      Outcome: Passed
+      Message: Wonder Britian passed assertion message
+      TracePrefix: Wonder Britian passed assertion trace
+      AttachmentCount: 2
+      AttachmentKinds:
+        - Json
+        - Yaml
+        - Binary
+      AdditionalTraceSections:
+        - Export baseline includes all attachment types to stress the artifact pipeline.
+
+  - Name: WonderBritianBroken
+    Assertion: ReportPortalRichAssertion
+    Severity: Blocker
+    SessionNamePatterns:
+      - Wonder.*Session
+    AssertionConfiguration:
+      Outcome: Broken
+      Message: Wonder Britian broken assertion message
+      TracePrefix: Wonder Britian broken assertion trace
+      AttachmentCount: 1
+      AttachmentKinds:
+        - Binary
+      AdditionalTraceSections:
+        - Broken export path should keep stack traces and failure-correlated session logs.
+
+  - Name: WonderBritianNoTrace
+    Assertion: ReportPortalRichAssertion
+    Severity: Minor
+    DisplayTrace: false
+    SaveTemplate: false
+    SaveAttachments: false
+    SessionNamePatterns:
+      - Wonder.*Session
+    DataSourcePatterns:
+      - WonderBritian.*
+    AssertionConfiguration:
+      Outcome: Passed
+      Message: Wonder Britian hidden trace assertion message
+      TracePrefix: Wonder Britian hidden trace
+      AttachmentCount: 1
+      AttachmentKinds:
+        - Json

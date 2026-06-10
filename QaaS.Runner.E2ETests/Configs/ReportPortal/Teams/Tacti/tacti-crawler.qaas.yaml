@@ -1,0 +1,130 @@
+MetaData:
+  Team: Tacti
+  System: Crawler
+  ExtraLabels:
+    Component: Discovery
+    Area: Crawl
+    Owner: Tacti
+    Environment: Lab
+    Scenario: Baseline
+
+ReportPortal:
+  Attributes:
+    Variation: TactiCrawler
+    Suite: ReportPortalE2E
+    Profile: Baseline
+    Visibility: Core
+
+DataSources:
+  - Name: TactiCrawlerPayloads
+    Generator: ReportPortalPayloadGenerator
+    GeneratorConfiguration:
+      Count: 3
+      PayloadPrefix: tacti-crawler
+      Component: Discovery
+      Area: Crawl
+      Owner: Tacti
+      EnvironmentName: Lab
+      Capability: CrawlFlow
+      Region: IL
+      Scenario: Baseline
+      EvidenceCount: 3
+      Tags:
+        - Tacti
+        - Crawler
+        - Discovery
+        - Crawl
+
+Sessions:
+  - Name: Tacti Crawl Session
+    Probes:
+      - Name: TactiCrawlProbe
+        Probe: ReportPortalDiagnosticProbe
+        ProbeConfiguration:
+          StepName: Tacti Crawl Diagnostics
+          TraceMessage: Crawl probe completed without failure.
+          DelayMilliseconds: 70
+          Notes:
+            - seed queue drained
+
+  - Name: Tacti Crawl Failure Session
+    Probes:
+      - Name: TactiCrawlFailureProbe
+        Probe: ReportPortalDiagnosticProbe
+        ProbeConfiguration:
+          StepName: Tacti Crawl Failure
+          TraceMessage: Crawl probe failed intentionally to test history.
+          DelayMilliseconds: 110
+          ThrowOnRun: true
+          Notes:
+            - parser fallback exceeded retry budget
+
+Assertions:
+  - Name: TactiCrawlerPassed
+    Assertion: ReportPortalRichAssertion
+    Severity: Critical
+    SessionNamePatterns:
+      - Tacti.*Session
+    DataSourceNames:
+      - TactiCrawlerPayloads
+    Links:
+      - Name: Crawler Dashboard
+        Grafana:
+          Url: https://grafana.example.local
+          DashboardId: tacti-crawler
+          Variables:
+            - Key: system
+              Value: Crawler
+            - Key: component
+              Value: Discovery
+    AssertionConfiguration:
+      Outcome: Passed
+      Message: Tacti Crawler passed assertion message
+      TracePrefix: Tacti Crawler passed assertion trace
+      AttachmentCount: 2
+      AttachmentKinds:
+        - Json
+        - Yaml
+      AdditionalTraceSections:
+        - Crawl baseline validates link generation and multi-format attachments.
+
+  - Name: TactiCrawlerFailed
+    Assertion: ReportPortalRichAssertion
+    Severity: Blocker
+    SessionNamePatterns:
+      - Tacti.*Session
+    DataSourceNames:
+      - TactiCrawlerPayloads
+    AssertionConfiguration:
+      Outcome: Failed
+      Message: Tacti Crawler failed assertion message
+      TracePrefix: Tacti Crawler failed assertion trace
+      AttachmentCount: 1
+      AttachmentKinds:
+        - Binary
+      AdditionalTraceSections:
+        - Failure path is anchored to the crawl failure probe to seed failure-oriented widgets.
+
+  - Name: TactiCrawlerNoTrace
+    Assertion: ReportPortalRichAssertion
+    Severity: Minor
+    DisplayTrace: false
+    SaveTemplate: false
+    SaveAttachments: false
+    SessionNamePatterns:
+      - Tacti.*Session
+    DataSourcePatterns:
+      - TactiCrawler.*
+    Links:
+      - Name: Crawl Log Discover
+        Kibana:
+          Url: https://kibana.example.local
+          DataViewId: tacti-crawler-logs
+          KqlQuery: 'labels.system : "Crawler" and labels.component : "Discovery"'
+    AssertionConfiguration:
+      Outcome: Passed
+      Message: Tacti Crawler minimal assertion message
+      TracePrefix: Tacti Crawler hidden trace
+      AttachmentCount: 1
+      AttachmentKinds:
+        - Json

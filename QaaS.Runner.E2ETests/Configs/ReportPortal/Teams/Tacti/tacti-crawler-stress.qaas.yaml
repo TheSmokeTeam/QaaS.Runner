@@ -1,0 +1,139 @@
+MetaData:
+  Team: Tacti
+  System: Crawler
+  ExtraLabels:
+    Component: Discovery
+    Area: Crawl
+    Owner: Tacti
+    Environment: Lab
+    Scenario: Stress
+    ReleaseRing: Canary
+    Tenant: Atlas
+
+ReportPortal:
+  Attributes:
+    Variation: TactiCrawlerStress
+    Suite: ReportPortalE2E
+    Profile: Stress
+    StressLevel: High
+
+DataSources:
+  - Name: TactiCrawlerStressSeedPayloads
+    Generator: ReportPortalPayloadGenerator
+    GeneratorConfiguration:
+      Count: 9
+      PayloadPrefix: tacti-crawler-seed
+      Component: Discovery
+      Area: Crawl
+      Owner: Tacti
+      EnvironmentName: Lab
+      Capability: SeedExpansion
+      Region: IL
+      Scenario: Stress
+      EvidenceCount: 3
+  - Name: TactiCrawlerStressParserPayloads
+    Generator: ReportPortalPayloadGenerator
+    GeneratorConfiguration:
+      Count: 6
+      PayloadPrefix: tacti-crawler-parser
+      Component: Discovery
+      Area: Parser
+      Owner: Tacti
+      EnvironmentName: Lab
+      Capability: ParserFallback
+      Region: IL
+      Scenario: Stress
+      EvidenceCount: 4
+
+Sessions:
+  - Name: Tacti Seed Session
+    Probes:
+      - Name: TactiSeedProbe
+        Probe: ReportPortalDiagnosticProbe
+        ProbeConfiguration:
+          StepName: Tacti Seed Expansion
+          TraceMessage: Seed expansion completed under load.
+          DelayMilliseconds: 130
+  - Name: Tacti Parser Session
+    Probes:
+      - Name: TactiParserProbe
+        Probe: ReportPortalDiagnosticProbe
+        ProbeConfiguration:
+          StepName: Tacti Parser Instability
+          TraceMessage: Parser instability triggered intentionally.
+          DelayMilliseconds: 95
+          ThrowOnRun: true
+  - Name: Tacti Crawl Session
+    Probes:
+      - Name: TactiCrawlAuditProbe
+        Probe: ReportPortalDiagnosticProbe
+        ProbeConfiguration:
+          StepName: Tacti Crawl Audit
+          TraceMessage: Crawl audit completed.
+          DelayMilliseconds: 75
+
+Assertions:
+  - Name: TactiCrawlerStressPassed
+    Assertion: ReportPortalRichAssertion
+    Severity: Blocker
+    SessionNamePatterns:
+      - Tacti.*Session
+    DataSourcePatterns:
+      - TactiCrawlerStress.*Payloads
+    AssertionConfiguration:
+      Outcome: Passed
+      Message: Tacti Crawler stress pass assertion message
+      TracePrefix: Tacti Crawler stress pass trace
+      AttachmentCount: 3
+      AttachmentKinds:
+        - Json
+        - Yaml
+        - Binary
+      TraceSectionRepeats: 2
+
+  - Name: TactiCrawlerStressFailed
+    Assertion: ReportPortalRichAssertion
+    Severity: Critical
+    SessionNamePatterns:
+      - Tacti.*Session
+    DataSourceNames:
+      - TactiCrawlerStressParserPayloads
+    AssertionConfiguration:
+      Outcome: Failed
+      Message: Tacti Crawler stress failed assertion message
+      TracePrefix: Tacti Crawler stress failed trace
+      AttachmentCount: 2
+      AttachmentKinds:
+        - Json
+        - Binary
+
+  - Name: TactiCrawlerStressBroken
+    Assertion: ReportPortalRichAssertion
+    Severity: Blocker
+    SessionNamePatterns:
+      - Tacti.*Session
+    AssertionConfiguration:
+      Outcome: Broken
+      Message: Tacti Crawler stress broken assertion message
+      TracePrefix: Tacti Crawler stress broken trace
+      AttachmentCount: 1
+      AttachmentKinds:
+        - Yaml
+
+  - Name: TactiCrawlerStressMinimal
+    Assertion: ReportPortalRichAssertion
+    Severity: Trivial
+    DisplayTrace: false
+    SaveSessionData: false
+    SaveAttachments: false
+    SaveTemplate: false
+    SessionNamePatterns:
+      - Tacti.*Session
+    AssertionConfiguration:
+      Outcome: Passed
+      Message: Tacti Crawler stress minimal assertion message
+      TracePrefix: Tacti Crawler stress minimal trace
+      AttachmentCount: 1
+      AttachmentKinds:
+        - Json
+      IncludeFailureRollupInMessage: false

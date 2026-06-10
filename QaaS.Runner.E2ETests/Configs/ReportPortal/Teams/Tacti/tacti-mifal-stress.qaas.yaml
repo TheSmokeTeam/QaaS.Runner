@@ -1,0 +1,139 @@
+MetaData:
+  Team: Tacti
+  System: Mifal
+  ExtraLabels:
+    Component: Factory
+    Area: Ingest
+    Owner: Tacti
+    Environment: Lab
+    Scenario: Stress
+    ReleaseRing: Stable
+    Tenant: Forge
+
+ReportPortal:
+  Attributes:
+    Variation: TactiMifalStress
+    Suite: ReportPortalE2E
+    Profile: Stress
+    StressLevel: High
+
+DataSources:
+  - Name: TactiMifalStressIngestPayloads
+    Generator: ReportPortalPayloadGenerator
+    GeneratorConfiguration:
+      Count: 8
+      PayloadPrefix: tacti-mifal-ingest
+      Component: Factory
+      Area: Ingest
+      Owner: Tacti
+      EnvironmentName: Lab
+      Capability: IngestBurst
+      Region: IL
+      Scenario: Stress
+      EvidenceCount: 3
+  - Name: TactiMifalStressArchivePayloads
+    Generator: ReportPortalPayloadGenerator
+    GeneratorConfiguration:
+      Count: 5
+      PayloadPrefix: tacti-mifal-archive
+      Component: Factory
+      Area: Archive
+      Owner: Tacti
+      EnvironmentName: Lab
+      Capability: ArchiveFlush
+      Region: IL
+      Scenario: Stress
+      EvidenceCount: 2
+
+Sessions:
+  - Name: Tacti Ingest Session
+    Probes:
+      - Name: TactiIngestProbe
+        Probe: ReportPortalDiagnosticProbe
+        ProbeConfiguration:
+          StepName: Tacti Ingest Pressure
+          TraceMessage: Ingest session completed under burst traffic.
+          DelayMilliseconds: 125
+  - Name: Tacti Archive Session
+    Probes:
+      - Name: TactiArchiveProbe
+        Probe: ReportPortalDiagnosticProbe
+        ProbeConfiguration:
+          StepName: Tacti Archive Pressure
+          TraceMessage: Archive session failed intentionally under pressure.
+          DelayMilliseconds: 110
+          ThrowOnRun: true
+  - Name: Tacti Validation Session
+    Probes:
+      - Name: TactiValidationProbe
+        Probe: ReportPortalDiagnosticProbe
+        ProbeConfiguration:
+          StepName: Tacti Validation
+          TraceMessage: Validation session completed.
+          DelayMilliseconds: 70
+
+Assertions:
+  - Name: TactiMifalStressPassed
+    Assertion: ReportPortalRichAssertion
+    Severity: Blocker
+    SessionNamePatterns:
+      - Tacti.*Session
+    DataSourcePatterns:
+      - TactiMifalStress.*Payloads
+    AssertionConfiguration:
+      Outcome: Passed
+      Message: Tacti Mifal stress pass assertion message
+      TracePrefix: Tacti Mifal stress pass trace
+      AttachmentCount: 3
+      AttachmentKinds:
+        - Json
+        - Yaml
+        - Binary
+      TraceSectionRepeats: 2
+
+  - Name: TactiMifalStressFailed
+    Assertion: ReportPortalRichAssertion
+    Severity: Critical
+    SessionNamePatterns:
+      - Tacti.*Session
+    DataSourceNames:
+      - TactiMifalStressArchivePayloads
+    AssertionConfiguration:
+      Outcome: Failed
+      Message: Tacti Mifal stress failed assertion message
+      TracePrefix: Tacti Mifal stress failed trace
+      AttachmentCount: 2
+      AttachmentKinds:
+        - Json
+        - Binary
+
+  - Name: TactiMifalStressBroken
+    Assertion: ReportPortalRichAssertion
+    Severity: Blocker
+    SessionNamePatterns:
+      - Tacti.*Session
+    AssertionConfiguration:
+      Outcome: Broken
+      Message: Tacti Mifal stress broken assertion message
+      TracePrefix: Tacti Mifal stress broken trace
+      AttachmentCount: 1
+      AttachmentKinds:
+        - Yaml
+
+  - Name: TactiMifalStressMinimal
+    Assertion: ReportPortalRichAssertion
+    Severity: Trivial
+    DisplayTrace: false
+    SaveSessionData: false
+    SaveAttachments: false
+    SaveTemplate: false
+    SessionNamePatterns:
+      - Tacti.*Session
+    AssertionConfiguration:
+      Outcome: Passed
+      Message: Tacti Mifal stress minimal assertion message
+      TracePrefix: Tacti Mifal stress minimal trace
+      AttachmentCount: 1
+      AttachmentKinds:
+        - Json
+      IncludeFailureRollupInMessage: false

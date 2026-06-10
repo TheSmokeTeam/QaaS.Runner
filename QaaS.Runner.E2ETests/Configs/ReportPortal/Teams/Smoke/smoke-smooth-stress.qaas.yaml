@@ -1,0 +1,141 @@
+MetaData:
+  Team: Smoke
+  System: Smooth
+  ExtraLabels:
+    Component: Scheduler
+    Area: Dispatch
+    Owner: Smoke
+    Environment: Lab
+    Scenario: Stress
+    ReleaseRing: Stable
+    Tenant: Beta
+
+ReportPortal:
+  Attributes:
+    Variation: SmokeSmoothStress
+    Suite: ReportPortalE2E
+    Profile: Stress
+    StressLevel: High
+
+DataSources:
+  - Name: SmokeSmoothStressQueuePayloads
+    Generator: ReportPortalPayloadGenerator
+    GeneratorConfiguration:
+      Count: 7
+      PayloadPrefix: smoke-smooth-queue
+      Component: Scheduler
+      Area: Dispatch
+      Owner: Smoke
+      EnvironmentName: Lab
+      Capability: QueuePressure
+      Region: IL
+      Scenario: Stress
+      EvidenceCount: 3
+  - Name: SmokeSmoothStressReplayPayloads
+    Generator: ReportPortalPayloadGenerator
+    GeneratorConfiguration:
+      Count: 5
+      PayloadPrefix: smoke-smooth-replay
+      Component: Scheduler
+      Area: Replay
+      Owner: Smoke
+      EnvironmentName: Lab
+      Capability: ReplayAudit
+      Region: IL
+      Scenario: Stress
+      EvidenceCount: 2
+
+Sessions:
+  - Name: Smooth Dispatch Session
+    Probes:
+      - Name: SmoothDispatchProbe
+        Probe: ReportPortalDiagnosticProbe
+        ProbeConfiguration:
+          StepName: Smooth Dispatch Pressure
+          TraceMessage: Dispatch session completed under load.
+          DelayMilliseconds: 100
+  - Name: Smooth Replay Session
+    Probes:
+      - Name: SmoothReplayFailureProbe
+        Probe: ReportPortalDiagnosticProbe
+        ProbeConfiguration:
+          StepName: Smooth Replay Instability
+          TraceMessage: Replay instability generated intentionally.
+          DelayMilliseconds: 120
+          ThrowOnRun: true
+  - Name: Smooth Cleanup Session
+    Probes:
+      - Name: SmoothCleanupProbe
+        Probe: ReportPortalDiagnosticProbe
+        ProbeConfiguration:
+          StepName: Smooth Cleanup
+          TraceMessage: Cleanup probe completed after replay pressure.
+          DelayMilliseconds: 65
+
+Assertions:
+  - Name: SmokeSmoothStressPassed
+    Assertion: ReportPortalRichAssertion
+    Severity: Blocker
+    SessionNamePatterns:
+      - Smooth.*Session
+    DataSourcePatterns:
+      - SmokeSmoothStress.*Payloads
+    AssertionConfiguration:
+      Outcome: Passed
+      Message: Smoke Smooth stress pass assertion message
+      TracePrefix: Smoke Smooth stress pass trace
+      AttachmentCount: 3
+      AttachmentKinds:
+        - Json
+        - Yaml
+        - Binary
+      TraceSectionRepeats: 2
+      AdditionalTraceSections:
+        - Queue and replay payloads are combined to stress the reporter.
+
+  - Name: SmokeSmoothStressFailed
+    Assertion: ReportPortalRichAssertion
+    Severity: Critical
+    SessionNamePatterns:
+      - Smooth.*Session
+    DataSourceNames:
+      - SmokeSmoothStressReplayPayloads
+    AssertionConfiguration:
+      Outcome: Failed
+      Message: Smoke Smooth stress failed assertion message
+      TracePrefix: Smoke Smooth stress failed trace
+      AttachmentCount: 2
+      AttachmentKinds:
+        - Json
+        - Binary
+
+  - Name: SmokeSmoothStressBroken
+    Assertion: ReportPortalRichAssertion
+    Severity: Blocker
+    SessionNamePatterns:
+      - Smooth.*Session
+    AssertionConfiguration:
+      Outcome: Broken
+      Message: Smoke Smooth stress broken assertion message
+      TracePrefix: Smoke Smooth stress broken trace
+      AttachmentCount: 1
+      AttachmentKinds:
+        - Yaml
+
+  - Name: SmokeSmoothStressMinimal
+    Assertion: ReportPortalRichAssertion
+    Severity: Trivial
+    DisplayTrace: false
+    SaveSessionData: false
+    SaveAttachments: false
+    SaveTemplate: false
+    SessionNamePatterns:
+      - Smooth.*Session
+    AssertionConfiguration:
+      Outcome: Passed
+      Message: Smoke Smooth stress minimal assertion message
+      TracePrefix: Smoke Smooth stress minimal trace
+      AttachmentCount: 1
+      AttachmentKinds:
+        - Json
+      IncludeFailureRollupInMessage: false

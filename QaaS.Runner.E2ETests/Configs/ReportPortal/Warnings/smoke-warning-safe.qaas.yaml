@@ -1,0 +1,32 @@
+MetaData:
+  Team: Smoke
+  System: QaaS
+  ExtraLabels:
+    Component: WarningSafe
+    Area: Validation
+    Owner: Smoke
+
+ReportPortal:
+  Attributes:
+    Variation: SmokeWarningSafe
+    Suite: ReportPortalE2E
+
+Sessions:
+  - Name: Warning Safe Session
+    Probes:
+      - Name: WarningSafeProbe
+        Probe: ReportPortalDiagnosticProbe
+        ProbeConfiguration:
+          StepName: Warning Safe Diagnostics
+          TraceMessage: This run validates ReportPortal warning paths without failing assertions.
+
+Assertions:
+  - Name: WarningSafePassedAssertion
+    Assertion: ReportPortalRichAssertion
+    AssertionConfiguration:
+      Outcome: Passed
+      Message: Warning safe passed assertion message
+      TracePrefix: Warning safe passed assertion trace
+      AttachmentCount: 1
+      AttachmentKinds:
+        - Json

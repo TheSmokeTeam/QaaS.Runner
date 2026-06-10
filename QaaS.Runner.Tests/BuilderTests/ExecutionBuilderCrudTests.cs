@@ -44,8 +44,7 @@ public class ExecutionBuilderCrudTests
         {
             Name = "assertion-a",
             Assertion = "Equals",
-            AssertionInstance = null!,
-            Reporter = null!
+            AssertionInstance = null!
         }.HookNamed("AssertionHook");
         var storage = new StorageBuilder().Configure(new S3Config());
         var dataSource = new DataSourceBuilder().Named("source-a").HookNamed("GeneratorHook");
@@ -147,15 +146,13 @@ public class ExecutionBuilderCrudTests
         {
             Name = "assertion-a",
             Assertion = "Equals",
-            AssertionInstance = null!,
-            Reporter = null!
+            AssertionInstance = null!
         }.HookNamed("HookA");
         var updatedAssertion = new AssertionBuilder
         {
             Name = "assertion-a",
             Assertion = "NotEquals",
-            AssertionInstance = null!,
-            Reporter = null!
+            AssertionInstance = null!
         }.HookNamed("HookB");
 
         var builder = new ExecutionBuilder()
@@ -191,7 +188,6 @@ public class ExecutionBuilderCrudTests
         });
     }
 }
-
 
 
 

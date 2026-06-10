@@ -7,7 +7,6 @@ using Allure.Commons;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 using QaaS.Framework.Configurations;
-using QaaS.Framework.Infrastructure;
 using QaaS.Framework.SDK.Hooks.Assertion;
 using QaaS.Framework.SDK.Session;
 using QaaS.Framework.SDK.Session.SessionDataObjects;
@@ -18,7 +17,7 @@ using AssertionResult = QaaS.Runner.Assertions.AssertionObjects.AssertionResult;
 using AssertionSeverity = QaaS.Runner.Assertions.AssertionObjects.AssertionSeverity;
 
 
-namespace QaaS.Runner.Assertions;
+namespace QaaS.Runner.Assertions.Reporters.Allure;
 
 /// <inheritdoc />
 public class AllureReporter : BaseReporter
@@ -722,21 +721,4 @@ public class AllureReporter : BaseReporter
   **{nameof(sessionFailure.Reason.Message)}:** `{sessionFailure.Reason.Message}`")));
     }
 
-    private bool ShouldSaveSessionData(AssertionObjects.Assertion assertion) =>
-        assertion.SaveSessionData ?? SaveSessionData;
-
-    private bool ShouldSaveLogs(AssertionObjects.Assertion assertion) =>
-        assertion.SaveLogs ?? SaveLogs;
-
-    private bool ShouldSaveAttachments(AssertionObjects.Assertion assertion) =>
-        assertion.SaveAttachments ?? SaveAttachments;
-
-    private bool ShouldSaveTemplate(AssertionObjects.Assertion assertion) =>
-        assertion.SaveTemplate ?? SaveTemplate;
-
-    private bool ShouldDisplayTrace(AssertionObjects.Assertion assertion) =>
-        assertion.DisplayTrace ?? DisplayTrace;
-
-    private AssertionSeverity ResolveSeverity(AssertionObjects.Assertion assertion) =>
-        assertion.Severity ?? Severity;
 }

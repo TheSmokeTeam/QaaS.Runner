@@ -1,0 +1,117 @@
+MetaData:
+  Team: Wonder
+  System: Young
+  ExtraLabels:
+    Component: Catalog
+    Area: Search
+    Owner: Wonder
+    Environment: Lab
+    Scenario: Baseline
+
+ReportPortal:
+  Attributes:
+    Variation: WonderYoung
+    Suite: ReportPortalE2E
+    Profile: Baseline
+    Visibility: Core
+
+DataSources:
+  - Name: WonderYoungPayloads
+    Generator: ReportPortalPayloadGenerator
+    GeneratorConfiguration:
+      Count: 3
+      PayloadPrefix: wonder-young
+      Component: Catalog
+      Area: Search
+      Owner: Wonder
+      EnvironmentName: Lab
+      Capability: SearchFlow
+      Region: IL
+      Scenario: Baseline
+      EvidenceCount: 3
+      Tags:
+        - Wonder
+        - Young
+        - Catalog
+        - Search
+
+Sessions:
+  - Name: Wonder Young Session
+    Probes:
+      - Name: WonderYoungProbe
+        Probe: ReportPortalDiagnosticProbe
+        ProbeConfiguration:
+          StepName: Wonder Young Diagnostics
+          TraceMessage: Wonder Young diagnostics completed without failure.
+          DelayMilliseconds: 75
+          Notes:
+            - search index warmed before assertions
+
+Assertions:
+  - Name: WonderYoungPassed
+    Assertion: ReportPortalRichAssertion
+    Severity: Critical
+    SessionNamePatterns:
+      - Wonder.*Session
+    DataSourceNames:
+      - WonderYoungPayloads
+    Links:
+      - Name: Young Search Dashboard
+        Grafana:
+          Url: https://grafana.example.local
+          DashboardId: wonder-young-search
+          Variables:
+            - Key: system
+              Value: Young
+            - Key: component
+              Value: Catalog
+      - Name: Young Search Logs
+        Kibana:
+          Url: https://kibana.example.local
+          DataViewId: wonder-search-logs
+          KqlQuery: 'labels.system : "Young" and labels.area : "Search"'
+    AssertionConfiguration:
+      Outcome: Passed
+      Message: Wonder Young passed assertion message
+      TracePrefix: Wonder Young passed assertion trace
+      AttachmentCount: 2
+      AttachmentKinds:
+        - Json
+        - Yaml
+      AdditionalTraceSections:
+        - Search baseline demonstrates combined Grafana and Kibana links on a passing assertion.
+
+  - Name: WonderYoungFailed
+    Assertion: ReportPortalRichAssertion
+    Severity: Blocker
+    SessionNamePatterns:
+      - Wonder.*Session
+    DataSourceNames:
+      - WonderYoungPayloads
+    AssertionConfiguration:
+      Outcome: Failed
+      Message: Wonder Young failed assertion message
+      TracePrefix: Wonder Young failed assertion trace
+      AttachmentCount: 1
+      AttachmentKinds:
+        - Binary
+      AdditionalTraceSections:
+        - Failure path keeps the same payload family so history grouping is stable across outcomes.
+
+  - Name: WonderYoungNoTrace
+    Assertion: ReportPortalRichAssertion
+    Severity: Minor
+    DisplayTrace: false
+    SaveTemplate: false
+    SaveAttachments: false
+    SessionNamePatterns:
+      - Wonder.*Session
+    DataSourcePatterns:
+      - WonderYoung.*
+    AssertionConfiguration:
+      Outcome: Passed
+      Message: Wonder Young hidden trace assertion message
+      TracePrefix: Wonder Young hidden trace
+      AttachmentCount: 1
+      AttachmentKinds:
+        - Json
