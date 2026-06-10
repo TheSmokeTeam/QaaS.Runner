@@ -13,41 +13,18 @@ namespace QaaS.Runner.Assertions.Tests.ConfigurationObjectsTests;
 [TestFixture]
 public class ReportPortalConfigTests
 {
-    private static readonly string[] ManagedEnvironmentVariables =
-    [
-        ReportPortalConfig.EnabledEnvironmentVariable,
-        ReportPortalConfig.EndpointEnvironmentVariable,
-        ReportPortalConfig.ProjectEnvironmentVariable,
-        ReportPortalConfig.ApiKeyEnvironmentVariable
-    ];
-
-    private Dictionary<string, string?> _originalEnvironment = null!;
-
     [SetUp]
     public void SetUp()
     {
-        _originalEnvironment = ManagedEnvironmentVariables.ToDictionary(
-            environmentVariableName => environmentVariableName,
-            Environment.GetEnvironmentVariable,
-            StringComparer.Ordinal);
-
-        foreach (var environmentVariableName in ManagedEnvironmentVariables)
-            Environment.SetEnvironmentVariable(environmentVariableName, null);
-    }
-
-    [TearDown]
-    public void TearDown()
-    {
-        foreach (var environmentVariable in _originalEnvironment)
-            Environment.SetEnvironmentVariable(environmentVariable.Key, environmentVariable.Value);
+        ReportPortalConfig.RegisterDefaults(enabled: false);
     }
 
     [Test]
-    public void Resolve_WithNoOverrides_DefaultsToPassiveEnabledConfiguration()
+    public void Resolve_WithNoOverrides_DefaultsToRegisteredDisabledConfiguration()
     {
         var settings = new ReportPortalConfig().Resolve(CreateRunDescriptor());
 
-        Assert.That(settings.Enabled, Is.True);
+        Assert.That(settings.Enabled, Is.False);
         Assert.That(settings.Endpoint, Is.Null);
         Assert.That(settings.RequestedProjectName, Is.EqualTo("Smoke"));
         Assert.That(settings.ApiKey, Is.Null);
@@ -60,10 +37,9 @@ public class ReportPortalConfigTests
     [Test]
     public void TryGetEndpointUri_WithGatewayEndpoint_NormalizesEndpointToApiPath()
     {
-        Environment.SetEnvironmentVariable(ReportPortalConfig.EndpointEnvironmentVariable, "http://localhost:8080");
-
         var settings = new ReportPortalConfig
         {
+            Endpoint = "http://localhost:8080",
             Project = "QaaS",
             ApiKey = "local-api-key"
         }.Resolve(CreateRunDescriptor());
@@ -77,51 +53,74 @@ public class ReportPortalConfigTests
     }
 
     [Test]
-    public void Resolve_WithEndpointAndApiKeyOnlyInYaml_IgnoresThemBecauseRuntimeUsesEnvironmentVariables()
+    public void Resolve_WithEndpointAndApiKeyOnlyInYaml_UsesYamlValues()
     {
+        var settings = new ReportPortalConfig
+        {
+            Enabled = true,
+            Endpoint = "http://from-yaml.local",
+            ApiKey = "yaml-api-key"
+        }.Resolve(CreateRunDescriptor());
+
+        Assert.That(settings.Enabled, Is.True);
+        Assert.That(settings.Endpoint, Is.EqualTo("http://from-yaml.local"));
+        Assert.That(settings.ApiKey, Is.EqualTo("yaml-api-key"));
+    }
+
+    [Test]
+    public void Resolve_WithRegisteredDefaults_UsesDefaultsButStillRoutesByTeam()
+    {
+        ReportPortalConfig.RegisterDefaults(
+            enabled: true,
+            reportPortalUri: "http://localhost:8080",
+            reportPortalApiKey: "default-api-key");
+
+        var settings = new ReportPortalConfig
+        {
+            Project = "IgnoredProject"
+        }.Resolve(CreateRunDescriptor());
+
+        Assert.That(settings.Enabled, Is.True);
+        Assert.That(settings.Endpoint, Is.EqualTo("http://localhost:8080"));
+        Assert.That(settings.RequestedProjectName, Is.EqualTo("Smoke"));
+        Assert.That(settings.ApiKey, Is.EqualTo("default-api-key"));
+        Assert.That(settings.IgnoredProjectOverride, Is.EqualTo("IgnoredProject"));
+    }
+
+    [Test]
+    public void Resolve_WithYamlOverrides_UsesYamlValuesBeforeRegisteredDefaults()
+    {
+        ReportPortalConfig.RegisterDefaults(
+            enabled: true,
+            reportPortalUri: "http://default.local",
+            reportPortalApiKey: "default-api-key");
+
         var settings = new ReportPortalConfig
         {
             Endpoint = "http://from-yaml.local",
             ApiKey = "yaml-api-key"
         }.Resolve(CreateRunDescriptor());
 
-        Assert.That(settings.Endpoint, Is.Null);
-        Assert.That(settings.ApiKey, Is.Null);
-    }
-
-    [Test]
-    public void Resolve_WithEnvironmentOverrides_UsesEnvironmentValuesButStillRoutesByTeam()
-    {
-        Environment.SetEnvironmentVariable(ReportPortalConfig.EnabledEnvironmentVariable, "true");
-        Environment.SetEnvironmentVariable(ReportPortalConfig.EndpointEnvironmentVariable, "http://localhost:8080");
-        Environment.SetEnvironmentVariable(ReportPortalConfig.ProjectEnvironmentVariable, "IgnoredProject");
-        Environment.SetEnvironmentVariable(ReportPortalConfig.ApiKeyEnvironmentVariable, "env-api-key");
-
-        var settings = new ReportPortalConfig
-        {
-            Enabled = false,
-            Endpoint = "http://ignored.local",
-            Project = "Ignored",
-            ApiKey = "ignored-api-key"
-        }.Resolve(CreateRunDescriptor());
-
         Assert.That(settings.Enabled, Is.True);
-        Assert.That(settings.Endpoint, Is.EqualTo("http://localhost:8080"));
-        Assert.That(settings.RequestedProjectName, Is.EqualTo("Smoke"));
-        Assert.That(settings.ApiKey, Is.EqualTo("env-api-key"));
-        Assert.That(settings.IgnoredProjectOverride, Is.EqualTo("IgnoredProject"));
+        Assert.That(settings.Endpoint, Is.EqualTo("http://from-yaml.local"));
+        Assert.That(settings.ApiKey, Is.EqualTo("yaml-api-key"));
     }
 
     [Test]
     public void Resolve_WithExplicitDisable_ReturnsDisabledSettingsWithoutNeedingMetadata()
     {
+        ReportPortalConfig.RegisterDefaults(
+            enabled: true,
+            reportPortalUri: "http://default.local",
+            reportPortalApiKey: "default-api-key");
+
         var settings = new ReportPortalConfig
         {
             Enabled = false
         }.Resolve(null);
 
         Assert.That(settings.Enabled, Is.False);
-        Assert.That(settings.Endpoint, Is.Null);
+        Assert.That(settings.Endpoint, Is.EqualTo("http://default.local"));
         Assert.That(settings.RequestedProjectName, Is.Null);
     }
 
@@ -151,7 +150,7 @@ public class ReportPortalConfigTests
 
         Assert.That(succeeded, Is.False);
         Assert.That(endpointUri, Is.Null);
-        Assert.That(failureReason, Does.Contain(ReportPortalConfig.EndpointEnvironmentVariable));
+        Assert.That(failureReason, Does.Contain("ReportPortal.Endpoint"));
     }
 
     [Test]

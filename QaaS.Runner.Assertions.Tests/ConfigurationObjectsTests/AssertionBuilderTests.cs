@@ -20,6 +20,12 @@ namespace QaaS.Runner.Assertions.Tests.ConfigurationObjectsTests;
 [TestFixture]
 public class AssertionBuilderTests
 {
+    [SetUp]
+    public void SetUp()
+    {
+        ReportPortalConfig.RegisterDefaults(enabled: false);
+    }
+
     [Test]
     public void Build_WithMissingAssertionHook_ThrowsArgumentException()
     {
@@ -131,6 +137,10 @@ public class AssertionBuilderTests
             Logger = Globals.Logger,
             RootConfiguration = new ConfigurationBuilder().Build()
         };
+        ReportPortalConfig.RegisterDefaults(
+            enabled: true,
+            reportPortalUri: "http://default.local",
+            reportPortalApiKey: "default-api-key");
         using var reportPortalLaunchManager = new ReportPortalLaunchManager();
 
         var reporters = new ReporterBuilder()
@@ -140,6 +150,37 @@ public class AssertionBuilderTests
 
         Assert.That(reporters, Has.Count.EqualTo(1));
         Assert.That(reporters[0], Is.TypeOf<AllureReporter>());
+    }
+
+    [Test]
+    public void ReporterBuilder_Build_WithReportPortalEnabledByDefaults_ReturnsAllureAndReportPortalReporters()
+    {
+        var context = new Context
+        {
+            Logger = Globals.Logger,
+            RootConfiguration = new ConfigurationBuilder().Build()
+        };
+        ReportPortalConfig.RegisterDefaults(
+            enabled: true,
+            reportPortalUri: "http://default.local",
+            reportPortalApiKey: "default-api-key");
+        var runDescriptor = new ReportPortalLaunchDescriptor(
+            "Smoke",
+            "QaaS",
+            ["Session A"],
+            "run",
+            new DateTimeOffset(2025, 1, 1, 10, 0, 0, TimeSpan.Zero));
+        using var reportPortalLaunchManager = new ReportPortalLaunchManager();
+
+        var reporters = new ReporterBuilder()
+            .WithReportPortalLaunchManager(reportPortalLaunchManager)
+            .WithReportPortalRunDescriptor(runDescriptor)
+            .Build(context, new DateTime(2025, 1, 1, 10, 0, 0, DateTimeKind.Utc));
+        var reportPortalReporter = reporters.OfType<ReportPortalReporter>().Single();
+
+        Assert.That(reporters, Has.Count.EqualTo(2));
+        Assert.That(reportPortalReporter.Settings.Endpoint, Is.EqualTo("http://default.local"));
+        Assert.That(reportPortalReporter.Settings.ApiKey, Is.EqualTo("default-api-key"));
     }
 
     [Test]

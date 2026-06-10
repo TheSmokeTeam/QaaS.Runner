@@ -42,7 +42,7 @@ public class ReportPortalAccessValidatorTests
         var result = await validator.EnsureWriteAccessAsync(CreateSettings(apiKey: null), Globals.Logger);
 
         Assert.That(result.CanPublish, Is.False);
-        Assert.That(result.FailureReason, Does.Contain(ReportPortalConfig.ApiKeyEnvironmentVariable));
+        Assert.That(result.FailureReason, Does.Contain("ReportPortal.ApiKey"));
         Assert.That(handler.RequestCount, Is.Zero);
     }
 

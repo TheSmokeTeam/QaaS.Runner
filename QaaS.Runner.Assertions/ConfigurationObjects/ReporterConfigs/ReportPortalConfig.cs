@@ -10,14 +10,27 @@ namespace QaaS.Runner.Assertions.ConfigurationObjects.ReporterConfigs;
 /// </summary>
 public class ReportPortalConfig : IReporterConfig
 {
-    public const string EnabledEnvironmentVariable = "QAAS_REPORTPORTAL_ENABLED";
-    public const string EndpointEnvironmentVariable = "QAAS_REPORTPORTAL_ENDPOINT";
-    public const string ApiKeyEnvironmentVariable = "QAAS_REPORTPORTAL_API_KEY";
-    public const string ProjectEnvironmentVariable = "QAAS_REPORTPORTAL_PROJECT";
+    private sealed class StaticReportPortalDefaultsProvider(ReportPortalConfigurationDefaults defaults)
+        : IReportPortalConfigurationDefaultsProvider
+    {
+        public ReportPortalConfigurationDefaults GetDefaults() => defaults;
+    }
 
-    [Description("Whether to publish runner assertion results to ReportPortal in addition to Allure. Defaults to true.")]
-    [DefaultValue(true)]
-    public bool Enabled { get; set; } = true;
+    private bool _enabled;
+    private bool _enabledConfigured;
+    private static IReportPortalConfigurationDefaultsProvider? _defaultsProvider;
+
+    [Description("Whether to publish runner assertion results to ReportPortal in addition to Allure. Defaults to the registered QaaS.Configuration value.")]
+    [DefaultValue(false)]
+    public bool Enabled
+    {
+        get => _enabled;
+        set
+        {
+            _enabled = value;
+            _enabledConfigured = true;
+        }
+    }
 
     [Description("ReportPortal base URL. Accepts either the gateway URL or the API URL and normalizes it to /api/.")]
     public string? Endpoint { get; set; }
@@ -41,17 +54,37 @@ public class ReportPortalConfig : IReporterConfig
     [Description("Static launch attributes to add to every launch in addition to the default QaaS team/system/session/source attributes.")]
     public Dictionary<string, string> Attributes { get; set; } = new(StringComparer.OrdinalIgnoreCase);
 
+    public static void RegisterDefaultsProvider(IReportPortalConfigurationDefaultsProvider defaultsProvider)
+    {
+        ArgumentNullException.ThrowIfNull(defaultsProvider);
+        _defaultsProvider = defaultsProvider;
+    }
+
+    public static IReportPortalConfigurationDefaultsProvider? GetDefaultsProvider() => _defaultsProvider;
+
+    public static void RegisterDefaults(
+        bool enabled,
+        string? reportPortalUri = null,
+        string? reportPortalApiKey = null) =>
+        RegisterDefaultsProvider(new StaticReportPortalDefaultsProvider(new ReportPortalConfigurationDefaults
+        {
+            Enabled = enabled,
+            ReportPortalUri = reportPortalUri,
+            ReportPortalApiKey = reportPortalApiKey
+        }));
+
     /// <summary>
-    /// Resolves the effective runtime settings from YAML and environment variables. This method is intentionally lenient:
+    /// Resolves the effective runtime settings from YAML and registered defaults. This method is intentionally lenient:
     /// missing endpoint, missing API key, or missing team metadata are handled later as warnings so QaaS can continue the
     /// run without affecting the exit code.
     /// </summary>
     internal ReportPortalSettings Resolve(ReportPortalLaunchDescriptor? runDescriptor)
     {
-        var enabled = ReadBooleanValue(EnabledEnvironmentVariable, Enabled);
-        var endpoint = ReadStringValue(EndpointEnvironmentVariable);
-        var apiKey = ReadStringValue(ApiKeyEnvironmentVariable);
-        var ignoredProjectOverride = ReadStringValue(ProjectEnvironmentVariable) ?? Project;
+        var defaults = GetDefaultsProvider()?.GetDefaults() ?? ReportPortalConfigurationDefaults.Empty;
+        var enabled = _enabledConfigured ? Enabled : defaults.Enabled;
+        var endpoint = FirstNonWhiteSpace(Endpoint, defaults.ReportPortalUri);
+        var apiKey = FirstNonWhiteSpace(ApiKey, defaults.ReportPortalApiKey);
+        var ignoredProjectOverride = Project;
         var launchName = string.IsNullOrWhiteSpace(LaunchName)
             ? runDescriptor?.BuildDefaultLaunchName()
             : LaunchName.Trim();
@@ -79,22 +112,24 @@ public class ReportPortalConfig : IReporterConfig
             ignoredProjectOverride?.Trim());
     }
 
-    private static string? ReadStringValue(string environmentVariableName)
-    {
-        var value = Environment.GetEnvironmentVariable(environmentVariableName);
-        return string.IsNullOrWhiteSpace(value) ? null : value.Trim();
-    }
+    private static string? FirstNonWhiteSpace(params string?[] values) =>
+        values.FirstOrDefault(value => !string.IsNullOrWhiteSpace(value))?.Trim();
+}
 
-    private static bool ReadBooleanValue(string environmentVariableName, bool fallbackValue)
-    {
-        var value = ReadStringValue(environmentVariableName);
-        if (value is null)
-            return fallbackValue;
+public sealed record ReportPortalConfigurationDefaults
+{
+    public static readonly ReportPortalConfigurationDefaults Empty = new();
 
-        return bool.TryParse(value, out var parsedValue)
-            ? parsedValue
-            : fallbackValue;
-    }
+    public bool Enabled { get; init; }
+
+    public string? ReportPortalUri { get; init; }
+
+    public string? ReportPortalApiKey { get; init; }
+}
+
+public interface IReportPortalConfigurationDefaultsProvider
+{
+    ReportPortalConfigurationDefaults GetDefaults();
 }
 
 /// <summary>
@@ -149,7 +184,7 @@ public sealed class ReportPortalSettings(
 
         if (string.IsNullOrWhiteSpace(Endpoint))
         {
-            failureReason = $"Environment variable {ReportPortalConfig.EndpointEnvironmentVariable} must be set when ReportPortal reporting is enabled.";
+            failureReason = "ReportPortal.Endpoint must be configured when ReportPortal reporting is enabled.";
             return false;
         }
 

@@ -77,17 +77,18 @@ Runtime rules:
 - When ReportPortal is enabled but the endpoint, API key, or target project is invalid, QaaS logs a warning and skips ReportPortal publishing without crashing the runner or changing the exit code for otherwise passing runs.
 - The default launch name is stable and derived from `Team + System + Sessions`, which keeps ReportPortal history grouped without creating new dashboards or projects.
 
-Environment variables:
+Configuration sources:
 
-| Variable | Default | Notes |
+| Setting | Default source | Override source | Notes |
 |---|---|---|
-| `QAAS_REPORTPORTAL_ENABLED` | `true` | Enables best-effort ReportPortal publishing. |
-| `QAAS_REPORTPORTAL_ENDPOINT` | none | Required when reporting is enabled. Must point to the ReportPortal base URL or API URL. |
-| `QAAS_REPORTPORTAL_API_KEY` | none | Required when reporting is enabled. Must already have write access to the target team projects. |
-| `QAAS_REPORTPORTAL_PROJECT` | none | Ignored at runtime. Kept only so QaaS can warn when callers try to override project routing manually. |
+| `ReportPortal.Enabled` | `QaaS.Configuration.ReportPortalDefaults.Enabled` (`false` in the public package) | YAML `ReportPortal.Enabled` | Enables best-effort ReportPortal publishing. |
+| `ReportPortal.Endpoint` | `QaaS.Configuration.ReportPortalDefaults.ReportPortalUri` | YAML `ReportPortal.Endpoint` | Required when reporting is enabled. Must point to the ReportPortal base URL or API URL. |
+| `ReportPortal.ApiKey` | `QaaS.Configuration.ReportPortalDefaults.ReportPortalApiKey` | YAML `ReportPortal.ApiKey` | Required when reporting is enabled. Must already have write access to the target team projects. |
+| `ReportPortal.Project` | none | YAML `ReportPortal.Project` | Ignored at runtime. QaaS warns and continues to route by `MetaData.Team`. |
 
 Notes:
-- `QAAS_REPORTPORTAL_ENDPOINT` and `QAAS_REPORTPORTAL_API_KEY` are environment-driven at runtime. QaaS does not fall back to YAML values for them.
+- Public `QaaS.Configuration` keeps ReportPortal disabled with null endpoint/key. Internal environments can publish a same-ID `QaaS.Configuration` package with internal ReportPortal defaults.
+- YAML `ReportPortal` values always override `QaaS.Configuration` defaults for that run.
 - Launch names are derived from the grouped team, system, and sessions unless you explicitly override the launch name/description in YAML.
 - Allure remains active and unchanged when ReportPortal publishing is enabled.
 
@@ -112,8 +113,8 @@ dotnet run -- execute executable.yaml -c InvalidApiKey
 
 Warning-path checks:
 - `MissingProject` uses a non-existent team/project mapping and should warn while preserving a zero exit code.
-- `MissingEndpoint` uses a pass-only scenario and should warn when `QAAS_REPORTPORTAL_ENDPOINT` is unset.
-- `InvalidApiKey` uses a pass-only scenario and should warn when `QAAS_REPORTPORTAL_ENDPOINT` points to a live instance but `QAAS_REPORTPORTAL_API_KEY` is invalid.
+- `MissingEndpoint` uses a pass-only scenario and should warn when `ReportPortal.Endpoint` is not provided by YAML or `QaaS.Configuration`.
+- `InvalidApiKey` uses a pass-only scenario and should warn when `ReportPortal.Endpoint` points to a live instance but `ReportPortal.ApiKey` is invalid.
 
 Team/system matrix available through `executable.yaml`:
 - `SmokeQaaS`

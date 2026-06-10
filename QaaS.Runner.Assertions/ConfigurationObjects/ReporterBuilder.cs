@@ -132,7 +132,8 @@ public class ReporterBuilder : ICloneable<ReporterBuilder>
                     reporters.Add(allureReporter);
                     break;
                 case ReporterTarget.ReportPortal:
-                    if (ReportPortal is { Enabled: true } && ReportPortalLaunchManager is not null)
+                    var reportPortalSettings = ReportPortal?.Resolve(ReportPortalRunDescriptor);
+                    if (reportPortalSettings is { Enabled: true } && ReportPortalLaunchManager is not null)
                     {
                         var reportPortalReporter = new ReportPortalReporter
                         {
@@ -144,7 +145,7 @@ public class ReporterBuilder : ICloneable<ReporterBuilder>
                             SaveSessionData = SaveSessionData,
                             FileSystem = fileSystem ?? new FileSystem(),
                             LaunchManager = ReportPortalLaunchManager,
-                            Settings = ReportPortal.Resolve(ReportPortalRunDescriptor)
+                            Settings = reportPortalSettings
                         };
                         reporters.Add(reportPortalReporter);
                     }

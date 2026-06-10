@@ -16,7 +16,7 @@ The feature branch contributed a passive ReportPortal reporting path, tests, E2E
 
 | File | Purpose |
 |---|---|
-| `QaaS.Runner.Assertions/ConfigurationObjects/ReportPortalConfig.cs` | Defines ReportPortal configuration and runtime-resolved settings. |
+| `QaaS.Runner.Assertions/ConfigurationObjects/ReporterConfigs/ReportPortalConfig.cs` | Defines ReportPortal configuration and runtime-resolved settings. |
 | `QaaS.Runner.Assertions/ReportPortalAccessValidator.cs` | Validates endpoint, API key, and team-project access without provisioning anything. |
 | `QaaS.Runner.Assertions/ReportPortalLaunchManager.cs` | Owns ReportPortal launch lifecycle for one runner invocation. |
 | `QaaS.Runner.Assertions/ReportPortalReporter.cs` | Publishes assertion results, logs, and attachments into ReportPortal. |
@@ -26,7 +26,7 @@ The feature branch contributed a passive ReportPortal reporting path, tests, E2E
 
 | File | Purpose |
 |---|---|
-| `QaaS.Runner.Assertions.Tests/ConfigurationObjectsTests/ReportPortalConfigTests.cs` | Covers environment-variable resolution, endpoint normalization, team routing, and launch attributes. |
+| `QaaS.Runner.Assertions.Tests/ConfigurationObjectsTests/ReportPortalConfigTests.cs` | Covers registered defaults, YAML overrides, endpoint normalization, team routing, and launch attributes. |
 | `QaaS.Runner.Assertions.Tests/ReportPortalAccessValidatorTests.cs` | Covers passive access checks, missing key/team/project cases, unauthorized keys, and cache behavior. |
 | `QaaS.Runner.Assertions.Tests/ReportPortalRunDescriptorTests.cs` | Covers stable launch naming and launch description content. |
 | `QaaS.Runner.Assertions.Tests/BaseReporterTests.cs` | Adds tests for shared reporter helper behavior used by ReportPortal. |
@@ -145,20 +145,20 @@ ReportPortal routing is based on QaaS metadata:
 
 - `MetaData.Team` maps to the ReportPortal project name.
 - `MetaData.System` is used for launch grouping inside that team project.
-- `ReportPortal.Project` and `QAAS_REPORTPORTAL_PROJECT` are treated as ignored overrides. The code warns and continues to route by team.
+- `ReportPortal.Project` is treated as an ignored override. The code warns and continues to route by team.
 
 This keeps ownership stable: each team owns its ReportPortal project, and systems are grouped under that project.
 
 ### Configuration Sources
 
-Runtime-sensitive values are resolved through environment variables:
+Runtime-sensitive values are resolved from YAML/config first, then from `QaaS.Configuration` defaults:
 
 | Setting | Source |
 |---|---|
-| Enabled | `QAAS_REPORTPORTAL_ENABLED` or config fallback |
-| Endpoint | `QAAS_REPORTPORTAL_ENDPOINT` |
-| API key | `QAAS_REPORTPORTAL_API_KEY` |
-| Ignored project override | `QAAS_REPORTPORTAL_PROJECT` or config `Project` |
+| Enabled | config `Enabled`, then `QaaS.Configuration.ReportPortalDefaults.Enabled` |
+| Endpoint | config `Endpoint`, then `QaaS.Configuration.ReportPortalDefaults.ReportPortalUri` |
+| API key | config `ApiKey`, then `QaaS.Configuration.ReportPortalDefaults.ReportPortalApiKey` |
+| Ignored project override | config `Project` |
 | Launch name | config `LaunchName` or descriptor default |
 | Description | config `Description` or descriptor default |
 | Debug mode | config `DebugMode` |
@@ -184,12 +184,12 @@ The endpoint is normalized to a ReportPortal API URL. For example, a gateway URL
 
 ### `ReportPortalConfig`
 
-Location: `QaaS.Runner.Assertions/ConfigurationObjects/ReportPortalConfig.cs`
+Location: `QaaS.Runner.Assertions/ConfigurationObjects/ReporterConfigs/ReportPortalConfig.cs`
 
 Responsibilities:
 
 - Defines the YAML/config shape for ReportPortal reporting.
-- Reads runtime-sensitive values from environment variables.
+- Resolves YAML/config values before registered `QaaS.Configuration` defaults.
 - Normalizes endpoint settings.
 - Builds immutable `ReportPortalSettings`.
 - Merges launch attributes from the run descriptor and static config.

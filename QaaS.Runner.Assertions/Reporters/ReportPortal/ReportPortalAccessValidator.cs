@@ -79,7 +79,7 @@ internal sealed class ReportPortalAccessValidator : IDisposable
         if (string.IsNullOrWhiteSpace(settings.ApiKey))
         {
             return WarnAndReturnFailure(logger,
-                $"Could not publish results to ReportPortal project `{settings.RequestedProjectName}` because environment variable {ReportPortalConfig.ApiKeyEnvironmentVariable} was not set.");
+                $"Could not publish results to ReportPortal project `{settings.RequestedProjectName}` because ReportPortal.ApiKey was not configured.");
         }
 
         try
