@@ -1,9 +1,9 @@
-# AGENTS.md — QaaS.Runner
+﻿# AGENTS.md — QaaS.Runner
 Guidance for AI agents working in this repository.
 
 ## What this repo is
 QaaS.Runner is the test execution and orchestration engine (Tier 2). It loads YAML test plans
-(`.qaas.yaml`), resolves hooks via QaaS.Framework.Providers assembly scanning, builds a
+(`test.qaas.yaml`), resolves hooks via QaaS.Framework.Providers assembly scanning, builds a
 Sessions → Stages → Actions execution graph with bounded parallelism, evaluates assertions
 over transaction logs, and reports via Allure and ReportPortal. Target: net10.0.
 
@@ -21,8 +21,7 @@ over transaction logs, and reports via Allure and ReportPortal. Target: net10.0.
 ```shell
 dotnet build -m QaaS.Runner.sln
 dotnet test QaaS.Runner.sln
-# Skip E2ETests (require live RabbitMQ):
-dotnet test QaaS.Runner.sln --filter "FullyQualifiedName!~E2ETests"
+# Note: QaaS.Runner.E2ETests has OutputType=Exe and is NOT run by dotnet test.
 # Canonical run:
 dotnet run --project QaaS.Runner -- run test.qaas.yaml
 ```
@@ -48,9 +47,8 @@ dotnet run --project QaaS.Runner -- run test.qaas.yaml
 ## Critical gotchas
 - **Depends on Tier-0 QaaS.Framework** — any SDK interface change (IGenerator, IAssertion, IProbe)
   requires updating Runner callsites; always align package versions.
-- **Hook discovery**: hooks must be in assemblies named `QaaS.*`, `Common.*`, or user libs for
-  Providers scanning to find them. A missing namespace means silently missing hooks at runtime.
-- **Act/Assert split** requires a shared `Storage` section in the YAML; the FileSystem path must
+- **Hook discovery**: hooks must be in assemblies discoverable by Providers scanning (entry assembly + loaded assemblies + `*.dll` in the app base directory). Assembly-name priority (`QaaS.*` → `Common.*` → others) is used as a tie-breaker for hooks sharing the same simple type name; resolution prefers `FullName`/`AssemblyQualifiedName` matches before falling back to `Type.Name`.
+- **Act/Assert split** requires a shared `Storages` section in the YAML; the FileSystem path must
   be stable and identical across both runs.
 - **`IterableSerializableDataIterator`** drives parallel Transaction execution (PR #33) — data
   iteration count and Transaction count must align; mismatches cause data-loss silently.
@@ -64,4 +62,4 @@ dotnet run --project QaaS.Runner -- run test.qaas.yaml
 Follow the QaaS harness pipeline: plan → contract → implement → adversarial evaluation
 (rubric: Correctness/Completeness/Craft/Robustness, each ≥7/10). Write tests first (TDD).
 Conventional commits: `feat:`, `fix:`, `chore(release):`.
-Run `dotnet format` before committing.
+Run `csharpier format` on changed files before committing.
