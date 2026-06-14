@@ -12,7 +12,6 @@ Execution orchestration package for running QaaS test workflows from YAML config
 - [Projects](#projects)
 - [Quick Start](#quick-start)
 - [ReportPortal](#reportportal)
-- [E2E Validation](#e2e-validation)
 - [Documentation](#documentation)
 
 ## Overview
@@ -91,49 +90,6 @@ Notes:
 - YAML `ReportPortal` values always override `QaaS.Configuration` defaults for that run.
 - Launch names are derived from the grouped team, system, and sessions unless you explicitly override the launch name/description in YAML.
 - Allure remains active and unchanged when ReportPortal publishing is enabled.
-
-## E2E Validation
-[`QaaS.Runner.E2ETests`](./QaaS.Runner.E2ETests/) contains ReportPortal-focused scenarios under [`Configs/ReportPortal`](./QaaS.Runner.E2ETests/Configs/ReportPortal/) and a single [`executable.yaml`](./QaaS.Runner.E2ETests/executable.yaml) that groups them by command ID.
-
-Run the following commands from [`QaaS.Runner.E2ETests`](./QaaS.Runner.E2ETests/):
-
-Useful commands:
-
-```bash
-cd ./QaaS.Runner.E2ETests
-dotnet run -- execute executable.yaml -c SmokeQaaS
-dotnet run -- execute executable.yaml -c SmokeQaaSStress
-dotnet run -- execute executable.yaml -c SmokeQaaS -c SmokeSmoothStress
-dotnet run -- execute executable.yaml -c TactiCrawler -c WonderYoungStress
-dotnet run -- execute executable.yaml -c SmokeQaaSStress -c TactiMifal -c WonderBritianStress
-dotnet run -- execute executable.yaml -c MissingProject
-dotnet run -- execute executable.yaml -c CaseInsensitiveTeam
-dotnet run -- execute executable.yaml -c InvalidApiKey
-```
-
-Warning-path checks:
-- `MissingProject` uses a non-existent team/project mapping and should warn while preserving a zero exit code.
-- `MissingEndpoint` uses a pass-only scenario and should warn when `ReportPortal.Endpoint` is not provided by YAML or `QaaS.Configuration`.
-- `InvalidApiKey` uses a pass-only scenario and should warn when `ReportPortal.Endpoint` points to a live instance but `ReportPortal.ApiKey` is invalid.
-
-Team/system matrix available through `executable.yaml`:
-- `SmokeQaaS`
-- `SmokeQaaSStress`
-- `SmokeSmooth`
-- `SmokeSmoothStress`
-- `TactiCrawler`
-- `TactiCrawlerStress`
-- `TactiMifal`
-- `TactiMifalStress`
-- `WonderYoung`
-- `WonderYoungStress`
-- `WonderBritian`
-- `WonderBritianStress`
-
-Scenario layout:
-- `Configs/ReportPortal/Teams/Smoke`, `Configs/ReportPortal/Teams/Tacti`, and `Configs/ReportPortal/Teams/Wonder` each contain baseline and stress scenarios for the systems owned by that team.
-- Baseline scenarios exercise links, message/trace enrichment, session exports, and attachment fan-out.
-- Stress scenarios add extra data sources, more sessions, deliberate session failures, larger traces, more attachments, and additional metadata labels such as `Scenario`, `ReleaseRing`, and `Tenant`.
 
 ## Documentation
 - Official docs: [thesmoketeam.github.io/qaas-docs](https://thesmoketeam.github.io/qaas-docs/)
