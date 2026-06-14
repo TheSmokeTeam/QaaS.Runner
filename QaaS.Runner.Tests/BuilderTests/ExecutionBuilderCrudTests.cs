@@ -187,7 +187,25 @@ public class ExecutionBuilderCrudTests
             Assert.That((builder.Links ?? []).ElementAtOrDefault(0), Is.Null);
         });
     }
-}
 
+    [Test]
+    public void UpdateReporters_ShouldReplaceConfiguredReporterBuilder()
+    {
+        var originalReporters = new ReporterBuilder().ShouldSaveLogs(true);
+        var updatedReporters = new ReporterBuilder().ShouldSaveAttachments(true);
+        var builder = new ExecutionBuilder
+        {
+            Reporters = originalReporters
+        };
+
+        var result = builder.UpdateReporters(updatedReporters);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(result, Is.SameAs(builder));
+            Assert.That(builder.Reporters, Is.SameAs(updatedReporters));
+        });
+    }
+}
 
 

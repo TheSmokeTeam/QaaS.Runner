@@ -640,6 +640,19 @@ public class ExecutionBuilder() : BaseExecutionBuilder<InternalContext, Executio
     }
 
     /// <summary>
+    /// Updates the reporter configuration stored on the current Runner execution builder instance.
+    /// </summary>
+    /// <remarks>
+    /// Use this method when working with the documented Runner execution builder API surface in code. The change is stored on the current builder instance and is consumed by later build, validation, or execution steps.
+    /// </remarks>
+    /// <qaas-docs group="Configuration as Code" subgroup="Executions" />
+    public ExecutionBuilder UpdateReporters(ReporterBuilder reporterBuilder)
+    {
+        Reporters = reporterBuilder;
+        return this;
+    }
+
+    /// <summary>
     ///     Loads the <see cref="ExecutionBuilder" /> scope with all context's dependencies
     /// </summary>
     private ILifetimeScope LoadContextScopeDependencies()
