@@ -1,6 +1,7 @@
 using System;
 using System.Collections;
 using System.Collections.Generic;
+using System.ComponentModel;
 using System.Linq;
 using Microsoft.Extensions.Configuration;
 using NUnit.Framework;
@@ -222,6 +223,54 @@ public class AssertionBuilderTests
     }
 
     [Test]
+    public void ReporterBuilder_Read_Always_ThrowsNotSupportedException()
+    {
+        var builder = new ReporterBuilder();
+
+        Assert.Throws<NotSupportedException>(() =>
+            builder.Read(null!, typeof(ReporterBuilder), null!));
+    }
+
+    [Test]
+    public void ReporterBuilder_Write_SerializesReporterPayload()
+    {
+        var reportPortal = new ReportPortalConfig
+        {
+            Enabled = true,
+            Endpoint = "https://reportportal.local"
+        };
+        var builder = new ReporterBuilder()
+            .ShouldSaveLogs(false)
+            .ShouldSaveAttachments(true)
+            .ShouldSaveTemplate(false)
+            .ShouldSaveSessionData(true)
+            .ShouldDisplayTrace(false)
+            .ConfigureReportPortal(reportPortal);
+        object? serialized = null;
+
+        builder.Write(null!, (payload, _) => serialized = payload);
+
+        Assert.That(serialized, Is.Not.Null);
+        var serializedType = serialized!.GetType();
+        Assert.Multiple(() =>
+        {
+            Assert.That(serializedType.GetProperty("SaveLogs")!.GetValue(serialized), Is.EqualTo(false));
+            Assert.That(serializedType.GetProperty("SaveAttachments")!.GetValue(serialized), Is.EqualTo(true));
+            Assert.That(serializedType.GetProperty("SaveTemplate")!.GetValue(serialized), Is.EqualTo(false));
+            Assert.That(serializedType.GetProperty("SaveSessionData")!.GetValue(serialized), Is.EqualTo(true));
+            Assert.That(serializedType.GetProperty("DisplayTrace")!.GetValue(serialized), Is.EqualTo(false));
+            Assert.That(serializedType.GetProperty("ReportPortal")!.GetValue(serialized), Is.SameAs(reportPortal));
+        });
+    }
+
+    [Test]
+    public void ReporterAndReportPortalConfigProperties_HaveDefaultValueAttributes()
+    {
+        AssertPublicConfigPropertiesHaveDefaultValueAttribute(typeof(ReporterBuilder));
+        AssertPublicConfigPropertiesHaveDefaultValueAttribute(typeof(ReportPortalConfig));
+    }
+
+    [Test]
     public void SessionCrudMethods_WhenCollectionsAreNull_InitializeAndReturnEmptyFallbacks()
     {
         var builder = CreateBuilder();
@@ -383,5 +432,18 @@ public class AssertionBuilderTests
     private static ReportPortalConfig CreateReportPortalConfig(bool enabled)
     {
         return new ReportPortalConfig { Enabled = enabled };
+    }
+
+    private static void AssertPublicConfigPropertiesHaveDefaultValueAttribute(Type type)
+    {
+        var missingProperties = type.GetProperties()
+            .Where(property => property.DeclaringType == type)
+            .Where(property => property.GetMethod?.IsPublic == true)
+            .Where(property => Attribute.GetCustomAttribute(property, typeof(DefaultValueAttribute)) == null)
+            .Select(property => property.Name)
+            .ToArray();
+
+        Assert.That(missingProperties, Is.Empty,
+            $"{type.Name} properties missing {nameof(DefaultValueAttribute)}: {string.Join(", ", missingProperties)}");
     }
 }

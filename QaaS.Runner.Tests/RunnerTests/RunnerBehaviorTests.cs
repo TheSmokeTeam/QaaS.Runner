@@ -15,6 +15,7 @@ using QaaS.Runner.Assertions;
 using QaaS.Runner.WrappedExternals;
 using Allure.Commons;
 using QaaS.Runner.Assertions.Reporters;
+using QaaS.Runner.Assertions.ConfigurationObjects.ReporterConfigs;
 using QaaS.Runner.Assertions.Reporters.ReportPortal;
 
 namespace QaaS.Runner.Tests.RunnerTests;
@@ -567,8 +568,8 @@ public class RunnerBehaviorTests
         using var scope = BuildScope();
         var builders = new List<ExecutionBuilder>
         {
-            CreateTemplateExecutionBuilder("case-1", team: "Smoke", system: "QaaS"),
-            CreateTemplateExecutionBuilder("case-2", team: "Smoke", system: "QaaS")
+            CreateTemplateExecutionBuilder("case-1", team: "Smoke", system: "QaaS", reportPortalEnabled: true),
+            CreateTemplateExecutionBuilder("case-2", team: "Smoke", system: "QaaS", reportPortalEnabled: true)
         };
 
         var runner = new ExposedRunner(scope, builders, Globals.Logger, new Mock<Serilog.ILogger>().Object);
@@ -589,8 +590,8 @@ public class RunnerBehaviorTests
         using var scope = BuildScope();
         var builders = new List<ExecutionBuilder>
         {
-            CreateTemplateExecutionBuilder("case-1", team: "Smoke", system: "QaaS"),
-            CreateTemplateExecutionBuilder("case-2", team: "AnotherTeam", system: "QaaS")
+            CreateTemplateExecutionBuilder("case-1", team: "Smoke", system: "QaaS", reportPortalEnabled: true),
+            CreateTemplateExecutionBuilder("case-2", team: "AnotherTeam", system: "QaaS", reportPortalEnabled: true)
         };
         var runner = new ExposedRunner(scope, builders, Globals.Logger, new Mock<Serilog.ILogger>().Object);
 
@@ -659,8 +660,8 @@ public class RunnerBehaviorTests
         using var scope = BuildScope();
         var builders = new List<ExecutionBuilder>
         {
-            CreateTemplateExecutionBuilder("case-1", team: "Smoke", system: "QaaS"),
-            CreateTemplateExecutionBuilder("case-2", team: "Smoke", system: "Smooth")
+            CreateTemplateExecutionBuilder("case-1", team: "Smoke", system: "QaaS", reportPortalEnabled: true),
+            CreateTemplateExecutionBuilder("case-2", team: "Smoke", system: "Smooth", reportPortalEnabled: true)
         };
         var runner = new ExposedRunner(scope, builders, Globals.Logger, new Mock<Serilog.ILogger>().Object);
 
@@ -737,7 +738,8 @@ public class RunnerBehaviorTests
         string caseName,
         IConfiguration? rootConfiguration = null,
         string team = "Smoke",
-        string system = "QaaS")
+        string system = "QaaS",
+        bool reportPortalEnabled = false)
     {
         var context = new InternalContext
         {
@@ -753,7 +755,7 @@ public class RunnerBehaviorTests
             System = system
         });
 
-        return new ExecutionBuilder(context, ExecutionType.Template, null, null, null, null)
+        var builder = new ExecutionBuilder(context, ExecutionType.Template, null, null, null, null)
             .SetExecutionId($"exec-{caseName}")
             .SetCase(caseName)
             .WithMetadata(new MetaDataConfig
@@ -761,6 +763,11 @@ public class RunnerBehaviorTests
                 Team = team,
                 System = system
             });
+
+        if (reportPortalEnabled)
+            builder.Reporters!.ConfigureReportPortal(new ReportPortalConfig { Enabled = true });
+
+        return builder;
     }
 
     private static InternalContext CreateContext()

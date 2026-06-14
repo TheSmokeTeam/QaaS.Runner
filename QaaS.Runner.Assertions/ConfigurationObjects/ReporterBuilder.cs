@@ -6,37 +6,43 @@ using QaaS.Runner.Assertions.ConfigurationObjects.ReporterConfigs;
 using QaaS.Runner.Assertions.Reporters;
 using QaaS.Runner.Assertions.Reporters.Allure;
 using QaaS.Runner.Assertions.Reporters.ReportPortal;
+using YamlDotNet.Core;
+using YamlDotNet.Serialization;
 
 namespace QaaS.Runner.Assertions.ConfigurationObjects;
 
-public class ReporterBuilder : ICloneable<ReporterBuilder>
+public class ReporterBuilder : IYamlConvertible, ICloneable<ReporterBuilder>
 {
     public ReporterBuilder Clone() 
     {
         var clone = BuilderCloner.DeepClone(this);
         clone.ReportPortalLaunchManager = ReportPortalLaunchManager;
-        clone.ReportPortalRunDescriptor = ReportPortalRunDescriptor;
-        clone.ReportPortal = ReportPortal;
         return clone;
     }
     
     [Description("Whether to save the session logs belonging to the assertion in the test report")]
+    [DefaultValue(null)]
     public bool? SaveLogs { get; internal set; }
 
     [Description("Whether to save the attachments of the assertion in the test report (true) or not (false)")]
+    [DefaultValue(null)]
     public bool? SaveAttachments { get; internal set; }
 
     [Description("Whether to save the configuration template in the test report (true) or not (false)")]
+    [DefaultValue(null)]
     public bool? SaveTemplate { get; internal set; }
 
     [Description("Whether to save the data of the session's belonging to this assertion in the test report")]
+    [DefaultValue(null)]
     public bool? SaveSessionData { get; internal set; }
 
     [Description("Whether to display the assertion's message trace in the assertion results or not." +
                  " Should be set to false when the assertion trace is massive and displaying it can cause performance issues")]
+    [DefaultValue(null)]
     public bool? DisplayTrace { get; internal set; }
     
     [Description("The ReportPortal configuration to use for this reporter. If not set, the default ReportPortal configuration will be used.")]
+    [DefaultValue(typeof(ReportPortalConfig))]
     public ReportPortalConfig? ReportPortal { get; internal set; } = new();
     
     internal ReportPortalLaunchManager? ReportPortalLaunchManager { get; set; }
@@ -157,5 +163,24 @@ public class ReporterBuilder : ICloneable<ReporterBuilder>
         }
         
         return reporters;
+    }
+
+    public void Read(IParser parser, Type expectedType, ObjectDeserializer nestedObjectDeserializer)
+    {
+        throw new NotSupportedException($"{nameof(Read)} doesn't support custom" +
+                                        $" deserialization from Yaml for {nameof(ReporterBuilder)}");
+    }
+
+    public void Write(IEmitter emitter, ObjectSerializer nestedObjectSerializer)
+    {
+        nestedObjectSerializer(new
+        {
+            SaveLogs,
+            SaveAttachments,
+            SaveTemplate,
+            SaveSessionData,
+            DisplayTrace,
+            ReportPortal
+        });
     }
 }
