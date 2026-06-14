@@ -28,11 +28,11 @@ public class GrafanaLinkBuilderTests
         {
             Url = url,
             DashboardId = "jEhCoNoSk",
-            Variables = new List<KeyValuePair<string, string>>
-            {
-                new(variableAKey, variableAValue),
-                new(variableBKey, variableBValue)
-            }.ToArray()
+            Variables =
+            [
+                new GrafanaVariableConfig { Key = variableAKey, Value = variableAValue },
+                new GrafanaVariableConfig { Key = variableBKey, Value = variableBValue }
+            ]
         });
         var startTimeOne = new DateTime(2024, 8, 6, 7, 1, 1, DateTimeKind.Utc);
         var endTimeOne = new DateTime(2024, 8, 6, 7, 2, 2, DateTimeKind.Utc);

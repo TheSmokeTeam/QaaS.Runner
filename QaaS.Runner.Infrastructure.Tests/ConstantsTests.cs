@@ -16,7 +16,8 @@ public class ConstantsTests
                 "Sessions",
                 "Assertions",
                 "Links",
-                "MetaData"
+                "MetaData",
+                "Reporters"
             }));
     }
 }

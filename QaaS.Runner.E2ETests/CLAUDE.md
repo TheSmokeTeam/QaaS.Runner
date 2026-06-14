@@ -5,7 +5,6 @@ End-to-end integration tests that run full QaaS workflows against real infrastru
 
 ## Key Files
 - `test.qaas.yaml` — Main E2E test configuration
-- `executable.yaml` — Execution configuration
 - `Generators/` — Custom test data generators
 - `Assertions/` — Custom E2E assertion hooks
 - `Probes/` — Custom E2E probe hooks

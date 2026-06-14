@@ -2,8 +2,8 @@ using Microsoft.Extensions.Logging;
 using QaaS.Framework.Executions.Logics;
 using QaaS.Framework.SDK.ContextObjects;
 using QaaS.Framework.SDK.ExecutionObjects;
-using QaaS.Runner.Assertions;
 using QaaS.Runner.Assertions.AssertionObjects;
+using QaaS.Runner.Assertions.Reporters;
 
 namespace QaaS.Runner.Logics;
 
@@ -32,7 +32,7 @@ public class ReportLogic(IList<IReporter> reporters, InternalContext context) : 
         foreach (var reporter in reporters)
         {
             var matchingAssertionResults = assertionResults
-                .Where(assertionResult => assertionResult.Assertion.ReporterType == reporter.GetType())
+                .Where(assertionResult => assertionResult.Assertion.ReporterTypes.Contains(reporter.GetType()))
                 .ToList();
 
             context.Logger.LogDebug(
@@ -45,7 +45,7 @@ public class ReportLogic(IList<IReporter> reporters, InternalContext context) : 
                 context.Logger.LogDebug(
                     "Routing assertion {AssertionName} with status {AssertionStatus} to reporter type {ReporterType}",
                     assertionResult.Assertion.Name, assertionResult.AssertionStatus, reporter.GetType().Name);
-                if (assertionResult.Assertion.StatussesToReport.Contains(assertionResult.AssertionStatus))
+                if (assertionResult.Assertion.StatusesToReport.Contains(assertionResult.AssertionStatus))
                 {
                     reporter.WriteTestResults(assertionResult);
                 }
