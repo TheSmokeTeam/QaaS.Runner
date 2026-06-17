@@ -131,10 +131,7 @@ public class ExecutionBuilderTests
         {
             builder.UpdateSession("missing", new SessionBuilder());
             builder.RemoveSession("missing");
-            builder.UpdateAssertion("missing", new AssertionBuilder
-            {
-                AssertionInstance = null!
-            });
+            builder.UpdateAssertion("missing", new AssertionBuilder());
             builder.RemoveAssertion("missing");
             builder.UpdateStorageAt(0, new StorageBuilder());
             builder.RemoveStorageAt(0);
@@ -943,7 +940,6 @@ public class ExecutionBuilderTests
                 new AssertionBuilder
                 {
                     Name = "assertion-display",
-                    AssertionInstance = null!
                 }
             ]
         };
@@ -990,7 +986,6 @@ public class ExecutionBuilderTests
         {
             Name = "test-assertion",
             Assertion = "Equals",
-            AssertionInstance = null
         }.HookNamed(nameof(TestAssertion));
         builder.AddAssertion(assertionBuilder);
 
@@ -1064,7 +1059,6 @@ public class ExecutionBuilderTests
         {
             Name = "test-assertion",
             Assertion = "Equals",
-            AssertionInstance = null
         }.HookNamed(nameof(TestAssertion));
         builder.AddAssertion(assertionBuilder);
 

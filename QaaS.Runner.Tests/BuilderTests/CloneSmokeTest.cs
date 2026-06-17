@@ -36,7 +36,6 @@ public class CloneSmokeTest
 
         var assertionBuilder = new AssertionBuilder
         {
-            AssertionInstance = null!,
             Name = "assertion1",
             Assertion = "MyAssertion",
             SessionNames = ["session1"],

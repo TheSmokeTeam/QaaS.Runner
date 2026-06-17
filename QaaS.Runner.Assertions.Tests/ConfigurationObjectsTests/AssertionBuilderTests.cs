@@ -423,10 +423,7 @@ public class AssertionBuilderTests
 
     private static AssertionBuilder CreateBuilder()
     {
-        return new AssertionBuilder
-        {
-            AssertionInstance = null!
-        };
+        return new AssertionBuilder();
     }
 
     private static ReportPortalConfig CreateReportPortalConfig(bool enabled)

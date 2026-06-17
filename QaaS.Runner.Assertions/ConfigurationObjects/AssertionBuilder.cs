@@ -27,11 +27,6 @@ public class AssertionBuilder : IYamlConvertible, ICloneable<AssertionBuilder>
 {
     public AssertionBuilder Clone() => BuilderCloner.DeepClone(this);
 
-    /// <summary>
-    /// Internal assertion instance
-    /// </summary>
-    public required Assertion AssertionInstance;
-
     [Required]
     [Description("The name of the assertion to use")]
     public string? Assertion { get; internal set; }
@@ -553,7 +548,7 @@ public class AssertionBuilder : IYamlConvertible, ICloneable<AssertionBuilder>
     /// </summary>
     internal Assertion Build(IList<KeyValuePair<string, IAssertion>> assertions, IEnumerable<LinkBuilder>? linkBuilders)
     {
-        AssertionInstance = new Assertion
+        var assertion = new Assertion
         {
             AssertionConfiguration = AssertionConfiguration,
             _sessionNames = SessionNames,
@@ -579,9 +574,9 @@ public class AssertionBuilder : IYamlConvertible, ICloneable<AssertionBuilder>
         var allLinkBuilders = Links.Concat(linkBuilders ?? []).ToList();
         var allLinks = allLinkBuilders.Select(linkBuilder => linkBuilder.Build());
 
-        AssertionInstance.AssertionName = Assertion!;
-        AssertionInstance.Links = allLinks.ToList();
-        return AssertionInstance;
+        assertion.AssertionName = Assertion!;
+        assertion.Links = allLinks.ToList();
+        return assertion;
     }
 
 }
