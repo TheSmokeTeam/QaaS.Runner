@@ -19,37 +19,75 @@ public class ReporterBuilder : IYamlConvertible, ICloneable<ReporterBuilder>
         clone.ReportPortalLaunchManager = ReportPortalLaunchManager;
         return clone;
     }
-    
-    [Description("Whether to save the session logs belonging to the assertion in the test report")]
+
+    [Description("Whether to save the session logs belonging to the assertions in the test report. " +
+                 "If not set, each assertion will determine whether to save them.")]
     [DefaultValue(null)]
     public bool? SaveLogs { get; internal set; }
 
-    [Description("Whether to save the attachments of the assertion in the test report (true) or not (false)")]
+    [Description("Whether to save the attachments belonging to the assertions in the test report. " +
+                 "If not set, each assertion will determine whether to save them.")]
     [DefaultValue(null)]
     public bool? SaveAttachments { get; internal set; }
 
-    [Description("Whether to save the configuration template in the test report (true) or not (false)")]
+    [Description("Whether to save the configuration template belonging to the assertions in the test report. " +
+                 "If not set, each assertion will determine whether to save it.")]
     [DefaultValue(null)]
     public bool? SaveTemplate { get; internal set; }
 
-    [Description("Whether to save the data of the session's belonging to this assertion in the test report")]
+    [Description("Whether to save the session data belonging to the assertions in the test report. " +
+                 "If not set, each assertion will determine whether to save it.")]
     [DefaultValue(null)]
     public bool? SaveSessionData { get; internal set; }
 
-    [Description("Whether to display the assertion's message trace in the assertion results or not." +
-                 " Should be set to false when the assertion trace is massive and displaying it can cause performance issues")]
+    [Description("Whether to display the assertion message trace in the assertions results. " +
+                 "If not set, each assertion will determine whether to display it.")]
     [DefaultValue(null)]
     public bool? DisplayTrace { get; internal set; }
-    
-    [Description("The ReportPortal configuration to use for this reporter. If not set, the default ReportPortal configuration will be used.")]
+
+    [Description("ReportPortal configuration to use for this reporter. " +
+                 "If not set, the default ReportPortal configuration will be used.")]
     [DefaultValue(typeof(ReportPortalConfig))]
     public ReportPortalConfig? ReportPortal { get; internal set; } = new();
-    
+
+    /// <summary>
+    /// Gets or sets the shared ReportPortal launch manager used by ReportPortal reporters created by this builder.
+    /// </summary>
+    /// <remarks>
+    /// The manager is injected internally by the runner and is required before a ReportPortal reporter can be built.
+    /// </remarks>
     internal ReportPortalLaunchManager? ReportPortalLaunchManager { get; set; }
+
+    /// <summary>
+    /// Gets or sets the ReportPortal launch descriptor for the current runner invocation.
+    /// </summary>
+    /// <remarks>
+    /// The descriptor is used to derive runtime ReportPortal settings, such as the default launch name,
+    /// when they are not explicitly provided in <see cref="ReportPortal"/>.
+    /// </remarks>
     internal ReportPortalLaunchDescriptor? ReportPortalRunDescriptor { get; set; }
     
+    public void Read(IParser parser, Type expectedType, ObjectDeserializer nestedObjectDeserializer)
+    {
+        throw new NotSupportedException($"{nameof(Read)} doesn't support custom" +
+                                        $" deserialization from Yaml for {nameof(ReporterBuilder)}");
+    }
+    
+    public void Write(IEmitter emitter, ObjectSerializer nestedObjectSerializer)
+    {
+        nestedObjectSerializer(new
+        {
+            SaveLogs,
+            SaveAttachments,
+            SaveTemplate,
+            SaveSessionData,
+            DisplayTrace,
+            ReportPortal
+        });
+    }
+    
     /// <summary>
-    /// Configure the ReportPortal settings for this reporter. If not set, the default ReportPortal configuration will be used.
+    /// Sets the ReportPortal configuration used when creating a ReportPortal reporter.
     /// </summary>
     public ReporterBuilder ConfigureReportPortal(ReportPortalConfig reportPortalConfig)
     {
@@ -57,6 +95,51 @@ public class ReporterBuilder : IYamlConvertible, ICloneable<ReporterBuilder>
         return this;
     }
 
+    /// <summary>
+    /// Configures whether assertion session logs are saved with reporter results.
+    /// </summary>
+    public ReporterBuilder ShouldSaveLogs(bool shouldSaveLogs)
+    {
+        SaveLogs = shouldSaveLogs;
+        return this;
+    }
+
+    /// <summary>
+    /// Configures whether assertion attachments are saved with reporter results.
+    /// </summary>
+    public ReporterBuilder ShouldSaveAttachments(bool shouldSaveAttachments)
+    {
+        SaveAttachments = shouldSaveAttachments;
+        return this;
+    }
+
+    /// <summary>
+    /// Configures whether the rendered assertion configuration template is saved with reporter results.
+    /// </summary>
+    public ReporterBuilder ShouldSaveTemplate(bool shouldSaveTemplate)
+    {
+        SaveTemplate = shouldSaveTemplate;
+        return this;
+    }
+
+    /// <summary>
+    /// Configures whether assertion session data is saved with reporter results.
+    /// </summary>
+    public ReporterBuilder ShouldSaveSessionData(bool shouldSaveSessionData)
+    {
+        SaveSessionData = shouldSaveSessionData;
+        return this;
+    }
+
+    /// <summary>
+    /// Configures whether the assertion message trace is displayed in reporter results.
+    /// </summary>
+    public ReporterBuilder ShouldDisplayTrace(bool shouldDisplayTrace)
+    {
+        DisplayTrace = shouldDisplayTrace;
+        return this;
+    }
+    
     internal ReporterBuilder WithReportPortalLaunchManager(ReportPortalLaunchManager manager)
     {
         ReportPortalLaunchManager = manager;
@@ -68,53 +151,25 @@ public class ReporterBuilder : IYamlConvertible, ICloneable<ReporterBuilder>
         ReportPortalRunDescriptor = descriptor;
         return this;
     }
-
-    /// <summary>
-    /// Configures whether logs are saved with the reporter result.
-    /// </summary>
-    public ReporterBuilder ShouldSaveLogs(bool shouldSaveLogs)
-    {
-        SaveLogs = shouldSaveLogs;
-        return this;
-    }
-
-    /// <summary>
-    /// Configures whether attachments are saved with the reporter result.
-    /// </summary>
-    public ReporterBuilder ShouldSaveAttachments(bool shouldSaveAttachments)
-    {
-        SaveAttachments = shouldSaveAttachments;
-        return this;
-    }
-
-    /// <summary>
-    /// Configures whether the rendered configuration template is saved with the reporter result.
-    /// </summary>
-    public ReporterBuilder ShouldSaveTemplate(bool shouldSaveTemplate)
-    {
-        SaveTemplate = shouldSaveTemplate;
-        return this;
-    }
-
-    /// <summary>
-    /// Configures whether session data is saved with the reporter result.
-    /// </summary>
-    public ReporterBuilder ShouldSaveSessionData(bool shouldSaveSessionData)
-    {
-        SaveSessionData = shouldSaveSessionData;
-        return this;
-    }
-
-    /// <summary>
-    /// Configures whether the assertion trace is displayed with the reporter result.
-    /// </summary>
-    public ReporterBuilder ShouldDisplayTrace(bool shouldDisplayTrace)
-    {
-        DisplayTrace = shouldDisplayTrace;
-        return this;
-    }
-
     
+    /// <summary>
+    /// Builds the reporter instances that should publish assertion results for the current run.
+    /// </summary>
+    /// <remarks>
+    /// Allure is always created. ReportPortal is created only when the resolved ReportPortal settings are enabled
+    /// and a <see cref="ReportPortalLaunchManager"/> was provided.
+    /// </remarks>
+    /// <param name="context">The QaaS execution context to attach to each reporter.</param>
+    /// <param name="testSuiteStartTimeUtc">
+    /// The UTC test-suite start time used by reporters that need an epoch-based run timestamp.
+    /// </param>
+    /// <param name="fileSystem">
+    /// Optional file-system abstraction used by reporters. When omitted, a default <see cref="FileSystem"/> is used.
+    /// </param>
+    /// <returns>The configured reporters for the current assertion run.</returns>
+    /// <exception cref="ArgumentOutOfRangeException">
+    /// Thrown when an unsupported <see cref="ReporterTarget"/> value is encountered.
+    /// </exception>
     internal List<IReporter> Build(Context context, DateTime testSuiteStartTimeUtc, IFileSystem? fileSystem = null)
     {
         var reporters = new List<IReporter>();
@@ -137,10 +192,12 @@ public class ReporterBuilder : IYamlConvertible, ICloneable<ReporterBuilder>
                     };
                     reporters.Add(allureReporter);
                     break;
+
                 case ReporterTarget.ReportPortal:
                     var reportPortalSettings = ReportPortal is null
                         ? null
                         : new ReportPortalSettings(ReportPortalRunDescriptor, ReportPortal);
+
                     if (reportPortalSettings is { Enabled: true } && ReportPortalLaunchManager is not null)
                     {
                         var reportPortalReporter = new ReportPortalReporter
@@ -159,30 +216,12 @@ public class ReporterBuilder : IYamlConvertible, ICloneable<ReporterBuilder>
                     }
 
                     break;
+
                 default:
                     throw new ArgumentOutOfRangeException(nameof(target), target, "Unsupported reporter target.");
             }
         }
         
         return reporters;
-    }
-
-    public void Read(IParser parser, Type expectedType, ObjectDeserializer nestedObjectDeserializer)
-    {
-        throw new NotSupportedException($"{nameof(Read)} doesn't support custom" +
-                                        $" deserialization from Yaml for {nameof(ReporterBuilder)}");
-    }
-
-    public void Write(IEmitter emitter, ObjectSerializer nestedObjectSerializer)
-    {
-        nestedObjectSerializer(new
-        {
-            SaveLogs,
-            SaveAttachments,
-            SaveTemplate,
-            SaveSessionData,
-            DisplayTrace,
-            ReportPortal
-        });
     }
 }
