@@ -1,6 +1,3 @@
 namespace QaaS.Runner.Assertions.ConfigurationObjects.ReporterConfigs;
 
-public interface IReporterConfig
-{
-    
-}
+public interface IReporterConfig;

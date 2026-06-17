@@ -1,6 +1,3 @@
 namespace QaaS.Runner.Assertions.ConfigurationObjects.ReporterConfigs;
 
-public record AllureConfig : IReporterConfig
-{
-    
-}
+public record AllureConfig : IReporterConfig;
