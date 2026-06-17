@@ -13,19 +13,20 @@ public sealed class ReportPortalLaunchDescriptor(
     DateTimeOffset startedAtLocal,
     IReadOnlyDictionary<string, string>? launchAttributes = null)
 {
-    public string? TeamName { get; } = string.IsNullOrWhiteSpace(teamName) ? null : teamName.Trim();
-    public string SystemName { get; } = string.IsNullOrWhiteSpace(systemName) ? "Unknown System" : systemName.Trim();
+    private const string UnknownSystem = "Unknown System";
+
+    public string? TeamName { get; } = Clean(teamName);
+    public string SystemName { get; } = Clean(systemName) ?? UnknownSystem;
     public IReadOnlyList<string> SessionNames { get; } = sessionNames
-        .Where(sessionName => !string.IsNullOrWhiteSpace(sessionName))
-        .Select(sessionName => sessionName.Trim())
+        .Select(Clean)
+        .OfType<string>()
         .Distinct(StringComparer.Ordinal)
         .OrderBy(sessionName => sessionName, StringComparer.Ordinal)
         .ToArray();
-    public string ExecutionMode { get; } = string.IsNullOrWhiteSpace(executionMode) ? "run" : executionMode.Trim();
+    public string ExecutionMode { get; } = Clean(executionMode) ?? "run";
     public DateTimeOffset StartedAtLocal { get; } = startedAtLocal;
     public IReadOnlyDictionary<string, string> LaunchAttributes { get; } =
-        new Dictionary<string, string>(launchAttributes ?? new Dictionary<string, string>(),
-            StringComparer.OrdinalIgnoreCase);
+        CleanAttributes(launchAttributes);
 
     /// <summary>
     /// Builds the default ReportPortal launch title for this runner invocation.
@@ -34,7 +35,7 @@ public sealed class ReportPortalLaunchDescriptor(
     /// </summary>
     public string BuildDefaultLaunchName()
     {
-        return string.IsNullOrWhiteSpace(TeamName)
+        return TeamName is null
             ? $"QaaS Run | {SystemName} | {BuildSessionSummary()}"
             : $"QaaS Run | {TeamName} | {SystemName} | {BuildSessionSummary()}";
     }
@@ -63,4 +64,21 @@ public sealed class ReportPortalLaunchDescriptor(
 
         return $"{SessionNames[0]}, {SessionNames[1]}(+{SessionNames.Count - 2})";
     }
+
+    private static IReadOnlyDictionary<string, string> CleanAttributes(
+        IReadOnlyDictionary<string, string>? attributes)
+    {
+        var cleanAttributes = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+
+        foreach (var (key, value) in attributes ?? new Dictionary<string, string>())
+        {
+            if (Clean(key) is { } cleanKey)
+                cleanAttributes[cleanKey] = Clean(value) ?? string.Empty;
+        }
+
+        return cleanAttributes;
+    }
+
+    private static string? Clean(string? value) =>
+        string.IsNullOrWhiteSpace(value) ? null : value.Trim();
 }

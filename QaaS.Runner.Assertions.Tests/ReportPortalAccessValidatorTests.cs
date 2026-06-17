@@ -17,6 +17,21 @@ namespace QaaS.Runner.Assertions.Tests;
 public class ReportPortalAccessValidatorTests
 {
     [Test]
+    public async Task EnsureWriteAccessAsync_WhenDisabled_ReturnsDisabledWithoutHttpCall()
+    {
+        using var handler = new RecordingHttpMessageHandler(_ =>
+            new HttpResponseMessage(HttpStatusCode.OK));
+        using var httpClient = new HttpClient(handler);
+        using var validator = new ReportPortalAccessValidator(httpClient);
+
+        var result = await validator.EnsureWriteAccessAsync(CreateSettings(enabled: false), Globals.Logger);
+
+        Assert.That(result.CanPublish, Is.False);
+        Assert.That(result.FailureReason, Is.Null);
+        Assert.That(handler.RequestCount, Is.Zero);
+    }
+
+    [Test]
     public async Task EnsureWriteAccessAsync_WithMissingTeam_ReturnsFailureWithoutHttpCall()
     {
         using var handler = new RecordingHttpMessageHandler(_ =>
@@ -123,8 +138,8 @@ public class ReportPortalAccessValidatorTests
         Assert.That(handler.RequestCount, Is.EqualTo(1));
     }
 
-    private static ReportPortalSettings CreateSettings(string? team = "Smoke", string? apiKey = "api-key",
-        string? endpoint = "http://localhost:8080")
+    private static ReportPortalSettings CreateSettings(bool enabled = true, string? team = "Smoke",
+        string? apiKey = "api-key", string? endpoint = "http://localhost:8080")
     {
         ReportPortalConfig.RegisterDefaults(enabled: false);
         return new ReportPortalSettings(
@@ -136,7 +151,7 @@ public class ReportPortalAccessValidatorTests
                 new DateTimeOffset(2025, 1, 1, 10, 0, 0, TimeSpan.Zero)),
             new ReportPortalConfig
             {
-                Enabled = true,
+                Enabled = enabled,
                 Endpoint = endpoint,
                 ApiKey = apiKey,
                 LaunchName = "launch",

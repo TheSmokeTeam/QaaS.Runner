@@ -26,7 +26,7 @@ public class ReportPortalSettingsTests
 
         Assert.That(settings.Enabled, Is.False);
         Assert.That(settings.Endpoint, Is.Null);
-        Assert.That(settings.RequestedProjectName, Is.EqualTo("Smoke"));
+        Assert.That(settings.Team, Is.EqualTo("Smoke"));
         Assert.That(settings.ApiKey, Is.Null);
         Assert.That(settings.LaunchName, Is.EqualTo("QaaS Run | Smoke | QaaS | Session A, Session B"));
         Assert.That(settings.Description,
@@ -82,9 +82,8 @@ public class ReportPortalSettingsTests
 
         Assert.That(settings.Enabled, Is.True);
         Assert.That(settings.Endpoint, Is.EqualTo("http://localhost:8080"));
-        Assert.That(settings.RequestedProjectName, Is.EqualTo("Smoke"));
+        Assert.That(settings.Team, Is.EqualTo("Smoke"));
         Assert.That(settings.ApiKey, Is.EqualTo("default-api-key"));
-        Assert.That(settings.IgnoredProjectOverride, Is.EqualTo("IgnoredProject"));
     }
 
     [Test]
@@ -121,11 +120,11 @@ public class ReportPortalSettingsTests
 
         Assert.That(settings.Enabled, Is.False);
         Assert.That(settings.Endpoint, Is.EqualTo("http://default.local"));
-        Assert.That(settings.RequestedProjectName, Is.Null);
+        Assert.That(settings.Team, Is.Null);
     }
 
     [Test]
-    public void Constructor_WhenProjectCannotBeDerived_DoesNotThrowAndLeavesRequestedProjectNameNull()
+    public void Constructor_WhenProjectCannotBeDerived_DoesNotThrowAndLeavesTeamNull()
     {
         var settings = CreateSettings(new ReportPortalConfig
         {
@@ -134,7 +133,7 @@ public class ReportPortalSettingsTests
         }, new ReportPortalLaunchDescriptor(null, "QaaS", ["Session A"], "run",
             new DateTimeOffset(2025, 1, 1, 10, 0, 0, TimeSpan.Zero)));
 
-        Assert.That(settings.RequestedProjectName, Is.Null);
+        Assert.That(settings.Team, Is.Null);
         Assert.That(settings.System, Is.EqualTo("QaaS"));
     }
 

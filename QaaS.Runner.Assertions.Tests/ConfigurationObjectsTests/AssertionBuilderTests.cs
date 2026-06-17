@@ -209,7 +209,7 @@ public class AssertionBuilderTests
 
         Assert.That(reporters, Has.Count.EqualTo(2));
         Assert.That(reporters.OfType<AllureReporter>(), Has.Exactly(1).Items);
-        Assert.That(reportPortalReporter.Settings.RequestedProjectName, Is.EqualTo("Smoke"));
+        Assert.That(reportPortalReporter.Settings.Team, Is.EqualTo("Smoke"));
         Assert.That(reportPortalReporter.LaunchManager, Is.SameAs(reportPortalLaunchManager));
     }
 

@@ -3,7 +3,6 @@ using System.Net;
 using System.Net.Http.Headers;
 using System.Text.Json;
 using Microsoft.Extensions.Logging;
-using QaaS.Runner.Assertions.ConfigurationObjects.ReporterConfigs;
 
 namespace QaaS.Runner.Assertions.Reporters.ReportPortal;
 
@@ -49,7 +48,7 @@ internal sealed class ReportPortalAccessValidator : IDisposable
         var cacheKey = string.Join("::",
             settings.Endpoint ?? "<missing-endpoint>",
             settings.ApiKey ?? "<missing-api-key>",
-            settings.RequestedProjectName ?? "<missing-project>");
+            settings.Team ?? "<missing-project>");
 
         var lazyResult = _accessCache.GetOrAdd(cacheKey,
             _ => new Lazy<Task<ReportPortalAccessResult>>(
@@ -62,16 +61,11 @@ internal sealed class ReportPortalAccessValidator : IDisposable
     private async Task<ReportPortalAccessResult> ValidateCoreAsync(ReportPortalSettings settings, ILogger logger,
         CancellationToken cancellationToken)
     {
-        if (!string.IsNullOrWhiteSpace(settings.IgnoredProjectOverride))
-        {
-            logger.LogWarning(
-                "Ignoring ReportPortal project override `{ConfiguredProject}` because QaaS always routes by MetaData.Team.",
-                settings.IgnoredProjectOverride);
-        }
-
-        if (string.IsNullOrWhiteSpace(settings.RequestedProjectName))
+        if (string.IsNullOrWhiteSpace(settings.Team))
             return WarnAndReturnFailure(logger,
                 "Could not publish results to ReportPortal because MetaData.Team was not configured.");
+
+        var team = settings.Team;
 
         if (!settings.TryGetEndpointUri(out var endpointUri, out var endpointFailureReason))
             return WarnAndReturnFailure(logger, $"Could not publish results to ReportPortal: {endpointFailureReason}");
@@ -79,14 +73,16 @@ internal sealed class ReportPortalAccessValidator : IDisposable
         if (string.IsNullOrWhiteSpace(settings.ApiKey))
         {
             return WarnAndReturnFailure(logger,
-                $"Could not publish results to ReportPortal project `{settings.RequestedProjectName}` because ReportPortal.ApiKey was not configured.");
+                $"Could not publish results to ReportPortal project `{team}` because ReportPortal.ApiKey was not configured.");
         }
+
+        var apiKey = settings.ApiKey;
 
         try
         {
             using var request = new HttpRequestMessage(HttpMethod.Get,
-                new Uri(endpointUri!, $"v1/project/{Uri.EscapeDataString(settings.RequestedProjectName)}"));
-            request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", settings.ApiKey);
+                new Uri(endpointUri!, $"v1/project/{Uri.EscapeDataString(team)}"));
+            request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", apiKey);
             request.Headers.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
 
             using var response = await _httpClient.SendAsync(request, cancellationToken).ConfigureAwait(false);
@@ -95,7 +91,7 @@ internal sealed class ReportPortalAccessValidator : IDisposable
             if (response.StatusCode is HttpStatusCode.Unauthorized or HttpStatusCode.Forbidden)
             {
                 return WarnAndReturnFailure(logger,
-                    $"Could not publish results to ReportPortal because the configured API key was rejected for team `{settings.RequestedProjectName}`.");
+                    $"Could not publish results to ReportPortal because the configured API key was rejected for team `{team}`.");
             }
 
             if (!response.IsSuccessStatusCode)
@@ -103,11 +99,11 @@ internal sealed class ReportPortalAccessValidator : IDisposable
                 if (response.StatusCode == HttpStatusCode.NotFound)
                 {
                     return WarnAndReturnFailure(logger,
-                        $"Could not publish results to ReportPortal because no accessible project matches team `{settings.RequestedProjectName}`.");
+                        $"Could not publish results to ReportPortal because no accessible project matches team `{team}`.");
                 }
 
                 return WarnAndReturnFailure(logger,
-                    $"Could not publish results to ReportPortal at {endpointUri} for team `{settings.RequestedProjectName}`. Status={(int)response.StatusCode} {response.ReasonPhrase}. Response={responseBody}");
+                    $"Could not publish results to ReportPortal at {endpointUri} for team `{team}`. Status={(int)response.StatusCode} {response.ReasonPhrase}. Response={responseBody}");
             }
 
             var project = JsonSerializer.Deserialize<ProjectResponse>(responseBody, _jsonSerializerOptions)
@@ -115,10 +111,10 @@ internal sealed class ReportPortalAccessValidator : IDisposable
             if (string.IsNullOrWhiteSpace(project.ProjectName))
             {
                 return WarnAndReturnFailure(logger,
-                    $"Could not publish results to ReportPortal because the endpoint `{settings.Endpoint}` returned an unreadable project payload for team `{settings.RequestedProjectName}`.");
+                    $"Could not publish results to ReportPortal because the endpoint `{settings.Endpoint}` returned an unreadable project payload for team `{team}`.");
             }
 
-            return ReportPortalAccessResult.Success(endpointUri!, project.ProjectName, settings.ApiKey!);
+            return ReportPortalAccessResult.Success(endpointUri!, project.ProjectName, apiKey);
         }
         catch (TaskCanceledException)
         {

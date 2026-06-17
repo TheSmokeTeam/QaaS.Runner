@@ -347,8 +347,8 @@ public class Runner : IRunner, IDisposable
         var descriptors = new Dictionary<ExecutionBuilder, ReportPortalLaunchDescriptor>();
         foreach (var builderGroup in builderSettings.GroupBy(item => new
                  {
-                     Team = item.Settings?.Team?.Trim().ToLowerInvariant() ?? string.Empty,
-                     System = item.Settings?.System.Trim().ToLowerInvariant()
+                     Team = item.Settings?.Team?.ToLowerInvariant() ?? string.Empty,
+                     System = item.Settings?.System.ToLowerInvariant()
                  }))
         {
             var sessionNames = builderGroup
