@@ -126,18 +126,22 @@ public class ReportPortalAccessValidatorTests
     private static ReportPortalSettings CreateSettings(string? team = "Smoke", string? apiKey = "api-key",
         string? endpoint = "http://localhost:8080")
     {
+        ReportPortalConfig.RegisterDefaults(enabled: false);
         return new ReportPortalSettings(
-            true,
-            endpoint,
-            apiKey,
-            team,
-            "QaaS",
-            ["session-a"],
-            "launch",
-            "description",
-            false,
-            new Dictionary<string, string>(),
-            null);
+            new ReportPortalLaunchDescriptor(
+                team,
+                "QaaS",
+                ["session-a"],
+                "run",
+                new DateTimeOffset(2025, 1, 1, 10, 0, 0, TimeSpan.Zero)),
+            new ReportPortalConfig
+            {
+                Enabled = true,
+                Endpoint = endpoint,
+                ApiKey = apiKey,
+                LaunchName = "launch",
+                Description = "description"
+            });
     }
 
     private sealed class RecordingHttpMessageHandler(Func<HttpRequestMessage, HttpResponseMessage> responseFactory)

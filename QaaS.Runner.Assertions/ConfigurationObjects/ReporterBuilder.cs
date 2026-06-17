@@ -138,7 +138,9 @@ public class ReporterBuilder : IYamlConvertible, ICloneable<ReporterBuilder>
                     reporters.Add(allureReporter);
                     break;
                 case ReporterTarget.ReportPortal:
-                    var reportPortalSettings = ReportPortal?.Resolve(ReportPortalRunDescriptor);
+                    var reportPortalSettings = ReportPortal is null
+                        ? null
+                        : new ReportPortalSettings(ReportPortalRunDescriptor, ReportPortal);
                     if (reportPortalSettings is { Enabled: true } && ReportPortalLaunchManager is not null)
                     {
                         var reportPortalReporter = new ReportPortalReporter

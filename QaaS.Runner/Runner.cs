@@ -329,7 +329,11 @@ public class Runner : IRunner, IDisposable
             .Select(builder => new
             {
                 Builder = builder,
-                Settings = builder.Reporters?.ReportPortal?.Resolve(BuildSingleBuilderRunDescriptor(builder, startedAtLocal))
+                Settings = builder.Reporters?.ReportPortal is { } reportPortalConfig
+                    ? new ReportPortalSettings(
+                        BuildSingleBuilderRunDescriptor(builder, startedAtLocal),
+                        reportPortalConfig)
+                    : null
             })
             .Where(item => item.Settings is { Enabled: true })
             .ToList();
