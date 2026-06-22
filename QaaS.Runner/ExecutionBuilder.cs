@@ -262,13 +262,10 @@ public class ExecutionBuilder() : BaseExecutionBuilder<InternalContext, Executio
     {
         if (Assertions is null || Assertions.Length == 0 || Reporters is null) return [];
         var testSuiteStartTimeUtc = DateTime.UtcNow;
-        
-        if (_reportPortalLaunchManager != null && _reportPortalSettings != null)
-            Reporters
-                .WithReportPortalLaunchManager(_reportPortalLaunchManager)
-                .WithReportPortalSettings(_reportPortalSettings);
-        
-        return Reporters.Build(Context, testSuiteStartTimeUtc);
+
+        return Reporters.Build(Context, testSuiteStartTimeUtc,
+            manager: _reportPortalLaunchManager,
+            settings: _reportPortalSettings);
     }
 
     private IEnumerable<IStorage> BuildStorages()

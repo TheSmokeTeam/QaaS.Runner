@@ -13,13 +13,7 @@ namespace QaaS.Runner.Assertions.ConfigurationObjects;
 
 public class ReporterBuilder : IYamlConvertible, ICloneable<ReporterBuilder>
 {
-    public ReporterBuilder Clone() 
-    {
-        var clone = BuilderCloner.DeepClone(this);
-        clone.ReportPortalLaunchManager = ReportPortalLaunchManager;
-        clone.ReportPortalSettings = ReportPortalSettings;
-        return clone;
-    }
+    public ReporterBuilder Clone() => BuilderCloner.DeepClone(this);
 
     [Description("Whether to save the session logs belonging to the assertions in the test report. " +
                  "If not set, each assertion will determine whether to save them.")]
@@ -50,23 +44,6 @@ public class ReporterBuilder : IYamlConvertible, ICloneable<ReporterBuilder>
                  "If not set, the default ReportPortal configuration will be used.")]
     [DefaultValue(typeof(ReportPortalConfig))]
     public ReportPortalConfig? ReportPortal { get; internal set; } = new();
-
-    /// <summary>
-    /// Gets or sets the shared ReportPortal launch manager used by ReportPortal reporters created by this builder.
-    /// </summary>
-    /// <remarks>
-    /// The manager is injected internally by the runner and is required before a ReportPortal reporter can be built.
-    /// </remarks>
-    internal ReportPortalLaunchManager? ReportPortalLaunchManager { get; set; }
-
-    /// <summary>
-    /// Gets or sets the resolved ReportPortal settings for the current runner invocation.
-    /// </summary>
-    /// <remarks>
-    /// The settings are resolved by the runner so every builder in the same launch group can share one immutable
-    /// publishing contract.
-    /// </remarks>
-    internal ReportPortalSettings? ReportPortalSettings { get; set; }
     
     public void Read(IParser parser, Type expectedType, ObjectDeserializer nestedObjectDeserializer)
     {
@@ -141,18 +118,6 @@ public class ReporterBuilder : IYamlConvertible, ICloneable<ReporterBuilder>
         return this;
     }
     
-    internal ReporterBuilder WithReportPortalLaunchManager(ReportPortalLaunchManager manager)
-    {
-        ReportPortalLaunchManager = manager;
-        return this;
-    }
-    
-    internal ReporterBuilder WithReportPortalSettings(ReportPortalSettings settings)
-    {
-        ReportPortalSettings = settings;
-        return this;
-    }
-    
     /// <summary>
     /// Builds the reporter instances that should publish assertion results for the current run.
     /// </summary>
@@ -167,11 +132,17 @@ public class ReporterBuilder : IYamlConvertible, ICloneable<ReporterBuilder>
     /// <param name="fileSystem">
     /// Optional file-system abstraction used by reporters. When omitted, a default <see cref="FileSystem"/> is used.
     /// </param>
+    /// <param name="manager">Optional shared ReportPortal launch manager used by ReportPortal reporters.</param>
+    /// <param name="settings">Optional resolved ReportPortal settings for the current runner invocation.</param>
     /// <returns>The configured reporters for the current assertion run.</returns>
     /// <exception cref="ArgumentOutOfRangeException">
     /// Thrown when an unsupported <see cref="ReporterTarget"/> value is encountered.
     /// </exception>
-    internal List<IReporter> Build(Context context, DateTime testSuiteStartTimeUtc, IFileSystem? fileSystem = null)
+    internal List<IReporter> Build(Context context, 
+        DateTime testSuiteStartTimeUtc, 
+        IFileSystem? fileSystem = null, 
+        ReportPortalLaunchManager? manager = null,
+        ReportPortalSettings? settings = null)
     {
         var reporters = new List<IReporter>();
         
@@ -195,7 +166,7 @@ public class ReporterBuilder : IYamlConvertible, ICloneable<ReporterBuilder>
                     break;
 
                 case ReporterTarget.ReportPortal:
-                    if (ReportPortalSettings is { Enabled: true } && ReportPortalLaunchManager is not null)
+                    if (settings is { Enabled: true } && manager is not null)
                     {
                         var reportPortalReporter = new ReportPortalReporter
                         {
@@ -206,8 +177,8 @@ public class ReporterBuilder : IYamlConvertible, ICloneable<ReporterBuilder>
                             SaveTemplate = SaveTemplate,
                             SaveSessionData = SaveSessionData,
                             FileSystem = fileSystem ?? new FileSystem(),
-                            LaunchManager = ReportPortalLaunchManager,
-                            Settings = ReportPortalSettings
+                            LaunchManager = manager,
+                            Settings = settings
                         };
                         reporters.Add(reportPortalReporter);
                     }

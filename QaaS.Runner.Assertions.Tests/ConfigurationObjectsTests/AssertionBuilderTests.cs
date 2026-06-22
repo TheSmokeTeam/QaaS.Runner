@@ -122,9 +122,18 @@ public class AssertionBuilderTests
             Logger = Globals.Logger,
             RootConfiguration = new ConfigurationBuilder().Build()
         };
+        var settings = new ReportPortalSettings(
+            CreateReportPortalConfig(enabled: true),
+            "Smoke",
+            "QaaS",
+            ["Session A"],
+            "run",
+            new DateTimeOffset(2025, 1, 1, 10, 0, 0, TimeSpan.Zero));
+        
         var reporters = new ReporterBuilder()
             .ConfigureReportPortal(CreateReportPortalConfig(enabled: true))
-            .Build(context, new DateTime(2025, 1, 1, 10, 0, 0, DateTimeKind.Utc));
+            .Build(context, new DateTime(2025, 1, 1, 10, 0, 0, DateTimeKind.Utc),
+                settings: settings);
 
         Assert.That(reporters, Has.Count.EqualTo(1));
         Assert.That(reporters[0], Is.TypeOf<AllureReporter>());
@@ -142,12 +151,20 @@ public class AssertionBuilderTests
             enabled: true,
             reportPortalUri: "http://default.local",
             reportPortalApiKey: "default-api-key");
+        var settings = new ReportPortalSettings(
+            CreateReportPortalConfig(enabled: false),
+            "Smoke",
+            "QaaS",
+            ["Session A"],
+            "run",
+            new DateTimeOffset(2025, 1, 1, 10, 0, 0, TimeSpan.Zero));
         using var reportPortalLaunchManager = new ReportPortalLaunchManager();
 
         var reporters = new ReporterBuilder()
             .ConfigureReportPortal(CreateReportPortalConfig(enabled: false))
-            .WithReportPortalLaunchManager(reportPortalLaunchManager)
-            .Build(context, new DateTime(2025, 1, 1, 10, 0, 0, DateTimeKind.Utc));
+            .Build(context, new DateTime(2025, 1, 1, 10, 0, 0, DateTimeKind.Utc),
+                manager: reportPortalLaunchManager,
+                settings: settings);
 
         Assert.That(reporters, Has.Count.EqualTo(1));
         Assert.That(reporters[0], Is.TypeOf<AllureReporter>());
@@ -175,9 +192,9 @@ public class AssertionBuilderTests
         using var reportPortalLaunchManager = new ReportPortalLaunchManager();
 
         var reporters = new ReporterBuilder()
-            .WithReportPortalLaunchManager(reportPortalLaunchManager)
-            .WithReportPortalSettings(settings)
-            .Build(context, new DateTime(2025, 1, 1, 10, 0, 0, DateTimeKind.Utc));
+            .Build(context, new DateTime(2025, 1, 1, 10, 0, 0, DateTimeKind.Utc),
+                manager: reportPortalLaunchManager,
+                settings: settings);
         var reportPortalReporter = reporters.OfType<ReportPortalReporter>().Single();
 
         Assert.That(reporters, Has.Count.EqualTo(2));
@@ -204,9 +221,9 @@ public class AssertionBuilderTests
 
         var reporters = new ReporterBuilder()
             .ConfigureReportPortal(CreateReportPortalConfig(enabled: true))
-            .WithReportPortalLaunchManager(reportPortalLaunchManager)
-            .WithReportPortalSettings(settings)
-            .Build(context, new DateTime(2025, 1, 1, 10, 0, 0, DateTimeKind.Utc));
+            .Build(context, new DateTime(2025, 1, 1, 10, 0, 0, DateTimeKind.Utc),
+                manager: reportPortalLaunchManager,
+                settings: settings);
         var reportPortalReporter = reporters.OfType<ReportPortalReporter>().Single();
 
         Assert.That(reporters, Has.Count.EqualTo(2));
