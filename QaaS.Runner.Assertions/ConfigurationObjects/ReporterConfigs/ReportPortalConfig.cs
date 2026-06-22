@@ -3,7 +3,7 @@ using System.ComponentModel;
 namespace QaaS.Runner.Assertions.ConfigurationObjects.ReporterConfigs;
 
 /// <summary>
-/// Defines the ReportPortal configuration used by QaaS to publish assertion results to ReportPortal.
+/// Configuration for ReportPortal reporting. Each field is optional and will fall back to the default value provided by the registered defaults provider when not set.
 /// </summary>
 public class ReportPortalConfig : IReporterConfig
 {
