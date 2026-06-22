@@ -4,6 +4,7 @@ using Microsoft.Extensions.Logging;
 using QaaS.Framework.Configurations.CustomExceptions;
 using QaaS.Framework.Executions;
 using QaaS.Runner.Options;
+using QaaS.Runner.Assertions.ConfigurationObjects.ReporterConfigs;
 using QaaS.Runner.Assertions.Reporters;
 using QaaS.Runner.Assertions.Reporters.ReportPortal;
 using QaaS.Runner.WrappedExternals;
@@ -215,7 +216,7 @@ public class Runner : IRunner, IDisposable
         var reportPortalLaunchManager = Scope.IsRegistered<ReportPortalLaunchManager>()
             ? Scope.Resolve<ReportPortalLaunchManager>()
             : null;
-        var reportPortalRunDescriptors = BuildReportPortalRunDescriptors();
+        var reportPortalSettingsByBuilder = BuildReportPortalSettingsByBuilder();
 
         // Builders share a single global dictionary so metadata and runtime values written by one
         // execution are visible to later executions in the same runner invocation.
@@ -230,8 +231,8 @@ public class Runner : IRunner, IDisposable
         
         if (reportPortalLaunchManager is not null)
             ExecutionBuilders.ForEach(builder => builder.WithReportPortalLaunchManager(reportPortalLaunchManager));
-        foreach (var runDescriptorPair in reportPortalRunDescriptors)
-            runDescriptorPair.Key.WithReportPortalRunDescriptor(runDescriptorPair.Value);
+        foreach (var settingsPair in reportPortalSettingsByBuilder)
+            settingsPair.Key.WithReportPortalSettings(settingsPair.Value);
         
         var executions = ExecutionBuilders.Select(builder => builder.Build()).ToList();
         Logger.LogInformation("Built {ExecutionCount} executions successfully", executions.Count);
@@ -318,21 +319,25 @@ public class Runner : IRunner, IDisposable
     }
 
     /// <summary>
-    /// Builds grouped ReportPortal launch descriptors so every execution builder targeting the same team project and
-    /// system reuses one shared launch name/description contract.
+    /// Resolves ReportPortal settings for the current runner invocation and assigns one shared settings instance to
+    /// every execution builder in the same launch group.
     /// </summary>
-    /// <returns>A dictionary mapping each execution builder to its assigned ReportPortal run descriptor.</returns>
-    private Dictionary<ExecutionBuilder, ReportPortalLaunchDescriptor> BuildReportPortalRunDescriptors()
+    /// <remarks>
+    /// Builders are grouped by the resolved ReportPortal endpoint, project, and system so compatible executions publish
+    /// into one remote launch. Group-level settings aggregate session names, execution modes, and launch attributes
+    /// before they are passed to the reporter pipeline.
+    /// </remarks>
+    /// <returns>A dictionary that maps each ReportPortal-enabled execution builder to its resolved settings.</returns>
+    private Dictionary<ExecutionBuilder, ReportPortalSettings> BuildReportPortalSettingsByBuilder()
     {
         var startedAtLocal = DateTimeOffset.Now;
         var builderSettings = ExecutionBuilders
             .Select(builder => new
             {
                 Builder = builder,
+                Config = builder.Reporters?.ReportPortal,
                 Settings = builder.Reporters?.ReportPortal is { } reportPortalConfig
-                    ? new ReportPortalSettings(
-                        BuildSingleBuilderRunDescriptor(builder, startedAtLocal),
-                        reportPortalConfig)
+                    ? BuildSingleBuilderReportPortalSettings(builder, reportPortalConfig, startedAtLocal)
                     : null
             })
             .Where(item => item.Settings is { Enabled: true })
@@ -341,17 +346,19 @@ public class Runner : IRunner, IDisposable
         if (builderSettings.Count == 0)
         {
             Logger.LogDebug("ReportPortal is disabled for all execution builders in this runner invocation.");
-            return new Dictionary<ExecutionBuilder, ReportPortalLaunchDescriptor>();
+            return new Dictionary<ExecutionBuilder, ReportPortalSettings>();
         }
 
-        var descriptors = new Dictionary<ExecutionBuilder, ReportPortalLaunchDescriptor>();
+        var settingsByBuilder = new Dictionary<ExecutionBuilder, ReportPortalSettings>();
         foreach (var builderGroup in builderSettings.GroupBy(item => new
                  {
-                     Team = item.Settings?.Team?.ToLowerInvariant() ?? string.Empty,
+                     Endpoint = item.Settings?.Endpoint?.ToLowerInvariant() ?? string.Empty,
+                     Project = item.Settings?.Project?.ToLowerInvariant() ?? string.Empty,
                      System = item.Settings?.System.ToLowerInvariant()
                  }))
         {
-            var sessionNames = builderGroup
+            var groupItems = builderGroup.ToList();
+            var sessionNames = groupItems
                 .SelectMany(item => item.Builder.ReadSessions())
                 .Select(session => session.Name)
                 .Where(sessionName => !string.IsNullOrWhiteSpace(sessionName))
@@ -359,41 +366,51 @@ public class Runner : IRunner, IDisposable
                 .Distinct(StringComparer.OrdinalIgnoreCase)
                 .OrderBy(sessionName => sessionName, StringComparer.OrdinalIgnoreCase)
                 .ToArray();
-            var executionModes = builderGroup
+            var executionModes = groupItems
                 .Select(item => item.Builder.ReadExecutionType().ToString().ToLowerInvariant())
                 .Distinct(StringComparer.Ordinal)
                 .ToList();
             var executionMode = executionModes.Count == 1 ? executionModes[0] : "mixed";
-            var teamName = builderGroup
+            var teamName = groupItems
                 .Select(item => item.Settings?.Team)
                 .FirstOrDefault(team => !string.IsNullOrWhiteSpace(team));
-            var systemName = builderGroup
+            var systemName = groupItems
                 .Select(item => item.Settings?.System)
                 .FirstOrDefault(system => !string.IsNullOrWhiteSpace(system)) ?? "Unknown System";
-            var descriptor = new ReportPortalLaunchDescriptor(
+            var settings = new ReportPortalSettings(
+                groupItems.First().Config!,
                 teamName,
                 systemName,
                 sessionNames,
                 executionMode,
                 startedAtLocal,
-                BuildLaunchAttributes(builderGroup.Select(item => item.Builder)));
+                BuildLaunchAttributes(groupItems.Select(item => item.Builder)));
 
             foreach (var item in builderGroup)
-                descriptors[item.Builder] = descriptor;
+                settingsByBuilder[item.Builder] = settings;
 
             Logger.LogDebug(
-                "Built ReportPortal run descriptor for team {TeamName}, system {SystemName}, sessions [{SessionNames}], execution mode {ExecutionMode}, builder count {BuilderCount}.",
-                descriptor.TeamName ?? "<none>",
-                descriptor.SystemName,
-                string.Join(", ", descriptor.SessionNames),
-                descriptor.ExecutionMode,
-                builderGroup.Count());
+                "Built ReportPortal settings for project {ProjectName}, team {TeamName}, system {SystemName}, sessions [{SessionNames}], execution mode {ExecutionMode}, builder count {BuilderCount}.",
+                settings.Project ?? "<none>",
+                settings.Team ?? "<none>",
+                settings.System,
+                string.Join(", ", settings.SessionNames),
+                settings.ExecutionMode,
+                groupItems.Count);
         }
 
-        return descriptors;
+        return settingsByBuilder;
     }
 
-    private static ReportPortalLaunchDescriptor BuildSingleBuilderRunDescriptor(ExecutionBuilder builder,
+    /// <summary>
+    /// Creates preliminary ReportPortal settings for one execution builder before launch grouping is applied.
+    /// </summary>
+    /// <param name="builder">The execution builder that owns the raw ReportPortal configuration and metadata.</param>
+    /// <param name="reportPortalConfig">The raw ReportPortal configuration supplied for the builder.</param>
+    /// <param name="startedAtLocal">The runner start timestamp used when default launch names and descriptions are built.</param>
+    /// <returns>Resolved ReportPortal settings scoped to the single builder.</returns>
+    private static ReportPortalSettings BuildSingleBuilderReportPortalSettings(ExecutionBuilder builder,
+        ReportPortalConfig reportPortalConfig,
         DateTimeOffset startedAtLocal)
     {
         var sessionNames = builder.ReadSessions()
@@ -402,7 +419,8 @@ public class Runner : IRunner, IDisposable
             .Select(sessionName => sessionName!)
             .ToArray();
 
-        return new ReportPortalLaunchDescriptor(
+        return new ReportPortalSettings(
+            reportPortalConfig,
             builder.MetaData?.Team,
             builder.MetaData?.System,
             sessionNames,
@@ -411,6 +429,14 @@ public class Runner : IRunner, IDisposable
             BuildLaunchAttributes([builder]));
     }
 
+    /// <summary>
+    /// Builds metadata-derived launch attributes for one or more execution builders.
+    /// </summary>
+    /// <param name="builders">The builders whose metadata, sessions, cases, and execution identifiers should be summarized.</param>
+    /// <returns>
+    /// A case-insensitive attribute map with duplicate values collapsed and deterministic ordering applied for stable
+    /// launch grouping and test output.
+    /// </returns>
     private static IReadOnlyDictionary<string, string> BuildLaunchAttributes(IEnumerable<ExecutionBuilder> builders)
     {
         var builderList = builders.ToList();

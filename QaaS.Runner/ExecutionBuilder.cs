@@ -75,7 +75,7 @@ public class ExecutionBuilder() : BaseExecutionBuilder<InternalContext, Executio
         _configuredCaseName = source._configuredCaseName;
         _configuredExecutionId = source._configuredExecutionId;
         _reportPortalLaunchManager = source._reportPortalLaunchManager;
-        _reportPortalRunDescriptor = source._reportPortalRunDescriptor;
+        _reportPortalSettings = source._reportPortalSettings;
         _globalDict = new Dictionary<string, object?>(source._globalDict);
         _loadVariablesIntoGlobalDict = source._loadVariablesIntoGlobalDict;
     }
@@ -158,7 +158,7 @@ public class ExecutionBuilder() : BaseExecutionBuilder<InternalContext, Executio
     private string? _configuredCaseName;
     private string? _configuredExecutionId;
     private ReportPortalLaunchManager? _reportPortalLaunchManager;
-    private ReportPortalLaunchDescriptor? _reportPortalRunDescriptor;
+    private ReportPortalSettings? _reportPortalSettings;
     private Dictionary<string, object?> _globalDict = new();
     private bool _loadVariablesIntoGlobalDict = true;
     private readonly IConfiguration? _templateSourceConfiguration;
@@ -263,11 +263,10 @@ public class ExecutionBuilder() : BaseExecutionBuilder<InternalContext, Executio
         if (Assertions is null || Assertions.Length == 0 || Reporters is null) return [];
         var testSuiteStartTimeUtc = DateTime.UtcNow;
         
-        if (_reportPortalLaunchManager != null && _reportPortalRunDescriptor != null)
-        {
-            Reporters.WithReportPortalLaunchManager(_reportPortalLaunchManager);
-            Reporters.WithReportPortalRunDescriptor(_reportPortalRunDescriptor);   
-        }
+        if (_reportPortalLaunchManager != null && _reportPortalSettings != null)
+            Reporters
+                .WithReportPortalLaunchManager(_reportPortalLaunchManager)
+                .WithReportPortalSettings(_reportPortalSettings);
         
         return Reporters.Build(Context, testSuiteStartTimeUtc);
     }
@@ -574,9 +573,9 @@ public class ExecutionBuilder() : BaseExecutionBuilder<InternalContext, Executio
         return this;
     }
 
-    internal ExecutionBuilder WithReportPortalRunDescriptor(ReportPortalLaunchDescriptor reportPortalLaunchDescriptor)
+    internal ExecutionBuilder WithReportPortalSettings(ReportPortalSettings reportPortalSettings)
     {
-        _reportPortalRunDescriptor = reportPortalLaunchDescriptor;
+        _reportPortalSettings = reportPortalSettings;
         return this;
     }
 

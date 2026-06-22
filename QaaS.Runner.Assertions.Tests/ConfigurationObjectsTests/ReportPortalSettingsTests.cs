@@ -2,10 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using NUnit.Framework;
-using QaaS.Runner.Assertions;
-using QaaS.Runner.Assertions.ConfigurationObjects;
 using QaaS.Runner.Assertions.ConfigurationObjects.ReporterConfigs;
-using QaaS.Runner.Assertions.Reporters;
 using QaaS.Runner.Assertions.Reporters.ReportPortal;
 
 namespace QaaS.Runner.Assertions.Tests.ConfigurationObjectsTests;
@@ -13,6 +10,9 @@ namespace QaaS.Runner.Assertions.Tests.ConfigurationObjectsTests;
 [TestFixture]
 public class ReportPortalSettingsTests
 {
+    private static readonly DateTimeOffset StartedAt =
+        new(2025, 1, 1, 10, 0, 0, TimeSpan.Zero);
+
     [SetUp]
     public void SetUp()
     {
@@ -20,18 +20,44 @@ public class ReportPortalSettingsTests
     }
 
     [Test]
-    public void Constructor_WithNoOverrides_DefaultsToRegisteredDisabledConfiguration()
+    public void Constructor_WithNoOverrides_DefaultsToRegisteredDisabledConfigurationAndMetadataProject()
     {
         var settings = CreateSettings(new ReportPortalConfig());
 
         Assert.That(settings.Enabled, Is.False);
         Assert.That(settings.Endpoint, Is.Null);
-        Assert.That(settings.Team, Is.EqualTo("Smoke"));
         Assert.That(settings.ApiKey, Is.Null);
+        Assert.That(settings.Team, Is.EqualTo("Smoke"));
+        Assert.That(settings.Project, Is.EqualTo("Smoke"));
+        Assert.That(settings.System, Is.EqualTo("QaaS"));
         Assert.That(settings.LaunchName, Is.EqualTo("QaaS Run | Smoke | QaaS | Session A, Session B"));
         Assert.That(settings.Description,
             Is.EqualTo(
                 "QaaS captured this run directly from the runner pipeline: live sessions, real assertion outcomes, and the exact shape of QaaS at 2025-01-01 10:00:00. Sessions=[Session A, Session B]. LaunchAttributes=[No additional launch attributes.]"));
+    }
+
+    [Test]
+    public void Constructor_WithProjectOverride_UsesProjectForPublishingButKeepsTeamContext()
+    {
+        var settings = CreateSettings(new ReportPortalConfig
+        {
+            Project = "ExplicitProject"
+        });
+
+        Assert.That(settings.Project, Is.EqualTo("ExplicitProject"));
+        Assert.That(settings.Team, Is.EqualTo("Smoke"));
+    }
+
+    [Test]
+    public void Constructor_WithMissingProject_FallsBackToMetadataTeam()
+    {
+        var settings = CreateSettings(new ReportPortalConfig
+        {
+            Project = " "
+        });
+
+        Assert.That(settings.Project, Is.EqualTo("Smoke"));
+        Assert.That(settings.Team, Is.EqualTo("Smoke"));
     }
 
     [Test]
@@ -68,7 +94,7 @@ public class ReportPortalSettingsTests
     }
 
     [Test]
-    public void Constructor_WithRegisteredDefaults_UsesDefaultsButStillRoutesByTeam()
+    public void Constructor_WithRegisteredDefaults_UsesDefaultsButStillRoutesByResolvedProject()
     {
         ReportPortalConfig.RegisterDefaults(
             enabled: true,
@@ -77,11 +103,12 @@ public class ReportPortalSettingsTests
 
         var settings = CreateSettings(new ReportPortalConfig
         {
-            Project = "IgnoredProject"
+            Project = "ConfiguredProject"
         });
 
         Assert.That(settings.Enabled, Is.True);
         Assert.That(settings.Endpoint, Is.EqualTo("http://localhost:8080"));
+        Assert.That(settings.Project, Is.EqualTo("ConfiguredProject"));
         Assert.That(settings.Team, Is.EqualTo("Smoke"));
         Assert.That(settings.ApiKey, Is.EqualTo("default-api-key"));
     }
@@ -113,27 +140,34 @@ public class ReportPortalSettingsTests
             reportPortalUri: "http://default.local",
             reportPortalApiKey: "default-api-key");
 
-        var settings = CreateSettings(new ReportPortalConfig
+        var settings = new ReportPortalSettings(new ReportPortalConfig
         {
             Enabled = false
-        }, null);
+        });
 
         Assert.That(settings.Enabled, Is.False);
         Assert.That(settings.Endpoint, Is.EqualTo("http://default.local"));
         Assert.That(settings.Team, Is.Null);
+        Assert.That(settings.Project, Is.Null);
     }
 
     [Test]
-    public void Constructor_WhenProjectCannotBeDerived_DoesNotThrowAndLeavesTeamNull()
+    public void Constructor_WhenProjectCannotBeDerived_DoesNotThrowAndLeavesProjectNull()
     {
-        var settings = CreateSettings(new ReportPortalConfig
-        {
-            Enabled = true,
-            Endpoint = "http://localhost:8080"
-        }, new ReportPortalLaunchDescriptor(null, "QaaS", ["Session A"], "run",
-            new DateTimeOffset(2025, 1, 1, 10, 0, 0, TimeSpan.Zero)));
+        var settings = new ReportPortalSettings(
+            new ReportPortalConfig
+            {
+                Enabled = true,
+                Endpoint = "http://localhost:8080"
+            },
+            null,
+            "QaaS",
+            ["Session A"],
+            "run",
+            StartedAt);
 
         Assert.That(settings.Team, Is.Null);
+        Assert.That(settings.Project, Is.Null);
         Assert.That(settings.System, Is.EqualTo("QaaS"));
     }
 
@@ -153,10 +187,11 @@ public class ReportPortalSettingsTests
     }
 
     [Test]
-    public void BuildLaunchAttributes_IncludesTeamSystemSessionsAndStaticAttributes()
+    public void BuildLaunchAttributes_IncludesTeamProjectSystemSessionsAndStaticAttributes()
     {
         var settings = CreateSettings(new ReportPortalConfig
         {
+            Project = "ConfiguredProject",
             Attributes = new Dictionary<string, string>
             {
                 ["Component"] = "Auth",
@@ -168,27 +203,55 @@ public class ReportPortalSettingsTests
 
         Assert.That(attributes.Any(attribute => attribute.Key == "tool" && attribute.Value == "QaaS"), Is.True);
         Assert.That(attributes.Any(attribute => attribute.Key == "team" && attribute.Value == "Smoke"), Is.True);
+        Assert.That(attributes.Any(attribute => attribute.Key == "project" && attribute.Value == "ConfiguredProject"),
+            Is.True);
         Assert.That(attributes.Any(attribute => attribute.Key == "system" && attribute.Value == "QaaS"), Is.True);
         Assert.That(attributes.Count(attribute => attribute.Key == "session"), Is.EqualTo(2));
         Assert.That(attributes.Any(attribute => attribute.Key == "Component" && attribute.Value == "Auth"), Is.True);
         Assert.That(attributes.Any(attribute => attribute.Key == "Owner" && attribute.Value == "Smoke Team"), Is.True);
     }
 
-    private static ReportPortalLaunchDescriptor CreateRunDescriptor()
+    [Test]
+    public void Constructor_WithManySessions_UsesCompactStableLaunchName()
     {
-        return new ReportPortalLaunchDescriptor(
+        var settings = new ReportPortalSettings(
+            new ReportPortalConfig(),
+            "Smoke",
+            "QaaS",
+            ["Session A", "Session B", "Session C"],
+            "run",
+            StartedAt);
+
+        Assert.That(settings.LaunchName, Is.EqualTo("QaaS Run | Smoke | QaaS | Session A, Session B(+1)"));
+    }
+
+    [Test]
+    public void Constructor_WithLaunchAttributes_AddsThemToDefaultDescription()
+    {
+        var settings = new ReportPortalSettings(
+            new ReportPortalConfig(),
             "Smoke",
             "QaaS",
             ["Session A", "Session B"],
             "run",
-            new DateTimeOffset(2025, 1, 1, 10, 0, 0, TimeSpan.Zero));
+            StartedAt,
+            new Dictionary<string, string>
+            {
+                ["Component"] = "Gateway",
+                ["Scenario"] = "Baseline"
+            });
+
+        Assert.That(settings.Description, Does.Contain("this run directly from the runner pipeline"));
+        Assert.That(settings.Description, Does.Contain("Sessions=[Session A, Session B]"));
+        Assert.That(settings.Description, Does.Contain("LaunchAttributes=[Component=Gateway, Scenario=Baseline]"));
     }
 
     private static ReportPortalSettings CreateSettings(ReportPortalConfig config) =>
-        new(CreateRunDescriptor(), config);
-
-    private static ReportPortalSettings CreateSettings(
-        ReportPortalConfig config,
-        ReportPortalLaunchDescriptor? descriptor) =>
-        new(descriptor, config);
+        new(
+            config,
+            "Smoke",
+            "QaaS",
+            ["Session A", "Session B"],
+            "run",
+            StartedAt);
 }

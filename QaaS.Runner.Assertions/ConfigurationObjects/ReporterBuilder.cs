@@ -17,6 +17,7 @@ public class ReporterBuilder : IYamlConvertible, ICloneable<ReporterBuilder>
     {
         var clone = BuilderCloner.DeepClone(this);
         clone.ReportPortalLaunchManager = ReportPortalLaunchManager;
+        clone.ReportPortalSettings = ReportPortalSettings;
         return clone;
     }
 
@@ -59,13 +60,13 @@ public class ReporterBuilder : IYamlConvertible, ICloneable<ReporterBuilder>
     internal ReportPortalLaunchManager? ReportPortalLaunchManager { get; set; }
 
     /// <summary>
-    /// Gets or sets the ReportPortal launch descriptor for the current runner invocation.
+    /// Gets or sets the resolved ReportPortal settings for the current runner invocation.
     /// </summary>
     /// <remarks>
-    /// The descriptor is used to derive runtime ReportPortal settings, such as the default launch name,
-    /// when they are not explicitly provided in <see cref="ReportPortal"/>.
+    /// The settings are resolved by the runner so every builder in the same launch group can share one immutable
+    /// publishing contract.
     /// </remarks>
-    internal ReportPortalLaunchDescriptor? ReportPortalRunDescriptor { get; set; }
+    internal ReportPortalSettings? ReportPortalSettings { get; set; }
     
     public void Read(IParser parser, Type expectedType, ObjectDeserializer nestedObjectDeserializer)
     {
@@ -146,9 +147,9 @@ public class ReporterBuilder : IYamlConvertible, ICloneable<ReporterBuilder>
         return this;
     }
     
-    internal ReporterBuilder WithReportPortalRunDescriptor(ReportPortalLaunchDescriptor descriptor)
+    internal ReporterBuilder WithReportPortalSettings(ReportPortalSettings settings)
     {
-        ReportPortalRunDescriptor = descriptor;
+        ReportPortalSettings = settings;
         return this;
     }
     
@@ -194,11 +195,7 @@ public class ReporterBuilder : IYamlConvertible, ICloneable<ReporterBuilder>
                     break;
 
                 case ReporterTarget.ReportPortal:
-                    var reportPortalSettings = ReportPortal is null
-                        ? null
-                        : new ReportPortalSettings(ReportPortalRunDescriptor, ReportPortal);
-
-                    if (reportPortalSettings is { Enabled: true } && ReportPortalLaunchManager is not null)
+                    if (ReportPortalSettings is { Enabled: true } && ReportPortalLaunchManager is not null)
                     {
                         var reportPortalReporter = new ReportPortalReporter
                         {
@@ -210,7 +207,7 @@ public class ReporterBuilder : IYamlConvertible, ICloneable<ReporterBuilder>
                             SaveSessionData = SaveSessionData,
                             FileSystem = fileSystem ?? new FileSystem(),
                             LaunchManager = ReportPortalLaunchManager,
-                            Settings = reportPortalSettings
+                            Settings = ReportPortalSettings
                         };
                         reporters.Add(reportPortalReporter);
                     }

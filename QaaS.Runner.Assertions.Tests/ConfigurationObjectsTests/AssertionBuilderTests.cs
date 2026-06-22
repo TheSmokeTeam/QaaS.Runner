@@ -165,7 +165,8 @@ public class AssertionBuilderTests
             enabled: true,
             reportPortalUri: "http://default.local",
             reportPortalApiKey: "default-api-key");
-        var runDescriptor = new ReportPortalLaunchDescriptor(
+        var settings = new ReportPortalSettings(
+            new ReportPortalConfig(),
             "Smoke",
             "QaaS",
             ["Session A"],
@@ -175,7 +176,7 @@ public class AssertionBuilderTests
 
         var reporters = new ReporterBuilder()
             .WithReportPortalLaunchManager(reportPortalLaunchManager)
-            .WithReportPortalRunDescriptor(runDescriptor)
+            .WithReportPortalSettings(settings)
             .Build(context, new DateTime(2025, 1, 1, 10, 0, 0, DateTimeKind.Utc));
         var reportPortalReporter = reporters.OfType<ReportPortalReporter>().Single();
 
@@ -192,7 +193,8 @@ public class AssertionBuilderTests
             Logger = Globals.Logger,
             RootConfiguration = new ConfigurationBuilder().Build()
         };
-        var runDescriptor = new ReportPortalLaunchDescriptor(
+        var settings = new ReportPortalSettings(
+            CreateReportPortalConfig(enabled: true),
             "Smoke",
             "QaaS",
             ["Session A"],
@@ -203,7 +205,7 @@ public class AssertionBuilderTests
         var reporters = new ReporterBuilder()
             .ConfigureReportPortal(CreateReportPortalConfig(enabled: true))
             .WithReportPortalLaunchManager(reportPortalLaunchManager)
-            .WithReportPortalRunDescriptor(runDescriptor)
+            .WithReportPortalSettings(settings)
             .Build(context, new DateTime(2025, 1, 1, 10, 0, 0, DateTimeKind.Utc));
         var reportPortalReporter = reporters.OfType<ReportPortalReporter>().Single();
 

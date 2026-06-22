@@ -124,6 +124,7 @@ public class ReportPortalReporter : BaseReporter
             .AppendLine("Assertion context:")
             .AppendLine($"- Stable identity: {stableIdentity}")
             .AppendLine($"- Team: {Settings.Team ?? "<missing-team>"}")
+            .AppendLine($"- Project: {Settings.Project ?? "<missing-project>"}")
             .AppendLine($"- System: {Settings.System}")
             .AppendLine($"- ExecutionId: {Context.ExecutionId ?? "<none>"}")
             .AppendLine($"- CaseName: {Context.CaseName ?? "<none>"}")
@@ -269,6 +270,8 @@ public class ReportPortalReporter : BaseReporter
 
         if (!string.IsNullOrWhiteSpace(Settings.Team))
             parameters.Add(new KeyValuePair<string, string>("Team", Settings.Team));
+        if (!string.IsNullOrWhiteSpace(Settings.Project))
+            parameters.Add(new KeyValuePair<string, string>("Project", Settings.Project));
         if (!string.IsNullOrWhiteSpace(Settings.System))
             parameters.Add(new KeyValuePair<string, string>("System", Settings.System));
         if (!string.IsNullOrWhiteSpace(Context.ExecutionId))
@@ -313,6 +316,15 @@ public class ReportPortalReporter : BaseReporter
             {
                 Key = "team",
                 Value = Settings.Team
+            });
+        }
+
+        if (!string.IsNullOrWhiteSpace(Settings.Project))
+        {
+            attributes.Add(new ItemAttribute
+            {
+                Key = "project",
+                Value = Settings.Project
             });
         }
 
@@ -392,6 +404,7 @@ public class ReportPortalReporter : BaseReporter
         description.AppendLine()
             .AppendLine("Execution context:")
             .AppendLine($"- Team: {Settings.Team ?? "<missing-team>"}")
+            .AppendLine($"- Project: {Settings.Project ?? "<missing-project>"}")
             .AppendLine($"- System: {Settings.System}")
             .AppendLine($"- Execution Id: {Context.ExecutionId ?? "<none>"}")
             .AppendLine($"- Case Name: {Context.CaseName ?? "<none>"}")

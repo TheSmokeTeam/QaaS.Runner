@@ -10,6 +10,10 @@ namespace QaaS.Runner.Assertions.Reporters.ReportPortal;
 /// Owns the ReportPortal launches used by one runner invocation. QaaS opens at most one launch per
 /// endpoint/project/system combination and reuses it across all matching assertions in the invocation.
 /// </summary>
+/// <remarks>
+/// Launch creation and finalization are best-effort. Failures are logged as warnings and do not change the runner exit
+/// code.
+/// </remarks>
 public sealed class ReportPortalLaunchManager : IDisposable
 {
     private readonly SemaphoreSlim _launchLock = new(1, 1);
@@ -18,10 +22,17 @@ public sealed class ReportPortalLaunchManager : IDisposable
     private readonly HashSet<string> _suppressedLaunchKeys = new(StringComparer.Ordinal);
     private bool _disposed;
 
+    /// <summary>
+    /// Creates a launch manager with the default ReportPortal access validator.
+    /// </summary>
     public ReportPortalLaunchManager() : this(new ReportPortalAccessValidator())
     {
     }
 
+    /// <summary>
+    /// Creates a launch manager with a caller-provided access validator.
+    /// </summary>
+    /// <param name="accessValidator">The validator used before a ReportPortal launch is opened.</param>
     internal ReportPortalLaunchManager(ReportPortalAccessValidator accessValidator)
     {
         _accessValidator = accessValidator;
@@ -32,6 +43,10 @@ public sealed class ReportPortalLaunchManager : IDisposable
     /// checks fail or launch creation fails, the manager logs a warning and returns <see langword="null" /> so the
     /// caller can keep the run green.
     /// </summary>
+    /// <param name="settings">The resolved ReportPortal settings for the current launch group.</param>
+    /// <param name="logger">The logger used for launch lifecycle messages.</param>
+    /// <param name="cancellationToken">A cancellation token for ReportPortal client calls.</param>
+    /// <returns>The active launch context, or <see langword="null" /> when publishing should be skipped.</returns>
     internal async Task<ReportPortalLaunchContext?> EnsureLaunchStartedAsync(ReportPortalSettings settings,
         ILogger logger, CancellationToken cancellationToken = default)
     {
@@ -43,15 +58,10 @@ public sealed class ReportPortalLaunchManager : IDisposable
 
         var accessResult = await _accessValidator.EnsureWriteAccessAsync(settings, logger, cancellationToken)
             .ConfigureAwait(false);
-        if (!accessResult.CanPublish ||
-            accessResult.EndpointUri is null ||
-            string.IsNullOrWhiteSpace(accessResult.Project) ||
-            string.IsNullOrWhiteSpace(accessResult.ApiKey))
-        {
+        if (!CanPublish(accessResult))
             return null;
-        }
 
-        var launchKey = settings.BuildLaunchGroupKey(accessResult.Project, accessResult.EndpointUri);
+        var launchKey = settings.BuildLaunchGroupKey(accessResult.Project!, accessResult.EndpointUri!);
 
         await _launchLock.WaitAsync(cancellationToken).ConfigureAwait(false);
         try
@@ -62,7 +72,7 @@ public sealed class ReportPortalLaunchManager : IDisposable
             if (_suppressedLaunchKeys.Contains(launchKey))
                 return null;
 
-            IClientService service = new Service(accessResult.EndpointUri, accessResult.Project, accessResult.ApiKey);
+            IClientService service = new Service(accessResult.EndpointUri!, accessResult.Project!, accessResult.ApiKey!);
             var launchStartTimeUtc = DateTime.UtcNow;
 
             try
@@ -77,8 +87,7 @@ public sealed class ReportPortalLaunchManager : IDisposable
                 }, cancellationToken).ConfigureAwait(false);
 
                 var managedLaunch = new ManagedLaunch(
-                    launchKey,
-                    accessResult.Project,
+                    accessResult.Project!,
                     settings.System,
                     launchStartTimeUtc,
                     service,
@@ -87,7 +96,7 @@ public sealed class ReportPortalLaunchManager : IDisposable
 
                 logger.LogInformation(
                     "Started ReportPortal launch {LaunchUuid} in project {ProjectName} for system {SystemName}.",
-                    launch.Uuid, accessResult.Project, settings.System);
+                    launch.Uuid, accessResult.Project!, settings.System);
 
                 return managedLaunch.ToContext();
             }
@@ -98,7 +107,7 @@ public sealed class ReportPortalLaunchManager : IDisposable
                 _suppressedLaunchKeys.Add(launchKey);
                 logger.LogWarning(exception,
                     "Could not start ReportPortal launch for project {ProjectName} and system {SystemName}. ReportPortal publishing will be skipped for this launch group.",
-                    accessResult.Project, settings.System);
+                    accessResult.Project!, settings.System);
                 return null;
             }
         }
@@ -111,6 +120,8 @@ public sealed class ReportPortalLaunchManager : IDisposable
     /// <summary>
     /// Finishes every launch that was started during the invocation. Launch finalization is best-effort and never throws.
     /// </summary>
+    /// <param name="logger">The logger used for finalization messages.</param>
+    /// <param name="cancellationToken">A cancellation token for ReportPortal client calls.</param>
     public async Task FinishLaunchAsync(ILogger logger, CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(logger);
@@ -151,6 +162,9 @@ public sealed class ReportPortalLaunchManager : IDisposable
         }
     }
 
+    /// <summary>
+    /// Releases ReportPortal client services and the access validator.
+    /// </summary>
     public void Dispose()
     {
         if (_disposed)
@@ -167,15 +181,24 @@ public sealed class ReportPortalLaunchManager : IDisposable
         GC.SuppressFinalize(this);
     }
 
+    private static bool CanPublish(ReportPortalAccessResult accessResult)
+    {
+        return accessResult.CanPublish &&
+               accessResult.EndpointUri is not null &&
+               !string.IsNullOrWhiteSpace(accessResult.Project) &&
+               !string.IsNullOrWhiteSpace(accessResult.ApiKey);
+    }
+
+    /// <summary>
+    /// Tracks an open ReportPortal launch and the client service that owns it.
+    /// </summary>
     private sealed class ManagedLaunch(
-        string launchKey,
         string project,
         string system,
         DateTime launchStartTimeUtc,
         IClientService service,
         string launchUuid)
     {
-        public string LaunchKey { get; } = launchKey;
         public string Project { get; } = project;
         public string System { get; } = system;
         public DateTime LaunchStartTimeUtc { get; } = launchStartTimeUtc;
@@ -183,6 +206,10 @@ public sealed class ReportPortalLaunchManager : IDisposable
         public string LaunchUuid { get; } = launchUuid;
         public bool IsFinished { get; set; }
 
+        /// <summary>
+        /// Creates the lightweight context used by reporters to publish test items.
+        /// </summary>
+        /// <returns>The launch context for the active ReportPortal launch.</returns>
         public ReportPortalLaunchContext ToContext()
         {
             return new ReportPortalLaunchContext(Service, LaunchUuid, LaunchStartTimeUtc);

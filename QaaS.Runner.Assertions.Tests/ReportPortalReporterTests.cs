@@ -123,17 +123,16 @@ public class ReportPortalReporterTests
     {
         ReportPortalConfig.RegisterDefaults(enabled: false);
         return new ReportPortalSettings(
-            new ReportPortalLaunchDescriptor(
-                "Smoke",
-                "QaaS",
-                [],
-                "run",
-                new DateTimeOffset(2025, 1, 1, 10, 0, 0, TimeSpan.Zero)),
             new ReportPortalConfig
             {
                 Enabled = true,
                 Endpoint = "https://reportportal.local/api/",
                 ApiKey = "api-key"
-            });
+            },
+            "Smoke",
+            "QaaS",
+            [],
+            "run",
+            new DateTimeOffset(2025, 1, 1, 10, 0, 0, TimeSpan.Zero));
     }
 }

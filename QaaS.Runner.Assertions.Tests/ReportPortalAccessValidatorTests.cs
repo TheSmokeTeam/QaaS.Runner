@@ -42,7 +42,7 @@ public class ReportPortalAccessValidatorTests
         var result = await validator.EnsureWriteAccessAsync(CreateSettings(team: null), Globals.Logger);
 
         Assert.That(result.CanPublish, Is.False);
-        Assert.That(result.FailureReason, Does.Contain("MetaData.Team"));
+        Assert.That(result.FailureReason, Does.Contain("ReportPortal.Project or MetaData.Team"));
         Assert.That(handler.RequestCount, Is.Zero);
     }
 
@@ -94,7 +94,7 @@ public class ReportPortalAccessValidatorTests
         var result = await validator.EnsureWriteAccessAsync(CreateSettings(team: "Smoke"), Globals.Logger);
 
         Assert.That(result.CanPublish, Is.False);
-        Assert.That(result.FailureReason, Does.Contain("no accessible project matches team `Smoke`"));
+        Assert.That(result.FailureReason, Does.Contain("no accessible project matches `Smoke`"));
         Assert.That(handler.RequestCount, Is.EqualTo(1));
     }
 
@@ -143,12 +143,6 @@ public class ReportPortalAccessValidatorTests
     {
         ReportPortalConfig.RegisterDefaults(enabled: false);
         return new ReportPortalSettings(
-            new ReportPortalLaunchDescriptor(
-                team,
-                "QaaS",
-                ["session-a"],
-                "run",
-                new DateTimeOffset(2025, 1, 1, 10, 0, 0, TimeSpan.Zero)),
             new ReportPortalConfig
             {
                 Enabled = enabled,
@@ -156,7 +150,12 @@ public class ReportPortalAccessValidatorTests
                 ApiKey = apiKey,
                 LaunchName = "launch",
                 Description = "description"
-            });
+            },
+            team,
+            "QaaS",
+            ["session-a"],
+            "run",
+            new DateTimeOffset(2025, 1, 1, 10, 0, 0, TimeSpan.Zero));
     }
 
     private sealed class RecordingHttpMessageHandler(Func<HttpRequestMessage, HttpResponseMessage> responseFactory)

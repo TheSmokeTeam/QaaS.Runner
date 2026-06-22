@@ -563,7 +563,7 @@ public class RunnerBehaviorTests
     }
 
     [Test]
-    public void BuildExecutions_AssignsSharedReportPortalRunDescriptorToAllBuilders()
+    public void BuildExecutions_AssignsSharedReportPortalSettingsToAllBuildersInSameLaunchGroup()
     {
         using var scope = BuildScope();
         var builders = new List<ExecutionBuilder>
@@ -575,17 +575,21 @@ public class RunnerBehaviorTests
         var runner = new ExposedRunner(scope, builders, Globals.Logger, new Mock<Serilog.ILogger>().Object);
         _ = runner.InvokeBuildExecutions();
 
-        var descriptorField = typeof(ExecutionBuilder)
-            .GetField("_reportPortalRunDescriptor", BindingFlags.Instance | BindingFlags.NonPublic)!;
-        var firstDescriptor = descriptorField.GetValue(builders[0]);
-        var secondDescriptor = descriptorField.GetValue(builders[1]);
+        var settingsField = typeof(ExecutionBuilder)
+            .GetField("_reportPortalSettings", BindingFlags.Instance | BindingFlags.NonPublic)!;
+        var firstSettings = (ReportPortalSettings?)settingsField.GetValue(builders[0]);
+        var secondSettings = (ReportPortalSettings?)settingsField.GetValue(builders[1]);
 
-        Assert.That(firstDescriptor, Is.Not.Null);
-        Assert.That(secondDescriptor, Is.SameAs(firstDescriptor));
+        Assert.That(firstSettings, Is.Not.Null);
+        Assert.That(secondSettings, Is.SameAs(firstSettings));
+        Assert.That(firstSettings!.Project, Is.EqualTo("Smoke"));
+        Assert.That(firstSettings.Team, Is.EqualTo("Smoke"));
+        Assert.That(firstSettings.System, Is.EqualTo("QaaS"));
+        Assert.That(firstSettings.SessionNames, Is.EquivalentTo(Array.Empty<string>()));
     }
 
     [Test]
-    public void BuildExecutions_WithMixedTeams_AssignsDifferentReportPortalDescriptorsPerTeam()
+    public void BuildExecutions_WithMixedProjects_AssignsDifferentReportPortalSettingsPerProject()
     {
         using var scope = BuildScope();
         var builders = new List<ExecutionBuilder>
@@ -597,18 +601,20 @@ public class RunnerBehaviorTests
 
         _ = runner.InvokeBuildExecutions();
 
-        var descriptorField = typeof(ExecutionBuilder)
-            .GetField("_reportPortalRunDescriptor", BindingFlags.Instance | BindingFlags.NonPublic)!;
-        var firstDescriptor = (ReportPortalLaunchDescriptor?)descriptorField.GetValue(builders[0]);
-        var secondDescriptor = (ReportPortalLaunchDescriptor?)descriptorField.GetValue(builders[1]);
+        var settingsField = typeof(ExecutionBuilder)
+            .GetField("_reportPortalSettings", BindingFlags.Instance | BindingFlags.NonPublic)!;
+        var firstSettings = (ReportPortalSettings?)settingsField.GetValue(builders[0]);
+        var secondSettings = (ReportPortalSettings?)settingsField.GetValue(builders[1]);
 
-        Assert.That(firstDescriptor, Is.Not.Null);
-        Assert.That(secondDescriptor, Is.Not.Null);
-        Assert.That(secondDescriptor, Is.Not.SameAs(firstDescriptor));
-        Assert.That(firstDescriptor!.TeamName, Is.EqualTo("Smoke"));
-        Assert.That(secondDescriptor!.TeamName, Is.EqualTo("AnotherTeam"));
-        Assert.That(firstDescriptor.SystemName, Is.EqualTo("QaaS"));
-        Assert.That(secondDescriptor.SystemName, Is.EqualTo("QaaS"));
+        Assert.That(firstSettings, Is.Not.Null);
+        Assert.That(secondSettings, Is.Not.Null);
+        Assert.That(secondSettings, Is.Not.SameAs(firstSettings));
+        Assert.That(firstSettings!.Project, Is.EqualTo("Smoke"));
+        Assert.That(secondSettings!.Project, Is.EqualTo("AnotherTeam"));
+        Assert.That(firstSettings.Team, Is.EqualTo("Smoke"));
+        Assert.That(secondSettings.Team, Is.EqualTo("AnotherTeam"));
+        Assert.That(firstSettings.System, Is.EqualTo("QaaS"));
+        Assert.That(secondSettings.System, Is.EqualTo("QaaS"));
     }
 
     [Test]
@@ -655,7 +661,7 @@ public class RunnerBehaviorTests
     }
 
     [Test]
-    public void BuildExecutions_WithMixedSystems_AssignsDifferentReportPortalDescriptorsPerSystem()
+    public void BuildExecutions_WithMixedSystems_AssignsDifferentReportPortalSettingsPerSystem()
     {
         using var scope = BuildScope();
         var builders = new List<ExecutionBuilder>
@@ -667,18 +673,18 @@ public class RunnerBehaviorTests
 
         _ = runner.InvokeBuildExecutions();
 
-        var descriptorField = typeof(ExecutionBuilder)
-            .GetField("_reportPortalRunDescriptor", BindingFlags.Instance | BindingFlags.NonPublic)!;
-        var firstDescriptor = (ReportPortalLaunchDescriptor?)descriptorField.GetValue(builders[0]);
-        var secondDescriptor = (ReportPortalLaunchDescriptor?)descriptorField.GetValue(builders[1]);
+        var settingsField = typeof(ExecutionBuilder)
+            .GetField("_reportPortalSettings", BindingFlags.Instance | BindingFlags.NonPublic)!;
+        var firstSettings = (ReportPortalSettings?)settingsField.GetValue(builders[0]);
+        var secondSettings = (ReportPortalSettings?)settingsField.GetValue(builders[1]);
 
-        Assert.That(firstDescriptor, Is.Not.Null);
-        Assert.That(secondDescriptor, Is.Not.Null);
-        Assert.That(secondDescriptor, Is.Not.SameAs(firstDescriptor));
-        Assert.That(firstDescriptor!.TeamName, Is.EqualTo("Smoke"));
-        Assert.That(secondDescriptor!.TeamName, Is.EqualTo("Smoke"));
-        Assert.That(firstDescriptor.SystemName, Is.EqualTo("QaaS"));
-        Assert.That(secondDescriptor.SystemName, Is.EqualTo("Smooth"));
+        Assert.That(firstSettings, Is.Not.Null);
+        Assert.That(secondSettings, Is.Not.Null);
+        Assert.That(secondSettings, Is.Not.SameAs(firstSettings));
+        Assert.That(firstSettings!.Team, Is.EqualTo("Smoke"));
+        Assert.That(secondSettings!.Team, Is.EqualTo("Smoke"));
+        Assert.That(firstSettings.System, Is.EqualTo("QaaS"));
+        Assert.That(secondSettings.System, Is.EqualTo("Smooth"));
     }
 
     [Test]
