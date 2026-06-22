@@ -17,6 +17,19 @@ public sealed class ReportPortalSettings
     private const string DefaultDescription = "QaaS captured this run directly from the runner pipeline.";
     private const string UnknownSystem = "Unknown System";
     private readonly DateTimeOffset? _startedAtLocal;
+    
+    public bool Enabled { get; }
+    public string? Endpoint { get; }
+    public string? ApiKey { get; }
+    public string? Project { get; }
+    public string? Team { get; }
+    public string System { get; }
+    public IReadOnlyList<string> SessionNames { get; }
+    public string ExecutionMode { get; }
+    public string LaunchName { get; }
+    public string Description { get; }
+    public bool DebugMode { get; }
+    public IReadOnlyDictionary<string, string> Attributes { get; }
 
     /// <summary>
     /// Creates settings from raw ReportPortal configuration without runner launch context.
@@ -62,66 +75,6 @@ public sealed class ReportPortalSettings
         Description = Clean(config.Description) ?? BuildDefaultDescription();
         DebugMode = config.DebugMode == true;
     }
-
-    /// <summary>
-    /// Gets whether ReportPortal publishing is enabled for this launch group.
-    /// </summary>
-    public bool Enabled { get; }
-
-    /// <summary>
-    /// Gets the configured ReportPortal endpoint before API-path normalization.
-    /// </summary>
-    public string? Endpoint { get; }
-
-    /// <summary>
-    /// Gets the API key used to publish to ReportPortal.
-    /// </summary>
-    public string? ApiKey { get; }
-
-    /// <summary>
-    /// Gets the resolved ReportPortal project. Explicit configuration wins; otherwise metadata team is used.
-    /// </summary>
-    public string? Project { get; }
-
-    /// <summary>
-    /// Gets the metadata team used for labels, attributes, and stable reporting identity.
-    /// </summary>
-    public string? Team { get; }
-
-    /// <summary>
-    /// Gets the metadata system used to group launches and annotate results.
-    /// </summary>
-    public string System { get; }
-
-    /// <summary>
-    /// Gets the distinct session names represented by this launch group.
-    /// </summary>
-    public IReadOnlyList<string> SessionNames { get; }
-
-    /// <summary>
-    /// Gets the execution mode represented by this launch group, or <c>mixed</c> when grouped builders differ.
-    /// </summary>
-    public string ExecutionMode { get; }
-
-    /// <summary>
-    /// Gets the launch name sent to ReportPortal.
-    /// </summary>
-    public string LaunchName { get; }
-
-    /// <summary>
-    /// Gets the launch description sent to ReportPortal.
-    /// </summary>
-    public string Description { get; }
-
-    /// <summary>
-    /// Gets whether the ReportPortal launch should be created in debug mode.
-    /// </summary>
-    public bool DebugMode { get; }
-
-    /// <summary>
-    /// Gets merged launch attributes from runner metadata and explicit ReportPortal configuration.
-    /// </summary>
-    public IReadOnlyDictionary<string, string> Attributes { get; }
 
     /// <summary>
     /// Normalizes and validates the configured ReportPortal endpoint.
