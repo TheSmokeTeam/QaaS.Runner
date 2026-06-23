@@ -1,10 +1,11 @@
 # CLAUDE.md — QaaS.Runner.Assertions
 
 ## Purpose
-Assertion engine that evaluates session outputs against configured assertion hooks. Produces Allure-compatible test reports.
+Assertion engine that evaluates session outputs against configured assertion hooks. Produces Allure-compatible test reports and optional ReportPortal reports.
 
 ## Key Files
-- `AllureReporter.cs` — Main reporter: builds Allure test results with steps, attachments, and links
+- `Reporters/Allure/AllureReporter.cs` — Main reporter: builds Allure test results with steps, attachments, and links
+- `Reporters/ReportPortal/` — ReportPortal reporter, settings, access validator, and launch manager
 - `BaseReporter.cs` — Abstract base for assertion reporters
 - `IReporter.cs` — Reporter interface
 - `AssertionObjects/` — Runtime assertion models
