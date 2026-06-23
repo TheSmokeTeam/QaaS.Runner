@@ -89,13 +89,13 @@ internal sealed class ReportPortalAccessValidator : IDisposable
         var projectName = settings.Project;
 
         if (!settings.TryGetEndpointUri(out var endpointUri, out var endpointFailureReason))
-            return WarnAndReturnFailure(logger, $"Could not publish results to ReportPortal: {endpointFailureReason}");
+            return WarnAndReturnFailure(logger, 
+                $"Could not publish results to ReportPortal: {endpointFailureReason}");
 
         if (string.IsNullOrWhiteSpace(settings.ApiKey))
-        {
             return WarnAndReturnFailure(logger,
                 $"Could not publish results to ReportPortal project `{projectName}` because ReportPortal.ApiKey was not configured.");
-        }
+        
 
         var apiKey = settings.ApiKey;
 
@@ -110,31 +110,20 @@ internal sealed class ReportPortalAccessValidator : IDisposable
             var responseBody = await response.Content.ReadAsStringAsync(cancellationToken).ConfigureAwait(false);
 
             if (response.StatusCode is HttpStatusCode.Unauthorized or HttpStatusCode.Forbidden)
-            {
                 return WarnAndReturnFailure(logger,
                     $"Could not publish results to ReportPortal because the configured API key was rejected for project `{projectName}`.");
-            }
-
+            
             if (!response.IsSuccessStatusCode)
-            {
-                if (response.StatusCode == HttpStatusCode.NotFound)
-                {
-                    return WarnAndReturnFailure(logger,
-                        $"Could not publish results to ReportPortal because no accessible project matches `{projectName}`.");
-                }
-
-                return WarnAndReturnFailure(logger,
-                    $"Could not publish results to ReportPortal at {endpointUri} for project `{projectName}`. Status={(int)response.StatusCode} {response.ReasonPhrase}. Response={responseBody}");
-            }
-
+                return WarnAndReturnFailure(logger, 
+                    response.StatusCode == HttpStatusCode.NotFound ? $"Could not publish results to ReportPortal because no accessible project matches `{projectName}`." : $"Could not publish results to ReportPortal at {endpointUri} for project `{projectName}`. Status={(int)response.StatusCode} {response.ReasonPhrase}. Response={responseBody}");
+            
             var project = JsonSerializer.Deserialize<ProjectResponse>(responseBody, _jsonSerializerOptions)
                           ?? new ProjectResponse();
+            
             if (string.IsNullOrWhiteSpace(project.ProjectName))
-            {
                 return WarnAndReturnFailure(logger,
                     $"Could not publish results to ReportPortal because the endpoint `{settings.Endpoint}` returned an unreadable project payload for project `{projectName}`.");
-            }
-
+            
             return ReportPortalAccessResult.Success(endpointUri!, project.ProjectName, apiKey);
         }
         catch (TaskCanceledException)

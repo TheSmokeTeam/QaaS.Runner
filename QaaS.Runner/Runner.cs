@@ -229,6 +229,8 @@ public class Runner : IRunner, IDisposable
         // not services resolved from the Autofac scope.
         ExecutionBuilders.ForEach(builder => builder.WithLogger(Logger));
         
+        // Adding ReportPortal manager and settings into each execution builder
+        // Builders shares the same manager to manage the ReportPortal launch.
         if (reportPortalLaunchManager is not null)
             ExecutionBuilders.ForEach(builder => builder.WithReportPortalLaunchManager(reportPortalLaunchManager));
         foreach (var settingsPair in reportPortalSettingsByBuilder)

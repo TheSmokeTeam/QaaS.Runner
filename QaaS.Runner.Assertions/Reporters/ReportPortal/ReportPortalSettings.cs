@@ -36,7 +36,7 @@ public sealed class ReportPortalSettings
     /// </summary>
     /// <param name="config">The raw ReportPortal reporter configuration.</param>
     public ReportPortalSettings(ReportPortalConfig config)
-        : this(config, null, null, [], "run", null, null)
+        : this(config, null, null, [], "run", null)
     {
     }
 
@@ -131,7 +131,7 @@ public sealed class ReportPortalSettings
             resolvedProjectName.ToLowerInvariant(),
             System.ToLowerInvariant());
 
-    private static IReadOnlyDictionary<string, string> MergeAttributes(
+    private static Dictionary<string, string> MergeAttributes(
         IReadOnlyDictionary<string, string>? launchAttributes,
         IReadOnlyDictionary<string, string>? configAttributes)
     {
