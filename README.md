@@ -2,6 +2,7 @@
 
 Execution orchestration package for running QaaS test workflows from YAML configuration.
 
+[![CI](https://github.com/TheSmokeTeam/QaaS.Runner/actions/workflows/ci.yml/badge.svg)](https://github.com/TheSmokeTeam/QaaS.Runner/actions/workflows/ci.yml)
 [![CI](https://img.shields.io/badge/CI-GitHub_Actions-2088FF)](./.github/workflows/ci.yml)
 [![Docs](https://img.shields.io/badge/docs-qaas--docs-blue)](https://thesmoketeam.github.io/qaas-docs/)
 [![.NET](https://img.shields.io/badge/.NET-10.0-512BD4)](https://dotnet.microsoft.com/)
