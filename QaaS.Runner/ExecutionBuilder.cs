@@ -52,8 +52,17 @@ namespace QaaS.Runner;
 [JsonSchema]
 public class ExecutionBuilder() : BaseExecutionBuilder<InternalContext, ExecutionData>, ICloneable<ExecutionBuilder>
 {
+    /// <summary>
+    /// Manually clone for <see cref="ExecutionBuilder" /> since it contains objects that can't be deep cloned with <see cref="BuilderCloner.DeepClone{T}(T)" />
+    /// Objects such as <see cref="ILogger" /> and <see cref="ReportPortalLaunchManager" /> are shared across ExecutionBuilders and can't be deep-cloned.
+    /// </summary>
+    /// <returns></returns>
     public ExecutionBuilder Clone() => new(this);
 
+    /// <summary>
+    /// Constructor for cloning an <see cref="ExecutionBuilder" /> instance used by <see cref="Clone" /> method.
+    /// </summary>
+    /// <param name="source"></param>
     private ExecutionBuilder(ExecutionBuilder source) : this()
     {
         DataSources = source.DataSources?.Select(dataSource => dataSource.Clone()).ToArray();
