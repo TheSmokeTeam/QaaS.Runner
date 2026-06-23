@@ -8,11 +8,11 @@ namespace QaaS.Runner.Assertions.ConfigurationObjects.ReporterConfigs;
 public class ReportPortalConfig : IReporterConfig
 {
     [Description("Whether to enable ReportPortal reporting")]
-    [DefaultValue(true)]
+    [DefaultValue("QaaS.Configuration defaults")]
     public bool? Enabled { get; set; } = _defaultsProvider?.GetDefaults().Enabled;
 
     [Description("ReportPortal endpoint URI. Accepts either the gateway URL or the API URL and normalizes it to /api/. Defaults to the global API URL.")]
-    [DefaultValue("Global API URL")]
+    [DefaultValue("Global URL in QaaS.Configuration")]
     public string? Endpoint { get; set; } = _defaultsProvider?.GetDefaults().ReportPortalUri;
 
     [Description("ReportPortal project where the launch will be published. Default is MetaData.Team.")]
@@ -20,7 +20,7 @@ public class ReportPortalConfig : IReporterConfig
     public string? Project { get; set; }
 
     [Description("ReportPortal API key used for publishing. Defaults to the global API key.")]
-    [DefaultValue("Global API key")]
+    [DefaultValue("Global API key in QaaS.Configuration")]
     public string? ApiKey { get; set; } = _defaultsProvider?.GetDefaults().ReportPortalApiKey;
 
     [Description("Optional launch name override.")]
