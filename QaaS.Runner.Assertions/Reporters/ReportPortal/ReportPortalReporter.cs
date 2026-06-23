@@ -3,7 +3,6 @@ using Microsoft.Extensions.Logging;
 using QaaS.Framework.Configurations;
 using QaaS.Framework.SDK.Hooks.Assertion;
 using QaaS.Runner.Assertions.AssertionObjects;
-using QaaS.Runner.Assertions.ConfigurationObjects.ReporterConfigs;
 using ReportPortal.Client.Abstractions.Models;
 using ReportPortal.Client.Abstractions.Requests;
 using AssertionSeverity = QaaS.Runner.Assertions.AssertionObjects.AssertionSeverity;
@@ -96,7 +95,8 @@ public class ReportPortalReporter : BaseReporter
             WriteAssertionContextLog(launch, itemUuid, assertionResult, stableIdentity);
             WriteAssertionOutcomeLog(launch, itemUuid, assertionResult);
             WriteLinksLog(launch, itemUuid, assertionResult);
-            WriteSessionLogs(launch, itemUuid, assertionResult);
+            WriteSessionDetails(launch, itemUuid, assertionResult);
+            WriteSessionLogAttachments(launch, itemUuid, assertionResult);
             WriteTemplateAttachment(launch, itemUuid, assertionResult);
             WriteAssertionAttachments(launch, itemUuid, assertionResult);
 
@@ -186,7 +186,7 @@ public class ReportPortalReporter : BaseReporter
         CreateLogItem(launch, itemUuid, ReportPortalLogLevel.Info, text, null);
     }
 
-    private void WriteSessionLogs(ReportPortalLaunchContext launch, string itemUuid, AssertionResult assertionResult)
+    private void WriteSessionDetails(ReportPortalLaunchContext launch, string itemUuid, AssertionResult assertionResult)
     {
         foreach (var sessionData in assertionResult.Assertion.SessionDataList)
         {
@@ -202,6 +202,21 @@ public class ReportPortalReporter : BaseReporter
                 CreateLogItem(launch, itemUuid, ReportPortalLogLevel.Error,
                     BuildActionFailureText(sessionData, actionFailure), null);
             }
+        }
+    }
+
+    private void WriteSessionLogAttachments(ReportPortalLaunchContext launch, string itemUuid,
+        AssertionResult assertionResult)
+    {
+        foreach (var sessionData in assertionResult.Assertion.SessionDataList)
+        {
+            var sessionLogArtifact = BuildSessionLogArtifact(sessionData, assertionResult.Assertion);
+            if (sessionLogArtifact is null)
+                continue;
+
+            CreateLogItem(launch, itemUuid, ReportPortalLogLevel.Info,
+                $"Session log: {sessionData.Name}",
+                sessionLogArtifact);
         }
     }
 

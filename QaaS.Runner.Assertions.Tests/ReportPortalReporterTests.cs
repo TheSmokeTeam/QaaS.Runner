@@ -1,8 +1,10 @@
 using System;
 using System.Collections.Immutable;
 using System.Collections.Generic;
+using System.IO;
 using System.Linq;
 using System.Reflection;
+using System.Text;
 using Microsoft.Extensions.Configuration;
 using NUnit.Framework;
 using QaaS.Framework.SDK.ContextObjects;
@@ -14,6 +16,7 @@ using QaaS.Runner.Assertions.ConfigurationObjects.ReporterConfigs;
 using QaaS.Runner.Assertions.Reporters;
 using QaaS.Runner.Assertions.Reporters.ReportPortal;
 using QaaS.Runner.Assertions.Tests.Mocks;
+using QaaS.Runner.Infrastructure;
 using ReportPortal.Client.Abstractions.Models;
 
 namespace QaaS.Runner.Assertions.Tests;
@@ -54,6 +57,77 @@ public class ReportPortalReporterTests
             Assert.That(firstSeverity, Is.EqualTo("critical"));
             Assert.That(secondSeverity, Is.EqualTo("minor"));
         });
+    }
+
+    [Test]
+    public void BuildSessionLogArtifact_WhenSaveLogsEnabled_ReturnsStoredSessionLog()
+    {
+        using var launchManager = new ReportPortalLaunchManager();
+        var reporter = CreateReporter(launchManager);
+        reporter.SaveLogs = true;
+        reporter.Context.AppendSessionLog("session-a", "Starting session-a");
+        reporter.Context.AppendSessionLog("session-a", "Completed session-a");
+        var sessionData = new SessionData
+        {
+            Name = "session-a"
+        };
+        var assertion = new Assertion
+        {
+            SaveLogs = false
+        };
+
+        var artifact = BuildSessionLogArtifact(reporter, sessionData, assertion);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(artifact, Is.Not.Null);
+            Assert.That(artifact!.Name, Is.EqualTo("session-a.log"));
+            Assert.That(artifact.RelativePath, Is.EqualTo(Path.Combine("SessionLogs", "session-a.log")));
+            Assert.That(artifact.ContentType, Is.EqualTo("text/plain"));
+            Assert.That(Encoding.UTF8.GetString(artifact.Content), Does.Contain("Starting session-a"));
+            Assert.That(Encoding.UTF8.GetString(artifact.Content), Does.Contain("Completed session-a"));
+        });
+    }
+
+    [Test]
+    public void BuildSessionLogArtifact_WhenSaveLogsDisabled_ReturnsNull()
+    {
+        using var launchManager = new ReportPortalLaunchManager();
+        var reporter = CreateReporter(launchManager);
+        reporter.SaveLogs = false;
+        reporter.Context.AppendSessionLog("session-a", "Starting session-a");
+        var sessionData = new SessionData
+        {
+            Name = "session-a"
+        };
+        var assertion = new Assertion
+        {
+            SaveLogs = true
+        };
+
+        var artifact = BuildSessionLogArtifact(reporter, sessionData, assertion);
+
+        Assert.That(artifact, Is.Null);
+    }
+
+    [Test]
+    public void BuildSessionLogArtifact_WhenAssertionSaveLogsEnabled_ReturnsStoredSessionLog()
+    {
+        using var launchManager = new ReportPortalLaunchManager();
+        var reporter = CreateReporter(launchManager);
+        reporter.Context.AppendSessionLog("session-a", "Starting session-a");
+        var sessionData = new SessionData
+        {
+            Name = "session-a"
+        };
+        var assertion = new Assertion
+        {
+            SaveLogs = true
+        };
+
+        var artifact = BuildSessionLogArtifact(reporter, sessionData, assertion);
+
+        Assert.That(artifact, Is.Not.Null);
     }
 
     private static ReportPortalReporter CreateReporter(ReportPortalLaunchManager launchManager)
@@ -100,6 +174,14 @@ public class ReportPortalReporterTests
     {
         var method = typeof(BaseReporter)
             .GetMethod("BuildSessionArtifact", BindingFlags.Instance | BindingFlags.NonPublic)!;
+        return (ReportArtifact?)method.Invoke(reporter, [sessionData, assertion]);
+    }
+
+    private static ReportArtifact? BuildSessionLogArtifact(ReportPortalReporter reporter, SessionData sessionData,
+        Assertion assertion)
+    {
+        var method = typeof(BaseReporter)
+            .GetMethod("BuildSessionLogArtifact", BindingFlags.Instance | BindingFlags.NonPublic)!;
         return (ReportArtifact?)method.Invoke(reporter, [sessionData, assertion]);
     }
 
