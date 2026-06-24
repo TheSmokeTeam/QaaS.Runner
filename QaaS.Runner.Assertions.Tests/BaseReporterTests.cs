@@ -1,11 +1,7 @@
 using System;
-using System.Collections;
-using System.Collections.Generic;
 using NUnit.Framework;
-using QaaS.Framework.SDK;
 using QaaS.Framework.Serialization;
 using QaaS.Runner.Assertions.AssertionObjects;
-using QaaS.Runner.Assertions.Reporters;
 
 namespace QaaS.Runner.Assertions.Tests;
 
@@ -21,11 +17,6 @@ public class BaseReporterTests
         public static string ResolveAttachmentType(SerializationType? serializationType)
         {
             return GetAttachmentTypeBySerializationType(serializationType);
-        }
-
-        public static string ResolveMetadataSummary(IReadOnlyDictionary<string, string> metadataAttributes)
-        {
-            return BuildMetadataSummaryText(metadataAttributes);
         }
     }
 
@@ -50,40 +41,5 @@ public class BaseReporterTests
     {
         Assert.Throws<InvalidOperationException>(() =>
             TestReporter.ResolveAttachmentType((SerializationType)999));
-    }
-
-    [Test]
-    public void ExtractMetadataAttributes_ExcludesTeamAndSystemAndFlattensExtraLabels()
-    {
-        var metaData = new MetaDataConfig
-        {
-            Team = "Smoke",
-            System = "QaaS"
-        };
-        var extraLabelsProperty = metaData.GetType().GetProperty("ExtraLabels");
-        Assert.That(extraLabelsProperty, Is.Not.Null, "MetaDataConfig.ExtraLabels must exist for ReportPortal grouping.");
-        var extraLabels = (IDictionary)Activator.CreateInstance(extraLabelsProperty!.PropertyType)!;
-        extraLabels["Component"] = "Auth";
-        extraLabels["Area"] = "Login";
-        extraLabelsProperty.SetValue(metaData, extraLabels);
-
-        var attributes = BaseReporter.ExtractMetadataAttributes(metaData);
-
-        Assert.That(attributes.ContainsKey("Team"), Is.False);
-        Assert.That(attributes.ContainsKey("System"), Is.False);
-        Assert.That(attributes["Component"], Is.EqualTo("Auth"));
-        Assert.That(attributes["Area"], Is.EqualTo("Login"));
-    }
-
-    [Test]
-    public void BuildMetadataSummaryText_WithAttributes_FormatsDeterministically()
-    {
-        var summary = TestReporter.ResolveMetadataSummary(new Dictionary<string, string>
-        {
-            ["Owner"] = "Smoke",
-            ["Component"] = "Gateway"
-        });
-
-        Assert.That(summary, Is.EqualTo("Component: Gateway" + Environment.NewLine + "Owner: Smoke"));
     }
 }

@@ -15,14 +15,5 @@ public record GrafanaLinkConfig : ILinkConfig
     public string? DashboardId { get; set; }
 
     [Description("The variables to display the dashboard with")]
-    public GrafanaVariableConfig[] Variables { get; set; } = [];
-}
-
-public record GrafanaVariableConfig
-{
-    [Required]
-    public string? Key { get; set; }
-
-    [Required]
-    public string? Value { get; set; }
+    public KeyValuePair<string, string>[] Variables { get; set; } = [];
 }

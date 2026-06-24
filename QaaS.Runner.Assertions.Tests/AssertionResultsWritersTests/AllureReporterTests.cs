@@ -13,8 +13,6 @@ using QaaS.Framework.SDK.Hooks.Assertion;
 using QaaS.Framework.SDK.Session.SessionDataObjects;
 using QaaS.Framework.Serialization;
 using QaaS.Runner.Assertions.AssertionObjects;
-using QaaS.Runner.Assertions.Reporters;
-using QaaS.Runner.Assertions.Reporters.Allure;
 using QaaS.Runner.Assertions.Tests.Mocks;
 using QaaS.Runner.Infrastructure;
 
@@ -45,7 +43,8 @@ public class AllureReporterTests
             },
             SaveLogs = true,
             SaveAttachments = true,
-            FileSystem = new FileSystem()
+            FileSystem = new FileSystem(),
+            Name = null
         };
     }
 
@@ -84,7 +83,7 @@ public class AllureReporterTests
                     SessionDataList =
                         [],
                     AssertionHook = null,
-                    StatusesToReport = null
+                    StatussesToReport = null
                 },
                 AssertionStatus = AssertionStatus.Passed,
                 TestDurationMs = 10,
@@ -111,7 +110,7 @@ public class AllureReporterTests
                         }
                     }.ToImmutableList(),
                     AssertionHook = null,
-                    StatusesToReport = null
+                    StatussesToReport = null
                 },
 
                 AssertionStatus = AssertionStatus.Passed,
@@ -144,7 +143,7 @@ public class AllureReporterTests
                         }
                     }.ToImmutableList(),
                     AssertionHook = null,
-                    StatusesToReport = null
+                    StatussesToReport = null
                 },
                 AssertionStatus = AssertionStatus.Passed,
                 TestDurationMs = 10,
@@ -176,7 +175,7 @@ public class AllureReporterTests
                         }
                     }.ToImmutableList(),
                     AssertionHook = null,
-                    StatusesToReport = null
+                    StatussesToReport = null
                 },
                 AssertionStatus = AssertionStatus.Passed,
                 TestDurationMs = 10,
@@ -213,7 +212,7 @@ public class AllureReporterTests
                         }
                     }.ToImmutableList(),
                     AssertionHook = null,
-                    StatusesToReport = null
+                    StatussesToReport = null
                 },
                 AssertionStatus = AssertionStatus.Passed,
                 TestDurationMs = 10,
@@ -266,7 +265,7 @@ public class AllureReporterTests
                         }
                     }.ToImmutableList(),
                     AssertionHook = null,
-                    StatusesToReport = null
+                    StatussesToReport = null
                 },
                 AssertionStatus = AssertionStatus.Passed,
                 TestDurationMs = 10,
@@ -295,7 +294,8 @@ public class AllureReporterTests
                 SaveAttachments = false,
                 SaveTemplate = saveTemplate,
                 SaveSessionData = saveSessionData,
-                FileSystem = new FileSystem()
+                FileSystem = new FileSystem(),
+                Name = null
             });
 
         // Act
@@ -386,7 +386,7 @@ public class AllureReporterTests
                 },
                 Name = null,
                 AssertionName = null,
-                StatusesToReport = null
+                StatussesToReport = null
             },
             AssertionStatus = AssertionStatus.Passed,
             TestDurationMs = 0,
@@ -435,7 +435,7 @@ public class AllureReporterTests
                 },
                 Name = "unsafe-assertion",
                 AssertionName = "AssertionOne",
-                StatusesToReport = null
+                StatussesToReport = null
             },
             AssertionStatus = AssertionStatus.Passed,
             TestDurationMs = 0,
@@ -495,7 +495,7 @@ public class AllureReporterTests
                 Name = "log-assertion",
                 AssertionName = "LogAssertion",
                 SessionDataList = new List<SessionData> { sessionData }.ToImmutableList(),
-                StatusesToReport = null
+                StatussesToReport = null
             },
             AssertionStatus = AssertionStatus.Passed,
             TestDurationMs = 10,
@@ -542,7 +542,7 @@ public class AllureReporterTests
                 Name = "log-assertion",
                 AssertionName = "LogAssertion",
                 SessionDataList = new List<SessionData> { sessionData }.ToImmutableList(),
-                StatusesToReport = null
+                StatussesToReport = null
             },
             AssertionStatus = AssertionStatus.Passed,
             TestDurationMs = 10,
@@ -591,7 +591,7 @@ public class AllureReporterTests
                 Name = "artifact-assertion",
                 AssertionName = "ArtifactAssertion",
                 SessionDataList = new List<SessionData> { sessionData }.ToImmutableList(),
-                StatusesToReport = null
+                StatussesToReport = null
             },
             AssertionStatus = AssertionStatus.Passed,
             TestDurationMs = 10,
@@ -645,7 +645,7 @@ public class AllureReporterTests
                     ]
                 },
                 SessionDataList = [],
-                StatusesToReport = null
+                StatussesToReport = null
             },
             AssertionStatus = AssertionStatus.Passed,
             TestDurationMs = 10,
@@ -721,7 +721,7 @@ public class AllureReporterTests
                 Name = "no-hook",
                 AssertionName = "NoHookAssertion",
                 AssertionHook = null,
-                StatusesToReport = null
+                StatussesToReport = null
             },
             AssertionStatus = AssertionStatus.Passed,
             TestDurationMs = 0,
@@ -762,7 +762,7 @@ public class AllureReporterTests
                 },
                 Name = "duplicate-attachments",
                 AssertionName = "DuplicateAttachmentAssertion",
-                StatusesToReport = null
+                StatussesToReport = null
             },
             AssertionStatus = AssertionStatus.Passed,
             TestDurationMs = 0,
@@ -797,7 +797,7 @@ public class AllureReporterTests
                 },
                 Name = "missing-file-name",
                 AssertionName = "MissingFileNameAssertion",
-                StatusesToReport = null
+                StatussesToReport = null
             },
             AssertionStatus = AssertionStatus.Passed,
             TestDurationMs = 0,
@@ -837,7 +837,7 @@ public class AllureReporterTests
                 {
                     new() { Name = "session-a", SessionFailures = [] }
                 }.ToImmutableList(),
-                StatusesToReport = null
+                StatussesToReport = null
             },
             AssertionStatus = AssertionStatus.Passed,
             TestDurationMs = 0,
@@ -871,7 +871,7 @@ public class AllureReporterTests
                 },
                 Name = "status-assertion",
                 AssertionName = "StatusAssertion",
-                StatusesToReport = null
+                StatussesToReport = null
             },
             AssertionStatus = status,
             Flaky = new Flaky { IsFlaky = true, FlakinessReasons = [] }
@@ -905,7 +905,7 @@ public class AllureReporterTests
                 },
                 Name = "broken-assertion",
                 AssertionName = "BrokenAssertion",
-                StatusesToReport = null
+                StatussesToReport = null
             },
             AssertionStatus = AssertionStatus.Broken,
             BrokenAssertionException = exception,
@@ -957,7 +957,7 @@ public class AllureReporterTests
                 Name = "failed-assertion",
                 AssertionName = "FailedAssertion",
                 SessionDataList = new List<SessionData> { sessionData }.ToImmutableList(),
-                StatusesToReport = null
+                StatussesToReport = null
             },
             AssertionStatus = AssertionStatus.Failed,
             TestDurationMs = 10,
@@ -989,7 +989,7 @@ public class AllureReporterTests
                 Name = "no-attachments",
                 AssertionName = "NoAttachmentsAssertion",
                 SessionDataList = [],
-                StatusesToReport = null
+                StatussesToReport = null
             },
             AssertionStatus = AssertionStatus.Passed,
             Flaky = new Flaky { IsFlaky = false, FlakinessReasons = [] }
@@ -1025,7 +1025,7 @@ public class AllureReporterTests
                 Name = "template-only",
                 AssertionName = "TemplateOnlyAssertion",
                 SessionDataList = [],
-                StatusesToReport = null
+                StatussesToReport = null
             },
             AssertionStatus = AssertionStatus.Passed,
             Flaky = new Flaky { IsFlaky = false, FlakinessReasons = [] }
@@ -1064,7 +1064,7 @@ public class AllureReporterTests
                     ]
                 },
                 SessionDataList = [],
-                StatusesToReport = null
+                StatussesToReport = null
             },
             AssertionStatus = AssertionStatus.Passed,
             Flaky = new Flaky { IsFlaky = false, FlakinessReasons = [] }
@@ -1159,7 +1159,7 @@ public class AllureReporterTests
                 Name = "invalid-status",
                 AssertionName = "InvalidStatusAssertion",
                 AssertionHook = new AssertionHookMock(),
-                StatusesToReport = null
+                StatussesToReport = null
             },
             AssertionStatus = (AssertionStatus)999,
             Flaky = new Flaky { IsFlaky = false, FlakinessReasons = [] }
@@ -1184,7 +1184,7 @@ public class AllureReporterTests
                 Name = "broken-with-trace",
                 AssertionName = "BrokenWithTraceAssertion",
                 AssertionHook = new AssertionHookMock(),
-                StatusesToReport = null
+                StatussesToReport = null
             },
             AssertionStatus = AssertionStatus.Broken,
             BrokenAssertionException = exception,
@@ -1223,7 +1223,7 @@ public class AllureReporterTests
                     })
                     .Build(),
                 SessionDataList = [],
-                StatusesToReport = null
+                StatussesToReport = null
             },
             AssertionStatus = AssertionStatus.Passed,
             TestDurationMs = 5,

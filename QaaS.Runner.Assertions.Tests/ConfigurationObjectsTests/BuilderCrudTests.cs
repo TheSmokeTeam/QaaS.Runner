@@ -15,7 +15,8 @@ public class BuilderCrudTests
     {
         var builder = new AssertionBuilder
         {
-            AssertionInstance = null!
+            AssertionInstance = null!,
+            Reporter = null!
         };
 
         builder.AddSessionName("session-a")
@@ -139,5 +140,6 @@ public class BuilderCrudTests
         });
     }
 }
+
 
 

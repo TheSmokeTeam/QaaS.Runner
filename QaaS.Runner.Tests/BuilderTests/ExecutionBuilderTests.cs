@@ -15,8 +15,6 @@ using QaaS.Framework.SDK.Session.SessionDataObjects;
 using QaaS.Framework.SDK.Session.SessionDataObjects.RunningSessionsObjects;
 using QaaS.Runner.Assertions.ConfigurationObjects;
 using QaaS.Runner.Assertions.ConfigurationObjects.LinkConfigs;
-using QaaS.Runner.Assertions.Reporters;
-using QaaS.Runner.Assertions.Reporters.Allure;
 using QaaS.Runner.Infrastructure;
 using QaaS.Runner.Sessions.Actions.MockerCommands;
 using QaaS.Runner.Sessions.Actions.Probes;
@@ -133,7 +131,8 @@ public class ExecutionBuilderTests
             builder.RemoveSession("missing");
             builder.UpdateAssertion("missing", new AssertionBuilder
             {
-                AssertionInstance = null!
+                AssertionInstance = null!,
+                Reporter = null!
             });
             builder.RemoveAssertion("missing");
             builder.UpdateStorageAt(0, new StorageBuilder());
@@ -933,32 +932,6 @@ public class ExecutionBuilderTests
     }
 
     [Test]
-    public void BuildReports_WithAssertions_UsesReporterFactoryBuiltInReporters()
-    {
-        var context = CreateLoadedContext(new Dictionary<string, string?>());
-        var builder = new ExecutionBuilder(context, ExecutionType.Run, null, null, null, null)
-        {
-            Assertions =
-            [
-                new AssertionBuilder
-                {
-                    Name = "assertion-display",
-                    AssertionInstance = null!
-                }
-            ]
-        };
-
-        var builtReports = ((System.Collections.IEnumerable)typeof(ExecutionBuilder)
-                .GetMethod("BuildReports", BindingFlags.Instance | BindingFlags.NonPublic)!
-                .Invoke(builder, [])!)
-            .Cast<IReporter>()
-            .ToList();
-
-        Assert.That(builtReports, Has.Count.EqualTo(1));
-        Assert.That(builtReports[0], Is.TypeOf<AllureReporter>());
-    }
-
-    [Test]
     public void BuildDataSources_WithoutInitializedBuildScope_ThrowsInvalidOperationException()
     {
         var builder = new ExecutionBuilder();
@@ -990,7 +963,8 @@ public class ExecutionBuilderTests
         {
             Name = "test-assertion",
             Assertion = "Equals",
-            AssertionInstance = null
+            AssertionInstance = null,
+            Reporter = null
         }.HookNamed(nameof(TestAssertion));
         builder.AddAssertion(assertionBuilder);
 
@@ -1064,7 +1038,8 @@ public class ExecutionBuilderTests
         {
             Name = "test-assertion",
             Assertion = "Equals",
-            AssertionInstance = null
+            AssertionInstance = null,
+            Reporter = null
         }.HookNamed(nameof(TestAssertion));
         builder.AddAssertion(assertionBuilder);
 
@@ -1136,5 +1111,7 @@ public class ExecutionBuilderTests
 
     private sealed record LogEntry(LogLevel LogLevel, string Message);
 }
+
+
 
 

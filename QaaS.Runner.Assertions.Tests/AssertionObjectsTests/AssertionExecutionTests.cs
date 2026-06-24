@@ -152,7 +152,7 @@ public class AssertionExecutionTests
             Name = "assertion-name",
             AssertionName = "assertion-type",
             AssertionHook = hook,
-            StatusesToReport = Enum.GetValues<AssertionStatus>().ToList(),
+            StatussesToReport = Enum.GetValues<AssertionStatus>().ToList(),
             _dataSourceNames = [],
             _dataSourcePatterns = [],
             _sessionNames = sessionNames ?? [],
