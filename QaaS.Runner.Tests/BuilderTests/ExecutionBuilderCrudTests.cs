@@ -44,7 +44,8 @@ public class ExecutionBuilderCrudTests
         {
             Name = "assertion-a",
             Assertion = "Equals",
-            AssertionInstance = null!
+            AssertionInstance = null!,
+            Reporter = null!
         }.HookNamed("AssertionHook");
         var storage = new StorageBuilder().Configure(new S3Config());
         var dataSource = new DataSourceBuilder().Named("source-a").HookNamed("GeneratorHook");
@@ -146,13 +147,15 @@ public class ExecutionBuilderCrudTests
         {
             Name = "assertion-a",
             Assertion = "Equals",
-            AssertionInstance = null!
+            AssertionInstance = null!,
+            Reporter = null!
         }.HookNamed("HookA");
         var updatedAssertion = new AssertionBuilder
         {
             Name = "assertion-a",
             Assertion = "NotEquals",
-            AssertionInstance = null!
+            AssertionInstance = null!,
+            Reporter = null!
         }.HookNamed("HookB");
 
         var builder = new ExecutionBuilder()
@@ -187,25 +190,8 @@ public class ExecutionBuilderCrudTests
             Assert.That((builder.Links ?? []).ElementAtOrDefault(0), Is.Null);
         });
     }
-
-    [Test]
-    public void UpdateReporters_ShouldReplaceConfiguredReporterBuilder()
-    {
-        var originalReporters = new ReporterBuilder().ShouldSaveLogs(true);
-        var updatedReporters = new ReporterBuilder().ShouldSaveAttachments(true);
-        var builder = new ExecutionBuilder
-        {
-            Reporters = originalReporters
-        };
-
-        var result = builder.UpdateReporters(updatedReporters);
-
-        Assert.Multiple(() =>
-        {
-            Assert.That(result, Is.SameAs(builder));
-            Assert.That(builder.Reporters, Is.SameAs(updatedReporters));
-        });
-    }
 }
+
+
 
 
