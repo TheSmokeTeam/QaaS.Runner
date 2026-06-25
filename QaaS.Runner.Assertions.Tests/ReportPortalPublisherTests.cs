@@ -11,6 +11,7 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 using Moq;
 using NUnit.Framework;
+using QaaS.Framework.Configurations.CustomExceptions;
 using QaaS.Framework.SDK;
 using QaaS.Framework.SDK.ContextObjects;
 using QaaS.Framework.SDK.Extensions;
@@ -27,7 +28,7 @@ using ReportPortal.Client.Abstractions.Responses;
 namespace QaaS.Runner.Assertions.Tests;
 
 [TestFixture]
-public class ReportPortalDeferredPublisherTests
+public class ReportPortalPublisherTests
 {
     [SetUp]
     public void SetUp()
@@ -36,11 +37,150 @@ public class ReportPortalDeferredPublisherTests
     }
 
     [Test]
+    public async Task ValidateAsync_WithDisabledReportPortal_DoesNotValidateOrCreatePublishClient()
+    {
+        using var httpClient = CreateSuccessfulValidationClient(out var handler);
+        var factory = new RecordingClientFactory();
+        using var publisher = new ReportPortalPublisher(httpClient, factory, StartedAt());
+        var reporter = CreateReporter(enabled: false);
+
+        await publisher.ValidateAsync([reporter], Globals.Logger);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(handler.RequestCount, Is.Zero);
+            Assert.That(factory.Services, Is.Empty);
+            Assert.That(ReportPortalLaunchPlan.Build([reporter], StartedAt(), requireQueuedResults: false),
+                Is.Empty);
+        });
+    }
+
+    [TestCase(null, "ReportPortal.Project or MetaData.Team", TestName = "Missing project fallback")]
+    [TestCase("Smoke", "ReportPortal.ApiKey", null, TestName = "Missing API key")]
+    [TestCase("Smoke", "ReportPortal.Endpoint", "api-key", null, TestName = "Missing endpoint")]
+    public void ValidateAsync_WithMissingConfiguration_ThrowsBeforeHttpOrPublishClient(
+        string? team,
+        string expectedMessage,
+        string? apiKey = "api-key",
+        string? endpoint = "http://localhost:8080")
+    {
+        using var httpClient = CreateSuccessfulValidationClient(out var handler);
+        var factory = new RecordingClientFactory();
+        using var publisher = new ReportPortalPublisher(httpClient, factory, StartedAt());
+        var reporter = CreateReporter(team: team, apiKey: apiKey, endpoint: endpoint);
+
+        var exception = Assert.ThrowsAsync<InvalidConfigurationsException>(
+            async () => await publisher.ValidateAsync([reporter], Globals.Logger));
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(exception!.Message, Does.Contain(expectedMessage));
+            Assert.That(handler.RequestCount, Is.Zero);
+            Assert.That(factory.Services, Is.Empty);
+        });
+    }
+
+    [Test]
+    public void ValidateAsync_WithUnauthorizedApiKey_ThrowsConfigurationFailure()
+    {
+        using var httpClient = CreateValidationClient(_ =>
+            new HttpResponseMessage(HttpStatusCode.Unauthorized)
+            {
+                Content = new StringContent("unauthorized", Encoding.UTF8, "text/plain")
+            }, out var handler);
+        var factory = new RecordingClientFactory();
+        using var publisher = new ReportPortalPublisher(httpClient, factory, StartedAt());
+
+        var exception = Assert.ThrowsAsync<InvalidConfigurationsException>(
+            async () => await publisher.ValidateAsync([CreateReporter()], Globals.Logger));
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(exception!.Message, Does.Contain("API key"));
+            Assert.That(handler.RequestCount, Is.EqualTo(1));
+            Assert.That(factory.Services, Is.Empty);
+        });
+    }
+
+    [Test]
+    public void ValidateAsync_WithMissingProject_ThrowsConfigurationFailure()
+    {
+        using var httpClient = CreateValidationClient(_ =>
+            new HttpResponseMessage(HttpStatusCode.NotFound)
+            {
+                Content = new StringContent("{\"message\":\"not found\"}", Encoding.UTF8,
+                    "application/json")
+            }, out var handler);
+        var factory = new RecordingClientFactory();
+        using var publisher = new ReportPortalPublisher(httpClient, factory, StartedAt());
+
+        var exception = Assert.ThrowsAsync<InvalidConfigurationsException>(
+            async () => await publisher.ValidateAsync([CreateReporter(team: "Smoke")], Globals.Logger));
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(exception!.Message, Does.Contain("no accessible project matches `Smoke`"));
+            Assert.That(handler.RequestCount, Is.EqualTo(1));
+            Assert.That(factory.Services, Is.Empty);
+        });
+    }
+
+    [Test]
+    public async Task ValidateAsync_WithSuccessfulProjectLookup_UsesProjectFallbackAndCreatesNoPublishClient()
+    {
+        using var httpClient = CreateSuccessfulValidationClient(out var handler);
+        var factory = new RecordingClientFactory();
+        using var publisher = new ReportPortalPublisher(httpClient, factory, StartedAt());
+
+        await publisher.ValidateAsync([CreateReporter(team: "Smoke", project: " ")], Globals.Logger);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(handler.RequestCount, Is.EqualTo(1));
+            Assert.That(handler.RequestedProjectNames, Is.EqualTo(new[] { "Smoke" }));
+            Assert.That(factory.Services, Is.Empty);
+        });
+    }
+
+    [Test]
+    public async Task ValidateAsync_CachesSuccessfulValidationPerNormalizedLaunchGroup()
+    {
+        using var httpClient = CreateSuccessfulValidationClient(out var handler);
+        var factory = new RecordingClientFactory();
+        using var publisher = new ReportPortalPublisher(httpClient, factory, StartedAt());
+        var firstReporter = CreateReporter(endpoint: "http://localhost:8080");
+        var equivalentEndpointReporter = CreateReporter(endpoint: "http://localhost:8080/api/v1/");
+
+        await publisher.ValidateAsync([firstReporter, equivalentEndpointReporter], Globals.Logger);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(handler.RequestCount, Is.EqualTo(1));
+            Assert.That(factory.Services, Is.Empty);
+        });
+    }
+
+    [Test]
+    public async Task ValidateAsync_WithDifferentSystem_ValidatesSeparateLaunchGroup()
+    {
+        using var httpClient = CreateSuccessfulValidationClient(out var handler);
+        var factory = new RecordingClientFactory();
+        using var publisher = new ReportPortalPublisher(httpClient, factory, StartedAt());
+
+        await publisher.ValidateAsync([
+            CreateReporter(system: "QaaS"),
+            CreateReporter(system: "AnotherSystem")
+        ], Globals.Logger);
+
+        Assert.That(handler.RequestCount, Is.EqualTo(2));
+    }
+
+    [Test]
     public async Task PublishAsync_WithSameNormalizedEndpointProjectAndSystem_PublishesOneLaunch()
     {
-        using var validator = CreateSuccessfulValidator(out var handler);
+        using var httpClient = CreateSuccessfulValidationClient(out var handler);
         var factory = new RecordingClientFactory();
-        using var publisher = new ReportPortalDeferredPublisher(validator, factory, StartedAt());
+        using var publisher = new ReportPortalPublisher(httpClient, factory, StartedAt());
         var firstReporter = CreateReporter(team: "Smoke", system: "QaaS", endpoint: "http://localhost:8080");
         var secondReporter = CreateReporter(team: "Smoke", system: "QaaS", endpoint: "http://localhost:8080/api/v1/");
         firstReporter.WriteTestResults(CreateResult("assertion-a", "Session A"));
@@ -61,9 +201,9 @@ public class ReportPortalDeferredPublisherTests
     [Test]
     public async Task PublishAsync_WithMixedProjectsAndSystems_PublishesSeparateLaunches()
     {
-        using var validator = CreateSuccessfulValidator(out var handler);
+        using var httpClient = CreateSuccessfulValidationClient(out var handler);
         var factory = new RecordingClientFactory();
-        using var publisher = new ReportPortalDeferredPublisher(validator, factory, StartedAt());
+        using var publisher = new ReportPortalPublisher(httpClient, factory, StartedAt());
         var firstReporter = CreateReporter(team: "Smoke", system: "QaaS");
         var secondReporter = CreateReporter(team: "AnotherTeam", system: "QaaS");
         var thirdReporter = CreateReporter(team: "Smoke", system: "AnotherSystem");
@@ -83,11 +223,11 @@ public class ReportPortalDeferredPublisherTests
     }
 
     [Test]
-    public async Task PublishAsync_WithNoQueuedResults_DoesNotCreateClientService()
+    public async Task PublishAsync_WithNoQueuedResults_DoesNotCreatePublishClient()
     {
-        using var validator = CreateSuccessfulValidator(out _);
+        using var httpClient = CreateSuccessfulValidationClient(out _);
         var factory = new RecordingClientFactory();
-        using var publisher = new ReportPortalDeferredPublisher(validator, factory, StartedAt());
+        using var publisher = new ReportPortalPublisher(httpClient, factory, StartedAt());
         var reporter = CreateReporter();
 
         await publisher.ValidateAsync([reporter], Globals.Logger);
@@ -97,11 +237,11 @@ public class ReportPortalDeferredPublisherTests
     }
 
     [Test]
-    public async Task PublishAsync_WhenLaunchStartFails_DoesNotThrow()
+    public async Task PublishAsync_WhenLaunchStartFails_DoesNotThrowAndLogsWarning()
     {
-        using var validator = CreateSuccessfulValidator(out _);
+        using var httpClient = CreateSuccessfulValidationClient(out _);
         var factory = new RecordingClientFactory { ThrowOnLaunchStart = true };
-        using var publisher = new ReportPortalDeferredPublisher(validator, factory, StartedAt());
+        using var publisher = new ReportPortalPublisher(httpClient, factory, StartedAt());
         var logger = new Mock<ILogger>();
         var reporter = CreateReporter();
         reporter.WriteTestResults(CreateResult("assertion-a", "Session A"));
@@ -113,11 +253,43 @@ public class ReportPortalDeferredPublisherTests
     }
 
     [Test]
+    public async Task PublishAsync_WhenLaunchFinishFails_DoesNotThrowAndLogsWarning()
+    {
+        using var httpClient = CreateSuccessfulValidationClient(out _);
+        var factory = new RecordingClientFactory { ThrowOnLaunchFinish = true };
+        using var publisher = new ReportPortalPublisher(httpClient, factory, StartedAt());
+        var logger = new Mock<ILogger>();
+        var reporter = CreateReporter();
+        reporter.WriteTestResults(CreateResult("assertion-a", "Session A"));
+
+        await publisher.ValidateAsync([reporter], logger.Object);
+
+        Assert.DoesNotThrowAsync(async () => await publisher.PublishAsync([reporter], logger.Object));
+        VerifyWarningLogged(logger, "Could not finish ReportPortal launch");
+    }
+
+    [Test]
+    public async Task PublishAsync_WhenItemPublishFails_DoesNotThrowAndLogsWarning()
+    {
+        using var httpClient = CreateSuccessfulValidationClient(out _);
+        var factory = new RecordingClientFactory { ThrowOnTestItemStart = true };
+        using var publisher = new ReportPortalPublisher(httpClient, factory, StartedAt());
+        var logger = new Mock<ILogger>();
+        var reporter = CreateReporter();
+        reporter.WriteTestResults(CreateResult("assertion-a", "Session A"));
+
+        await publisher.ValidateAsync([reporter], logger.Object);
+
+        Assert.DoesNotThrowAsync(async () => await publisher.PublishAsync([reporter], logger.Object));
+        VerifyWarningLogged(logger, "Could not publish assertion");
+    }
+
+    [Test]
     public async Task PublishAsync_DisposesClientServiceAfterPublishing()
     {
-        using var validator = CreateSuccessfulValidator(out _);
+        using var httpClient = CreateSuccessfulValidationClient(out _);
         var factory = new RecordingClientFactory();
-        using var publisher = new ReportPortalDeferredPublisher(validator, factory, StartedAt());
+        using var publisher = new ReportPortalPublisher(httpClient, factory, StartedAt());
         var reporter = CreateReporter();
         reporter.WriteTestResults(CreateResult("assertion-a", "Session A"));
 
@@ -132,9 +304,9 @@ public class ReportPortalDeferredPublisherTests
     [Test]
     public async Task PublishAsync_WhenClientDisposeFails_DoesNotThrowAndLogsWarning()
     {
-        using var validator = CreateSuccessfulValidator(out _);
+        using var httpClient = CreateSuccessfulValidationClient(out _);
         var factory = new RecordingClientFactory { ThrowOnDispose = true };
-        using var publisher = new ReportPortalDeferredPublisher(validator, factory, StartedAt());
+        using var publisher = new ReportPortalPublisher(httpClient, factory, StartedAt());
         var logger = new Mock<ILogger>();
         var reporter = CreateReporter();
         reporter.WriteTestResults(CreateResult("assertion-a", "Session A"));
@@ -145,9 +317,9 @@ public class ReportPortalDeferredPublisherTests
         VerifyWarningLogged(logger, "Could not dispose ReportPortal client service");
     }
 
-    private static ReportPortalAccessValidator CreateSuccessfulValidator(out RecordingHttpMessageHandler handler)
+    private static HttpClient CreateSuccessfulValidationClient(out RecordingHttpMessageHandler handler)
     {
-        handler = new RecordingHttpMessageHandler(request =>
+        return CreateValidationClient(request =>
         {
             var projectName = request.RequestUri!.Segments[^1];
             return new HttpResponseMessage(HttpStatusCode.OK)
@@ -155,37 +327,50 @@ public class ReportPortalDeferredPublisherTests
                 Content = new StringContent($"{{\"projectName\":\"{projectName}\"}}", Encoding.UTF8,
                     "application/json")
             };
-        });
-        return new ReportPortalAccessValidator(new HttpClient(handler));
+        }, out handler);
+    }
+
+    private static HttpClient CreateValidationClient(
+        Func<HttpRequestMessage, HttpResponseMessage> responseFactory,
+        out RecordingHttpMessageHandler handler)
+    {
+        handler = new RecordingHttpMessageHandler(responseFactory);
+        return new HttpClient(handler);
     }
 
     private static DateTimeOffset StartedAt() =>
         new(2025, 1, 1, 10, 0, 0, TimeSpan.Zero);
 
     private static ReportPortalReporter CreateReporter(
-        string team = "Smoke",
+        bool enabled = true,
+        string? team = "Smoke",
         string system = "QaaS",
         string? project = null,
-        string endpoint = "http://localhost:8080")
+        string? endpoint = "http://localhost:8080",
+        string? apiKey = "api-key")
     {
         var context = new InternalContext
         {
             Logger = Globals.Logger,
             RootConfiguration = new ConfigurationBuilder().Build()
         };
-        context.InsertValueIntoGlobalDictionary(context.GetMetaDataPath(), new MetaDataConfig
+
+        if (team is not null)
         {
-            Team = team,
-            System = system
-        });
+            context.InsertValueIntoGlobalDictionary(context.GetMetaDataPath(), new MetaDataConfig
+            {
+                Team = team,
+                System = system
+            });
+        }
 
         return new ReportPortalReporter
         {
             Config = new ReportPortalConfig
             {
-                Enabled = true,
+                Enabled = enabled,
                 Endpoint = endpoint,
-                ApiKey = "api-key",
+                ApiKey = apiKey,
                 Project = project
             },
             Context = context,
@@ -222,12 +407,18 @@ public class ReportPortalDeferredPublisherTests
     private sealed class RecordingClientFactory : IReportPortalClientFactory
     {
         public bool ThrowOnLaunchStart { get; init; }
+        public bool ThrowOnLaunchFinish { get; init; }
+        public bool ThrowOnTestItemStart { get; init; }
         public bool ThrowOnDispose { get; init; }
         public List<RecordingClientService> Services { get; } = [];
 
         public IClientService Create(Uri endpointUri, string project, string apiKey)
         {
-            var service = new RecordingClientService(ThrowOnLaunchStart, ThrowOnDispose);
+            var service = new RecordingClientService(
+                ThrowOnLaunchStart,
+                ThrowOnLaunchFinish,
+                ThrowOnTestItemStart,
+                ThrowOnDispose);
             Services.Add(service);
             return service.Object;
         }
@@ -240,7 +431,8 @@ public class ReportPortalDeferredPublisherTests
         private readonly Mock<ITestItemResource> _testItemResource = new();
         private readonly Mock<ILogItemResource> _logItemResource = new();
 
-        public RecordingClientService(bool throwOnLaunchStart, bool throwOnDispose)
+        public RecordingClientService(bool throwOnLaunchStart, bool throwOnLaunchFinish,
+            bool throwOnTestItemStart, bool throwOnDispose)
         {
             _service.SetupGet(service => service.Launch).Returns(_launchResource.Object);
             _service.SetupGet(service => service.TestItem).Returns(_testItemResource.Object);
@@ -268,15 +460,27 @@ public class ReportPortalDeferredPublisherTests
             _launchResource
                 .Setup(resource => resource.FinishAsync(It.IsAny<string>(), It.IsAny<FinishLaunchRequest>(),
                     It.IsAny<CancellationToken>()))
-                .ReturnsAsync(new LaunchFinishedResponse { Uuid = "launch" });
+                .ReturnsAsync(() =>
+                {
+                    if (throwOnLaunchFinish)
+                        throw new InvalidOperationException("finish failed");
+
+                    return new LaunchFinishedResponse { Uuid = "launch" };
+                });
 
             _testItemResource
                 .Setup(resource => resource.StartAsync(It.IsAny<StartTestItemRequest>(),
                     It.IsAny<CancellationToken>()))
                 .Callback<StartTestItemRequest, CancellationToken>((request, _) => TestItemStartRequests.Add(request))
-                .ReturnsAsync(() => new TestItemCreatedResponse
+                .ReturnsAsync(() =>
                 {
-                    Uuid = $"item-{TestItemStartRequests.Count}"
+                    if (throwOnTestItemStart)
+                        throw new InvalidOperationException("item failed");
+
+                    return new TestItemCreatedResponse
+                    {
+                        Uuid = $"item-{TestItemStartRequests.Count}"
+                    };
                 });
             _testItemResource
                 .Setup(resource => resource.FinishAsync(It.IsAny<string>(), It.IsAny<FinishTestItemRequest>(),
@@ -299,11 +503,13 @@ public class ReportPortalDeferredPublisherTests
         : HttpMessageHandler
     {
         public int RequestCount { get; private set; }
+        public List<string> RequestedProjectNames { get; } = [];
 
         protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request,
             CancellationToken cancellationToken)
         {
             RequestCount++;
+            RequestedProjectNames.Add(Uri.UnescapeDataString(request.RequestUri!.Segments[^1]));
             return Task.FromResult(responseFactory(request));
         }
     }

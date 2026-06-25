@@ -28,9 +28,9 @@ Assertion engine and reporter dispatcher.
 ## Reporter selection
 
 Reporter type is configured per assertion and routed in `ReportLogic`.
-Allure writes immediately. ReportPortal queues locally during execution; the
-runner validates access before sessions start and publishes grouped launches at
-cleanup.
+Allure writes immediately. ReportPortal queues locally during execution; one
+runner-owned publisher validates access read-only before sessions start and
+publishes grouped launches at cleanup.
 
 ## Concurrency
 

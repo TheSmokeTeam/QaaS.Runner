@@ -27,7 +27,7 @@ public class Runner : IRunner, IDisposable
     private string ServeResultsFolder { get; set; } = AssertableOptions.DefaultServeResultsFolder;
     private bool DisposeSerilogLogger { get; set; } = true;
     private int? BootstrapHandledExitCode { get; set; }
-    internal IReportPortalDeferredPublisher ReportPortalPublisher { get; set; } = new ReportPortalDeferredPublisher();
+    internal IReportPortalPublisher ReportPortalPublisher { get; set; } = new ReportPortalPublisher();
 
     /// <summary>
     /// Controls whether <see cref="Run" /> terminates the current process after the runner finishes successfully.

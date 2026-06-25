@@ -134,7 +134,7 @@ public class RunnerBehaviorTests
     }
 
     private sealed class RecordingReportPortalPublisher(Exception? validationException = null)
-        : IReportPortalDeferredPublisher
+        : IReportPortalPublisher
     {
         private readonly Exception? _validationException = validationException;
         public List<string> Calls { get; } = [];

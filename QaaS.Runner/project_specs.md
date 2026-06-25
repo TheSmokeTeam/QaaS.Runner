@@ -47,8 +47,8 @@ help text; verb classes inherit a common base for shared options
 - Storage implementations.
 - Logger (Serilog) per `QaaS.Framework.Executions.ExecutionLogging`.
 - Configuration loaders (YAML + placeholder/reference parsers).
-- ReportPortal is runner-owned and deferred: reporters queue results locally,
-  then `Runner` publishes at cleanup without a container-managed ReportPortal client.
+- ReportPortal has one runner-owned publisher: reporters queue results locally,
+  then `Runner` validates read-only before sessions and publishes at cleanup without a container-managed ReportPortal client.
 
 ## Conventions
 

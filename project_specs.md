@@ -162,9 +162,9 @@ DataAnnotations.
 - `AllureReporter` writes Allure JSON + attachments. Attachments are
   deduplicated through a `ConcurrentDictionary<hash, path>`.
 - `ReportPortalReporter` provides passive reporting: it queues assertion
-  results during `ReportLogic`; `Runner` validates ReportPortal access before
-  execution and publishes grouped launches at cleanup before execution scopes
-  are disposed.
+  results during `ReportLogic`; one runner-owned publisher validates
+  ReportPortal access before execution and publishes grouped launches at
+  cleanup before execution scopes are disposed.
 - Recent change: reporters are **shared** across assertions rather than
   rebuilt per-assertion (see `06e23d1`, `4876603`, `9da3c76`).
 

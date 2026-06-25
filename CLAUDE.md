@@ -144,9 +144,10 @@ or `QaaS.Common.*` over baking the hook into the runner.
 - `IReporter` is the abstraction.
 - `AllureReporter` writes Allure-format JSON + attachments (deduped via
   `ConcurrentDictionary`).
-- ReportPortal integration ships as a separate passive reporter; `ReportLogic`
-  queues matching assertion results locally, while `Runner` validates access
-  before execution and publishes grouped launches during cleanup.
+- ReportPortal integration ships as a passive reporter; `ReportLogic`
+  queues matching assertion results locally, while one runner-owned publisher
+  validates access read-only before execution and publishes grouped launches
+  during cleanup.
 - Reporters are now **shared across assertions** rather than reconstructed
   per assertion (commit `4876603`).
 
