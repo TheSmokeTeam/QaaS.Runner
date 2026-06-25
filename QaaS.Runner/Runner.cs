@@ -249,7 +249,7 @@ public class Runner : IRunner, IDisposable
     private static IEnumerable<ReportPortalReporter> GetReportPortalReporters(IEnumerable<Execution>? executions)
     {
         return (executions ?? Enumerable.Empty<Execution>())
-            .SelectMany(execution => execution.ReportLogic?.Reporters ?? [])
+            .SelectMany(execution => execution.ReportLogic.Reporters)
             .OfType<ReportPortalReporter>();
     }
 

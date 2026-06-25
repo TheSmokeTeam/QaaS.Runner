@@ -1,6 +1,5 @@
 using QaaS.Framework.SDK;
 using QaaS.Framework.SDK.ContextObjects;
-using QaaS.Runner.Assertions.ConfigurationObjects.ReporterConfigs;
 using QaaS.Runner.Assertions.AssertionObjects;
 using QaaS.Runner.Infrastructure;
 using ReportPortal.Client.Abstractions.Models;

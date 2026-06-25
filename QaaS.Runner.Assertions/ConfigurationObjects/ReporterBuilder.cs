@@ -179,7 +179,6 @@ public class ReporterBuilder : IYamlConvertible, ICloneable<ReporterBuilder>
                         };
                         reporters.Add(reportPortalReporter);
                     }
-
                     break;
 
                 default:
