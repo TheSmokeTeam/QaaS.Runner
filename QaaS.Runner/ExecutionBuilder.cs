@@ -31,7 +31,6 @@ using QaaS.Framework.SDK.Session.SessionDataObjects.RunningSessionsObjects;
 using QaaS.Runner.Assertions.AssertionObjects;
 using QaaS.Runner.Assertions.ConfigurationObjects;
 using QaaS.Runner.Assertions.Reporters;
-using QaaS.Runner.Assertions.Reporters.ReportPortal;
 using QaaS.Runner.Extensions;
 using QaaS.Runner.Infrastructure;
 using QaaS.Runner.Sessions.Actions.Probes;
@@ -54,7 +53,7 @@ public class ExecutionBuilder() : BaseExecutionBuilder<InternalContext, Executio
 {
     /// <summary>
     /// Manually clone for <see cref="ExecutionBuilder" /> since it contains objects that can't be deep cloned with <see cref="BuilderCloner.DeepClone{T}(T)" />
-    /// Objects such as <see cref="ILogger" /> and <see cref="ReportPortalLaunchManager" /> are shared across ExecutionBuilders and can't be deep-cloned.
+    /// Objects such as <see cref="ILogger" /> are shared across ExecutionBuilders and can't be deep-cloned.
     /// </summary>
     /// <returns></returns>
     public ExecutionBuilder Clone() => new(this);
@@ -83,8 +82,6 @@ public class ExecutionBuilder() : BaseExecutionBuilder<InternalContext, Executio
         _configuredLogger = source._configuredLogger;
         _configuredCaseName = source._configuredCaseName;
         _configuredExecutionId = source._configuredExecutionId;
-        _reportPortalLaunchManager = source._reportPortalLaunchManager;
-        _reportPortalSettings = source._reportPortalSettings;
         _globalDict = new Dictionary<string, object?>(source._globalDict);
         _loadVariablesIntoGlobalDict = source._loadVariablesIntoGlobalDict;
     }
@@ -166,8 +163,6 @@ public class ExecutionBuilder() : BaseExecutionBuilder<InternalContext, Executio
     private ILogger _configuredLogger = default!;
     private string? _configuredCaseName;
     private string? _configuredExecutionId;
-    private ReportPortalLaunchManager? _reportPortalLaunchManager;
-    private ReportPortalSettings? _reportPortalSettings;
     private Dictionary<string, object?> _globalDict = new();
     private bool _loadVariablesIntoGlobalDict = true;
     private readonly IConfiguration? _templateSourceConfiguration;
@@ -273,8 +268,7 @@ public class ExecutionBuilder() : BaseExecutionBuilder<InternalContext, Executio
         var testSuiteStartTimeUtc = DateTime.UtcNow;
 
         return Reporters.Build(Context, testSuiteStartTimeUtc,
-            manager: _reportPortalLaunchManager,
-            settings: _reportPortalSettings);
+            executionMode: Type.ToString().ToLowerInvariant());
     }
 
     private IEnumerable<IStorage> BuildStorages()
@@ -570,18 +564,6 @@ public class ExecutionBuilder() : BaseExecutionBuilder<InternalContext, Executio
     internal ExecutionBuilder WithLogger(ILogger logger)
     {
         _configuredLogger = logger;
-        return this;
-    }
-
-    internal ExecutionBuilder WithReportPortalLaunchManager(ReportPortalLaunchManager reportPortalLaunchManager)
-    {
-        _reportPortalLaunchManager = reportPortalLaunchManager;
-        return this;
-    }
-
-    internal ExecutionBuilder WithReportPortalSettings(ReportPortalSettings reportPortalSettings)
-    {
-        _reportPortalSettings = reportPortalSettings;
         return this;
     }
 

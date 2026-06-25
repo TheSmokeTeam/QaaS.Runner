@@ -11,8 +11,8 @@ namespace QaaS.Runner.Assertions.Reporters.ReportPortal;
 /// or mutates ReportPortal resources; it only checks endpoint reachability, API key validity, and project visibility.
 /// </summary>
 /// <remarks>
-/// Validation is intentionally best-effort. Failures are converted into warning-backed
-/// <see cref="ReportPortalAccessResult" /> values so ReportPortal outages do not fail the runner.
+/// Failures are returned as warning-backed <see cref="ReportPortalAccessResult" /> values. The runner-owned
+/// deferred publisher decides whether to hard-fail early validation or skip a final publish attempt.
 /// </remarks>
 internal sealed class ReportPortalAccessValidator : IDisposable
 {
@@ -44,60 +44,57 @@ internal sealed class ReportPortalAccessValidator : IDisposable
     }
 
     /// <summary>
-    /// Resolves the passive publishing access contract for the given settings. Results are cached per endpoint/API
-    /// key/project combination so repeated assertions do not spam the same warning.
+    /// Resolves the passive publishing access contract for the given launch plan. Results are cached per endpoint/API
+    /// key/project combination so repeated launch groups do not spam the same warning.
     /// </summary>
-    /// <param name="settings">The resolved ReportPortal publishing settings.</param>
+    /// <param name="launchPlan">The ReportPortal launch plan to validate.</param>
     /// <param name="logger">The logger used for best-effort warning messages.</param>
     /// <param name="cancellationToken">A cancellation token for the outbound validation request.</param>
     /// <returns>The resolved access contract, or a failure result when publishing should be skipped.</returns>
-    internal Task<ReportPortalAccessResult> EnsureWriteAccessAsync(ReportPortalSettings settings, ILogger logger,
+    internal Task<ReportPortalAccessResult> EnsureWriteAccessAsync(ReportPortalLaunchPlan launchPlan, ILogger logger,
         CancellationToken cancellationToken = default)
     {
-        ArgumentNullException.ThrowIfNull(settings);
+        ArgumentNullException.ThrowIfNull(launchPlan);
         ArgumentNullException.ThrowIfNull(logger);
 
-        if (!settings.Enabled)
-            return Task.FromResult(ReportPortalAccessResult.Disabled);
-
-        var cacheKey = BuildCacheKey(settings);
+        var cacheKey = BuildCacheKey(launchPlan);
         var lazyResult = _accessCache.GetOrAdd(cacheKey,
             _ => new Lazy<Task<ReportPortalAccessResult>>(
-                () => ValidateCoreAsync(settings, logger, cancellationToken),
+                () => ValidateCoreAsync(launchPlan, logger, cancellationToken),
                 LazyThreadSafetyMode.ExecutionAndPublication));
 
         return lazyResult.Value;
     }
 
     /// <summary>
-    /// Performs the uncached ReportPortal access check for one resolved settings instance.
+    /// Performs the uncached ReportPortal access check for one resolved launch plan.
     /// </summary>
-    /// <param name="settings">The resolved ReportPortal publishing settings to validate.</param>
+    /// <param name="launchPlan">The ReportPortal launch plan to validate.</param>
     /// <param name="logger">The logger that receives best-effort publishing warnings.</param>
     /// <param name="cancellationToken">A cancellation token for the outbound ReportPortal request.</param>
     /// <returns>
     /// A successful access result when the endpoint, API key, and project are valid; otherwise a failure result with the
     /// warning message that explains why publishing should be skipped.
     /// </returns>
-    private async Task<ReportPortalAccessResult> ValidateCoreAsync(ReportPortalSettings settings, ILogger logger,
+    private async Task<ReportPortalAccessResult> ValidateCoreAsync(ReportPortalLaunchPlan launchPlan, ILogger logger,
         CancellationToken cancellationToken)
     {
-        if (string.IsNullOrWhiteSpace(settings.Project))
+        if (string.IsNullOrWhiteSpace(launchPlan.Project))
             return WarnAndReturnFailure(logger,
                 "Could not publish results to ReportPortal because ReportPortal.Project or MetaData.Team was not configured.");
 
-        var projectName = settings.Project;
+        var projectName = launchPlan.Project;
 
-        if (!settings.TryGetEndpointUri(out var endpointUri, out var endpointFailureReason))
+        if (!launchPlan.TryGetEndpointUri(out var endpointUri, out var endpointFailureReason))
             return WarnAndReturnFailure(logger, 
                 $"Could not publish results to ReportPortal: {endpointFailureReason}");
 
-        if (string.IsNullOrWhiteSpace(settings.ApiKey))
+        if (string.IsNullOrWhiteSpace(launchPlan.ApiKey))
             return WarnAndReturnFailure(logger,
                 $"Could not publish results to ReportPortal project `{projectName}` because ReportPortal.ApiKey was not configured.");
         
 
-        var apiKey = settings.ApiKey;
+        var apiKey = launchPlan.ApiKey;
 
         try
         {
@@ -122,33 +119,38 @@ internal sealed class ReportPortalAccessValidator : IDisposable
             
             if (string.IsNullOrWhiteSpace(project.ProjectName))
                 return WarnAndReturnFailure(logger,
-                    $"Could not publish results to ReportPortal because the endpoint `{settings.Endpoint}` returned an unreadable project payload for project `{projectName}`.");
+                    $"Could not publish results to ReportPortal because the endpoint `{launchPlan.Endpoint}` returned an unreadable project payload for project `{projectName}`.");
             
             return ReportPortalAccessResult.Success(endpointUri!, project.ProjectName, apiKey);
         }
         catch (TaskCanceledException)
         {
             return WarnAndReturnFailure(logger,
-                $"Could not publish results to ReportPortal because the endpoint `{settings.Endpoint}` timed out.");
+                $"Could not publish results to ReportPortal because the endpoint `{launchPlan.Endpoint}` timed out.");
         }
         catch (HttpRequestException exception)
         {
             return WarnAndReturnFailure(logger,
-                $"Could not publish results to ReportPortal because the endpoint `{settings.Endpoint}` is unreachable. {exception.Message}");
+                $"Could not publish results to ReportPortal because the endpoint `{launchPlan.Endpoint}` is unreachable. {exception.Message}");
         }
         catch (JsonException exception)
         {
             return WarnAndReturnFailure(logger,
-                $"Could not publish results to ReportPortal because the endpoint `{settings.Endpoint}` returned an unreadable project payload. {exception.Message}");
+                $"Could not publish results to ReportPortal because the endpoint `{launchPlan.Endpoint}` returned an unreadable project payload. {exception.Message}");
         }
     }
 
-    private static string BuildCacheKey(ReportPortalSettings settings)
+    private static string BuildCacheKey(ReportPortalLaunchPlan launchPlan)
     {
+        var endpoint = launchPlan.TryGetEndpointUri(out var endpointUri, out _)
+            ? endpointUri!.AbsoluteUri
+            : launchPlan.Endpoint ?? "<missing-endpoint>";
+
         return string.Join("::",
-            settings.Endpoint ?? "<missing-endpoint>",
-            settings.ApiKey ?? "<missing-api-key>",
-            settings.Project ?? "<missing-project>");
+            endpoint,
+            launchPlan.ApiKey ?? "<missing-api-key>",
+            launchPlan.Project ?? "<missing-project>",
+            launchPlan.System);
     }
 
     private static ReportPortalAccessResult WarnAndReturnFailure(ILogger logger, string warningMessage)
@@ -182,7 +184,7 @@ internal sealed class ReportPortalAccessValidator : IDisposable
 /// </summary>
 /// <remarks>
 /// A successful result contains the normalized endpoint URI, the project name returned by ReportPortal, and the API key
-/// that should be used by the launch manager.
+/// that should be used by the final publisher.
 /// </remarks>
 internal sealed class ReportPortalAccessResult
 {
@@ -220,11 +222,6 @@ internal sealed class ReportPortalAccessResult
     /// Gets the reason publishing was disabled or denied.
     /// </summary>
     public string? FailureReason { get; }
-
-    /// <summary>
-    /// Gets a disabled access result for configurations where ReportPortal reporting is off.
-    /// </summary>
-    public static ReportPortalAccessResult Disabled { get; } = new(false, null, null, null, null);
 
     /// <summary>
     /// Creates a successful access result.

@@ -29,7 +29,7 @@ This repository contains one solution: [`QaaS.Runner.sln`](./QaaS.Runner.sln).
 ### [QaaS.Runner](./QaaS.Runner/)
 - CLI/bootstrap entrypoint for `run`, `act`, `assert`, `template`, and `execute` verbs.
 - Builds execution contexts and routes each execution type through the right logic chain.
-- Orchestrates setup/teardown, optional Allure result serving, and optional ReportPortal launch finalization.
+- Orchestrates setup/teardown, optional Allure result serving, ReportPortal access validation, and final ReportPortal publishing.
 
 ### [QaaS.Runner.Assertions](./QaaS.Runner.Assertions/)
 - Builds assertion runtime objects from configured hooks and filters.
@@ -71,17 +71,19 @@ Runtime rules:
 - QaaS never creates ReportPortal projects, dashboards, filters, users, or API keys.
 - Project routing uses `Reporters.ReportPortal.Project` when configured; otherwise it falls back to `MetaData.Team`.
 - Launches are grouped by resolved endpoint, project, and system.
+- QaaS validates ReportPortal endpoint/API-key/project access after executions are built and before sessions start. Validation failures stop the run with a configuration failure exit code.
+- ReportPortal reporters queue assertion results locally during execution. QaaS opens a ReportPortal client only at final publish time, starts the grouped launch, uploads queued items/logs/attachments, finishes the launch, and disposes the client.
 - `ExtraLabels` and other metadata key/value pairs are emitted as ReportPortal attributes so teams can filter by labels such as `Component`, `Area`, or `Owner`.
 - Each assertion is published as its own ReportPortal test item together with assertion message/trace, stack trace for broken assertions, session summaries, session failure history, assertion attachments, template YAML, and a generated assertion-context JSON artifact.
 - Assertion links configured in QaaS remain active in Allure and are also written into ReportPortal logs.
-- When ReportPortal is enabled but the endpoint, API key, or target project is invalid, QaaS logs a warning and skips ReportPortal publishing without crashing the runner or changing the exit code for otherwise passing runs.
+- If final publishing fails after early validation succeeded, QaaS logs warnings and keeps the assertion-derived exit code unchanged.
 - The default launch name is stable and derived from team, system, and sessions, which keeps ReportPortal history grouped without creating new dashboards or projects.
 
 Configuration sources:
 
 | Setting | Default source | Override source | Notes |
 |---|---|---|
-| `Reporters.ReportPortal.Enabled` | `QaaS.Configuration.ReportPortalDefaults.Enabled` (`false` in the public package) | YAML `Reporters.ReportPortal.Enabled` | Enables best-effort ReportPortal publishing. |
+| `Reporters.ReportPortal.Enabled` | `QaaS.Configuration.ReportPortalDefaults.Enabled` (`false` in the public package) | YAML `Reporters.ReportPortal.Enabled` | Enables early-validated, final ReportPortal publishing. |
 | `Reporters.ReportPortal.Endpoint` | `QaaS.Configuration.ReportPortalDefaults.ReportPortalUri` | YAML `Reporters.ReportPortal.Endpoint` | Required when reporting is enabled. Must point to the ReportPortal base URL or API URL. |
 | `Reporters.ReportPortal.ApiKey` | `QaaS.Configuration.ReportPortalDefaults.ReportPortalApiKey` | YAML `Reporters.ReportPortal.ApiKey` | Required when reporting is enabled. Must already have write access to the target team projects. |
 | `Reporters.ReportPortal.Project` | `MetaData.Team` | YAML `Reporters.ReportPortal.Project` | Overrides the target ReportPortal project. If omitted, QaaS uses `MetaData.Team`. |

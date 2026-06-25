@@ -1,8 +1,6 @@
 using Autofac;
 using NUnit.Framework;
-using QaaS.Runner.Assertions;
-using QaaS.Runner.Assertions.Reporters;
-using QaaS.Runner.Assertions.Reporters.ReportPortal;
+using QaaS.Runner.WrappedExternals;
 
 namespace QaaS.Runner.Tests;
 
@@ -10,13 +8,17 @@ namespace QaaS.Runner.Tests;
 public class BootstrapScopeTests
 {
     [Test]
-    public void CreateRunnerScope_RegistersReportPortalLaunchManagerAsSingleInstance()
+    public void CreateRunnerScope_DoesNotRegisterReportPortalServices()
     {
         using var scope = Bootstrap.CreateRunnerScope();
 
-        var firstResolution = scope.Resolve<ReportPortalLaunchManager>();
-        var secondResolution = scope.Resolve<ReportPortalLaunchManager>();
+        var reportPortalRegistrationExists = scope.ComponentRegistry.Registrations.Any(registration =>
+            registration.Activator.LimitType.FullName?.Contains("ReportPortal", StringComparison.Ordinal) == true);
 
-        Assert.That(secondResolution, Is.SameAs(firstResolution));
+        Assert.Multiple(() =>
+        {
+            Assert.That(scope.IsRegistered<AllureWrapper>(), Is.True);
+            Assert.That(reportPortalRegistrationExists, Is.False);
+        });
     }
 }

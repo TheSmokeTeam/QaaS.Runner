@@ -10,8 +10,17 @@ namespace QaaS.Runner.Logics;
 /// <summary>
 /// Routes assertion results to configured reporters.
 /// </summary>
-public class ReportLogic(IList<IReporter> reporters, InternalContext context) : ILogic
+public class ReportLogic : ILogic
 {
+    internal IList<IReporter> Reporters { get; }
+    private readonly InternalContext _context;
+
+    public ReportLogic(IList<IReporter> reporters, InternalContext context)
+    {
+        Reporters = reporters;
+        _context = context;
+    }
+
     /// <summary>
     /// Reports matching <see cref="AssertionResult" /> entries to each configured <see cref="IReporter" />.
     /// </summary>
@@ -19,30 +28,30 @@ public class ReportLogic(IList<IReporter> reporters, InternalContext context) : 
     /// <returns>The same <paramref name="executionData" /> instance after reporting completes.</returns>
     public ExecutionData Run(ExecutionData executionData)
     {
-        var reporterTypes = FormatReporterTypes(reporters);
-        context.Logger.LogInformation("Running {Reports} Logic", "Reports");
-        context.Logger.LogInformation(
+        var reporterTypes = FormatReporterTypes(Reporters);
+        _context.Logger.LogInformation("Running {Reports} Logic", "Reports");
+        _context.Logger.LogInformation(
             "Started writing assertion results using {ReporterCount} reporters. ReporterTypes={ReporterTypes}",
-            reporters.Count, reporterTypes);
+            Reporters.Count, reporterTypes);
 
         var assertionResults = executionData.AssertionResults
             .OfType<AssertionResult>()
             .ToList();
 
-        foreach (var reporter in reporters)
+        foreach (var reporter in Reporters)
         {
             var matchingAssertionResults = assertionResults
                 .Where(assertionResult => assertionResult.Assertion.ReporterTypes.Contains(reporter.GetType()))
                 .ToList();
 
-            context.Logger.LogDebug(
+            _context.Logger.LogDebug(
                 "Reporter type {ReporterType} matched {AssertionCount} assertion results",
                 reporter.GetType().Name,
                 matchingAssertionResults.Count);
 
             foreach (var assertionResult in matchingAssertionResults)
             {
-                context.Logger.LogDebug(
+                _context.Logger.LogDebug(
                     "Routing assertion {AssertionName} with status {AssertionStatus} to reporter type {ReporterType}",
                     assertionResult.Assertion.Name, assertionResult.AssertionStatus, reporter.GetType().Name);
                 if (assertionResult.Assertion.StatusesToReport.Contains(assertionResult.AssertionStatus))
@@ -51,16 +60,16 @@ public class ReportLogic(IList<IReporter> reporters, InternalContext context) : 
                 }
                 else
                 {
-                    context.Logger.LogDebug(
+                    _context.Logger.LogDebug(
                         "Skipping reporter type {ReporterType} for assertion {AssertionName} because status {AssertionStatus} is not configured for reporting",
                         reporter.GetType().Name, assertionResult.Assertion.Name, assertionResult.AssertionStatus);
                 }
             }
         }
 
-        context.Logger.LogInformation(
+        _context.Logger.LogInformation(
             "Finished writing assertion results using {ReporterCount} reporters. ReporterTypes={ReporterTypes}",
-            reporters.Count, reporterTypes);
+            Reporters.Count, reporterTypes);
 
         return executionData;
     }

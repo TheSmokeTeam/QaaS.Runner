@@ -4,8 +4,6 @@ using Microsoft.Extensions.Logging;
 using QaaS.Framework.Configurations.CustomExceptions;
 using QaaS.Framework.Executions;
 using QaaS.Runner.Options;
-using QaaS.Runner.Assertions.ConfigurationObjects.ReporterConfigs;
-using QaaS.Runner.Assertions.Reporters;
 using QaaS.Runner.Assertions.Reporters.ReportPortal;
 using QaaS.Runner.WrappedExternals;
 using ILogger = Microsoft.Extensions.Logging.ILogger;
@@ -29,6 +27,7 @@ public class Runner : IRunner, IDisposable
     private string ServeResultsFolder { get; set; } = AssertableOptions.DefaultServeResultsFolder;
     private bool DisposeSerilogLogger { get; set; } = true;
     private int? BootstrapHandledExitCode { get; set; }
+    internal IReportPortalDeferredPublisher ReportPortalPublisher { get; set; } = new ReportPortalDeferredPublisher();
 
     /// <summary>
     /// Controls whether <see cref="Run" /> terminates the current process after the runner finishes successfully.
@@ -135,12 +134,6 @@ public class Runner : IRunner, IDisposable
     protected virtual void Teardown()
     {
         Logger.LogDebug("Runner teardown started");
-        
-        if (Scope.IsRegistered<ReportPortalLaunchManager>())
-        {
-            Logger.LogDebug("Finishing ReportPortal launch before teardown completes");
-            FinishLaunchInReportPortal();
-        }
 
         if (DisposeSerilogLogger && SerilogLogger is IDisposable disposableLogger)
         {
@@ -159,15 +152,6 @@ public class Runner : IRunner, IDisposable
         }
 
         Logger.LogDebug("Runner teardown completed");
-    }
-
-    /// <summary>
-    /// Finishes the ReportPortal launch if a launch manager is registered in the scope.
-    /// </summary>
-    private void FinishLaunchInReportPortal()
-    {
-        var reportPortalLaunchManager = Scope.Resolve<ReportPortalLaunchManager>();
-        reportPortalLaunchManager.FinishLaunchAsync(Logger).GetAwaiter().GetResult();
     }
 
     /// <summary>
@@ -212,11 +196,6 @@ public class Runner : IRunner, IDisposable
     {
         Logger.LogInformation("Building {ExecutionCount} executions", ExecutionBuilders.Count);
         var globalDict = new Dictionary<string, object?>();
-        
-        var reportPortalLaunchManager = Scope.IsRegistered<ReportPortalLaunchManager>()
-            ? Scope.Resolve<ReportPortalLaunchManager>()
-            : null;
-        var reportPortalSettingsByBuilder = BuildReportPortalSettingsByBuilder();
 
         // Builders share a single global dictionary so metadata and runtime values written by one
         // execution are visible to later executions in the same runner invocation.
@@ -228,14 +207,7 @@ public class Runner : IRunner, IDisposable
         // The logger is also assigned directly because execution builders are plain mutable configuration objects,
         // not services resolved from the Autofac scope.
         ExecutionBuilders.ForEach(builder => builder.WithLogger(Logger));
-        
-        // Adding ReportPortal manager and settings into each execution builder
-        // Builders shares the same manager to manage the ReportPortal launch.
-        if (reportPortalLaunchManager is not null)
-            ExecutionBuilders.ForEach(builder => builder.WithReportPortalLaunchManager(reportPortalLaunchManager));
-        foreach (var settingsPair in reportPortalSettingsByBuilder)
-            settingsPair.Key.WithReportPortalSettings(settingsPair.Value);
-        
+
         var executions = ExecutionBuilders.Select(builder => builder.Build()).ToList();
         Logger.LogInformation("Built {ExecutionCount} executions successfully", executions.Count);
         return executions;
@@ -252,6 +224,33 @@ public class Runner : IRunner, IDisposable
         var exitCode = executions.Select(execution => execution.Start()).Sum();
         Logger.LogInformation("Finished running executions. Aggregated exit code: {ExitCode}", exitCode);
         return exitCode;
+    }
+
+    /// <summary>
+    /// Validates ReportPortal access before executions start so invalid enabled publishing fails early.
+    /// </summary>
+    /// <param name="executions">The built executions that may contain ReportPortal reporters.</param>
+    protected virtual void ValidateReportPortalAccess(List<Execution> executions)
+    {
+        var reportPortalReporters = GetReportPortalReporters(executions).ToList();
+        ReportPortalPublisher.ValidateAsync(reportPortalReporters, Logger).GetAwaiter().GetResult();
+    }
+
+    /// <summary>
+    /// Publishes queued ReportPortal assertion results after execution and before execution scopes are disposed.
+    /// </summary>
+    /// <param name="executions">The executions whose ReportPortal reporters may have queued assertion results.</param>
+    protected virtual void PublishReportPortalResults(IEnumerable<Execution>? executions)
+    {
+        var reportPortalReporters = GetReportPortalReporters(executions).ToList();
+        ReportPortalPublisher.PublishAsync(reportPortalReporters, Logger).GetAwaiter().GetResult();
+    }
+
+    private static IEnumerable<ReportPortalReporter> GetReportPortalReporters(IEnumerable<Execution>? executions)
+    {
+        return (executions ?? Enumerable.Empty<Execution>())
+            .SelectMany(execution => execution.ReportLogic?.Reporters ?? [])
+            .OfType<ReportPortalReporter>();
     }
 
     /// <summary>
@@ -279,6 +278,8 @@ public class Runner : IRunner, IDisposable
             return;
 
         _disposed = true;
+        if (ReportPortalPublisher is IDisposable disposableReportPortalPublisher)
+            disposableReportPortalPublisher.Dispose();
         Logger.LogDebug("Disposing runner scope");
         Scope.Dispose();
         GC.SuppressFinalize(this);
@@ -318,176 +319,6 @@ public class Runner : IRunner, IDisposable
             ServeResultsFolder = serveResultsFolder.Trim();
 
         return this;
-    }
-
-    /// <summary>
-    /// Resolves ReportPortal settings for the current runner invocation and assigns one shared settings instance to
-    /// every execution builder in the same launch group.
-    /// </summary>
-    /// <remarks>
-    /// Builders are grouped by the resolved ReportPortal endpoint, project, and system so compatible executions publish
-    /// into one remote launch. Group-level settings aggregate session names, execution modes, and launch attributes
-    /// before they are passed to the reporter pipeline.
-    /// </remarks>
-    /// <returns>A dictionary that maps each ReportPortal-enabled execution builder to its resolved settings.</returns>
-    private Dictionary<ExecutionBuilder, ReportPortalSettings> BuildReportPortalSettingsByBuilder()
-    {
-        var startedAtLocal = DateTimeOffset.Now;
-        var builderSettings = ExecutionBuilders
-            .Select(builder => new
-            {
-                Builder = builder,
-                Config = builder.Reporters?.ReportPortal,
-                Settings = builder.Reporters?.ReportPortal is { } reportPortalConfig
-                    ? BuildSingleBuilderReportPortalSettings(builder, reportPortalConfig, startedAtLocal)
-                    : null
-            })
-            .Where(item => item.Settings is { Enabled: true })
-            .ToList();
-
-        if (builderSettings.Count == 0)
-        {
-            Logger.LogDebug("ReportPortal is disabled for all execution builders in this runner invocation.");
-            return new Dictionary<ExecutionBuilder, ReportPortalSettings>();
-        }
-
-        var settingsByBuilder = new Dictionary<ExecutionBuilder, ReportPortalSettings>();
-        foreach (var builderGroup in builderSettings.GroupBy(item => new
-                 {
-                     Endpoint = item.Settings?.Endpoint?.ToLowerInvariant() ?? string.Empty,
-                     Project = item.Settings?.Project?.ToLowerInvariant() ?? string.Empty,
-                     System = item.Settings?.System.ToLowerInvariant()
-                 }))
-        {
-            var groupItems = builderGroup.ToList();
-            var sessionNames = groupItems
-                .SelectMany(item => item.Builder.ReadSessions())
-                .Select(session => session.Name)
-                .Where(sessionName => !string.IsNullOrWhiteSpace(sessionName))
-                .Select(sessionName => sessionName!)
-                .Distinct(StringComparer.OrdinalIgnoreCase)
-                .OrderBy(sessionName => sessionName, StringComparer.OrdinalIgnoreCase)
-                .ToArray();
-            var executionModes = groupItems
-                .Select(item => item.Builder.ReadExecutionType().ToString().ToLowerInvariant())
-                .Distinct(StringComparer.Ordinal)
-                .ToList();
-            var executionMode = executionModes.Count == 1 ? executionModes[0] : "mixed";
-            var teamName = groupItems
-                .Select(item => item.Settings?.Team)
-                .FirstOrDefault(team => !string.IsNullOrWhiteSpace(team));
-            var systemName = groupItems
-                .Select(item => item.Settings?.System)
-                .FirstOrDefault(system => !string.IsNullOrWhiteSpace(system)) ?? "Unknown System";
-            var settings = new ReportPortalSettings(
-                groupItems.First().Config!,
-                teamName,
-                systemName,
-                sessionNames,
-                executionMode,
-                startedAtLocal,
-                BuildLaunchAttributes(groupItems.Select(item => item.Builder)));
-
-            foreach (var item in builderGroup)
-                settingsByBuilder[item.Builder] = settings;
-
-            Logger.LogDebug(
-                "Built ReportPortal settings for project {ProjectName}, team {TeamName}, system {SystemName}, sessions [{SessionNames}], execution mode {ExecutionMode}, builder count {BuilderCount}.",
-                settings.Project ?? "<none>",
-                settings.Team ?? "<none>",
-                settings.System,
-                string.Join(", ", settings.SessionNames),
-                settings.ExecutionMode,
-                groupItems.Count);
-        }
-
-        return settingsByBuilder;
-    }
-
-    /// <summary>
-    /// Creates preliminary ReportPortal settings for one execution builder before launch grouping is applied.
-    /// </summary>
-    /// <param name="builder">The execution builder that owns the raw ReportPortal configuration and metadata.</param>
-    /// <param name="reportPortalConfig">The raw ReportPortal configuration supplied for the builder.</param>
-    /// <param name="startedAtLocal">The runner start timestamp used when default launch names and descriptions are built.</param>
-    /// <returns>Resolved ReportPortal settings scoped to the single builder.</returns>
-    private static ReportPortalSettings BuildSingleBuilderReportPortalSettings(ExecutionBuilder builder,
-        ReportPortalConfig reportPortalConfig,
-        DateTimeOffset startedAtLocal)
-    {
-        var sessionNames = builder.ReadSessions()
-            .Select(session => session.Name)
-            .Where(sessionName => !string.IsNullOrWhiteSpace(sessionName))
-            .Select(sessionName => sessionName!)
-            .ToArray();
-
-        return new ReportPortalSettings(
-            reportPortalConfig,
-            builder.MetaData?.Team,
-            builder.MetaData?.System,
-            sessionNames,
-            builder.ReadExecutionType().ToString().ToLowerInvariant(),
-            startedAtLocal,
-            BuildLaunchAttributes([builder]));
-    }
-
-    /// <summary>
-    /// Builds metadata-derived launch attributes for one or more execution builders.
-    /// </summary>
-    /// <param name="builders">The builders whose metadata, sessions, cases, and execution identifiers should be summarized.</param>
-    /// <returns>
-    /// A case-insensitive attribute map with duplicate values collapsed and deterministic ordering applied for stable
-    /// launch grouping and test output.
-    /// </returns>
-    private static IReadOnlyDictionary<string, string> BuildLaunchAttributes(IEnumerable<ExecutionBuilder> builders)
-    {
-        var builderList = builders.ToList();
-        var attributes = builderList
-            .SelectMany(builder => builder.MetaData is null
-                ? Enumerable.Empty<KeyValuePair<string, string>>()
-                : BaseReporter.ExtractMetadataAttributes(builder.MetaData))
-            .Where(attribute => !string.IsNullOrWhiteSpace(attribute.Key) &&
-                                !string.IsNullOrWhiteSpace(attribute.Value))
-            .GroupBy(attribute => attribute.Key, StringComparer.OrdinalIgnoreCase)
-            .ToDictionary(
-                group => group.Key,
-                group => string.Join(", ", group.Select(attribute => attribute.Value)
-                    .Distinct(StringComparer.OrdinalIgnoreCase)
-                    .OrderBy(value => value, StringComparer.OrdinalIgnoreCase)),
-                StringComparer.OrdinalIgnoreCase);
-
-        attributes["executionMode"] = string.Join(", ", builderList
-            .Select(builder => builder.ReadExecutionType().ToString().ToLowerInvariant())
-            .Distinct(StringComparer.Ordinal)
-            .OrderBy(value => value, StringComparer.Ordinal));
-        attributes["builderCount"] = builderList.Count.ToString();
-        attributes["sessionCount"] = builderList
-            .SelectMany(builder => builder.ReadSessions())
-            .Select(session => session.Name)
-            .Where(sessionName => !string.IsNullOrWhiteSpace(sessionName))
-            .Distinct(StringComparer.OrdinalIgnoreCase)
-            .Count()
-            .ToString();
-
-        var caseNames = builderList
-            .Select(builder => builder.ReadCase())
-            .Where(caseName => !string.IsNullOrWhiteSpace(caseName))
-            .Distinct(StringComparer.OrdinalIgnoreCase)
-            .OrderBy(caseName => caseName, StringComparer.OrdinalIgnoreCase)
-            .ToArray();
-        if (caseNames.Length > 0)
-            attributes["caseName"] = string.Join(", ", caseNames);
-
-        var executionIds = builderList
-            .Select(builder => builder.ReadExecutionId())
-            .Where(executionId => !string.IsNullOrWhiteSpace(executionId))
-            .Distinct(StringComparer.OrdinalIgnoreCase)
-            .OrderBy(executionId => executionId, StringComparer.OrdinalIgnoreCase)
-            .ToArray();
-        if (executionIds.Length > 0)
-            attributes["executionId"] = string.Join(", ", executionIds);
-
-        return attributes;
     }
 
     /// <summary>
@@ -565,6 +396,8 @@ public class Runner : IRunner, IDisposable
     {
         ExecuteLifecyclePhase(RunnerLifecyclePhase.Setup, Setup);
         lifecycleState.Executions = ExecuteLifecyclePhase(RunnerLifecyclePhase.BuildExecutions, BuildExecutions);
+        ExecuteLifecyclePhase(RunnerLifecyclePhase.ValidateReportPortal,
+            () => ValidateReportPortalAccess(lifecycleState.Executions!));
 
         var exitCode = ExecuteLifecyclePhase(RunnerLifecyclePhase.StartExecutions,
             () => StartExecutions(lifecycleState.Executions!));
@@ -646,6 +479,7 @@ public class Runner : IRunner, IDisposable
         Logger.LogDebug("Runner cleanup started");
 
         var cleanupFailures = new List<Exception>();
+        RunCleanupStep("publish ReportPortal results", () => PublishReportPortalResults(executions), cleanupFailures);
         RunCleanupStep("dispose executions", () => DisposeExecutions(executions), cleanupFailures);
         RunCleanupStep("teardown", Teardown, cleanupFailures);
         RunCleanupStep("dispose runner", Dispose, cleanupFailures);
@@ -719,6 +553,7 @@ public class Runner : IRunner, IDisposable
         {
             RunnerLifecyclePhase.Setup => "setup",
             RunnerLifecyclePhase.BuildExecutions => "build executions",
+            RunnerLifecyclePhase.ValidateReportPortal => "validate ReportPortal",
             RunnerLifecyclePhase.StartExecutions => "start executions",
             _ => throw new ArgumentOutOfRangeException(nameof(phase), phase, "Unknown runner lifecycle phase.")
         };
@@ -738,6 +573,11 @@ public class Runner : IRunner, IDisposable
         /// The execution materialization phase.
         /// </summary>
         BuildExecutions,
+
+        /// <summary>
+        /// The pre-execution ReportPortal access validation phase.
+        /// </summary>
+        ValidateReportPortal,
 
         /// <summary>
         /// The execution start phase.

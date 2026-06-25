@@ -115,28 +115,25 @@ public class AssertionBuilderTests
     }
 
     [Test]
-    public void ReporterBuilder_Build_WithoutReportPortalLaunchManager_ReturnsAllureReporterOnly()
+    public void ReporterBuilder_Build_WithEnabledReportPortal_ReturnsAllureAndReportPortalReporters()
     {
         var context = new Context
         {
             Logger = Globals.Logger,
             RootConfiguration = new ConfigurationBuilder().Build()
         };
-        var settings = new ReportPortalSettings(
-            CreateReportPortalConfig(enabled: true),
-            "Smoke",
-            "QaaS",
-            ["Session A"],
-            "run",
-            new DateTimeOffset(2025, 1, 1, 10, 0, 0, TimeSpan.Zero));
+        var reportPortalConfig = CreateReportPortalConfig(enabled: true);
         
         var reporters = new ReporterBuilder()
-            .ConfigureReportPortal(CreateReportPortalConfig(enabled: true))
+            .ConfigureReportPortal(reportPortalConfig)
             .Build(context, new DateTime(2025, 1, 1, 10, 0, 0, DateTimeKind.Utc),
-                settings: settings);
+                executionMode: "assert");
+        var reportPortalReporter = reporters.OfType<ReportPortalReporter>().Single();
 
-        Assert.That(reporters, Has.Count.EqualTo(1));
-        Assert.That(reporters[0], Is.TypeOf<AllureReporter>());
+        Assert.That(reporters, Has.Count.EqualTo(2));
+        Assert.That(reporters.OfType<AllureReporter>(), Has.Exactly(1).Items);
+        Assert.That(reportPortalReporter.Config, Is.SameAs(reportPortalConfig));
+        Assert.That(reportPortalReporter.ExecutionMode, Is.EqualTo("assert"));
     }
 
     [Test]
@@ -151,20 +148,9 @@ public class AssertionBuilderTests
             enabled: true,
             reportPortalUri: "http://default.local",
             reportPortalApiKey: "default-api-key");
-        var settings = new ReportPortalSettings(
-            CreateReportPortalConfig(enabled: false),
-            "Smoke",
-            "QaaS",
-            ["Session A"],
-            "run",
-            new DateTimeOffset(2025, 1, 1, 10, 0, 0, TimeSpan.Zero));
-        using var reportPortalLaunchManager = new ReportPortalLaunchManager();
-
         var reporters = new ReporterBuilder()
             .ConfigureReportPortal(CreateReportPortalConfig(enabled: false))
-            .Build(context, new DateTime(2025, 1, 1, 10, 0, 0, DateTimeKind.Utc),
-                manager: reportPortalLaunchManager,
-                settings: settings);
+            .Build(context, new DateTime(2025, 1, 1, 10, 0, 0, DateTimeKind.Utc));
 
         Assert.That(reporters, Has.Count.EqualTo(1));
         Assert.That(reporters[0], Is.TypeOf<AllureReporter>());
@@ -182,54 +168,14 @@ public class AssertionBuilderTests
             enabled: true,
             reportPortalUri: "http://default.local",
             reportPortalApiKey: "default-api-key");
-        var settings = new ReportPortalSettings(
-            new ReportPortalConfig(),
-            "Smoke",
-            "QaaS",
-            ["Session A"],
-            "run",
-            new DateTimeOffset(2025, 1, 1, 10, 0, 0, TimeSpan.Zero));
-        using var reportPortalLaunchManager = new ReportPortalLaunchManager();
 
         var reporters = new ReporterBuilder()
-            .Build(context, new DateTime(2025, 1, 1, 10, 0, 0, DateTimeKind.Utc),
-                manager: reportPortalLaunchManager,
-                settings: settings);
+            .Build(context, new DateTime(2025, 1, 1, 10, 0, 0, DateTimeKind.Utc));
         var reportPortalReporter = reporters.OfType<ReportPortalReporter>().Single();
 
         Assert.That(reporters, Has.Count.EqualTo(2));
-        Assert.That(reportPortalReporter.Settings.Endpoint, Is.EqualTo("http://default.local"));
-        Assert.That(reportPortalReporter.Settings.ApiKey, Is.EqualTo("default-api-key"));
-    }
-
-    [Test]
-    public void ReporterBuilder_Build_WithEnabledReportPortal_ReturnsAllureAndReportPortalReporters()
-    {
-        var context = new Context
-        {
-            Logger = Globals.Logger,
-            RootConfiguration = new ConfigurationBuilder().Build()
-        };
-        var settings = new ReportPortalSettings(
-            CreateReportPortalConfig(enabled: true),
-            "Smoke",
-            "QaaS",
-            ["Session A"],
-            "run",
-            new DateTimeOffset(2025, 1, 1, 10, 0, 0, TimeSpan.Zero));
-        using var reportPortalLaunchManager = new ReportPortalLaunchManager();
-
-        var reporters = new ReporterBuilder()
-            .ConfigureReportPortal(CreateReportPortalConfig(enabled: true))
-            .Build(context, new DateTime(2025, 1, 1, 10, 0, 0, DateTimeKind.Utc),
-                manager: reportPortalLaunchManager,
-                settings: settings);
-        var reportPortalReporter = reporters.OfType<ReportPortalReporter>().Single();
-
-        Assert.That(reporters, Has.Count.EqualTo(2));
-        Assert.That(reporters.OfType<AllureReporter>(), Has.Exactly(1).Items);
-        Assert.That(reportPortalReporter.Settings.Team, Is.EqualTo("Smoke"));
-        Assert.That(reportPortalReporter.LaunchManager, Is.SameAs(reportPortalLaunchManager));
+        Assert.That(reportPortalReporter.Config.Endpoint, Is.EqualTo("http://default.local"));
+        Assert.That(reportPortalReporter.Config.ApiKey, Is.EqualTo("default-api-key"));
     }
 
     [Test]

@@ -3,6 +3,7 @@ using Microsoft.Extensions.Logging;
 using QaaS.Framework.Configurations;
 using QaaS.Framework.SDK.Hooks.Assertion;
 using QaaS.Runner.Assertions.AssertionObjects;
+using QaaS.Runner.Assertions.ConfigurationObjects.ReporterConfigs;
 using ReportPortal.Client.Abstractions.Models;
 using ReportPortal.Client.Abstractions.Requests;
 using AssertionSeverity = QaaS.Runner.Assertions.AssertionObjects.AssertionSeverity;
@@ -36,57 +37,77 @@ public class ReportPortalReporter : BaseReporter
             { AssertionSeverity.Blocker, "blocker" }
         };
     
-    public required ReportPortalSettings Settings { get; init; }
-    public required ReportPortalLaunchManager LaunchManager { get; init; }
+    private readonly Lock _queuedResultsLock = new();
+    private readonly List<AssertionResult> _queuedResults = [];
+
+    public required ReportPortalConfig Config { get; init; }
+    public string ExecutionMode { get; init; } = "run";
 
     /// <summary>
-    /// Writes one runner-produced assertion result into the shared ReportPortal launch for the corresponding team project
-    /// and system. Any publishing failure is downgraded to a warning so QaaS can continue running.
+    /// Queues one runner-produced assertion result for final ReportPortal publishing.
     /// </summary>
     public override void WriteTestResults(AssertionResult assertionResult)
     {
         ArgumentNullException.ThrowIfNull(assertionResult);
 
-        try
+        lock (_queuedResultsLock)
         {
-            WriteTestResultsCore(assertionResult);
-        }
-        catch (Exception exception)
-        {
-            Context.Logger.LogWarning(exception,
-                "Could not publish assertion {AssertionName} to ReportPortal for team {TeamName} and system {SystemName}. The run will continue.",
-                assertionResult.Assertion.Name,
-                Settings.Team ?? "<missing-team>",
-                Settings.System);
+            _queuedResults.Add(assertionResult);
         }
     }
 
-    private void WriteTestResultsCore(AssertionResult assertionResult)
+    internal IReadOnlyList<AssertionResult> GetQueuedResultsSnapshot()
     {
-        var launch = LaunchManager.EnsureLaunchStartedAsync(Settings, Context.Logger).GetAwaiter().GetResult();
-        if (launch is null)
-            return;
+        lock (_queuedResultsLock)
+        {
+            return _queuedResults.ToArray();
+        }
+    }
 
+    internal void PublishQueuedResults(ReportPortalPublishContext publishContext,
+        IReadOnlyList<AssertionResult> assertionResults,
+        ILogger logger)
+    {
+        foreach (var assertionResult in assertionResults)
+        {
+            try
+            {
+                PublishTestResultCore(publishContext, assertionResult);
+            }
+            catch (Exception exception)
+            {
+                logger.LogWarning(exception,
+                    "Could not publish assertion {AssertionName} to ReportPortal for team {TeamName} and system {SystemName}. The run will continue.",
+                    assertionResult.Assertion.Name,
+                    publishContext.LaunchPlan.Team ?? "<missing-team>",
+                    publishContext.LaunchPlan.System);
+            }
+        }
+    }
+
+    private void PublishTestResultCore(ReportPortalPublishContext launch, AssertionResult assertionResult)
+    {
         var requestedStartTimeUtc = GetAssertionStartTime(assertionResult);
         var startTimeUtc = requestedStartTimeUtc < launch.LaunchStartTimeUtc
             ? launch.LaunchStartTimeUtc
             : requestedStartTimeUtc;
         var finishTimeUtc = startTimeUtc.AddMilliseconds(Math.Max(assertionResult.TestDurationMs, 1));
-        var itemAttributes = BuildItemAttributes(assertionResult);
+        var launchPlan = launch.LaunchPlan;
+        var itemAttributes = BuildItemAttributes(assertionResult, launchPlan);
         var stableIdentity = BuildStableReportPortalIdentity(assertionResult,
-            Settings.Team ?? "Unknown Team",
-            Settings.System);
+            launchPlan.Team ?? "Unknown Team",
+            launchPlan.System);
         var itemUuid = launch.Service.TestItem.StartAsync(new StartTestItemRequest
         {
             LaunchUuid = launch.LaunchUuid,
             Name = assertionResult.Assertion.Name,
-            Description = BuildDescription(assertionResult),
+            Description = BuildDescription(assertionResult, launchPlan),
             StartTime = startTimeUtc,
             Type = TestItemType.Test,
             UniqueId = stableIdentity,
             TestCaseId = stableIdentity,
             CodeReference = BuildCodeReference(stableIdentity),
-            Parameters = BuildParameters(assertionResult),
+            Parameters = BuildParameters(assertionResult, launchPlan),
             Attributes = itemAttributes
         }).GetAwaiter().GetResult().Uuid;
 
@@ -105,7 +126,7 @@ public class ReportPortalReporter : BaseReporter
                 LaunchUuid = launch.LaunchUuid,
                 EndTime = finishTimeUtc,
                 Status = AssertionStatusToReportPortalStatusMap[assertionResult.AssertionStatus],
-                Description = BuildDescription(assertionResult),
+                Description = BuildDescription(assertionResult, launchPlan),
                 Attributes = itemAttributes
             }).GetAwaiter().GetResult();
         }
@@ -116,16 +137,17 @@ public class ReportPortalReporter : BaseReporter
         }
     }
 
-    private void WriteAssertionContextLog(ReportPortalLaunchContext launch, string itemUuid, AssertionResult assertionResult,
+    private void WriteAssertionContextLog(ReportPortalPublishContext launch, string itemUuid, AssertionResult assertionResult,
         string stableIdentity)
     {
+        var launchPlan = launch.LaunchPlan;
         var metadataAttributes = BuildMetadataAttributes();
         var contextText = new StringBuilder()
             .AppendLine("Assertion context:")
             .AppendLine($"- Stable identity: {stableIdentity}")
-            .AppendLine($"- Team: {Settings.Team ?? "<missing-team>"}")
-            .AppendLine($"- Project: {Settings.Project ?? "<missing-project>"}")
-            .AppendLine($"- System: {Settings.System}")
+            .AppendLine($"- Team: {launchPlan.Team ?? "<missing-team>"}")
+            .AppendLine($"- Project: {launchPlan.Project ?? "<missing-project>"}")
+            .AppendLine($"- System: {launchPlan.System}")
             .AppendLine($"- ExecutionId: {Context.ExecutionId ?? "<none>"}")
             .AppendLine($"- CaseName: {Context.CaseName ?? "<none>"}")
             .AppendLine($"- Sessions: {assertionResult.Assertion.SessionDataList.Count}")
@@ -137,10 +159,10 @@ public class ReportPortalReporter : BaseReporter
             .Trim();
 
         CreateLogItem(launch, itemUuid, ReportPortalLogLevel.Info, contextText,
-            BuildAssertionContextArtifact(assertionResult, Settings.Team, Settings.System));
+            BuildAssertionContextArtifact(assertionResult, launchPlan.Team, launchPlan.System));
     }
 
-    private void WriteAssertionOutcomeLog(ReportPortalLaunchContext launch, string itemUuid, AssertionResult assertionResult)
+    private void WriteAssertionOutcomeLog(ReportPortalPublishContext launch, string itemUuid, AssertionResult assertionResult)
     {
         var logLevel = assertionResult.AssertionStatus switch
         {
@@ -169,7 +191,7 @@ public class ReportPortalReporter : BaseReporter
         CreateLogItem(launch, itemUuid, logLevel, text.ToString().Trim(), null);
     }
 
-    private void WriteLinksLog(ReportPortalLaunchContext launch, string itemUuid, AssertionResult assertionResult)
+    private void WriteLinksLog(ReportPortalPublishContext launch, string itemUuid, AssertionResult assertionResult)
     {
         if (assertionResult.Links is null)
             return;
@@ -186,7 +208,7 @@ public class ReportPortalReporter : BaseReporter
         CreateLogItem(launch, itemUuid, ReportPortalLogLevel.Info, text, null);
     }
 
-    private void WriteSessionDetails(ReportPortalLaunchContext launch, string itemUuid, AssertionResult assertionResult)
+    private void WriteSessionDetails(ReportPortalPublishContext launch, string itemUuid, AssertionResult assertionResult)
     {
         foreach (var sessionData in assertionResult.Assertion.SessionDataList)
         {
@@ -205,7 +227,7 @@ public class ReportPortalReporter : BaseReporter
         }
     }
 
-    private void WriteSessionLogAttachments(ReportPortalLaunchContext launch, string itemUuid,
+    private void WriteSessionLogAttachments(ReportPortalPublishContext launch, string itemUuid,
         AssertionResult assertionResult)
     {
         foreach (var sessionData in assertionResult.Assertion.SessionDataList)
@@ -220,7 +242,7 @@ public class ReportPortalReporter : BaseReporter
         }
     }
 
-    private void WriteTemplateAttachment(ReportPortalLaunchContext launch, string itemUuid,
+    private void WriteTemplateAttachment(ReportPortalPublishContext launch, string itemUuid,
         AssertionResult assertionResult)
     {
         var templateArtifact = BuildTemplateArtifact(assertionResult.Assertion);
@@ -231,7 +253,7 @@ public class ReportPortalReporter : BaseReporter
             templateArtifact);
     }
 
-    private void WriteAssertionAttachments(ReportPortalLaunchContext launch, string itemUuid, AssertionResult assertionResult)
+    private void WriteAssertionAttachments(ReportPortalPublishContext launch, string itemUuid, AssertionResult assertionResult)
     {
         foreach (var artifact in BuildAssertionArtifacts(assertionResult))
         {
@@ -241,7 +263,7 @@ public class ReportPortalReporter : BaseReporter
         }
     }
 
-    private void CreateLogItem(ReportPortalLaunchContext launch, string itemUuid, ReportPortalLogLevel level,
+    private void CreateLogItem(ReportPortalPublishContext launch, string itemUuid, ReportPortalLogLevel level,
         string text,
         ReportArtifact? artifact)
     {
@@ -273,7 +295,8 @@ public class ReportPortalReporter : BaseReporter
         return DateTime.UtcNow;
     }
 
-    private IList<KeyValuePair<string, string>> BuildParameters(AssertionResult assertionResult)
+    private IList<KeyValuePair<string, string>> BuildParameters(AssertionResult assertionResult,
+        ReportPortalLaunchPlan launchPlan)
     {
         var parameters = new List<KeyValuePair<string, string>>
         {
@@ -283,12 +306,12 @@ public class ReportPortalReporter : BaseReporter
                 $"[{string.Join(", ", assertionResult.Assertion.DataSourceList?.Select(dataSource => dataSource.Name) ?? [])}]")
         };
 
-        if (!string.IsNullOrWhiteSpace(Settings.Team))
-            parameters.Add(new KeyValuePair<string, string>("Team", Settings.Team));
-        if (!string.IsNullOrWhiteSpace(Settings.Project))
-            parameters.Add(new KeyValuePair<string, string>("Project", Settings.Project));
-        if (!string.IsNullOrWhiteSpace(Settings.System))
-            parameters.Add(new KeyValuePair<string, string>("System", Settings.System));
+        if (!string.IsNullOrWhiteSpace(launchPlan.Team))
+            parameters.Add(new KeyValuePair<string, string>("Team", launchPlan.Team));
+        if (!string.IsNullOrWhiteSpace(launchPlan.Project))
+            parameters.Add(new KeyValuePair<string, string>("Project", launchPlan.Project));
+        if (!string.IsNullOrWhiteSpace(launchPlan.System))
+            parameters.Add(new KeyValuePair<string, string>("System", launchPlan.System));
         if (!string.IsNullOrWhiteSpace(Context.ExecutionId))
             parameters.Add(new KeyValuePair<string, string>("Execution Id", Context.ExecutionId));
         if (!string.IsNullOrWhiteSpace(Context.CaseName))
@@ -304,7 +327,7 @@ public class ReportPortalReporter : BaseReporter
         return parameters;
     }
 
-    private IList<ItemAttribute> BuildItemAttributes(AssertionResult assertionResult)
+    private IList<ItemAttribute> BuildItemAttributes(AssertionResult assertionResult, ReportPortalLaunchPlan launchPlan)
     {
         var attributes = new List<ItemAttribute>
         {
@@ -325,30 +348,30 @@ public class ReportPortalReporter : BaseReporter
             }
         };
 
-        if (!string.IsNullOrWhiteSpace(Settings.Team))
+        if (!string.IsNullOrWhiteSpace(launchPlan.Team))
         {
             attributes.Add(new ItemAttribute
             {
                 Key = "team",
-                Value = Settings.Team
+                Value = launchPlan.Team
             });
         }
 
-        if (!string.IsNullOrWhiteSpace(Settings.Project))
+        if (!string.IsNullOrWhiteSpace(launchPlan.Project))
         {
             attributes.Add(new ItemAttribute
             {
                 Key = "project",
-                Value = Settings.Project
+                Value = launchPlan.Project
             });
         }
 
-        if (!string.IsNullOrWhiteSpace(Settings.System))
+        if (!string.IsNullOrWhiteSpace(launchPlan.System))
         {
             attributes.Add(new ItemAttribute
             {
                 Key = "system",
-                Value = Settings.System
+                Value = launchPlan.System
             });
         }
 
@@ -382,7 +405,7 @@ public class ReportPortalReporter : BaseReporter
             });
         }
 
-        foreach (var attribute in Settings.Attributes.Where(attribute => !string.IsNullOrWhiteSpace(attribute.Key)))
+        foreach (var attribute in launchPlan.Attributes.Where(attribute => !string.IsNullOrWhiteSpace(attribute.Key)))
         {
             attributes.Add(new ItemAttribute
             {
@@ -404,7 +427,7 @@ public class ReportPortalReporter : BaseReporter
         return attributes;
     }
 
-    private string BuildDescription(AssertionResult assertionResult)
+    private string BuildDescription(AssertionResult assertionResult, ReportPortalLaunchPlan launchPlan)
     {
         var assertionTextDetails = BuildAssertionTextDetails(assertionResult);
         var metadataAttributes = BuildMetadataAttributes();
@@ -418,9 +441,9 @@ public class ReportPortalReporter : BaseReporter
 
         description.AppendLine()
             .AppendLine("Execution context:")
-            .AppendLine($"- Team: {Settings.Team ?? "<missing-team>"}")
-            .AppendLine($"- Project: {Settings.Project ?? "<missing-project>"}")
-            .AppendLine($"- System: {Settings.System}")
+            .AppendLine($"- Team: {launchPlan.Team ?? "<missing-team>"}")
+            .AppendLine($"- Project: {launchPlan.Project ?? "<missing-project>"}")
+            .AppendLine($"- System: {launchPlan.System}")
             .AppendLine($"- Execution Id: {Context.ExecutionId ?? "<none>"}")
             .AppendLine($"- Case Name: {Context.CaseName ?? "<none>"}")
             .AppendLine($"- Sessions: {string.Join(", ", assertionResult.Assertion.SessionDataList.Select(session => session.Name))}")
@@ -452,7 +475,7 @@ public class ReportPortalReporter : BaseReporter
         return $"qaas/{stableIdentity.Replace("::", "/", StringComparison.Ordinal)}";
     }
 
-    private void TryFinishAsFailed(ReportPortalLaunchContext launch, string itemUuid)
+    private void TryFinishAsFailed(ReportPortalPublishContext launch, string itemUuid)
     {
         try
         {

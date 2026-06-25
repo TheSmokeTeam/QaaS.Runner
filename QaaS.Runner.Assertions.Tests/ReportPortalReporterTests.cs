@@ -27,8 +27,7 @@ public class ReportPortalReporterTests
     [Test]
     public void ReporterHelpers_WithDifferentAssertionConfigurations_UseEachAssertionOptions()
     {
-        using var launchManager = new ReportPortalLaunchManager();
-        var reporter = CreateReporter(launchManager);
+        var reporter = CreateReporter();
         var sessionData = new SessionData
         {
             Name = "session-a",
@@ -62,8 +61,7 @@ public class ReportPortalReporterTests
     [Test]
     public void BuildSessionLogArtifact_WhenSaveLogsEnabled_ReturnsStoredSessionLog()
     {
-        using var launchManager = new ReportPortalLaunchManager();
-        var reporter = CreateReporter(launchManager);
+        var reporter = CreateReporter();
         reporter.SaveLogs = true;
         reporter.Context.AppendSessionLog("session-a", "Starting session-a");
         reporter.Context.AppendSessionLog("session-a", "Completed session-a");
@@ -92,8 +90,7 @@ public class ReportPortalReporterTests
     [Test]
     public void BuildSessionLogArtifact_WhenSaveLogsDisabled_ReturnsNull()
     {
-        using var launchManager = new ReportPortalLaunchManager();
-        var reporter = CreateReporter(launchManager);
+        var reporter = CreateReporter();
         reporter.SaveLogs = false;
         reporter.Context.AppendSessionLog("session-a", "Starting session-a");
         var sessionData = new SessionData
@@ -113,8 +110,7 @@ public class ReportPortalReporterTests
     [Test]
     public void BuildSessionLogArtifact_WhenAssertionSaveLogsEnabled_ReturnsStoredSessionLog()
     {
-        using var launchManager = new ReportPortalLaunchManager();
-        var reporter = CreateReporter(launchManager);
+        var reporter = CreateReporter();
         reporter.Context.AppendSessionLog("session-a", "Starting session-a");
         var sessionData = new SessionData
         {
@@ -130,12 +126,29 @@ public class ReportPortalReporterTests
         Assert.That(artifact, Is.Not.Null);
     }
 
-    private static ReportPortalReporter CreateReporter(ReportPortalLaunchManager launchManager)
+    [Test]
+    public void WriteTestResults_QueuesResultsWithoutPublishing()
     {
+        var reporter = CreateReporter();
+        var result = CreateAssertionResult("queued", AssertionSeverity.Normal, false, true, "trace",
+            new SessionData { Name = "session-a" });
+
+        reporter.WriteTestResults(result);
+
+        Assert.That(reporter.GetQueuedResultsSnapshot(), Is.EqualTo(new[] { result }));
+    }
+
+    private static ReportPortalReporter CreateReporter()
+    {
+        ReportPortalConfig.RegisterDefaults(enabled: false);
         return new ReportPortalReporter
         {
-            Settings = CreateReportPortalSettings(),
-            LaunchManager = launchManager,
+            Config = new ReportPortalConfig
+            {
+                Enabled = true,
+                Endpoint = "https://reportportal.local/api/",
+                ApiKey = "api-key"
+            },
             Context = new Context
             {
                 Logger = Globals.Logger,
@@ -197,24 +210,12 @@ public class ReportPortalReporterTests
     {
         var method = typeof(ReportPortalReporter)
             .GetMethod("BuildItemAttributes", BindingFlags.Instance | BindingFlags.NonPublic)!;
-        var attributes = (IList<ItemAttribute>)method.Invoke(reporter, [assertionResult])!;
+        reporter.WriteTestResults(assertionResult);
+        var launchPlan = ReportPortalLaunchPlan.Build(
+            [reporter],
+            new DateTimeOffset(2025, 1, 1, 10, 0, 0, TimeSpan.Zero),
+            requireQueuedResults: true).Single();
+        var attributes = (IList<ItemAttribute>)method.Invoke(reporter, [assertionResult, launchPlan])!;
         return attributes.Single(attribute => attribute.Key == "severity").Value;
-    }
-
-    private static ReportPortalSettings CreateReportPortalSettings()
-    {
-        ReportPortalConfig.RegisterDefaults(enabled: false);
-        return new ReportPortalSettings(
-            new ReportPortalConfig
-            {
-                Enabled = true,
-                Endpoint = "https://reportportal.local/api/",
-                ApiKey = "api-key"
-            },
-            "Smoke",
-            "QaaS",
-            [],
-            "run",
-            new DateTimeOffset(2025, 1, 1, 10, 0, 0, TimeSpan.Zero));
     }
 }

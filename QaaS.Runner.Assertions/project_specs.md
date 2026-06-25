@@ -20,7 +20,7 @@ Assertion engine and reporter dispatcher.
 | `IReporter` | Abstraction for downstream reporting backends. |
 | `BaseReporter` | Shared scaffolding — open/close test, attach files, hash-dedup. |
 | `AllureReporter` (~35 KB) | Allure-format JSON + attachments. Attachments deduplicated via `ConcurrentDictionary`. |
-| `ReportPortalReporter` | ReportPortal reporter for assertion results. |
+| `ReportPortalReporter` | Passive ReportPortal reporter that queues assertion-result references for runner-owned final publishing. |
 | `AssertionObjects/*` | Builder + runtime wrapper around an `IAssertion` hook. |
 | `LinkBuilders/*` | Builders that compose Grafana, Kibana, and Prometheus links into the report. |
 | `ConfigurationObjects/*` | YAML-bound config records for assertions and reporters. |
@@ -28,6 +28,9 @@ Assertion engine and reporter dispatcher.
 ## Reporter selection
 
 Reporter type is configured per assertion and routed in `ReportLogic`.
+Allure writes immediately. ReportPortal queues locally during execution; the
+runner validates access before sessions start and publishes grouped launches at
+cleanup.
 
 ## Concurrency
 

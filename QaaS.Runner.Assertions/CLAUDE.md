@@ -5,7 +5,7 @@ Assertion engine that evaluates session outputs against configured assertion hoo
 
 ## Key Files
 - `Reporters/Allure/AllureReporter.cs` — Main reporter: builds Allure test results with steps, attachments, and links
-- `Reporters/ReportPortal/` — ReportPortal reporter, settings, access validator, and launch manager
+- `Reporters/ReportPortal/` — Passive ReportPortal reporter, launch planning, access validation, and deferred final publisher
 - `BaseReporter.cs` — Abstract base for assertion reporters
 - `IReporter.cs` — Reporter interface
 - `AssertionObjects/` — Runtime assertion models

@@ -122,8 +122,7 @@ public class ReporterBuilder : IYamlConvertible, ICloneable<ReporterBuilder>
     /// Builds the reporter instances that should publish assertion results for the current run.
     /// </summary>
     /// <remarks>
-    /// Allure is always created. ReportPortal is created only when the resolved ReportPortal settings are enabled
-    /// and a <see cref="ReportPortalLaunchManager"/> was provided.
+    /// Allure is always created. ReportPortal is created only when its resolved configuration is enabled.
     /// </remarks>
     /// <param name="context">The QaaS execution context to attach to each reporter.</param>
     /// <param name="testSuiteStartTimeUtc">
@@ -132,17 +131,15 @@ public class ReporterBuilder : IYamlConvertible, ICloneable<ReporterBuilder>
     /// <param name="fileSystem">
     /// Optional file-system abstraction used by reporters. When omitted, a default <see cref="FileSystem"/> is used.
     /// </param>
-    /// <param name="manager">Optional shared ReportPortal launch manager used by ReportPortal reporters.</param>
-    /// <param name="settings">Optional resolved ReportPortal settings for the current runner invocation.</param>
+    /// <param name="executionMode">The execution mode represented by the current execution.</param>
     /// <returns>The configured reporters for the current assertion run.</returns>
     /// <exception cref="ArgumentOutOfRangeException">
     /// Thrown when an unsupported <see cref="ReporterTarget"/> value is encountered.
     /// </exception>
     internal List<IReporter> Build(Context context, 
         DateTime testSuiteStartTimeUtc, 
-        IFileSystem? fileSystem = null, 
-        ReportPortalLaunchManager? manager = null,
-        ReportPortalSettings? settings = null)
+        IFileSystem? fileSystem = null,
+        string executionMode = "run")
     {
         var reporters = new List<IReporter>();
         
@@ -166,7 +163,7 @@ public class ReporterBuilder : IYamlConvertible, ICloneable<ReporterBuilder>
                     break;
 
                 case ReporterTarget.ReportPortal:
-                    if (settings is { Enabled: true } && manager is not null)
+                    if (ReportPortal is { Enabled: true } reportPortalConfig)
                     {
                         var reportPortalReporter = new ReportPortalReporter
                         {
@@ -177,8 +174,8 @@ public class ReporterBuilder : IYamlConvertible, ICloneable<ReporterBuilder>
                             SaveTemplate = SaveTemplate,
                             SaveSessionData = SaveSessionData,
                             FileSystem = fileSystem ?? new FileSystem(),
-                            LaunchManager = manager,
-                            Settings = settings
+                            Config = reportPortalConfig,
+                            ExecutionMode = executionMode
                         };
                         reporters.Add(reportPortalReporter);
                     }
