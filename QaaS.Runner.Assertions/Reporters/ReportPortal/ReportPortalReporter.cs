@@ -39,7 +39,6 @@ public class ReportPortalReporter : BaseReporter
     
     private readonly Lock _queuedResultsLock = new();
     private readonly List<AssertionResult> _queuedResults = [];
-
     public required ReportPortalConfig Config { get; init; }
     public string ExecutionMode { get; init; } = "run";
 
