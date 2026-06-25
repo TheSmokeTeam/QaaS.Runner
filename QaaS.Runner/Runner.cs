@@ -27,7 +27,7 @@ public class Runner : IRunner, IDisposable
     private string ServeResultsFolder { get; set; } = AssertableOptions.DefaultServeResultsFolder;
     private bool DisposeSerilogLogger { get; set; } = true;
     private int? BootstrapHandledExitCode { get; set; }
-    internal IReportPortalPublisher ReportPortalPublisher { get; set; } = new ReportPortalPublisher();
+    internal ReportPortalPublisher ReportPortalPublisher { get; set; }
 
     /// <summary>
     /// Controls whether <see cref="Run" /> terminates the current process after the runner finishes successfully.
@@ -68,6 +68,7 @@ public class Runner : IRunner, IDisposable
         Scope = scope;
         EmptyResults = emptyResults;
         ServeResults = serveResults;
+        ReportPortalPublisher = new ReportPortalPublisher(logger);
     }
 
     /// <summary>
@@ -233,7 +234,7 @@ public class Runner : IRunner, IDisposable
     protected virtual void ValidateReportPortalAccess(List<Execution> executions)
     {
         var reportPortalReporters = GetReportPortalReporters(executions).ToList();
-        ReportPortalPublisher.ValidateAsync(reportPortalReporters, Logger).GetAwaiter().GetResult();
+        ReportPortalPublisher.ValidateAsync(reportPortalReporters).GetAwaiter().GetResult();
     }
 
     /// <summary>
@@ -243,7 +244,7 @@ public class Runner : IRunner, IDisposable
     protected virtual void PublishReportPortalResults(IEnumerable<Execution>? executions)
     {
         var reportPortalReporters = GetReportPortalReporters(executions).ToList();
-        ReportPortalPublisher.PublishAsync(reportPortalReporters, Logger).GetAwaiter().GetResult();
+        ReportPortalPublisher.PublishAsync(reportPortalReporters).GetAwaiter().GetResult();
     }
 
     private static IEnumerable<ReportPortalReporter> GetReportPortalReporters(IEnumerable<Execution>? executions)
@@ -278,8 +279,7 @@ public class Runner : IRunner, IDisposable
             return;
 
         _disposed = true;
-        if (ReportPortalPublisher is IDisposable disposableReportPortalPublisher)
-            disposableReportPortalPublisher.Dispose();
+        ReportPortalPublisher.Dispose();
         Logger.LogDebug("Disposing runner scope");
         Scope.Dispose();
         GC.SuppressFinalize(this);

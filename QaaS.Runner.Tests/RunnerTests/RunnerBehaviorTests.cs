@@ -134,13 +134,12 @@ public class RunnerBehaviorTests
     }
 
     private sealed class RecordingReportPortalPublisher(Exception? validationException = null)
-        : IReportPortalPublisher
+        : ReportPortalPublisher(Globals.Logger)
     {
         private readonly Exception? _validationException = validationException;
         public List<string> Calls { get; } = [];
 
-        public Task ValidateAsync(IEnumerable<ReportPortalReporter> reporters,
-            Microsoft.Extensions.Logging.ILogger logger,
+        public override Task ValidateAsync(IEnumerable<ReportPortalReporter> reporters,
             CancellationToken cancellationToken = default)
         {
             Calls.Add("validate");
@@ -150,8 +149,7 @@ public class RunnerBehaviorTests
             return Task.CompletedTask;
         }
 
-        public Task PublishAsync(IEnumerable<ReportPortalReporter> reporters,
-            Microsoft.Extensions.Logging.ILogger logger,
+        public override Task PublishAsync(IEnumerable<ReportPortalReporter> reporters,
             CancellationToken cancellationToken = default)
         {
             Calls.Add("publish");

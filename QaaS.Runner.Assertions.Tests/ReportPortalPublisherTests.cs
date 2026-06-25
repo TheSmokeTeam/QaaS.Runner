@@ -39,19 +39,16 @@ public class ReportPortalPublisherTests
     [Test]
     public async Task ValidateAsync_WithDisabledReportPortal_DoesNotValidateOrCreatePublishClient()
     {
-        using var httpClient = CreateSuccessfulValidationClient(out var handler);
         var factory = new RecordingClientFactory();
-        using var publisher = new ReportPortalPublisher(httpClient, factory, StartedAt());
+        using var publisher = CreateSuccessfulPublisher(factory, out var handler);
         var reporter = CreateReporter(enabled: false);
 
-        await publisher.ValidateAsync([reporter], Globals.Logger);
+        await publisher.ValidateAsync([reporter]);
 
         Assert.Multiple(() =>
         {
             Assert.That(handler.RequestCount, Is.Zero);
             Assert.That(factory.Services, Is.Empty);
-            Assert.That(ReportPortalLaunchPlan.Build([reporter], StartedAt(), requireQueuedResults: false),
-                Is.Empty);
         });
     }
 
@@ -64,13 +61,12 @@ public class ReportPortalPublisherTests
         string? apiKey = "api-key",
         string? endpoint = "http://localhost:8080")
     {
-        using var httpClient = CreateSuccessfulValidationClient(out var handler);
         var factory = new RecordingClientFactory();
-        using var publisher = new ReportPortalPublisher(httpClient, factory, StartedAt());
+        using var publisher = CreateSuccessfulPublisher(factory, out var handler);
         var reporter = CreateReporter(team: team, apiKey: apiKey, endpoint: endpoint);
 
         var exception = Assert.ThrowsAsync<InvalidConfigurationsException>(
-            async () => await publisher.ValidateAsync([reporter], Globals.Logger));
+            async () => await publisher.ValidateAsync([reporter]));
 
         Assert.Multiple(() =>
         {
@@ -83,16 +79,15 @@ public class ReportPortalPublisherTests
     [Test]
     public void ValidateAsync_WithUnauthorizedApiKey_ThrowsConfigurationFailure()
     {
-        using var httpClient = CreateValidationClient(_ =>
+        var factory = new RecordingClientFactory();
+        using var publisher = CreatePublisher(factory, _ =>
             new HttpResponseMessage(HttpStatusCode.Unauthorized)
             {
                 Content = new StringContent("unauthorized", Encoding.UTF8, "text/plain")
             }, out var handler);
-        var factory = new RecordingClientFactory();
-        using var publisher = new ReportPortalPublisher(httpClient, factory, StartedAt());
 
         var exception = Assert.ThrowsAsync<InvalidConfigurationsException>(
-            async () => await publisher.ValidateAsync([CreateReporter()], Globals.Logger));
+            async () => await publisher.ValidateAsync([CreateReporter()]));
 
         Assert.Multiple(() =>
         {
@@ -105,17 +100,16 @@ public class ReportPortalPublisherTests
     [Test]
     public void ValidateAsync_WithMissingProject_ThrowsConfigurationFailure()
     {
-        using var httpClient = CreateValidationClient(_ =>
+        var factory = new RecordingClientFactory();
+        using var publisher = CreatePublisher(factory, _ =>
             new HttpResponseMessage(HttpStatusCode.NotFound)
             {
                 Content = new StringContent("{\"message\":\"not found\"}", Encoding.UTF8,
                     "application/json")
             }, out var handler);
-        var factory = new RecordingClientFactory();
-        using var publisher = new ReportPortalPublisher(httpClient, factory, StartedAt());
 
         var exception = Assert.ThrowsAsync<InvalidConfigurationsException>(
-            async () => await publisher.ValidateAsync([CreateReporter(team: "Smoke")], Globals.Logger));
+            async () => await publisher.ValidateAsync([CreateReporter(team: "Smoke")]));
 
         Assert.Multiple(() =>
         {
@@ -128,11 +122,10 @@ public class ReportPortalPublisherTests
     [Test]
     public async Task ValidateAsync_WithSuccessfulProjectLookup_UsesProjectFallbackAndCreatesNoPublishClient()
     {
-        using var httpClient = CreateSuccessfulValidationClient(out var handler);
         var factory = new RecordingClientFactory();
-        using var publisher = new ReportPortalPublisher(httpClient, factory, StartedAt());
+        using var publisher = CreateSuccessfulPublisher(factory, out var handler);
 
-        await publisher.ValidateAsync([CreateReporter(team: "Smoke", project: " ")], Globals.Logger);
+        await publisher.ValidateAsync([CreateReporter(team: "Smoke", project: null)]);
 
         Assert.Multiple(() =>
         {
@@ -143,15 +136,14 @@ public class ReportPortalPublisherTests
     }
 
     [Test]
-    public async Task ValidateAsync_CachesSuccessfulValidationPerNormalizedLaunchGroup()
+    public async Task ValidateAsync_GroupsSuccessfulValidationByNormalizedLaunchGroup()
     {
-        using var httpClient = CreateSuccessfulValidationClient(out var handler);
         var factory = new RecordingClientFactory();
-        using var publisher = new ReportPortalPublisher(httpClient, factory, StartedAt());
+        using var publisher = CreateSuccessfulPublisher(factory, out var handler);
         var firstReporter = CreateReporter(endpoint: "http://localhost:8080");
         var equivalentEndpointReporter = CreateReporter(endpoint: "http://localhost:8080/api/v1/");
 
-        await publisher.ValidateAsync([firstReporter, equivalentEndpointReporter], Globals.Logger);
+        await publisher.ValidateAsync([firstReporter, equivalentEndpointReporter]);
 
         Assert.Multiple(() =>
         {
@@ -163,14 +155,13 @@ public class ReportPortalPublisherTests
     [Test]
     public async Task ValidateAsync_WithDifferentSystem_ValidatesSeparateLaunchGroup()
     {
-        using var httpClient = CreateSuccessfulValidationClient(out var handler);
         var factory = new RecordingClientFactory();
-        using var publisher = new ReportPortalPublisher(httpClient, factory, StartedAt());
+        using var publisher = CreateSuccessfulPublisher(factory, out var handler);
 
         await publisher.ValidateAsync([
             CreateReporter(system: "QaaS"),
             CreateReporter(system: "AnotherSystem")
-        ], Globals.Logger);
+        ]);
 
         Assert.That(handler.RequestCount, Is.EqualTo(2));
     }
@@ -178,16 +169,15 @@ public class ReportPortalPublisherTests
     [Test]
     public async Task PublishAsync_WithSameNormalizedEndpointProjectAndSystem_PublishesOneLaunch()
     {
-        using var httpClient = CreateSuccessfulValidationClient(out var handler);
         var factory = new RecordingClientFactory();
-        using var publisher = new ReportPortalPublisher(httpClient, factory, StartedAt());
+        using var publisher = CreateSuccessfulPublisher(factory, out var handler);
         var firstReporter = CreateReporter(team: "Smoke", system: "QaaS", endpoint: "http://localhost:8080");
         var secondReporter = CreateReporter(team: "Smoke", system: "QaaS", endpoint: "http://localhost:8080/api/v1/");
         firstReporter.WriteTestResults(CreateResult("assertion-a", "Session A"));
         secondReporter.WriteTestResults(CreateResult("assertion-b", "Session B"));
 
-        await publisher.ValidateAsync([firstReporter, secondReporter], Globals.Logger);
-        await publisher.PublishAsync([firstReporter, secondReporter], Globals.Logger);
+        await publisher.ValidateAsync([firstReporter, secondReporter]);
+        await publisher.PublishAsync([firstReporter, secondReporter]);
 
         Assert.Multiple(() =>
         {
@@ -201,9 +191,8 @@ public class ReportPortalPublisherTests
     [Test]
     public async Task PublishAsync_WithMixedProjectsAndSystems_PublishesSeparateLaunches()
     {
-        using var httpClient = CreateSuccessfulValidationClient(out var handler);
         var factory = new RecordingClientFactory();
-        using var publisher = new ReportPortalPublisher(httpClient, factory, StartedAt());
+        using var publisher = CreateSuccessfulPublisher(factory, out var handler);
         var firstReporter = CreateReporter(team: "Smoke", system: "QaaS");
         var secondReporter = CreateReporter(team: "AnotherTeam", system: "QaaS");
         var thirdReporter = CreateReporter(team: "Smoke", system: "AnotherSystem");
@@ -211,8 +200,8 @@ public class ReportPortalPublisherTests
         secondReporter.WriteTestResults(CreateResult("assertion-b", "Session B"));
         thirdReporter.WriteTestResults(CreateResult("assertion-c", "Session C"));
 
-        await publisher.ValidateAsync([firstReporter, secondReporter, thirdReporter], Globals.Logger);
-        await publisher.PublishAsync([firstReporter, secondReporter, thirdReporter], Globals.Logger);
+        await publisher.ValidateAsync([firstReporter, secondReporter, thirdReporter]);
+        await publisher.PublishAsync([firstReporter, secondReporter, thirdReporter]);
 
         Assert.Multiple(() =>
         {
@@ -225,13 +214,12 @@ public class ReportPortalPublisherTests
     [Test]
     public async Task PublishAsync_WithNoQueuedResults_DoesNotCreatePublishClient()
     {
-        using var httpClient = CreateSuccessfulValidationClient(out _);
         var factory = new RecordingClientFactory();
-        using var publisher = new ReportPortalPublisher(httpClient, factory, StartedAt());
+        using var publisher = CreateSuccessfulPublisher(factory, out _);
         var reporter = CreateReporter();
 
-        await publisher.ValidateAsync([reporter], Globals.Logger);
-        await publisher.PublishAsync([reporter], Globals.Logger);
+        await publisher.ValidateAsync([reporter]);
+        await publisher.PublishAsync([reporter]);
 
         Assert.That(factory.Services, Is.Empty);
     }
@@ -239,64 +227,60 @@ public class ReportPortalPublisherTests
     [Test]
     public async Task PublishAsync_WhenLaunchStartFails_DoesNotThrowAndLogsWarning()
     {
-        using var httpClient = CreateSuccessfulValidationClient(out _);
         var factory = new RecordingClientFactory { ThrowOnLaunchStart = true };
-        using var publisher = new ReportPortalPublisher(httpClient, factory, StartedAt());
         var logger = new Mock<ILogger>();
+        using var publisher = CreateSuccessfulPublisher(factory, out _, logger.Object);
         var reporter = CreateReporter();
         reporter.WriteTestResults(CreateResult("assertion-a", "Session A"));
 
-        await publisher.ValidateAsync([reporter], logger.Object);
+        await publisher.ValidateAsync([reporter]);
 
-        Assert.DoesNotThrowAsync(async () => await publisher.PublishAsync([reporter], logger.Object));
+        Assert.DoesNotThrowAsync(async () => await publisher.PublishAsync([reporter]));
         VerifyWarningLogged(logger, "Could not publish ReportPortal launch");
     }
 
     [Test]
     public async Task PublishAsync_WhenLaunchFinishFails_DoesNotThrowAndLogsWarning()
     {
-        using var httpClient = CreateSuccessfulValidationClient(out _);
         var factory = new RecordingClientFactory { ThrowOnLaunchFinish = true };
-        using var publisher = new ReportPortalPublisher(httpClient, factory, StartedAt());
         var logger = new Mock<ILogger>();
+        using var publisher = CreateSuccessfulPublisher(factory, out _, logger.Object);
         var reporter = CreateReporter();
         reporter.WriteTestResults(CreateResult("assertion-a", "Session A"));
 
-        await publisher.ValidateAsync([reporter], logger.Object);
+        await publisher.ValidateAsync([reporter]);
 
-        Assert.DoesNotThrowAsync(async () => await publisher.PublishAsync([reporter], logger.Object));
+        Assert.DoesNotThrowAsync(async () => await publisher.PublishAsync([reporter]));
         VerifyWarningLogged(logger, "Could not finish ReportPortal launch");
     }
 
     [Test]
     public async Task PublishAsync_WhenItemPublishFails_DoesNotThrowAndLogsWarning()
     {
-        using var httpClient = CreateSuccessfulValidationClient(out _);
         var factory = new RecordingClientFactory { ThrowOnTestItemStart = true };
-        using var publisher = new ReportPortalPublisher(httpClient, factory, StartedAt());
         var logger = new Mock<ILogger>();
+        using var publisher = CreateSuccessfulPublisher(factory, out _, logger.Object);
         var reporter = CreateReporter();
         reporter.WriteTestResults(CreateResult("assertion-a", "Session A"));
 
-        await publisher.ValidateAsync([reporter], logger.Object);
+        await publisher.ValidateAsync([reporter]);
 
-        Assert.DoesNotThrowAsync(async () => await publisher.PublishAsync([reporter], logger.Object));
+        Assert.DoesNotThrowAsync(async () => await publisher.PublishAsync([reporter]));
         VerifyWarningLogged(logger, "Could not publish assertion");
     }
 
     [Test]
     public async Task PublishAsync_DisposesClientServiceAfterPublishing()
     {
-        using var httpClient = CreateSuccessfulValidationClient(out _);
         var factory = new RecordingClientFactory();
-        using var publisher = new ReportPortalPublisher(httpClient, factory, StartedAt());
+        using var publisher = CreateSuccessfulPublisher(factory, out _);
         var reporter = CreateReporter();
         reporter.WriteTestResults(CreateResult("assertion-a", "Session A"));
 
-        await publisher.ValidateAsync([reporter], Globals.Logger);
+        await publisher.ValidateAsync([reporter]);
         Assert.That(factory.Services, Is.Empty);
 
-        await publisher.PublishAsync([reporter], Globals.Logger);
+        await publisher.PublishAsync([reporter]);
 
         Assert.That(factory.Services.Single().DisposeCount, Is.EqualTo(1));
     }
@@ -304,22 +288,29 @@ public class ReportPortalPublisherTests
     [Test]
     public async Task PublishAsync_WhenClientDisposeFails_DoesNotThrowAndLogsWarning()
     {
-        using var httpClient = CreateSuccessfulValidationClient(out _);
         var factory = new RecordingClientFactory { ThrowOnDispose = true };
-        using var publisher = new ReportPortalPublisher(httpClient, factory, StartedAt());
         var logger = new Mock<ILogger>();
+        using var publisher = CreateSuccessfulPublisher(factory, out _, logger.Object);
         var reporter = CreateReporter();
         reporter.WriteTestResults(CreateResult("assertion-a", "Session A"));
 
-        await publisher.ValidateAsync([reporter], logger.Object);
+        await publisher.ValidateAsync([reporter]);
 
-        Assert.DoesNotThrowAsync(async () => await publisher.PublishAsync([reporter], logger.Object));
+        Assert.DoesNotThrowAsync(async () => await publisher.PublishAsync([reporter]));
         VerifyWarningLogged(logger, "Could not dispose ReportPortal client service");
     }
 
-    private static HttpClient CreateSuccessfulValidationClient(out RecordingHttpMessageHandler handler)
+    private static RecordingReportPortalPublisher CreateSuccessfulPublisher(RecordingClientFactory factory,
+        out RecordingHttpMessageHandler handler)
     {
-        return CreateValidationClient(request =>
+        return CreateSuccessfulPublisher(factory, out handler, Globals.Logger);
+    }
+
+    private static RecordingReportPortalPublisher CreateSuccessfulPublisher(RecordingClientFactory factory,
+        out RecordingHttpMessageHandler handler,
+        ILogger logger)
+    {
+        return CreatePublisher(factory, request =>
         {
             var projectName = request.RequestUri!.Segments[^1];
             return new HttpResponseMessage(HttpStatusCode.OK)
@@ -327,19 +318,24 @@ public class ReportPortalPublisherTests
                 Content = new StringContent($"{{\"projectName\":\"{projectName}\"}}", Encoding.UTF8,
                     "application/json")
             };
-        }, out handler);
+        }, out handler, logger);
     }
 
-    private static HttpClient CreateValidationClient(
+    private static RecordingReportPortalPublisher CreatePublisher(RecordingClientFactory factory,
         Func<HttpRequestMessage, HttpResponseMessage> responseFactory,
         out RecordingHttpMessageHandler handler)
     {
-        handler = new RecordingHttpMessageHandler(responseFactory);
-        return new HttpClient(handler);
+        return CreatePublisher(factory, responseFactory, out handler, Globals.Logger);
     }
 
-    private static DateTimeOffset StartedAt() =>
-        new(2025, 1, 1, 10, 0, 0, TimeSpan.Zero);
+    private static RecordingReportPortalPublisher CreatePublisher(RecordingClientFactory factory,
+        Func<HttpRequestMessage, HttpResponseMessage> responseFactory,
+        out RecordingHttpMessageHandler handler,
+        ILogger logger)
+    {
+        handler = new RecordingHttpMessageHandler(responseFactory);
+        return new RecordingReportPortalPublisher(handler, factory, logger);
+    }
 
     private static ReportPortalReporter CreateReporter(
         bool enabled = true,
@@ -404,7 +400,7 @@ public class ReportPortalPublisherTests
         };
     }
 
-    private sealed class RecordingClientFactory : IReportPortalClientFactory
+    private sealed class RecordingClientFactory
     {
         public bool ThrowOnLaunchStart { get; init; }
         public bool ThrowOnLaunchFinish { get; init; }
@@ -412,7 +408,7 @@ public class ReportPortalPublisherTests
         public bool ThrowOnDispose { get; init; }
         public List<RecordingClientService> Services { get; } = [];
 
-        public IClientService Create(Uri endpointUri, string project, string apiKey)
+        public IClientService Create()
         {
             var service = new RecordingClientService(
                 ThrowOnLaunchStart,
@@ -421,6 +417,23 @@ public class ReportPortalPublisherTests
                 ThrowOnDispose);
             Services.Add(service);
             return service.Object;
+        }
+    }
+
+    private sealed class RecordingReportPortalPublisher(
+        RecordingHttpMessageHandler validationHandler,
+        RecordingClientFactory clientFactory,
+        ILogger logger) : ReportPortalPublisher(logger)
+    {
+        protected override Task<HttpResponseMessage> SendValidationRequestAsync(HttpRequestMessage request,
+            CancellationToken cancellationToken)
+        {
+            return validationHandler.SendAsyncForTest(request, cancellationToken);
+        }
+
+        protected override IClientService CreateClient(Uri endpointUri, string project, string apiKey)
+        {
+            return clientFactory.Create();
         }
     }
 
@@ -504,6 +517,12 @@ public class ReportPortalPublisherTests
     {
         public int RequestCount { get; private set; }
         public List<string> RequestedProjectNames { get; } = [];
+
+        public Task<HttpResponseMessage> SendAsyncForTest(HttpRequestMessage request,
+            CancellationToken cancellationToken)
+        {
+            return SendAsync(request, cancellationToken);
+        }
 
         protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request,
             CancellationToken cancellationToken)

@@ -21,7 +21,6 @@ internal sealed class ReportPortalLaunchPlan
         string? team,
         string system,
         IReadOnlyList<string> sessionNames,
-        string executionMode,
         string launchName,
         string description,
         bool debugMode,
@@ -35,7 +34,6 @@ internal sealed class ReportPortalLaunchPlan
         Team = team;
         System = system;
         SessionNames = sessionNames;
-        ExecutionMode = executionMode;
         LaunchName = launchName;
         Description = description;
         DebugMode = debugMode;
@@ -49,15 +47,22 @@ internal sealed class ReportPortalLaunchPlan
     public string? Project { get; }
     public string? Team { get; }
     public string System { get; }
-    public IReadOnlyList<string> SessionNames { get; }
-    public string ExecutionMode { get; }
     public string LaunchName { get; }
     public string Description { get; }
     public bool DebugMode { get; }
     public IReadOnlyDictionary<string, string> Attributes { get; }
     public IReadOnlyList<ReportPortalReporterResults> ReporterResults { get; }
-    public IEnumerable<AssertionResult> QueuedResults => ReporterResults.SelectMany(reporter => reporter.Results);
+    private IReadOnlyList<string> SessionNames { get; }
 
+    /// <summary>
+    /// Builds one launch plan per normalized ReportPortal endpoint/project/system group.
+    /// </summary>
+    /// <param name="reporters">The ReportPortal reporters built for this runner invocation.</param>
+    /// <param name="startedAtLocal">The runner start time used in generated launch descriptions.</param>
+    /// <param name="requireQueuedResults">
+    /// <see langword="true" /> when final publishing should skip reporters with no queued assertion results.
+    /// </param>
+    /// <returns>The grouped launch plans to validate or publish.</returns>
     public static IReadOnlyList<ReportPortalLaunchPlan> Build(
         IEnumerable<ReportPortalReporter> reporters,
         DateTimeOffset startedAtLocal,
@@ -77,9 +82,18 @@ internal sealed class ReportPortalLaunchPlan
             .ToList();
     }
 
-    public bool TryGetEndpointUri(out Uri? endpointUri, out string? failureReason) =>
-        TryNormalizeEndpoint(Endpoint, out endpointUri, out failureReason);
+    /// <summary>
+    /// Resolves the configured endpoint for this launch plan into the ReportPortal API base URI.
+    /// </summary>
+    public bool TryGetEndpointUri(out Uri? endpointUri, out string? failureReason)
+    {
+        return TryNormalizeEndpoint(Endpoint, out endpointUri, out failureReason);
+    }
 
+    /// <summary>
+    /// Builds ReportPortal launch-level attributes from runner metadata, grouped sessions, and configured attributes.
+    /// </summary>
+    /// <returns>The ReportPortal attributes sent with the launch start request.</returns>
     public IList<ItemAttribute> BuildLaunchAttributes()
     {
         var attributes = new List<ItemAttribute>
@@ -98,90 +112,96 @@ internal sealed class ReportPortalLaunchPlan
         return attributes;
     }
 
+    /// <summary>
+    /// Normalizes ReportPortal gateway/API endpoints to the API base URI used by validation and publishing.
+    /// </summary>
+    /// <param name="endpoint">The configured ReportPortal endpoint.</param>
+    /// <param name="endpointUri">The normalized API endpoint URI when normalization succeeds.</param>
+    /// <param name="failureReason">The validation failure when the endpoint is missing or invalid.</param>
+    /// <returns><see langword="true" /> when the endpoint can be used for ReportPortal requests.</returns>
     internal static bool TryNormalizeEndpoint(string? endpoint, out Uri? endpointUri, out string? failureReason)
     {
         endpointUri = null;
 
-        if (Clean(endpoint) is not { } cleanEndpoint)
-            return Fail("ReportPortal.Endpoint must be configured when ReportPortal reporting is enabled.",
-                out failureReason);
+        if (string.IsNullOrWhiteSpace(endpoint))
+        {
+            failureReason = "ReportPortal.Endpoint must be configured when ReportPortal reporting is enabled.";
+            return false;
+        }
 
-        if (!Uri.TryCreate(cleanEndpoint, UriKind.Absolute, out var rawUri))
-            return Fail($"ReportPortal endpoint `{cleanEndpoint}` is not a valid absolute URI.", out failureReason);
+        if (!Uri.TryCreate(endpoint, UriKind.Absolute, out var rawUri))
+        {
+            failureReason = $"ReportPortal endpoint `{endpoint}` is not a valid absolute URI.";
+            return false;
+        }
 
         endpointUri = NormalizeEndpoint(rawUri);
         failureReason = null;
         return true;
     }
 
+    /// <summary>
+    /// Builds the concrete launch plan for one already-grouped endpoint/project/system set of reporters.
+    /// </summary>
     private static ReportPortalLaunchPlan BuildGroupPlan(
         string groupKey,
         IReadOnlyList<ReportPortalReporterResults> reporterResults,
         DateTimeOffset startedAtLocal)
     {
-        var firstReporter = reporterResults[0].Reporter;
-        var firstConfig = firstReporter.Config;
-        var metadataByReporter = reporterResults
-            .Select(reporter => new
-            {
-                reporter.Reporter,
-                Metadata = GetMetadata(reporter.Reporter.Context)
-            })
+        var firstConfig = reporterResults[0].Reporter.Config;
+        var metadataList = reporterResults
+            .Select(reporter => GetMetadata(reporter.Reporter.Context))
             .ToList();
 
-        var team = metadataByReporter
-            .Select(item => Clean(item.Metadata.Team))
+        var team = metadataList
+            .Select(metadata => metadata.Team)
             .FirstOrDefault(value => !string.IsNullOrWhiteSpace(value));
-        var project = Clean(firstConfig.Project) ?? team;
-        var system = metadataByReporter
-            .Select(item => Clean(item.Metadata.System))
+        var project = firstConfig.Project ?? team;
+        var system = metadataList
+            .Select(metadata => metadata.System)
             .FirstOrDefault(value => !string.IsNullOrWhiteSpace(value)) ?? UnknownSystem;
         var sessionNames = reporterResults
             .SelectMany(reporter => reporter.Results)
             .SelectMany(result => result.Assertion.SessionDataList)
-            .Select(session => Clean(session.Name))
-            .OfType<string>()
+            .Select(session => session.Name)
+            .Where(sessionName => !string.IsNullOrWhiteSpace(sessionName))
+            .Select(sessionName => sessionName!)
             .Distinct(StringComparer.OrdinalIgnoreCase)
             .OrderBy(sessionName => sessionName, StringComparer.OrdinalIgnoreCase)
             .ToArray();
         var executionModes = reporterResults
-            .Select(reporter => Clean(reporter.Reporter.ExecutionMode) ?? "run")
+            .Select(reporter => string.IsNullOrWhiteSpace(reporter.Reporter.ExecutionMode)
+                ? "run"
+                : reporter.Reporter.ExecutionMode)
             .Distinct(StringComparer.Ordinal)
             .OrderBy(mode => mode, StringComparer.Ordinal)
             .ToList();
         var executionMode = executionModes.Count == 1 ? executionModes[0] : "mixed";
         var attributes = BuildAttributes(reporterResults, sessionNames, executionMode, firstConfig.Attributes);
-        var temporaryPlan = new ReportPortalLaunchPlan(
+
+        return new ReportPortalLaunchPlan(
             groupKey,
-            Clean(firstConfig.Endpoint),
-            Clean(firstConfig.ApiKey),
+            firstConfig.Endpoint,
+            firstConfig.ApiKey,
             project,
             team,
             system,
             sessionNames,
-            executionMode,
-            string.Empty,
-            string.Empty,
+            firstConfig.LaunchName ?? BuildDefaultLaunchName(team, system, sessionNames),
+            firstConfig.Description ?? BuildDefaultDescription(
+                startedAtLocal,
+                executionMode,
+                system,
+                sessionNames,
+                attributes),
             firstConfig.DebugMode == true,
             attributes,
             reporterResults);
-
-        return new ReportPortalLaunchPlan(
-            groupKey,
-            temporaryPlan.Endpoint,
-            temporaryPlan.ApiKey,
-            temporaryPlan.Project,
-            temporaryPlan.Team,
-            temporaryPlan.System,
-            temporaryPlan.SessionNames,
-            temporaryPlan.ExecutionMode,
-            Clean(firstConfig.LaunchName) ?? temporaryPlan.BuildDefaultLaunchName(),
-            Clean(firstConfig.Description) ?? temporaryPlan.BuildDefaultDescription(startedAtLocal),
-            temporaryPlan.DebugMode,
-            temporaryPlan.Attributes,
-            temporaryPlan.ReporterResults);
     }
 
+    /// <summary>
+    /// Builds de-duplicated launch metadata attributes from grouped reporter context and ReportPortal configuration.
+    /// </summary>
     private static IReadOnlyDictionary<string, string> BuildAttributes(
         IReadOnlyList<ReportPortalReporterResults> reporterResults,
         IReadOnlyList<string> sessionNames,
@@ -189,9 +209,7 @@ internal sealed class ReportPortalLaunchPlan
         IReadOnlyDictionary<string, string>? configAttributes)
     {
         var attributes = reporterResults
-            .SelectMany(reporter => GetMetadata(reporter.Reporter.Context) is { } metadata
-                ? BaseReporter.ExtractMetadataAttributes(metadata)
-                : Enumerable.Empty<KeyValuePair<string, string>>())
+            .SelectMany(reporter => BaseReporter.ExtractMetadataAttributes(GetMetadata(reporter.Reporter.Context)))
             .Where(attribute => !string.IsNullOrWhiteSpace(attribute.Key) &&
                                 !string.IsNullOrWhiteSpace(attribute.Value))
             .GroupBy(attribute => attribute.Key, StringComparer.OrdinalIgnoreCase)
@@ -207,8 +225,8 @@ internal sealed class ReportPortalLaunchPlan
         attributes["sessionCount"] = sessionNames.Count.ToString();
 
         var caseNames = reporterResults
-            .Select(reporter => Clean(reporter.Reporter.Context.CaseName))
-            .OfType<string>()
+            .Select(reporter => reporter.Reporter.Context.CaseName)
+            .Where(caseName => !string.IsNullOrWhiteSpace(caseName))
             .Distinct(StringComparer.OrdinalIgnoreCase)
             .OrderBy(caseName => caseName, StringComparer.OrdinalIgnoreCase)
             .ToArray();
@@ -216,53 +234,68 @@ internal sealed class ReportPortalLaunchPlan
             attributes["caseName"] = string.Join(", ", caseNames);
 
         var executionIds = reporterResults
-            .Select(reporter => Clean(reporter.Reporter.Context.ExecutionId))
-            .OfType<string>()
+            .Select(reporter => reporter.Reporter.Context.ExecutionId)
+            .Where(executionId => !string.IsNullOrWhiteSpace(executionId))
             .Distinct(StringComparer.OrdinalIgnoreCase)
             .OrderBy(executionId => executionId, StringComparer.OrdinalIgnoreCase)
             .ToArray();
         if (executionIds.Length > 0)
             attributes["executionId"] = string.Join(", ", executionIds);
 
-        AddCleanAttributes(attributes, configAttributes);
+        AddConfiguredAttributes(attributes, configAttributes);
         return attributes;
     }
 
-    private string BuildDefaultLaunchName()
+    /// <summary>
+    /// Builds the fallback launch name when the ReportPortal configuration does not provide one.
+    /// </summary>
+    private static string BuildDefaultLaunchName(string? team, string system, IReadOnlyList<string> sessionNames)
     {
-        var sessionSummary = BuildSessionSummary();
-        return Team is null
-            ? $"QaaS Run | {System} | {sessionSummary}"
-            : $"QaaS Run | {Team} | {System} | {sessionSummary}";
+        var sessionSummary = BuildSessionSummary(sessionNames);
+        return team is null
+            ? $"QaaS Run | {system} | {sessionSummary}"
+            : $"QaaS Run | {team} | {system} | {sessionSummary}";
     }
 
-    private string BuildDefaultDescription(DateTimeOffset startedAtLocal)
+    /// <summary>
+    /// Builds the fallback launch description from execution mode, grouped sessions, and launch attributes.
+    /// </summary>
+    private static string BuildDefaultDescription(
+        DateTimeOffset startedAtLocal,
+        string executionMode,
+        string system,
+        IReadOnlyCollection<string> sessionNames,
+        IReadOnlyDictionary<string, string> attributes)
     {
-        var launchAttributeSummary = Attributes.Count == 0
-            ? "No additional launch attributes."
-            : string.Join(", ",
-                Attributes.OrderBy(attribute => attribute.Key, StringComparer.OrdinalIgnoreCase)
-                    .Select(attribute => $"{attribute.Key}={attribute.Value}"));
+        var launchAttributeSummary = string.Join(", ",
+            attributes.OrderBy(attribute => attribute.Key, StringComparer.OrdinalIgnoreCase)
+                .Select(attribute => $"{attribute.Key}={attribute.Value}"));
         return
-            $"QaaS captured this {ExecutionMode} directly from the runner pipeline: live sessions, real assertion outcomes, and the exact shape of {System} at {startedAtLocal:yyyy-MM-dd HH:mm:ss}. Sessions=[{string.Join(", ", SessionNames)}]. LaunchAttributes=[{launchAttributeSummary}]";
+            $"QaaS captured this {executionMode} directly from the runner pipeline: live sessions, real assertion outcomes, and the exact shape of {system} at {startedAtLocal:yyyy-MM-dd HH:mm:ss}. Sessions=[{string.Join(", ", sessionNames)}]. LaunchAttributes=[{launchAttributeSummary}]";
     }
 
-    private string BuildSessionSummary() =>
-        SessionNames.Count switch
+    /// <summary>
+    /// Produces a compact session segment for generated launch names.
+    /// </summary>
+    private static string BuildSessionSummary(IReadOnlyList<string> sessionNames) =>
+        sessionNames.Count switch
         {
             0 => "No Sessions",
-            <= 2 => string.Join(", ", SessionNames),
-            _ => $"{SessionNames[0]}, {SessionNames[1]}(+{SessionNames.Count - 2})"
+            <= 2 => string.Join(", ", sessionNames),
+            _ => $"{sessionNames[0]}, {sessionNames[1]}(+{sessionNames.Count - 2})"
         };
 
+    /// <summary>
+    /// Builds the stable grouping key that keeps compatible reporters in the same ReportPortal launch.
+    /// </summary>
     private static string BuildGroupKey(ReportPortalReporter reporter)
     {
         var metadata = GetMetadata(reporter.Context);
         var endpointKey = TryNormalizeEndpoint(reporter.Config.Endpoint, out var endpointUri, out _)
             ? endpointUri!.AbsoluteUri.ToLowerInvariant()
-            : Clean(reporter.Config.Endpoint)?.ToLowerInvariant() ?? "<missing-endpoint>";
-        var project = Clean(reporter.Config.Project) ?? Clean(metadata.Team) ?? "<missing-project>";
-        var system = Clean(metadata.System) ?? UnknownSystem;
+            : reporter.Config.Endpoint?.ToLowerInvariant() ?? "<missing-endpoint>";
+        var project = reporter.Config.Project ?? metadata.Team ?? "<missing-project>";
+        var system = metadata.System ?? UnknownSystem;
 
         return string.Join("::",
             endpointKey,
@@ -270,6 +303,9 @@ internal sealed class ReportPortalLaunchPlan
             system.ToLowerInvariant());
     }
 
+    /// <summary>
+    /// Reads runner metadata from the internal context when it is available.
+    /// </summary>
     private static MetaDataConfig GetMetadata(Context context)
     {
         return context is InternalContext internalContext
@@ -277,6 +313,9 @@ internal sealed class ReportPortalLaunchPlan
             : new MetaDataConfig();
     }
 
+    /// <summary>
+    /// Converts a ReportPortal host or API URL into a canonical API base URI.
+    /// </summary>
     private static Uri NormalizeEndpoint(Uri uri)
     {
         var builder = new UriBuilder(uri)
@@ -294,13 +333,16 @@ internal sealed class ReportPortalLaunchPlan
         return builder.Uri;
     }
 
-    private static void AddCleanAttributes(IDictionary<string, string> destination,
+    /// <summary>
+    /// Adds configured launch attributes without trimming; configuration values are expected to be normalized earlier.
+    /// </summary>
+    private static void AddConfiguredAttributes(IDictionary<string, string> destination,
         IEnumerable<KeyValuePair<string, string>>? source)
     {
         foreach (var (key, value) in source ?? [])
         {
-            if (Clean(key) is { } cleanKey)
-                destination[cleanKey] = Clean(value) ?? string.Empty;
+            if (!string.IsNullOrWhiteSpace(key))
+                destination[key] = value ?? string.Empty;
         }
     }
 
@@ -316,17 +358,11 @@ internal sealed class ReportPortalLaunchPlan
             Key = key,
             Value = value
         };
-
-    private static bool Fail(string reason, out string? failureReason)
-    {
-        failureReason = reason;
-        return false;
-    }
-
-    private static string? Clean(string? value) =>
-        string.IsNullOrWhiteSpace(value) ? null : value.Trim();
 }
 
+/// <summary>
+/// Couples a passive ReportPortal reporter with the assertion results it queued for final publishing.
+/// </summary>
 internal sealed record ReportPortalReporterResults(
     ReportPortalReporter Reporter,
     IReadOnlyList<AssertionResult> Results);

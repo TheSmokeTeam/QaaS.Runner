@@ -54,7 +54,7 @@ public class ReportPortalLaunchPlanTests
     [Test]
     public void Build_WithMissingProject_FallsBackToMetadataTeam()
     {
-        var reporter = CreateReporter(project: " ");
+        var reporter = CreateReporter(project: null);
 
         var launchPlan = BuildPlan(reporter);
 
