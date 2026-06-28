@@ -11,14 +11,12 @@ namespace QaaS.Runner.Assertions.Reporters.ReportPortal;
 /// </summary>
 internal sealed class ReportPortalLaunchPlan
 {
-    internal const string UnknownSystem = "Unknown System";
-
     private ReportPortalLaunchPlan(
         string groupKey,
         string? endpoint,
         string? apiKey,
-        string? project,
-        string? team,
+        string project,
+        string team,
         string system,
         IReadOnlyList<string> sessionNames,
         string launchName,
@@ -44,8 +42,8 @@ internal sealed class ReportPortalLaunchPlan
     public string GroupKey { get; }
     public string? Endpoint { get; }
     public string? ApiKey { get; }
-    public string? Project { get; }
-    public string? Team { get; }
+    public string Project { get; }
+    public string Team { get; }
     public string System { get; }
     public string LaunchName { get; }
     public string Description { get; }
@@ -102,9 +100,9 @@ internal sealed class ReportPortalLaunchPlan
             Attr("source", "runner")
         };
 
-        Add(attributes, "team", Team);
-        Add(attributes, "project", Project);
-        Add(attributes, "system", System);
+        attributes.Add(Attr("team", Team));
+        attributes.Add(Attr("project", Project));
+        attributes.Add(Attr("system", System));
 
         attributes.AddRange(SessionNames.Select(session => Attr("session", session)));
         attributes.AddRange(Attributes.Select(attribute => Attr(attribute.Key, attribute.Value)));
@@ -153,13 +151,9 @@ internal sealed class ReportPortalLaunchPlan
             .Select(reporter => GetMetadata(reporter.Reporter.Context))
             .ToList();
 
-        var team = metadataList
-            .Select(metadata => metadata.Team)
-            .FirstOrDefault(value => !string.IsNullOrWhiteSpace(value));
-        var project = firstConfig.Project ?? team;
-        var system = metadataList
-            .Select(metadata => metadata.System)
-            .FirstOrDefault(value => !string.IsNullOrWhiteSpace(value)) ?? UnknownSystem;
+        var team = GetMetadataValue(metadataList, metadata => metadata.Team, nameof(MetaDataConfig.Team));
+        var project = string.IsNullOrWhiteSpace(firstConfig.Project) ? team : firstConfig.Project;
+        var system = GetMetadataValue(metadataList, metadata => metadata.System, nameof(MetaDataConfig.System));
         var sessionNames = reporterResults
             .SelectMany(reporter => reporter.Results)
             .SelectMany(result => result.Assertion.SessionDataList)
@@ -249,12 +243,10 @@ internal sealed class ReportPortalLaunchPlan
     /// <summary>
     /// Builds the fallback launch name when the ReportPortal configuration does not provide one.
     /// </summary>
-    private static string BuildDefaultLaunchName(string? team, string system, IReadOnlyList<string> sessionNames)
+    private static string BuildDefaultLaunchName(string team, string system, IReadOnlyList<string> sessionNames)
     {
         var sessionSummary = BuildSessionSummary(sessionNames);
-        return team is null
-            ? $"QaaS Run | {system} | {sessionSummary}"
-            : $"QaaS Run | {team} | {system} | {sessionSummary}";
+        return $"QaaS Run | {team} | {system} | {sessionSummary}";
     }
 
     /// <summary>
@@ -294,8 +286,9 @@ internal sealed class ReportPortalLaunchPlan
         var endpointKey = TryNormalizeEndpoint(reporter.Config.Endpoint, out var endpointUri, out _)
             ? endpointUri!.AbsoluteUri.ToLowerInvariant()
             : reporter.Config.Endpoint?.ToLowerInvariant() ?? "<missing-endpoint>";
-        var project = reporter.Config.Project ?? metadata.Team ?? "<missing-project>";
-        var system = metadata.System ?? UnknownSystem;
+        var team = GetRequiredMetadataValue(metadata.Team, nameof(MetaDataConfig.Team));
+        var project = string.IsNullOrWhiteSpace(reporter.Config.Project) ? team : reporter.Config.Project;
+        var system = GetRequiredMetadataValue(metadata.System, nameof(MetaDataConfig.System));
 
         return string.Join("::",
             endpointKey,
@@ -310,7 +303,27 @@ internal sealed class ReportPortalLaunchPlan
     {
         return context is InternalContext internalContext
             ? internalContext.GetMetaDataOrDefault()
-            : new MetaDataConfig();
+            : throw new InvalidOperationException("ReportPortal reporting requires an internal context with configured metadata.");
+    }
+
+    private static string GetMetadataValue(
+        IEnumerable<MetaDataConfig> metadataList,
+        Func<MetaDataConfig, string?> valueSelector,
+        string propertyName)
+    {
+        var value = metadataList
+            .Select(valueSelector)
+            .FirstOrDefault(value => !string.IsNullOrWhiteSpace(value));
+
+        return GetRequiredMetadataValue(value, propertyName);
+    }
+
+    private static string GetRequiredMetadataValue(string? value, string propertyName)
+    {
+        if (!string.IsNullOrWhiteSpace(value))
+            return value;
+
+        throw new InvalidOperationException($"ReportPortal reporting requires MetaData.{propertyName}.");
     }
 
     /// <summary>
@@ -344,12 +357,6 @@ internal sealed class ReportPortalLaunchPlan
             if (!string.IsNullOrWhiteSpace(key))
                 destination[key] = value ?? string.Empty;
         }
-    }
-
-    private static void Add(ICollection<ItemAttribute> attributes, string key, string? value)
-    {
-        if (value is not null)
-            attributes.Add(Attr(key, value));
     }
 
     private static ItemAttribute Attr(string key, string value) =>

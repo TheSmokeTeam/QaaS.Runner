@@ -7,7 +7,9 @@ using System.Reflection;
 using System.Text;
 using Microsoft.Extensions.Configuration;
 using NUnit.Framework;
+using QaaS.Framework.SDK;
 using QaaS.Framework.SDK.ContextObjects;
+using QaaS.Framework.SDK.Extensions;
 using QaaS.Framework.SDK.Hooks.Assertion;
 using QaaS.Framework.SDK.Session.SessionDataObjects;
 using QaaS.Runner.Assertions.AssertionObjects;
@@ -141,6 +143,17 @@ public class ReportPortalReporterTests
     private static ReportPortalReporter CreateReporter()
     {
         ReportPortalConfig.RegisterDefaults(enabled: false);
+        var context = new InternalContext
+        {
+            Logger = Globals.Logger,
+            RootConfiguration = new ConfigurationBuilder().Build()
+        };
+        context.InsertValueIntoGlobalDictionary(context.GetMetaDataPath(), new MetaDataConfig
+        {
+            Team = "Smoke",
+            System = "QaaS"
+        });
+
         return new ReportPortalReporter
         {
             Config = new ReportPortalConfig
@@ -149,11 +162,7 @@ public class ReportPortalReporterTests
                 Endpoint = "https://reportportal.local/api/",
                 ApiKey = "api-key"
             },
-            Context = new Context
-            {
-                Logger = Globals.Logger,
-                RootConfiguration = new ConfigurationBuilder().Build()
-            },
+            Context = context,
             Severity = AssertionSeverity.Normal
         };
     }

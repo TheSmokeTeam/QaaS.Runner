@@ -52,18 +52,16 @@ public class ReportPortalPublisherTests
         });
     }
 
-    [TestCase(null, "ReportPortal.Project or MetaData.Team", TestName = "Missing project fallback")]
-    [TestCase("Smoke", "ReportPortal.ApiKey", null, TestName = "Missing API key")]
-    [TestCase("Smoke", "ReportPortal.Endpoint", "api-key", null, TestName = "Missing endpoint")]
+    [TestCase("ReportPortal.ApiKey", null, "http://localhost:8080", TestName = "Missing API key")]
+    [TestCase("ReportPortal.Endpoint", "api-key", null, TestName = "Missing endpoint")]
     public void ValidateAsync_WithMissingConfiguration_ThrowsBeforeHttpOrPublishClient(
-        string? team,
         string expectedMessage,
-        string? apiKey = "api-key",
-        string? endpoint = "http://localhost:8080")
+        string? apiKey,
+        string? endpoint)
     {
         var factory = new RecordingClientFactory();
         using var publisher = CreateSuccessfulPublisher(factory, out var handler);
-        var reporter = CreateReporter(team: team, apiKey: apiKey, endpoint: endpoint);
+        var reporter = CreateReporter(apiKey: apiKey, endpoint: endpoint);
 
         var exception = Assert.ThrowsAsync<InvalidConfigurationsException>(
             async () => await publisher.ValidateAsync([reporter]));
@@ -339,7 +337,7 @@ public class ReportPortalPublisherTests
 
     private static ReportPortalReporter CreateReporter(
         bool enabled = true,
-        string? team = "Smoke",
+        string team = "Smoke",
         string system = "QaaS",
         string? project = null,
         string? endpoint = "http://localhost:8080",
@@ -351,14 +349,11 @@ public class ReportPortalPublisherTests
             RootConfiguration = new ConfigurationBuilder().Build()
         };
 
-        if (team is not null)
+        context.InsertValueIntoGlobalDictionary(context.GetMetaDataPath(), new MetaDataConfig
         {
-            context.InsertValueIntoGlobalDictionary(context.GetMetaDataPath(), new MetaDataConfig
-            {
-                Team = team,
-                System = system
-            });
-        }
+            Team = team,
+            System = system
+        });
 
         return new ReportPortalReporter
         {

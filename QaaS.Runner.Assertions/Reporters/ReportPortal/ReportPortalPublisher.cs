@@ -185,7 +185,7 @@ internal class ReportPortalPublisher(ILogger logger) : IDisposable
             return launchPlan.Project;
 
         const string warningMessage =
-            "Could not publish results to ReportPortal because ReportPortal.Project or MetaData.Team was not configured.";
+            "Could not publish results to ReportPortal because ReportPortal.Project was configured as an empty value.";
         logger.LogWarning(warningMessage);
         throw new InvalidConfigurationsException(warningMessage);
     }
@@ -301,14 +301,14 @@ internal class ReportPortalPublisher(ILogger logger) : IDisposable
         out string apiKey)
     {
         endpointUri = default!;
-        projectName = launchPlan.Project ?? "<missing-project>";
+        projectName = launchPlan.Project;
         apiKey = string.Empty;
 
         if (!_validatedGroupKeys.Contains(launchPlan.GroupKey))
         {
             logger.LogWarning(
                 "Skipping ReportPortal publish for project {ProjectName} and system {SystemName} because the launch group was not validated successfully.",
-                launchPlan.Project ?? "<missing-project>",
+                launchPlan.Project,
                 launchPlan.System);
             return false;
         }
@@ -319,7 +319,7 @@ internal class ReportPortalPublisher(ILogger logger) : IDisposable
         {
             logger.LogWarning(
                 "Skipping ReportPortal publish for project {ProjectName} and system {SystemName} because the launch group no longer has valid publish access. Reason={FailureReason}",
-                launchPlan.Project ?? "<missing-project>",
+                launchPlan.Project,
                 launchPlan.System,
                 endpointFailureReason ?? "Missing ReportPortal project or API key.");
             return false;

@@ -78,7 +78,7 @@ public class ReportPortalReporter : BaseReporter
                 logger.LogWarning(exception,
                     "Could not publish assertion {AssertionName} to ReportPortal for team {TeamName} and system {SystemName}. The run will continue.",
                     assertionResult.Assertion.Name,
-                    publishContext.LaunchPlan.Team ?? "<missing-team>",
+                    publishContext.LaunchPlan.Team,
                     publishContext.LaunchPlan.System);
             }
         }
@@ -94,7 +94,7 @@ public class ReportPortalReporter : BaseReporter
         var launchPlan = launch.LaunchPlan;
         var itemAttributes = BuildItemAttributes(assertionResult, launchPlan);
         var stableIdentity = BuildStableReportPortalIdentity(assertionResult,
-            launchPlan.Team ?? "Unknown Team",
+            launchPlan.Team,
             launchPlan.System);
         var itemUuid = launch.Service.TestItem.StartAsync(new StartTestItemRequest
         {
@@ -144,8 +144,8 @@ public class ReportPortalReporter : BaseReporter
         var contextText = new StringBuilder()
             .AppendLine("Assertion context:")
             .AppendLine($"- Stable identity: {stableIdentity}")
-            .AppendLine($"- Team: {launchPlan.Team ?? "<missing-team>"}")
-            .AppendLine($"- Project: {launchPlan.Project ?? "<missing-project>"}")
+            .AppendLine($"- Team: {launchPlan.Team}")
+            .AppendLine($"- Project: {launchPlan.Project}")
             .AppendLine($"- System: {launchPlan.System}")
             .AppendLine($"- ExecutionId: {Context.ExecutionId ?? "<none>"}")
             .AppendLine($"- CaseName: {Context.CaseName ?? "<none>"}")
@@ -302,15 +302,12 @@ public class ReportPortalReporter : BaseReporter
             new("Session Names",
                 $"[{string.Join(", ", assertionResult.Assertion.SessionDataList.Select(session => session.Name))}]"),
             new("Data Sources",
-                $"[{string.Join(", ", assertionResult.Assertion.DataSourceList?.Select(dataSource => dataSource.Name) ?? [])}]")
+                $"[{string.Join(", ", assertionResult.Assertion.DataSourceList?.Select(dataSource => dataSource.Name) ?? [])}]"),
+            new("Team", launchPlan.Team),
+            new("Project", launchPlan.Project),
+            new("System", launchPlan.System)
         };
 
-        if (!string.IsNullOrWhiteSpace(launchPlan.Team))
-            parameters.Add(new KeyValuePair<string, string>("Team", launchPlan.Team));
-        if (!string.IsNullOrWhiteSpace(launchPlan.Project))
-            parameters.Add(new KeyValuePair<string, string>("Project", launchPlan.Project));
-        if (!string.IsNullOrWhiteSpace(launchPlan.System))
-            parameters.Add(new KeyValuePair<string, string>("System", launchPlan.System));
         if (!string.IsNullOrWhiteSpace(Context.ExecutionId))
             parameters.Add(new KeyValuePair<string, string>("Execution Id", Context.ExecutionId));
         if (!string.IsNullOrWhiteSpace(Context.CaseName))
@@ -344,35 +341,23 @@ public class ReportPortalReporter : BaseReporter
             {
                 Key = "severity",
                 Value = AssertionSeverityToAttributeValueMap[ResolveSeverity(assertionResult.Assertion)]
-            }
-        };
-
-        if (!string.IsNullOrWhiteSpace(launchPlan.Team))
-        {
-            attributes.Add(new ItemAttribute
+            },
+            new()
             {
                 Key = "team",
                 Value = launchPlan.Team
-            });
-        }
-
-        if (!string.IsNullOrWhiteSpace(launchPlan.Project))
-        {
-            attributes.Add(new ItemAttribute
+            },
+            new()
             {
                 Key = "project",
                 Value = launchPlan.Project
-            });
-        }
-
-        if (!string.IsNullOrWhiteSpace(launchPlan.System))
-        {
-            attributes.Add(new ItemAttribute
+            },
+            new()
             {
                 Key = "system",
                 Value = launchPlan.System
-            });
-        }
+            }
+        };
 
         foreach (var sessionName in assertionResult.Assertion.SessionDataList
                      .Select(session => session.Name)
@@ -440,8 +425,8 @@ public class ReportPortalReporter : BaseReporter
 
         description.AppendLine()
             .AppendLine("Execution context:")
-            .AppendLine($"- Team: {launchPlan.Team ?? "<missing-team>"}")
-            .AppendLine($"- Project: {launchPlan.Project ?? "<missing-project>"}")
+            .AppendLine($"- Team: {launchPlan.Team}")
+            .AppendLine($"- Project: {launchPlan.Project}")
             .AppendLine($"- System: {launchPlan.System}")
             .AppendLine($"- Execution Id: {Context.ExecutionId ?? "<none>"}")
             .AppendLine($"- Case Name: {Context.CaseName ?? "<none>"}")

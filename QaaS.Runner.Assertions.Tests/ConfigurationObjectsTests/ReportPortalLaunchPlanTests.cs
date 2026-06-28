@@ -63,18 +63,6 @@ public class ReportPortalLaunchPlanTests
     }
 
     [Test]
-    public void Build_WhenProjectCannotBeDerived_DoesNotThrowAndLeavesProjectNull()
-    {
-        var reporter = CreateReporter(team: null, system: null);
-
-        var launchPlan = BuildPlan(reporter);
-
-        Assert.That(launchPlan.Team, Is.Null);
-        Assert.That(launchPlan.Project, Is.Null);
-        Assert.That(launchPlan.System, Is.EqualTo(ReportPortalLaunchPlan.UnknownSystem));
-    }
-
-    [Test]
     public void Build_WithQueuedResults_GeneratesStableLaunchNameAndDescription()
     {
         var reporter = CreateReporter();
@@ -137,8 +125,8 @@ public class ReportPortalLaunchPlanTests
     }
 
     private static ReportPortalReporter CreateReporter(
-        string? team = "Smoke",
-        string? system = "QaaS",
+        string team = "Smoke",
+        string system = "QaaS",
         string? project = null,
         IReadOnlyDictionary<string, string>? attributes = null,
         IReadOnlyDictionary<string, string>? extraLabels = null)
@@ -149,19 +137,16 @@ public class ReportPortalLaunchPlanTests
             RootConfiguration = new ConfigurationBuilder().Build()
         };
 
-        if (team is not null || system is not null || extraLabels is not null)
+        context.InsertValueIntoGlobalDictionary(context.GetMetaDataPath(), new MetaDataConfig
         {
-            context.InsertValueIntoGlobalDictionary(context.GetMetaDataPath(), new MetaDataConfig
-            {
-                Team = team,
-                System = system,
-                ExtraLabels = extraLabels?.ToDictionary(
-                    label => label.Key,
-                    label => (object)label.Value,
-                    StringComparer.OrdinalIgnoreCase)
-                              ?? new Dictionary<string, object>()
-            });
-        }
+            Team = team,
+            System = system,
+            ExtraLabels = extraLabels?.ToDictionary(
+                label => label.Key,
+                label => (object)label.Value,
+                StringComparer.OrdinalIgnoreCase)
+                          ?? new Dictionary<string, object>()
+        });
 
         return new ReportPortalReporter
         {
