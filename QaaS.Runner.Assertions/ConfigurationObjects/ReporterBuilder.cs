@@ -11,6 +11,9 @@ using YamlDotNet.Serialization;
 
 namespace QaaS.Runner.Assertions.ConfigurationObjects;
 
+/// <summary>
+/// Builder for configuring reporter behavior for assertion results.
+/// </summary>
 public class ReporterBuilder : IYamlConvertible, ICloneable<ReporterBuilder>
 {
     public ReporterBuilder Clone() => BuilderCloner.DeepClone(this);
@@ -45,12 +48,26 @@ public class ReporterBuilder : IYamlConvertible, ICloneable<ReporterBuilder>
     [DefaultValue(typeof(ReportPortalConfig))]
     public ReportPortalConfig? ReportPortal { get; internal set; } = new();
     
+    /// <summary>
+    /// Reads the serialized configuration for the current Runner reporter builder instance.
+    /// </summary>
+    /// <remarks>
+    /// This method participates in the YAML serialization surface that backs configuration-as-code support.
+    /// </remarks>
+    /// <qaas-docs group="Configuration as Code" subgroup="Reporters" />
     public void Read(IParser parser, Type expectedType, ObjectDeserializer nestedObjectDeserializer)
     {
         throw new NotSupportedException($"{nameof(Read)} doesn't support custom" +
                                         $" deserialization from Yaml for {nameof(ReporterBuilder)}");
     }
-    
+
+    /// <summary>
+    /// Writes the current Runner reporter builder configuration to the configured serializer output.
+    /// </summary>
+    /// <remarks>
+    /// This method participates in the YAML serialization surface that backs configuration-as-code support.
+    /// </remarks>
+    /// <qaas-docs group="Configuration as Code" subgroup="Reporters" />
     public void Write(IEmitter emitter, ObjectSerializer nestedObjectSerializer)
     {
         nestedObjectSerializer(new
@@ -67,6 +84,10 @@ public class ReporterBuilder : IYamlConvertible, ICloneable<ReporterBuilder>
     /// <summary>
     /// Sets the ReportPortal configuration used when creating a ReportPortal reporter.
     /// </summary>
+    /// <remarks>
+    /// Use this method when working with the documented Runner reporter builder API surface in code. The change is stored on the current builder instance and is consumed by later build, validation, or execution steps.
+    /// </remarks>
+    /// <qaas-docs group="Configuration as Code" subgroup="Reporters" />
     public ReporterBuilder ConfigureReportPortal(ReportPortalConfig reportPortalConfig)
     {
         ReportPortal = reportPortalConfig;
@@ -76,6 +97,10 @@ public class ReporterBuilder : IYamlConvertible, ICloneable<ReporterBuilder>
     /// <summary>
     /// Configures whether assertion session logs are saved with reporter results.
     /// </summary>
+    /// <remarks>
+    /// Use this method when working with the documented Runner reporter builder API surface in code. The change is stored on the current builder instance and is consumed by later build, validation, or execution steps.
+    /// </remarks>
+    /// <qaas-docs group="Configuration as Code" subgroup="Reporters" />
     public ReporterBuilder ShouldSaveLogs(bool shouldSaveLogs)
     {
         SaveLogs = shouldSaveLogs;
@@ -85,6 +110,10 @@ public class ReporterBuilder : IYamlConvertible, ICloneable<ReporterBuilder>
     /// <summary>
     /// Configures whether assertion attachments are saved with reporter results.
     /// </summary>
+    /// <remarks>
+    /// Use this method when working with the documented Runner reporter builder API surface in code. The change is stored on the current builder instance and is consumed by later build, validation, or execution steps.
+    /// </remarks>
+    /// <qaas-docs group="Configuration as Code" subgroup="Reporters" />
     public ReporterBuilder ShouldSaveAttachments(bool shouldSaveAttachments)
     {
         SaveAttachments = shouldSaveAttachments;
@@ -94,6 +123,10 @@ public class ReporterBuilder : IYamlConvertible, ICloneable<ReporterBuilder>
     /// <summary>
     /// Configures whether the rendered assertion configuration template is saved with reporter results.
     /// </summary>
+    /// <remarks>
+    /// Use this method when working with the documented Runner reporter builder API surface in code. The change is stored on the current builder instance and is consumed by later build, validation, or execution steps.
+    /// </remarks>
+    /// <qaas-docs group="Configuration as Code" subgroup="Reporters" />
     public ReporterBuilder ShouldSaveTemplate(bool shouldSaveTemplate)
     {
         SaveTemplate = shouldSaveTemplate;
@@ -103,6 +136,10 @@ public class ReporterBuilder : IYamlConvertible, ICloneable<ReporterBuilder>
     /// <summary>
     /// Configures whether assertion session data is saved with reporter results.
     /// </summary>
+    /// <remarks>
+    /// Use this method when working with the documented Runner reporter builder API surface in code. The change is stored on the current builder instance and is consumed by later build, validation, or execution steps.
+    /// </remarks>
+    /// <qaas-docs group="Configuration as Code" subgroup="Reporters" />
     public ReporterBuilder ShouldSaveSessionData(bool shouldSaveSessionData)
     {
         SaveSessionData = shouldSaveSessionData;
@@ -112,6 +149,10 @@ public class ReporterBuilder : IYamlConvertible, ICloneable<ReporterBuilder>
     /// <summary>
     /// Configures whether the assertion message trace is displayed in reporter results.
     /// </summary>
+    /// <remarks>
+    /// Use this method when working with the documented Runner reporter builder API surface in code. The behavior exposed here is part of the public surface that the generated function documentation groups under 'Configuration as Code / Reporters'.
+    /// </remarks>
+    /// <qaas-docs group="Configuration as Code" subgroup="Reporters" />
     public ReporterBuilder ShouldDisplayTrace(bool shouldDisplayTrace)
     {
         DisplayTrace = shouldDisplayTrace;
