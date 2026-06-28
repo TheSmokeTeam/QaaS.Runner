@@ -1,3 +1,4 @@
+using System.Collections.Concurrent;
 using System.Text;
 using Microsoft.Extensions.Logging;
 using QaaS.Framework.Configurations;
@@ -37,8 +38,7 @@ public class ReportPortalReporter : BaseReporter
             { AssertionSeverity.Blocker, "blocker" }
         };
     
-    private readonly Lock _queuedResultsLock = new();
-    private readonly List<AssertionResult> _queuedResults = [];
+    private readonly ConcurrentQueue<AssertionResult> _queuedResults = new();
     public required ReportPortalConfig Config { get; init; }
     public string ExecutionMode { get; init; } = "run";
 
@@ -48,19 +48,12 @@ public class ReportPortalReporter : BaseReporter
     public override void WriteTestResults(AssertionResult assertionResult)
     {
         ArgumentNullException.ThrowIfNull(assertionResult);
-
-        lock (_queuedResultsLock)
-        {
-            _queuedResults.Add(assertionResult);
-        }
+        _queuedResults.Enqueue(assertionResult);
     }
 
     internal IReadOnlyList<AssertionResult> GetQueuedResultsSnapshot()
     {
-        lock (_queuedResultsLock)
-        {
-            return _queuedResults.ToArray();
-        }
+        return _queuedResults.ToArray();
     }
 
     internal void PublishQueuedResults(ReportPortalPublishContext publishContext,
