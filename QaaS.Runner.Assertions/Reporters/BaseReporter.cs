@@ -240,7 +240,7 @@ public abstract class BaseReporter : IReporter
             identityParts.Add(NormalizeIdentitySegment(attribute.Value));
         }
 
-        return string.Join(".", identityParts);
+        return string.Join("::", identityParts);
     }
 
     /// <summary>
