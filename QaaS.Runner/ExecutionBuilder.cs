@@ -51,7 +51,41 @@ namespace QaaS.Runner;
 [JsonSchema]
 public class ExecutionBuilder() : BaseExecutionBuilder<InternalContext, ExecutionData>, ICloneable<ExecutionBuilder>
 {
-    public ExecutionBuilder Clone() => BuilderCloner.DeepClone(this);
+    
+    /// <summary>
+    /// Manually clone for <see cref="ExecutionBuilder" /> since it contains objects that can't be deep cloned with <see cref="BuilderCloner.DeepClone{T}(T)" />
+    /// Objects such as <see cref="ILogger" /> are shared across ExecutionBuilders and can't be deep-cloned.
+    /// </summary>
+    /// <returns></returns>
+    public ExecutionBuilder Clone() => new(this);
+
+    /// <summary>
+    /// Constructor for cloning an <see cref="ExecutionBuilder" /> instance used by <see cref="Clone" /> method.
+    /// </summary>
+    /// <param name="source"></param>
+    private ExecutionBuilder(ExecutionBuilder source) : this()
+    {
+        DataSources = source.DataSources?.Select(dataSource => dataSource.Clone()).ToArray();
+        Sessions = source.Sessions?.Select(session => session.Clone()).ToArray();
+        Storages = source.Storages?.Select(storage => storage.Clone()).ToArray();
+        Assertions = source.Assertions?.Select(assertion => assertion.Clone()).ToArray();
+        Links = source.Links?.Select(link => link.Clone()).ToArray();
+        MetaData = source.MetaData is null ? null : BuilderCloner.DeepClone(source.MetaData);
+        Reporters = source.Reporters?.Clone();
+        Type = source.Type;
+        LoadedContext = source.LoadedContext;
+        Context = source.Context;
+        _templateSourceConfiguration = source._templateSourceConfiguration;
+        _sessionNamesToRun = source._sessionNamesToRun?.ToArray();
+        _sessionCategoriesToRun = source._sessionCategoriesToRun?.ToArray();
+        _assertionNamesToRun = source._assertionNamesToRun?.ToArray();
+        _assertionCategoriesToRun = source._assertionCategoriesToRun?.ToArray();
+        _configuredLogger = source._configuredLogger;
+        _configuredCaseName = source._configuredCaseName;
+        _configuredExecutionId = source._configuredExecutionId;
+        _globalDict = new Dictionary<string, object?>(source._globalDict);
+        _loadVariablesIntoGlobalDict = source._loadVariablesIntoGlobalDict;
+    }
 
     /// <summary>
     /// List of all sessions to run.
