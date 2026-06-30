@@ -28,7 +28,7 @@ public interface IReporter
     public bool? SaveTemplate { get; set; }
     
     /// <summary>
-    /// Weather to display the assertion message trace. If not set, each assertion will determine whether to display it.
+    /// Weather to display the assertions message trace. If not set, each assertion will determine whether to display it.
     /// </summary>
     public bool? DisplayTrace { get; set; }
     

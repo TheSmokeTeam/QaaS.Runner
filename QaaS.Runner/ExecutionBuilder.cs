@@ -141,7 +141,8 @@ public class ExecutionBuilder() : BaseExecutionBuilder<InternalContext, Executio
     /// <summary>
     /// The reporters used to report the test results
     /// </summary>
-    [Description("The reporters used to report the test results")]
+    [Description("The reporters which being used to report the test results. " +
+                 "This section is not required, and if not set defualt values will be used.")]
     public ReporterBuilder? Reporters { get; internal set; } = new();
 
     private ExecutionType Type { get; set; }
