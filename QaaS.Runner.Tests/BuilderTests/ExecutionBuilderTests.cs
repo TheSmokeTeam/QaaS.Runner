@@ -17,6 +17,7 @@ using QaaS.Runner.Assertions.ConfigurationObjects;
 using QaaS.Runner.Assertions.ConfigurationObjects.LinkConfigs;
 using QaaS.Runner.Assertions.Reporters;
 using QaaS.Runner.Assertions.Reporters.Allure;
+using QaaS.Runner.Assertions.Reporters.ReportPortal;
 using QaaS.Runner.Infrastructure;
 using QaaS.Runner.Sessions.Actions.MockerCommands;
 using QaaS.Runner.Sessions.Actions.Probes;
@@ -950,8 +951,9 @@ public class ExecutionBuilderTests
             .Cast<IReporter>()
             .ToList();
 
-        Assert.That(builtReports, Has.Count.EqualTo(1));
-        Assert.That(builtReports[0], Is.TypeOf<AllureReporter>());
+        Assert.That(builtReports, Has.Count.EqualTo(2));
+        Assert.That(builtReports.OfType<AllureReporter>(), Has.Exactly(1).Items);
+        Assert.That(builtReports.OfType<ReportPortalReporter>(), Has.Exactly(1).Items);
     }
 
     [Test]

@@ -9,11 +9,20 @@ public class ReportPortalConfig : IReporterConfig
 {
     [Description("Whether to enable ReportPortal reporting")]
     [DefaultValue("QaaS.Configuration defaults")]
-    public bool? Enabled { get; set; }
+    public bool? Enabled
+    {
+        get => field ?? _defaultsProvider?.GetDefaults().Enabled;
+        set;
+    }
 
-    [Description("ReportPortal endpoint URI. Accepts either the gateway URL or the API URL and normalizes it to /api/. Defaults to the global API URL.")]
+    [Description(
+        "ReportPortal endpoint URI. Accepts either the gateway URL or the API URL and normalizes it to /api/. Defaults to the global API URL.")]
     [DefaultValue("Global URL in QaaS.Configuration")]
-    public string? Endpoint { get; set; }
+    public string? Endpoint
+    {
+        get => field ?? _defaultsProvider?.GetDefaults().ReportPortalUri;
+        set;
+    }
 
     [Description("ReportPortal project where the launch will be published. Default is MetaData.Team value.")]
     [DefaultValue("MetaData.Team value")]
@@ -21,7 +30,11 @@ public class ReportPortalConfig : IReporterConfig
 
     [Description("ReportPortal API key used for publishing. Defaults to the global API key.")]
     [DefaultValue("Global API key in QaaS.Configuration")]
-    public string? ApiKey { get; set; }
+    public string? ApiKey
+    {
+        get => field ?? _defaultsProvider?.GetDefaults().ReportPortalApiKey;
+        set;
+    }
 
     [Description("Optional launch name override.")]
     [DefaultValue("Generated according MetaData.Team, MetaData.System and the session occured")]
@@ -76,6 +89,18 @@ public class ReportPortalConfig : IReporterConfig
     /// <param name="reportPortalUri">Default ReportPortal endpoint URI.</param>
     /// <param name="reportPortalApiKey">Default ReportPortal API key.</param>
     public static void RegisterDefaults(
+        bool enabled,
+        string? reportPortalUri = null,
+        string? reportPortalApiKey = null
+    ) => RegisterDefaults((bool?)enabled, reportPortalUri, reportPortalApiKey);
+
+    /// <summary>
+    /// Registers static global ReportPortal configuration defaults.
+    /// </summary>
+    /// <param name="enabled">Default value indicating whether ReportPortal reporting is enabled.</param>
+    /// <param name="reportPortalUri">Default ReportPortal endpoint URI.</param>
+    /// <param name="reportPortalApiKey">Default ReportPortal API key.</param>
+    public static void RegisterDefaults(
         bool? enabled,
         string? reportPortalUri = null,
         string? reportPortalApiKey = null
@@ -98,28 +123,6 @@ public class ReportPortalConfig : IReporterConfig
     /// The registered defaults provider, or <see langword="null"/> when no provider was registered.
     /// </returns>
     public static IReportPortalConfigurationDefaultsProvider? GetDefaultsProvider() => _defaultsProvider;
-
-    /// <summary>
-    /// Resolves unset ReportPortal values against the currently registered defaults provider.
-    /// </summary>
-    /// <returns>A copy of the current configuration with provider-backed defaults applied to unset fields.</returns>
-    internal ReportPortalConfig ResolveDefaults()
-    {
-        var defaults = _defaultsProvider?.GetDefaults();
-        return new ReportPortalConfig
-        {
-            Enabled = Enabled ?? defaults?.Enabled,
-            Endpoint = Endpoint ?? defaults?.ReportPortalUri,
-            Project = Project,
-            ApiKey = ApiKey ?? defaults?.ReportPortalApiKey,
-            LaunchName = LaunchName,
-            Description = Description,
-            DebugMode = DebugMode,
-            Attributes = Attributes is null
-                ? null
-                : new Dictionary<string, string>(Attributes, StringComparer.OrdinalIgnoreCase),
-        };
-    }
 }
 
 /// <summary>

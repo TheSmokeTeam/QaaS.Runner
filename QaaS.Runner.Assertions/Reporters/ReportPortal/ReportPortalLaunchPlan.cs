@@ -72,7 +72,7 @@ internal sealed class ReportPortalLaunchPlan
         var reporterResults = reporters
             .Select(reporter => new ReportPortalReporterResults(
                 reporter,
-                reporter.Config.ResolveDefaults(),
+                reporter.Config,
                 requireQueuedResults ? reporter.GetQueuedResultsSnapshot() : []
             ))
             .Where(reporter => reporter.Config.Enabled == true)

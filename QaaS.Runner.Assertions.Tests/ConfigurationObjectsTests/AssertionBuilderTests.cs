@@ -3,6 +3,7 @@ using System.Collections;
 using System.Collections.Generic;
 using System.ComponentModel;
 using System.Linq;
+using System.Reflection;
 using Microsoft.Extensions.Configuration;
 using NUnit.Framework;
 using QaaS.Framework.SDK.ContextObjects;
@@ -141,7 +142,7 @@ public class AssertionBuilderTests
 
         Assert.That(reporters, Has.Count.EqualTo(2));
         Assert.That(reporters.OfType<AllureReporter>(), Has.Exactly(1).Items);
-        Assert.That(reportPortalReporter.Config, Is.Not.SameAs(reportPortalConfig));
+        Assert.That(reportPortalReporter.Config, Is.SameAs(reportPortalConfig));
         Assert.That(reportPortalReporter.Config.Enabled, Is.True);
         Assert.That(reportPortalReporter.ExecutionMode, Is.EqualTo("assert"));
     }
@@ -216,6 +217,74 @@ public class AssertionBuilderTests
         Assert.That(reporters, Has.Count.EqualTo(2));
         Assert.That(reportPortalReporter.Config.Endpoint, Is.EqualTo("http://late-default.local"));
         Assert.That(reportPortalReporter.Config.ApiKey, Is.EqualTo("late-default-api-key"));
+    }
+
+    [Test]
+    public void ReportPortalConfig_Properties_ResolveRegisteredDefaultsOnRead()
+    {
+        var reportPortalConfig = new ReportPortalConfig();
+        ReportPortalConfig.RegisterDefaults(
+            enabled: true,
+            reportPortalUri: "http://read-default.local",
+            reportPortalApiKey: "read-default-api-key"
+        );
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(reportPortalConfig.Enabled, Is.True);
+            Assert.That(reportPortalConfig.Endpoint, Is.EqualTo("http://read-default.local"));
+            Assert.That(reportPortalConfig.ApiKey, Is.EqualTo("read-default-api-key"));
+        });
+    }
+
+    [Test]
+    public void ReportPortalConfig_Properties_KeepExplicitValuesOverRegisteredDefaults()
+    {
+        ReportPortalConfig.RegisterDefaults(
+            enabled: true,
+            reportPortalUri: "http://read-default.local",
+            reportPortalApiKey: "read-default-api-key"
+        );
+        var reportPortalConfig = new ReportPortalConfig
+        {
+            Enabled = false,
+            Endpoint = "",
+            ApiKey = "",
+        };
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(reportPortalConfig.Enabled, Is.False);
+            Assert.That(reportPortalConfig.Endpoint, Is.EqualTo(""));
+            Assert.That(reportPortalConfig.ApiKey, Is.EqualTo(""));
+        });
+    }
+
+    [Test]
+    public void ReportPortalConfig_RegisterDefaults_CanBeCalledByConfigurationBootstrapReflectionShape()
+    {
+        var registerDefaultsMethod = typeof(ReportPortalConfig).GetMethod(
+            "RegisterDefaults",
+            BindingFlags.Public | BindingFlags.Static,
+            binder: null,
+            types: [typeof(bool), typeof(string), typeof(string)],
+            modifiers: null
+        );
+
+        Assert.That(registerDefaultsMethod, Is.Not.Null);
+
+        registerDefaultsMethod!.Invoke(
+            null,
+            [true, "http://bootstrap-default.local", "bootstrap-default-api-key"]
+        );
+
+        var defaults = ReportPortalConfig.GetDefaultsProvider()!.GetDefaults();
+        Assert.Multiple(() =>
+        {
+            Assert.That(defaults.Enabled, Is.True);
+            Assert.That(defaults.ReportPortalUri, Is.EqualTo("http://bootstrap-default.local"));
+            Assert.That(defaults.ReportPortalApiKey, Is.EqualTo("bootstrap-default-api-key"));
+        });
     }
 
     [Test]

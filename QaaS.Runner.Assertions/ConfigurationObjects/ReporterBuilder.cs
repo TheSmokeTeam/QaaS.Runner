@@ -210,8 +210,7 @@ public class ReporterBuilder : IYamlConvertible, ICloneable<ReporterBuilder>
                     break;
 
                 case ReporterTarget.ReportPortal:
-                    var reportPortalConfig = ReportPortal?.ResolveDefaults();
-                    if (reportPortalConfig is { Enabled: true })
+                    if (ReportPortal is { Enabled: true })
                     {
                         var reportPortalReporter = new ReportPortalReporter
                         {
@@ -222,7 +221,7 @@ public class ReporterBuilder : IYamlConvertible, ICloneable<ReporterBuilder>
                             SaveTemplate = SaveTemplate,
                             SaveSessionData = SaveSessionData,
                             FileSystem = fileSystem ?? new FileSystem(),
-                            Config = reportPortalConfig,
+                            Config = ReportPortal,
                             ExecutionMode = executionMode,
                         };
                         reporters.Add(reportPortalReporter);
