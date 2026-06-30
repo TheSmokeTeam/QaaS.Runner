@@ -197,7 +197,7 @@ public class SessionBuilderTests
     {
         var builder = new SessionBuilder
         {
-            Stages = null
+            Stages = null!
         };
         var stageConfig = new StageConfig(3, 10, 20);
 

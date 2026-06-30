@@ -112,8 +112,10 @@ public class ExecutionBuilderTests
 
         _ = builder.Build();
 
-        Assert.That(builder.Sessions ?? [], Has.Length.EqualTo(1));
-        Assert.That(builder.Sessions[0].Stage, Is.EqualTo(0));
+        var sessions = builder.Sessions ?? [];
+
+        Assert.That(sessions, Has.Length.EqualTo(1));
+        Assert.That(sessions[0].Stage, Is.EqualTo(0));
     }
 
     [Test]
@@ -441,7 +443,7 @@ public class ExecutionBuilderTests
         });
 
         var builder = new ExecutionBuilder(context, ExecutionType.Run, null, null, null, null);
-        var session = builder.Sessions.Single();
+        var session = (builder.Sessions ?? []).Single();
         var publisher = session.Publishers!.Single();
         var consumer = session.Consumers!.Single();
         var publisherRabbitMq = (RabbitMqSenderConfig?)typeof(QaaS.Runner.Sessions.Actions.Publishers.Builders.PublisherBuilder)
@@ -476,7 +478,7 @@ public class ExecutionBuilderTests
         });
 
         var builder = new ExecutionBuilder(context, ExecutionType.Template, null, null, null, null);
-        var session = builder.Sessions.Single();
+        var session = (builder.Sessions ?? []).Single();
         var stage = session.Stages.Single();
 
         Assert.Multiple(() =>
@@ -501,7 +503,7 @@ public class ExecutionBuilderTests
         });
 
         var builder = new ExecutionBuilder(context, ExecutionType.Template, null, null, null, null);
-        var consumer = builder.Sessions.Single().Consumers!.Single();
+        var consumer = (builder.Sessions ?? []).Single().Consumers!.Single();
 
         Assert.Multiple(() =>
         {
@@ -543,7 +545,7 @@ public class ExecutionBuilderTests
         });
 
         var builder = new ExecutionBuilder(context, ExecutionType.Run, null, null, null, null);
-        var session = builder.Sessions.Single();
+        var session = (builder.Sessions ?? []).Single();
         var publisher = session.Publishers!.Single();
         Assert.Throws<InvalidConfigurationsException>(() => builder.Build());
         var validationResults = (IReadOnlyList<System.ComponentModel.DataAnnotations.ValidationResult>)typeof(ExecutionBuilder)
