@@ -18,8 +18,7 @@ namespace QaaS.Runner.Assertions.Tests.ConfigurationObjectsTests;
 [TestFixture]
 public class ReportPortalLaunchPlanTests
 {
-    private static readonly DateTimeOffset StartedAt =
-        new(2025, 1, 1, 10, 0, 0, TimeSpan.Zero);
+    private static readonly DateTimeOffset StartedAt = new(2025, 1, 1, 10, 0, 0, TimeSpan.Zero);
 
     [SetUp]
     public void SetUp()
@@ -33,7 +32,8 @@ public class ReportPortalLaunchPlanTests
         var succeeded = ReportPortalLaunchPlan.TryNormalizeEndpoint(
             "http://localhost:8080",
             out var endpointUri,
-            out var failureReason);
+            out var failureReason
+        );
 
         Assert.That(succeeded, Is.True);
         Assert.That(failureReason, Is.Null);
@@ -71,8 +71,14 @@ public class ReportPortalLaunchPlanTests
 
         var launchPlan = BuildPlan(reporter, requireQueuedResults: true);
 
-        Assert.That(launchPlan.LaunchName, Is.EqualTo("QaaS Run | Smoke | QaaS | Session A, Session B"));
-        Assert.That(launchPlan.Description, Does.Contain("this run directly from the runner pipeline"));
+        Assert.That(
+            launchPlan.LaunchName,
+            Is.EqualTo("QaaS Run | Smoke | QaaS | Session A, Session B")
+        );
+        Assert.That(
+            launchPlan.Description,
+            Does.Contain("this run directly from the runner pipeline")
+        );
         Assert.That(launchPlan.Description, Does.Contain("Sessions=[Session A, Session B]"));
     }
 
@@ -84,26 +90,48 @@ public class ReportPortalLaunchPlanTests
             attributes: new Dictionary<string, string>
             {
                 ["Component"] = "Auth",
-                ["Owner"] = "Smoke Team"
+                ["Owner"] = "Smoke Team",
             },
-            extraLabels: new Dictionary<string, string>
-            {
-                ["Area"] = "Checkout"
-            });
+            extraLabels: new Dictionary<string, string> { ["Area"] = "Checkout" }
+        );
         reporter.WriteTestResults(CreateResult("assertion-a", "Session A"));
         reporter.WriteTestResults(CreateResult("assertion-b", "Session B"));
 
         var attributes = BuildPlan(reporter, requireQueuedResults: true).BuildLaunchAttributes();
 
-        Assert.That(attributes.Any(attribute => attribute.Key == "tool" && attribute.Value == "QaaS"), Is.True);
-        Assert.That(attributes.Any(attribute => attribute.Key == "team" && attribute.Value == "Smoke"), Is.True);
-        Assert.That(attributes.Any(attribute => attribute.Key == "project" && attribute.Value == "ConfiguredProject"),
-            Is.True);
-        Assert.That(attributes.Any(attribute => attribute.Key == "system" && attribute.Value == "QaaS"), Is.True);
+        Assert.That(
+            attributes.Any(attribute => attribute.Key == "tool" && attribute.Value == "QaaS"),
+            Is.True
+        );
+        Assert.That(
+            attributes.Any(attribute => attribute.Key == "team" && attribute.Value == "Smoke"),
+            Is.True
+        );
+        Assert.That(
+            attributes.Any(attribute =>
+                attribute.Key == "project" && attribute.Value == "ConfiguredProject"
+            ),
+            Is.True
+        );
+        Assert.That(
+            attributes.Any(attribute => attribute.Key == "system" && attribute.Value == "QaaS"),
+            Is.True
+        );
         Assert.That(attributes.Count(attribute => attribute.Key == "session"), Is.EqualTo(2));
-        Assert.That(attributes.Any(attribute => attribute.Key == "Component" && attribute.Value == "Auth"), Is.True);
-        Assert.That(attributes.Any(attribute => attribute.Key == "Owner" && attribute.Value == "Smoke Team"), Is.True);
-        Assert.That(attributes.Any(attribute => attribute.Key == "Area" && attribute.Value == "Checkout"), Is.True);
+        Assert.That(
+            attributes.Any(attribute => attribute.Key == "Component" && attribute.Value == "Auth"),
+            Is.True
+        );
+        Assert.That(
+            attributes.Any(attribute =>
+                attribute.Key == "Owner" && attribute.Value == "Smoke Team"
+            ),
+            Is.True
+        );
+        Assert.That(
+            attributes.Any(attribute => attribute.Key == "Area" && attribute.Value == "Checkout"),
+            Is.True
+        );
     }
 
     [Test]
@@ -116,10 +144,114 @@ public class ReportPortalLaunchPlanTests
 
         var launchPlan = BuildPlan(reporter, requireQueuedResults: true);
 
-        Assert.That(launchPlan.LaunchName, Is.EqualTo("QaaS Run | Smoke | QaaS | Session A, Session B(+1)"));
+        Assert.That(
+            launchPlan.LaunchName,
+            Is.EqualTo("QaaS Run | Smoke | QaaS | Session A, Session B(+1)")
+        );
     }
 
-    private static ReportPortalLaunchPlan BuildPlan(ReportPortalReporter reporter, bool requireQueuedResults = false)
+    [Test]
+    public void Build_WithDifferentApiKeys_CreatesSeparateLaunchPlansAndPreservesApiKeys()
+    {
+        var plans = ReportPortalLaunchPlan.Build(
+            [CreateReporter(apiKey: "api-key-a"), CreateReporter(apiKey: "api-key-b")],
+            StartedAt,
+            requireQueuedResults: false
+        );
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(plans, Has.Count.EqualTo(2));
+            Assert.That(
+                plans.Select(plan => plan.ApiKey),
+                Is.EquivalentTo(["api-key-a", "api-key-b"])
+            );
+        });
+    }
+
+    [Test]
+    public void Build_WithDifferentLaunchNames_CreatesSeparateLaunchPlansAndPreservesLaunchNames()
+    {
+        var plans = ReportPortalLaunchPlan.Build(
+            [CreateReporter(launchName: "Launch A"), CreateReporter(launchName: "Launch B")],
+            StartedAt,
+            requireQueuedResults: false
+        );
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(plans, Has.Count.EqualTo(2));
+            Assert.That(
+                plans.Select(plan => plan.LaunchName),
+                Is.EquivalentTo(["Launch A", "Launch B"])
+            );
+        });
+    }
+
+    [Test]
+    public void Build_WithDifferentDescriptions_CreatesSeparateLaunchPlansAndPreservesDescriptions()
+    {
+        var plans = ReportPortalLaunchPlan.Build(
+            [
+                CreateReporter(description: "Description A"),
+                CreateReporter(description: "Description B"),
+            ],
+            StartedAt,
+            requireQueuedResults: false
+        );
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(plans, Has.Count.EqualTo(2));
+            Assert.That(
+                plans.Select(plan => plan.Description),
+                Is.EquivalentTo(["Description A", "Description B"])
+            );
+        });
+    }
+
+    [Test]
+    public void Build_WithDifferentDebugModes_CreatesSeparateLaunchPlansAndPreservesDebugModes()
+    {
+        var plans = ReportPortalLaunchPlan.Build(
+            [CreateReporter(debugMode: false), CreateReporter(debugMode: true)],
+            StartedAt,
+            requireQueuedResults: false
+        );
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(plans, Has.Count.EqualTo(2));
+            Assert.That(plans.Select(plan => plan.DebugMode), Is.EquivalentTo([false, true]));
+        });
+    }
+
+    [Test]
+    public void Build_WithDifferentStaticAttributes_CreatesSeparateLaunchPlansAndPreservesAttributes()
+    {
+        var plans = ReportPortalLaunchPlan.Build(
+            [
+                CreateReporter(attributes: new Dictionary<string, string> { ["Owner"] = "Team A" }),
+                CreateReporter(attributes: new Dictionary<string, string> { ["Owner"] = "Team B" }),
+            ],
+            StartedAt,
+            requireQueuedResults: false
+        );
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(plans, Has.Count.EqualTo(2));
+            Assert.That(
+                plans.Select(plan => plan.Attributes["Owner"]),
+                Is.EquivalentTo(["Team A", "Team B"])
+            );
+        });
+    }
+
+    private static ReportPortalLaunchPlan BuildPlan(
+        ReportPortalReporter reporter,
+        bool requireQueuedResults = false
+    )
     {
         return ReportPortalLaunchPlan.Build([reporter], StartedAt, requireQueuedResults).Single();
     }
@@ -128,41 +260,55 @@ public class ReportPortalLaunchPlanTests
         string team = "Smoke",
         string system = "QaaS",
         string? project = null,
+        string? endpoint = "http://localhost:8080",
+        string? apiKey = "api-key",
+        string? launchName = null,
+        string? description = null,
+        bool? debugMode = false,
         IReadOnlyDictionary<string, string>? attributes = null,
-        IReadOnlyDictionary<string, string>? extraLabels = null)
+        IReadOnlyDictionary<string, string>? extraLabels = null
+    )
     {
         var context = new InternalContext
         {
             Logger = Globals.Logger,
-            RootConfiguration = new ConfigurationBuilder().Build()
+            RootConfiguration = new ConfigurationBuilder().Build(),
         };
 
-        context.InsertValueIntoGlobalDictionary(context.GetMetaDataPath(), new MetaDataConfig
-        {
-            Team = team,
-            System = system,
-            ExtraLabels = extraLabels?.ToDictionary(
-                label => label.Key,
-                label => (object)label.Value,
-                StringComparer.OrdinalIgnoreCase)
-                          ?? new Dictionary<string, object>()
-        });
+        context.InsertValueIntoGlobalDictionary(
+            context.GetMetaDataPath(),
+            new MetaDataConfig
+            {
+                Team = team,
+                System = system,
+                ExtraLabels =
+                    extraLabels?.ToDictionary(
+                        label => label.Key,
+                        label => (object)label.Value,
+                        StringComparer.OrdinalIgnoreCase
+                    ) ?? new Dictionary<string, object>(),
+            }
+        );
 
         return new ReportPortalReporter
         {
             Config = new ReportPortalConfig
             {
                 Enabled = true,
-                Endpoint = "http://localhost:8080",
-                ApiKey = "api-key",
+                Endpoint = endpoint,
+                ApiKey = apiKey,
                 Project = project,
+                LaunchName = launchName,
+                Description = description,
+                DebugMode = debugMode,
                 Attributes = attributes?.ToDictionary(
                     attribute => attribute.Key,
                     attribute => attribute.Value,
-                    StringComparer.OrdinalIgnoreCase)
+                    StringComparer.OrdinalIgnoreCase
+                ),
             },
             Context = context,
-            ExecutionMode = "run"
+            ExecutionMode = "run",
         };
     }
 
@@ -172,7 +318,7 @@ public class ReportPortalLaunchPlanTests
         {
             Name = sessionName,
             UtcStartTime = new DateTime(2025, 1, 1, 10, 0, 0, DateTimeKind.Utc),
-            UtcEndTime = new DateTime(2025, 1, 1, 10, 0, 1, DateTimeKind.Utc)
+            UtcEndTime = new DateTime(2025, 1, 1, 10, 0, 1, DateTimeKind.Utc),
         };
 
         return new AssertionResult
@@ -184,11 +330,11 @@ public class ReportPortalLaunchPlanTests
                 SessionDataList = ImmutableList.Create(sessionData),
                 DisplayTrace = true,
                 AssertionHook = null,
-                AssertionConfiguration = new ConfigurationBuilder().Build()
+                AssertionConfiguration = new ConfigurationBuilder().Build(),
             },
             AssertionStatus = AssertionStatus.Passed,
             TestDurationMs = 1,
-            Flaky = new Flaky { IsFlaky = false, FlakinessReasons = [] }
+            Flaky = new Flaky { IsFlaky = false, FlakinessReasons = [] },
         };
     }
 }

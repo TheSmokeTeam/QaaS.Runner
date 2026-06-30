@@ -47,7 +47,7 @@ public class ReporterBuilder : IYamlConvertible, ICloneable<ReporterBuilder>
                  "If not set, the default ReportPortal configuration will be used.")]
     [DefaultValue(typeof(ReportPortalConfig))]
     public ReportPortalConfig? ReportPortal { get; internal set; } = new();
-    
+
     /// <summary>
     /// Reads the serialized configuration for the current Runner reporter builder instance.
     /// </summary>
@@ -57,8 +57,10 @@ public class ReporterBuilder : IYamlConvertible, ICloneable<ReporterBuilder>
     /// <qaas-docs group="Configuration as Code" subgroup="Reporters" />
     public void Read(IParser parser, Type expectedType, ObjectDeserializer nestedObjectDeserializer)
     {
-        throw new NotSupportedException($"{nameof(Read)} doesn't support custom" +
-                                        $" deserialization from Yaml for {nameof(ReporterBuilder)}");
+        throw new NotSupportedException(
+            $"{nameof(Read)} doesn't support custom"
+                + $" deserialization from Yaml for {nameof(ReporterBuilder)}"
+        );
     }
 
     /// <summary>
@@ -70,17 +72,19 @@ public class ReporterBuilder : IYamlConvertible, ICloneable<ReporterBuilder>
     /// <qaas-docs group="Configuration as Code" subgroup="Reporters" />
     public void Write(IEmitter emitter, ObjectSerializer nestedObjectSerializer)
     {
-        nestedObjectSerializer(new
-        {
-            SaveLogs,
-            SaveAttachments,
-            SaveTemplate,
-            SaveSessionData,
-            DisplayTrace,
-            ReportPortal
-        });
+        nestedObjectSerializer(
+            new
+            {
+                SaveLogs,
+                SaveAttachments,
+                SaveTemplate,
+                SaveSessionData,
+                DisplayTrace,
+                ReportPortal,
+            }
+        );
     }
-    
+
     /// <summary>
     /// Sets the ReportPortal configuration used when creating a ReportPortal reporter.
     /// </summary>
@@ -158,7 +162,7 @@ public class ReporterBuilder : IYamlConvertible, ICloneable<ReporterBuilder>
         DisplayTrace = shouldDisplayTrace;
         return this;
     }
-    
+
     /// <summary>
     /// Builds the reporter instances that should publish assertion results for the current run.
     /// </summary>
@@ -177,13 +181,15 @@ public class ReporterBuilder : IYamlConvertible, ICloneable<ReporterBuilder>
     /// <exception cref="ArgumentOutOfRangeException">
     /// Thrown when an unsupported <see cref="ReporterTarget"/> value is encountered.
     /// </exception>
-    internal List<IReporter> Build(Context context, 
-        DateTime testSuiteStartTimeUtc, 
+    internal List<IReporter> Build(
+        Context context,
+        DateTime testSuiteStartTimeUtc,
         IFileSystem? fileSystem = null,
-        string executionMode = "run")
+        string executionMode = "run"
+    )
     {
         var reporters = new List<IReporter>();
-        
+
         foreach (var target in Enum.GetValues<ReporterTarget>())
         {
             switch (target)
@@ -204,7 +210,8 @@ public class ReporterBuilder : IYamlConvertible, ICloneable<ReporterBuilder>
                     break;
 
                 case ReporterTarget.ReportPortal:
-                    if (ReportPortal is { Enabled: true } reportPortalConfig)
+                    var reportPortalConfig = ReportPortal?.ResolveDefaults();
+                    if (reportPortalConfig is { Enabled: true })
                     {
                         var reportPortalReporter = new ReportPortalReporter
                         {
@@ -216,17 +223,21 @@ public class ReporterBuilder : IYamlConvertible, ICloneable<ReporterBuilder>
                             SaveSessionData = SaveSessionData,
                             FileSystem = fileSystem ?? new FileSystem(),
                             Config = reportPortalConfig,
-                            ExecutionMode = executionMode
+                            ExecutionMode = executionMode,
                         };
                         reporters.Add(reportPortalReporter);
                     }
                     break;
 
                 default:
-                    throw new ArgumentOutOfRangeException(nameof(target), target, "Unsupported reporter target.");
+                    throw new ArgumentOutOfRangeException(
+                        nameof(target),
+                        target,
+                        "Unsupported reporter target."
+                    );
             }
         }
-        
+
         return reporters;
     }
 }

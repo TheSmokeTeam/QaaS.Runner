@@ -9,11 +9,11 @@ public class ReportPortalConfig : IReporterConfig
 {
     [Description("Whether to enable ReportPortal reporting")]
     [DefaultValue("QaaS.Configuration defaults")]
-    public bool? Enabled { get; set; } = _defaultsProvider?.GetDefaults().Enabled;
+    public bool? Enabled { get; set; }
 
     [Description("ReportPortal endpoint URI. Accepts either the gateway URL or the API URL and normalizes it to /api/. Defaults to the global API URL.")]
     [DefaultValue("Global URL in QaaS.Configuration")]
-    public string? Endpoint { get; set; } = _defaultsProvider?.GetDefaults().ReportPortalUri;
+    public string? Endpoint { get; set; }
 
     [Description("ReportPortal project where the launch will be published. Default is MetaData.Team value.")]
     [DefaultValue("MetaData.Team value")]
@@ -21,7 +21,7 @@ public class ReportPortalConfig : IReporterConfig
 
     [Description("ReportPortal API key used for publishing. Defaults to the global API key.")]
     [DefaultValue("Global API key in QaaS.Configuration")]
-    public string? ApiKey { get; set; } = _defaultsProvider?.GetDefaults().ReportPortalApiKey;
+    public string? ApiKey { get; set; }
 
     [Description("Optional launch name override.")]
     [DefaultValue("Generated according MetaData.Team, MetaData.System and the session occured")]
@@ -37,7 +37,8 @@ public class ReportPortalConfig : IReporterConfig
 
     [Description("Static launch attributes to add to every launch in addition to the default QaaS team/system/session/source attributes.")]
     [DefaultValue(null)]
-    public Dictionary<string, string>? Attributes { get; set; } = new(StringComparer.OrdinalIgnoreCase);
+    public Dictionary<string, string>? Attributes { get; set; } =
+        new(StringComparer.OrdinalIgnoreCase);
 
     private static IReportPortalConfigurationDefaultsProvider? _defaultsProvider;
 
@@ -77,13 +78,18 @@ public class ReportPortalConfig : IReporterConfig
     public static void RegisterDefaults(
         bool? enabled,
         string? reportPortalUri = null,
-        string? reportPortalApiKey = null) =>
-        RegisterDefaultsProvider(new StaticReportPortalDefaultsProvider(new ReportPortalConfigurationDefaults
-        {
-            Enabled = enabled,
-            ReportPortalUri = reportPortalUri,
-            ReportPortalApiKey = reportPortalApiKey
-        }));
+        string? reportPortalApiKey = null
+    ) =>
+        RegisterDefaultsProvider(
+            new StaticReportPortalDefaultsProvider(
+                new ReportPortalConfigurationDefaults
+                {
+                    Enabled = enabled,
+                    ReportPortalUri = reportPortalUri,
+                    ReportPortalApiKey = reportPortalApiKey,
+                }
+            )
+        );
 
     /// <summary>
     /// Gets the registered ReportPortal defaults provider.
@@ -92,6 +98,28 @@ public class ReportPortalConfig : IReporterConfig
     /// The registered defaults provider, or <see langword="null"/> when no provider was registered.
     /// </returns>
     public static IReportPortalConfigurationDefaultsProvider? GetDefaultsProvider() => _defaultsProvider;
+
+    /// <summary>
+    /// Resolves unset ReportPortal values against the currently registered defaults provider.
+    /// </summary>
+    /// <returns>A copy of the current configuration with provider-backed defaults applied to unset fields.</returns>
+    internal ReportPortalConfig ResolveDefaults()
+    {
+        var defaults = _defaultsProvider?.GetDefaults();
+        return new ReportPortalConfig
+        {
+            Enabled = Enabled ?? defaults?.Enabled,
+            Endpoint = Endpoint ?? defaults?.ReportPortalUri,
+            Project = Project,
+            ApiKey = ApiKey ?? defaults?.ReportPortalApiKey,
+            LaunchName = LaunchName,
+            Description = Description,
+            DebugMode = DebugMode,
+            Attributes = Attributes is null
+                ? null
+                : new Dictionary<string, string>(Attributes, StringComparer.OrdinalIgnoreCase),
+        };
+    }
 }
 
 /// <summary>
