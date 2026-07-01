@@ -22,7 +22,7 @@ public class ReportLogic : ILogic
     }
 
     /// <summary>
-    /// Reports matching <see cref="AssertionResult" /> entries to each configured <see cref="IReporter" />.
+    /// Reports each status-eligible <see cref="AssertionResult" /> to every configured <see cref="IReporter" />.
     /// </summary>
     /// <param name="executionData">The mutable execution context containing assertion results.</param>
     /// <returns>The same <paramref name="executionData" /> instance after reporting completes.</returns>
@@ -40,22 +40,18 @@ public class ReportLogic : ILogic
 
         foreach (var reporter in Reporters)
         {
-            var matchingAssertionResults = assertionResults
-                .Where(assertionResult => assertionResult.Assertion.ReporterTypes.Contains(reporter.GetType()))
-                .ToList();
-
             _context.Logger.LogDebug(
-                "Reporter type {ReporterType} matched {AssertionCount} assertion results",
+                "Reporter type {ReporterType} is evaluating {AssertionCount} assertion results",
                 reporter.GetType().Name,
-                matchingAssertionResults.Count);
+                assertionResults.Count);
 
-            foreach (var assertionResult in matchingAssertionResults)
+            foreach (var assertionResult in assertionResults)
             {
-                _context.Logger.LogDebug(
-                    "Routing assertion {AssertionName} with status {AssertionStatus} to reporter type {ReporterType}",
-                    assertionResult.Assertion.Name, assertionResult.AssertionStatus, reporter.GetType().Name);
                 if (assertionResult.Assertion.StatusesToReport.Contains(assertionResult.AssertionStatus))
                 {
+                    _context.Logger.LogDebug(
+                        "Routing assertion {AssertionName} with status {AssertionStatus} to reporter type {ReporterType}",
+                        assertionResult.Assertion.Name, assertionResult.AssertionStatus, reporter.GetType().Name);
                     reporter.WriteTestResults(assertionResult);
                 }
                 else

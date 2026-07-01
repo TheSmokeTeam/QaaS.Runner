@@ -7,8 +7,6 @@ using QaaS.Framework.SDK.Extensions;
 using QaaS.Framework.SDK.Hooks.Assertion;
 using QaaS.Framework.SDK.Session.SessionDataObjects;
 using QaaS.Runner.Assertions.LinkBuilders;
-using QaaS.Runner.Assertions.Reporters.Allure;
-using QaaS.Runner.Assertions.Reporters.ReportPortal;
 
 namespace QaaS.Runner.Assertions.AssertionObjects;
 
@@ -37,11 +35,6 @@ public class Assertion
     public bool DisplayTrace { get; set; }
 
     public AssertionSeverity? Severity { get; set; }
-
-    /// <summary>
-    /// Reporter implementation type that should receive this assertion result.
-    /// </summary>
-    public IList<Type> ReporterTypes { get; set; } = [typeof(AllureReporter), typeof(ReportPortalReporter)];
 
     /// <summary>
     ///     All Session data that might be relevant to the session according to its configuration
