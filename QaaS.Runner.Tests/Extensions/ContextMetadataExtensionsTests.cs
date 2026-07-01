@@ -18,18 +18,18 @@ public class ContextMetadataExtensionsTests
     public void GetMetaDataOrDefault_WhenMetadataIsMissing_ReturnsAndStoresEmptyMetadata()
     {
         var context = CreateContext();
-        var metadataKey = context.GetMetaDataPath().Last();
+        var metadataPath = context.GetMetaDataPath();
 
         var metadata = context.GetMetaDataOrDefault();
 
         Assert.That(metadata, Is.Not.Null);
-        Assert.That(context.InternalGlobalDict[metadataKey], Is.SameAs(metadata));
+        Assert.That(context.GetValueFromGlobalDictionary(metadataPath), Is.SameAs(metadata));
     }
 
     [Test]
     public void GetMetaDataOrDefault_WhenMetadataAlreadyExists_ReturnsConfiguredInstance()
     {
-        var context = CreateContext();
+        var context = CreateContext(caseName: "case-a", executionId: "execution-1");
         var configuredMetadata = new MetaDataConfig
         {
             Team = "Smoke",
@@ -45,14 +45,14 @@ public class ContextMetadataExtensionsTests
     [Test]
     public void GetMetaDataOrDefault_WhenMetadataHasUnexpectedType_ReplacesIt()
     {
-        var context = CreateContext();
-        var metadataKey = context.GetMetaDataPath().Last();
-        context.InternalGlobalDict[metadataKey] = "invalid";
+        var context = CreateContext(caseName: "case-a", executionId: "execution-1");
+        var metadataPath = context.GetMetaDataPath();
+        context.InsertValueIntoGlobalDictionary(metadataPath, "invalid");
 
         var metadata = context.GetMetaDataOrDefault();
 
         Assert.That(metadata, Is.TypeOf<MetaDataConfig>());
-        Assert.That(context.InternalGlobalDict[metadataKey], Is.SameAs(metadata));
+        Assert.That(context.GetValueFromGlobalDictionary(metadataPath), Is.SameAs(metadata));
     }
 
     [Test]
@@ -75,12 +75,15 @@ public class ContextMetadataExtensionsTests
         });
     }
 
-    private static InternalContext CreateContext(ILogger? logger = null)
+    private static InternalContext CreateContext(ILogger? logger = null, string? caseName = null,
+        string? executionId = null)
     {
         return new InternalContext
         {
             Logger = logger ?? Globals.Logger,
             RootConfiguration = new ConfigurationBuilder().Build(),
+            CaseName = caseName,
+            ExecutionId = executionId,
             InternalRunningSessions = new RunningSessions(new Dictionary<string, RunningSessionData<object, object>>()),
             InternalGlobalDict = new Dictionary<string, object?>()
         };

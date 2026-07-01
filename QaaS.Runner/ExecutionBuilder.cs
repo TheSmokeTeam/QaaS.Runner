@@ -31,7 +31,6 @@ using QaaS.Framework.SDK.Session.SessionDataObjects.RunningSessionsObjects;
 using QaaS.Runner.Assertions.AssertionObjects;
 using QaaS.Runner.Assertions.ConfigurationObjects;
 using QaaS.Runner.Assertions.Reporters;
-using QaaS.Runner.Assertions.Reporters.ReportPortal;
 using QaaS.Runner.Extensions;
 using QaaS.Runner.Infrastructure;
 using QaaS.Runner.Sessions.Actions.Probes;
@@ -52,8 +51,18 @@ namespace QaaS.Runner;
 [JsonSchema]
 public class ExecutionBuilder() : BaseExecutionBuilder<InternalContext, ExecutionData>, ICloneable<ExecutionBuilder>
 {
+    
+    /// <summary>
+    /// Manually clone for <see cref="ExecutionBuilder" /> since it contains objects that can't be deep cloned with <see cref="BuilderCloner.DeepClone{T}(T)" />
+    /// Objects such as <see cref="ILogger" /> are shared across ExecutionBuilders and can't be deep-cloned.
+    /// </summary>
+    /// <returns></returns>
     public ExecutionBuilder Clone() => new(this);
 
+    /// <summary>
+    /// Constructor for cloning an <see cref="ExecutionBuilder" /> instance used by <see cref="Clone" /> method.
+    /// </summary>
+    /// <param name="source"></param>
     private ExecutionBuilder(ExecutionBuilder source) : this()
     {
         DataSources = source.DataSources?.Select(dataSource => dataSource.Clone()).ToArray();
@@ -74,8 +83,6 @@ public class ExecutionBuilder() : BaseExecutionBuilder<InternalContext, Executio
         _configuredLogger = source._configuredLogger;
         _configuredCaseName = source._configuredCaseName;
         _configuredExecutionId = source._configuredExecutionId;
-        _reportPortalLaunchManager = source._reportPortalLaunchManager;
-        _reportPortalRunDescriptor = source._reportPortalRunDescriptor;
         _globalDict = new Dictionary<string, object?>(source._globalDict);
         _loadVariablesIntoGlobalDict = source._loadVariablesIntoGlobalDict;
     }
@@ -134,7 +141,8 @@ public class ExecutionBuilder() : BaseExecutionBuilder<InternalContext, Executio
     /// <summary>
     /// The reporters used to report the test results
     /// </summary>
-    [Description("The reporters used to report the test results")]
+    [Description("The reporters which being used to report the test results. " +
+                 "This section is not required, and if not set defualt values will be used.")]
     public ReporterBuilder? Reporters { get; internal set; } = new();
 
     private ExecutionType Type { get; set; }
@@ -157,8 +165,6 @@ public class ExecutionBuilder() : BaseExecutionBuilder<InternalContext, Executio
     private ILogger _configuredLogger = default!;
     private string? _configuredCaseName;
     private string? _configuredExecutionId;
-    private ReportPortalLaunchManager? _reportPortalLaunchManager;
-    private ReportPortalLaunchDescriptor? _reportPortalRunDescriptor;
     private Dictionary<string, object?> _globalDict = new();
     private bool _loadVariablesIntoGlobalDict = true;
     private readonly IConfiguration? _templateSourceConfiguration;
@@ -262,14 +268,9 @@ public class ExecutionBuilder() : BaseExecutionBuilder<InternalContext, Executio
     {
         if (Assertions is null || Assertions.Length == 0 || Reporters is null) return [];
         var testSuiteStartTimeUtc = DateTime.UtcNow;
-        
-        if (_reportPortalLaunchManager != null && _reportPortalRunDescriptor != null)
-        {
-            Reporters.WithReportPortalLaunchManager(_reportPortalLaunchManager);
-            Reporters.WithReportPortalRunDescriptor(_reportPortalRunDescriptor);   
-        }
-        
-        return Reporters.Build(Context, testSuiteStartTimeUtc);
+
+        return Reporters.Build(Context, testSuiteStartTimeUtc,
+            executionMode: Type.ToString().ToLowerInvariant());
     }
 
     private IEnumerable<IStorage> BuildStorages()
@@ -566,38 +567,6 @@ public class ExecutionBuilder() : BaseExecutionBuilder<InternalContext, Executio
     {
         _configuredLogger = logger;
         return this;
-    }
-
-    internal ExecutionBuilder WithReportPortalLaunchManager(ReportPortalLaunchManager reportPortalLaunchManager)
-    {
-        _reportPortalLaunchManager = reportPortalLaunchManager;
-        return this;
-    }
-
-    internal ExecutionBuilder WithReportPortalRunDescriptor(ReportPortalLaunchDescriptor reportPortalLaunchDescriptor)
-    {
-        _reportPortalRunDescriptor = reportPortalLaunchDescriptor;
-        return this;
-    }
-
-    internal ExecutionType ReadExecutionType()
-    {
-        return Type;
-    }
-
-    internal IReadOnlyList<SessionBuilder> ReadSessions()
-    {
-        return Sessions ?? [];
-    }
-
-    internal string? ReadCase()
-    {
-        return _configuredCaseName ?? Context.CaseName;
-    }
-
-    internal string? ReadExecutionId()
-    {
-        return _configuredExecutionId ?? Context.ExecutionId;
     }
 
     /// <summary>

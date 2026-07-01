@@ -89,6 +89,74 @@ public class RunnerBehaviorTests
         }
     }
 
+    private sealed class PublishOrderRunner(
+        ILifetimeScope scope,
+        List<ExecutionBuilder> executionBuilders,
+        Microsoft.Extensions.Logging.ILogger logger,
+        Serilog.ILogger serilogLogger) : Runner(scope, executionBuilders, logger, serilogLogger)
+    {
+        public List<string> Calls { get; } = [];
+
+        protected override void Setup() => Calls.Add("setup");
+
+        protected override List<Execution> BuildExecutions()
+        {
+            Calls.Add("build");
+            return [];
+        }
+
+        protected override int StartExecutions(List<Execution> executions)
+        {
+            Calls.Add("start");
+            return 0;
+        }
+
+        protected override void PublishReportPortalResults(IEnumerable<Execution>? executions)
+        {
+            Calls.Add("publish-reportportal");
+        }
+
+        protected override void DisposeExecutions(IEnumerable<Execution>? executions)
+        {
+            Calls.Add("dispose-executions");
+        }
+
+        protected override void Teardown()
+        {
+            Calls.Add("teardown");
+        }
+
+        public override void Dispose()
+        {
+            Calls.Add("dispose");
+            base.Dispose();
+        }
+    }
+
+    private sealed class RecordingReportPortalPublisher(Exception? validationException = null)
+        : ReportPortalPublisher(Globals.Logger)
+    {
+        private readonly Exception? _validationException = validationException;
+        public List<string> Calls { get; } = [];
+
+        public override Task ValidateAsync(IEnumerable<ReportPortalReporter> reporters,
+            CancellationToken cancellationToken = default)
+        {
+            Calls.Add("validate");
+            if (_validationException is not null)
+                throw _validationException;
+
+            return Task.CompletedTask;
+        }
+
+        public override Task PublishAsync(IEnumerable<ReportPortalReporter> reporters,
+            CancellationToken cancellationToken = default)
+        {
+            Calls.Add("publish");
+            return Task.CompletedTask;
+        }
+    }
+
     private sealed class ServeResultsRunner(
         ILifetimeScope scope,
         List<ExecutionBuilder> executionBuilders,
@@ -542,73 +610,71 @@ public class RunnerBehaviorTests
     }
 
     [Test]
-    public void BuildExecutions_AssignsSharedReportPortalLaunchManagerWhenRegistered()
-    {
-        using var scope = BuildScope(registerReportPortalLaunchManager: true);
-        var builders = new List<ExecutionBuilder>
-        {
-            CreateTemplateExecutionBuilder("case-1"),
-            CreateTemplateExecutionBuilder("case-2")
-        };
-
-        var runner = new ExposedRunner(scope, builders, Globals.Logger, new Mock<Serilog.ILogger>().Object);
-        _ = runner.InvokeBuildExecutions();
-
-        var managerField = typeof(ExecutionBuilder)
-            .GetField("_reportPortalLaunchManager", BindingFlags.Instance | BindingFlags.NonPublic)!;
-        var registeredManager = scope.Resolve<ReportPortalLaunchManager>();
-
-        Assert.That(managerField.GetValue(builders[0]), Is.SameAs(registeredManager));
-        Assert.That(managerField.GetValue(builders[1]), Is.SameAs(registeredManager));
-    }
-
-    [Test]
-    public void BuildExecutions_AssignsSharedReportPortalRunDescriptorToAllBuilders()
+    public void BuildExecutions_DoesNotAssignReportPortalRuntimeStateToBuilders()
     {
         using var scope = BuildScope();
         var builders = new List<ExecutionBuilder>
         {
-            CreateTemplateExecutionBuilder("case-1", team: "Smoke", system: "QaaS", reportPortalEnabled: true),
-            CreateTemplateExecutionBuilder("case-2", team: "Smoke", system: "QaaS", reportPortalEnabled: true)
+            CreateTemplateExecutionBuilder("case-1", reportPortalEnabled: true),
+            CreateTemplateExecutionBuilder("case-2", reportPortalEnabled: true)
         };
 
         var runner = new ExposedRunner(scope, builders, Globals.Logger, new Mock<Serilog.ILogger>().Object);
         _ = runner.InvokeBuildExecutions();
 
-        var descriptorField = typeof(ExecutionBuilder)
-            .GetField("_reportPortalRunDescriptor", BindingFlags.Instance | BindingFlags.NonPublic)!;
-        var firstDescriptor = descriptorField.GetValue(builders[0]);
-        var secondDescriptor = descriptorField.GetValue(builders[1]);
+        var reportPortalRuntimeFields = typeof(ExecutionBuilder)
+            .GetFields(BindingFlags.Instance | BindingFlags.NonPublic)
+            .Where(field =>
+                field.Name.Contains("reportPortal", StringComparison.OrdinalIgnoreCase) &&
+                !field.FieldType.IsAssignableTo(typeof(Delegate)))
+            .Select(field => field.Name)
+            .ToArray();
 
-        Assert.That(firstDescriptor, Is.Not.Null);
-        Assert.That(secondDescriptor, Is.SameAs(firstDescriptor));
+        Assert.That(reportPortalRuntimeFields, Is.Empty);
     }
 
     [Test]
-    public void BuildExecutions_WithMixedTeams_AssignsDifferentReportPortalDescriptorsPerTeam()
+    public void RunAndGetExitCode_WhenReportPortalValidationFails_ReturnsFailureExitCodeBeforeStart()
     {
         using var scope = BuildScope();
-        var builders = new List<ExecutionBuilder>
+        var publisher = new RecordingReportPortalPublisher(
+            new InvalidConfigurationsException("ReportPortal validation failed"));
+        var runner = new RunLifecycleRunner(scope, [], Globals.Logger, new Mock<Serilog.ILogger>().Object)
         {
-            CreateTemplateExecutionBuilder("case-1", team: "Smoke", system: "QaaS", reportPortalEnabled: true),
-            CreateTemplateExecutionBuilder("case-2", team: "AnotherTeam", system: "QaaS", reportPortalEnabled: true)
+            ReportPortalPublisher = publisher
         };
-        var runner = new ExposedRunner(scope, builders, Globals.Logger, new Mock<Serilog.ILogger>().Object);
 
-        _ = runner.InvokeBuildExecutions();
+        var exitCode = runner.RunAndGetExitCode();
 
-        var descriptorField = typeof(ExecutionBuilder)
-            .GetField("_reportPortalRunDescriptor", BindingFlags.Instance | BindingFlags.NonPublic)!;
-        var firstDescriptor = (ReportPortalLaunchDescriptor?)descriptorField.GetValue(builders[0]);
-        var secondDescriptor = (ReportPortalLaunchDescriptor?)descriptorField.GetValue(builders[1]);
+        Assert.Multiple(() =>
+        {
+            Assert.That(exitCode, Is.EqualTo(1));
+            Assert.That(runner.Calls, Is.EqualTo(new[] { "setup", "build", "teardown" }));
+            Assert.That(publisher.Calls, Is.EqualTo(new[] { "validate", "publish" }));
+            Assert.That(runner.LastExitCode, Is.EqualTo(1));
+        });
+    }
 
-        Assert.That(firstDescriptor, Is.Not.Null);
-        Assert.That(secondDescriptor, Is.Not.Null);
-        Assert.That(secondDescriptor, Is.Not.SameAs(firstDescriptor));
-        Assert.That(firstDescriptor!.TeamName, Is.EqualTo("Smoke"));
-        Assert.That(secondDescriptor!.TeamName, Is.EqualTo("AnotherTeam"));
-        Assert.That(firstDescriptor.SystemName, Is.EqualTo("QaaS"));
-        Assert.That(secondDescriptor.SystemName, Is.EqualTo("QaaS"));
+    [Test]
+    public void RunAndGetExitCode_PublishesReportPortalResultsBeforeDisposingExecutions()
+    {
+        using var scope = BuildScope();
+        var runner = new PublishOrderRunner(scope, [], Globals.Logger, new Mock<Serilog.ILogger>().Object);
+
+        var exitCode = runner.RunAndGetExitCode();
+
+        Assert.That(exitCode, Is.Zero);
+        Assert.That(runner.Calls,
+            Is.EqualTo(new[]
+            {
+                "setup",
+                "build",
+                "start",
+                "publish-reportportal",
+                "dispose-executions",
+                "teardown",
+                "dispose"
+            }));
     }
 
     [Test]
@@ -655,33 +721,6 @@ public class RunnerBehaviorTests
     }
 
     [Test]
-    public void BuildExecutions_WithMixedSystems_AssignsDifferentReportPortalDescriptorsPerSystem()
-    {
-        using var scope = BuildScope();
-        var builders = new List<ExecutionBuilder>
-        {
-            CreateTemplateExecutionBuilder("case-1", team: "Smoke", system: "QaaS", reportPortalEnabled: true),
-            CreateTemplateExecutionBuilder("case-2", team: "Smoke", system: "Smooth", reportPortalEnabled: true)
-        };
-        var runner = new ExposedRunner(scope, builders, Globals.Logger, new Mock<Serilog.ILogger>().Object);
-
-        _ = runner.InvokeBuildExecutions();
-
-        var descriptorField = typeof(ExecutionBuilder)
-            .GetField("_reportPortalRunDescriptor", BindingFlags.Instance | BindingFlags.NonPublic)!;
-        var firstDescriptor = (ReportPortalLaunchDescriptor?)descriptorField.GetValue(builders[0]);
-        var secondDescriptor = (ReportPortalLaunchDescriptor?)descriptorField.GetValue(builders[1]);
-
-        Assert.That(firstDescriptor, Is.Not.Null);
-        Assert.That(secondDescriptor, Is.Not.Null);
-        Assert.That(secondDescriptor, Is.Not.SameAs(firstDescriptor));
-        Assert.That(firstDescriptor!.TeamName, Is.EqualTo("Smoke"));
-        Assert.That(secondDescriptor!.TeamName, Is.EqualTo("Smoke"));
-        Assert.That(firstDescriptor.SystemName, Is.EqualTo("QaaS"));
-        Assert.That(secondDescriptor.SystemName, Is.EqualTo("Smooth"));
-    }
-
-    [Test]
     public void StartExecutions_WithNoExecutions_ReturnsZero()
     {
         using var scope = BuildScope();
@@ -716,12 +755,10 @@ public class RunnerBehaviorTests
         Assert.That(runner.Disposed, Is.True);
     }
 
-    private static ILifetimeScope BuildScope(bool registerReportPortalLaunchManager = false)
+    private static ILifetimeScope BuildScope()
     {
         var builder = new ContainerBuilder();
         builder.RegisterType<AllureWrapper>().SingleInstance();
-        if (registerReportPortalLaunchManager)
-            builder.RegisterType<ReportPortalLaunchManager>().SingleInstance();
         return builder.Build().BeginLifetimeScope();
     }
 

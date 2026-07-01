@@ -22,7 +22,7 @@ Top-level project of the Runner solution. Owns:
 | Type | File | Purpose |
 |---|---|---|
 | `Bootstrap` | `Bootstrap.cs` | Static `New(args)` factory. Builds the Autofac container, wires modules, returns a `Runner`. |
-| `Runner` | `Runner.cs` | `Run()` / `RunAndGetExitCode()` — drives the configured execution to completion. |
+| `Runner` | `Runner.cs` | `Run()` / `RunAndGetExitCode()` — prepares execution builders, validates ReportPortal access, drives execution, and final-publishes queued ReportPortal launches during cleanup. |
 | `Execution` | `Execution.cs` | Encapsulates a built run; disposable. |
 | `ExecutionBuilder` | `ExecutionBuilder.cs` | The fluent root builder. `Build()` calls `BuildDataSources/Sessions/Assertions/Storages/Links` in order. |
 | `IExecutionBuilderConfigurator` | same name | Plug-in seam letting host apps mutate the builder before `Build()`. |
@@ -47,6 +47,8 @@ help text; verb classes inherit a common base for shared options
 - Storage implementations.
 - Logger (Serilog) per `QaaS.Framework.Executions.ExecutionLogging`.
 - Configuration loaders (YAML + placeholder/reference parsers).
+- ReportPortal has one runner-owned publisher: reporters queue results locally,
+  then `Runner` validates read-only before sessions and publishes at cleanup without a container-managed ReportPortal client.
 
 ## Conventions
 

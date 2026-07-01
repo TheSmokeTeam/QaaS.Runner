@@ -1,0 +1,483 @@
+using System.Net;
+using System.Net.Http.Headers;
+using System.Text.Json;
+using Microsoft.Extensions.Logging;
+using QaaS.Framework.Configurations.CustomExceptions;
+using ReportPortal.Client;
+using ReportPortal.Client.Abstractions;
+using ReportPortal.Client.Abstractions.Models;
+using ReportPortal.Client.Abstractions.Requests;
+
+namespace QaaS.Runner.Assertions.Reporters.ReportPortal;
+
+/// <summary>
+/// Runner-owned ReportPortal coordinator that validates access before execution and publishes queued reporter results during cleanup.
+/// </summary>
+internal class ReportPortalPublisher(ILogger logger) : IDisposable
+{
+    private readonly HttpClient _validationHttpClient = new();
+    private readonly DateTimeOffset _startedAtLocal = DateTimeOffset.Now;
+    private readonly HashSet<string> _validatedGroupKeys = new(StringComparer.Ordinal);
+    private bool _validationHttpClientDisposed;
+
+    /// <summary>
+    /// Validates every enabled ReportPortal launch group without creating launches or writing items.
+    /// </summary>
+    /// <remarks>
+    /// The runner calls this after executions are built and before sessions start. Configuration or access failures are
+    /// reported as <see cref="InvalidConfigurationsException" /> so the run stops before test execution.
+    /// </remarks>
+    /// <param name="reporters">The ReportPortal reporters built for this runner invocation.</param>
+    /// <param name="cancellationToken">A token that cancels read-only ReportPortal access checks.</param>
+    public virtual async Task ValidateAsync(IEnumerable<ReportPortalReporter> reporters,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(reporters);
+
+        try
+        {
+            await ValidateReportersAsync(reporters, cancellationToken).ConfigureAwait(false);
+        }
+        finally
+        {
+            Dispose();
+        }
+    }
+
+    /// <summary>
+    /// Publishes queued ReportPortal assertion results for the launch groups that passed pre-run validation.
+    /// </summary>
+    /// <remarks>
+    /// The runner calls this during cleanup before execution scopes are disposed. A ReportPortal client is created only
+    /// inside this method, and final publish failures are logged as warnings without changing the assertion exit code.
+    /// </remarks>
+    /// <param name="reporters">The ReportPortal reporters that queued assertion results during execution.</param>
+    /// <param name="cancellationToken">A token that cancels final ReportPortal publish operations.</param>
+    public virtual async Task PublishAsync(IEnumerable<ReportPortalReporter> reporters,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(reporters);
+
+        var launchPlans = ReportPortalLaunchPlan.Build(reporters, _startedAtLocal, requireQueuedResults: true);
+        if (launchPlans.Count == 0)
+        {
+            logger.LogDebug("ReportPortal final publish skipped because no assertion results were queued.");
+            return;
+        }
+
+        foreach (var launchPlan in launchPlans)
+        {
+            await PublishLaunch(launchPlan, cancellationToken).ConfigureAwait(false);
+        }
+    }
+
+    /// <summary>
+    /// Builds validation launch plans and skips validation when no ReportPortal reporters are enabled.
+    /// </summary>
+    private async Task ValidateReportersAsync(IEnumerable<ReportPortalReporter> reporters,
+        CancellationToken cancellationToken)
+    {
+        var launchPlans = ReportPortalLaunchPlan.Build(reporters, _startedAtLocal, requireQueuedResults: false);
+        if (launchPlans.Count == 0)
+        {
+            logger.LogDebug("ReportPortal validation skipped because no enabled ReportPortal reporters were built.");
+            return;
+        }
+
+        await ValidateLaunchPlansOrThrowAsync(launchPlans, cancellationToken).ConfigureAwait(false);
+    }
+
+    /// <summary>
+    /// Validates every launch group and throws one combined configuration failure if any group cannot publish.
+    /// </summary>
+    private async Task ValidateLaunchPlansOrThrowAsync(IReadOnlyList<ReportPortalLaunchPlan> launchPlans,
+        CancellationToken cancellationToken)
+    {
+        var failures = await CollectValidationFailuresAsync(launchPlans, cancellationToken).ConfigureAwait(false);
+        if (failures.Count > 0)
+        {
+            throw new InvalidConfigurationsException(
+                "ReportPortal validation failed before execution started." + Environment.NewLine +
+                string.Join(Environment.NewLine, failures.Distinct(StringComparer.Ordinal)));
+        }
+
+        logger.LogInformation("Validated ReportPortal access for {LaunchGroupCount} launch group(s).",
+            launchPlans.Count);
+    }
+
+    /// <summary>
+    /// Validates all launch groups while collecting each configuration failure for a single runner error.
+    /// </summary>
+    private async Task<List<string>> CollectValidationFailuresAsync(IReadOnlyList<ReportPortalLaunchPlan> launchPlans,
+        CancellationToken cancellationToken)
+    {
+        var failures = new List<string>();
+        foreach (var launchPlan in launchPlans)
+        {
+            try
+            {
+                await ValidateLaunchPlanAsync(launchPlan, cancellationToken).ConfigureAwait(false);
+            }
+            catch (InvalidConfigurationsException exception)
+            {
+                failures.Add(exception.Message);
+            }
+        }
+
+        return failures;
+    }
+
+    /// <summary>
+    /// Validates one launch group and remembers successful access for cleanup-time publishing.
+    /// </summary>
+    private async Task ValidateLaunchPlanAsync(ReportPortalLaunchPlan launchPlan, CancellationToken cancellationToken)
+    {
+        await ValidateCoreAsync(launchPlan, cancellationToken).ConfigureAwait(false);
+        _validatedGroupKeys.Add(launchPlan.GroupKey);
+    }
+
+    /// <summary>
+    /// Checks the normalized endpoint, API key, and project visibility without creating a ReportPortal client service.
+    /// </summary>
+    private async Task ValidateCoreAsync(
+        ReportPortalLaunchPlan launchPlan,
+        CancellationToken cancellationToken)
+    {
+        var projectName = GetProjectName(launchPlan);
+        var endpointUri = GetEndpointUri(launchPlan);
+        var apiKey = GetApiKey(launchPlan, projectName);
+
+        try
+        {
+            using var response = await SendProjectLookupAsync(endpointUri, projectName, apiKey, cancellationToken)
+                .ConfigureAwait(false);
+            var responseBody = await response.Content.ReadAsStringAsync(cancellationToken).ConfigureAwait(false);
+
+            EnsureProjectLookupSucceeded(response, responseBody, endpointUri, projectName);
+            EnsureReadableProjectPayload(launchPlan, responseBody, projectName);
+        }
+        catch (TaskCanceledException)
+        {
+            var warningMessage =
+                $"Could not publish results to ReportPortal because the endpoint `{launchPlan.Endpoint}` timed out.";
+            logger.LogWarning(warningMessage);
+            throw new InvalidConfigurationsException(warningMessage);
+        }
+        catch (HttpRequestException exception)
+        {
+            var warningMessage =
+                $"Could not publish results to ReportPortal because the endpoint `{launchPlan.Endpoint}` is unreachable. {exception.Message}";
+            logger.LogWarning(warningMessage);
+            throw new InvalidConfigurationsException(warningMessage);
+        }
+        catch (JsonException exception)
+        {
+            var warningMessage =
+                $"Could not publish results to ReportPortal because the endpoint `{launchPlan.Endpoint}` returned an unreadable project payload. {exception.Message}";
+            logger.LogWarning(warningMessage);
+            throw new InvalidConfigurationsException(warningMessage);
+        }
+    }
+
+    private string GetProjectName(ReportPortalLaunchPlan launchPlan)
+    {
+        if (!string.IsNullOrWhiteSpace(launchPlan.Project))
+            return launchPlan.Project;
+
+        const string warningMessage =
+            "Could not publish results to ReportPortal because ReportPortal.Project was configured as an empty value.";
+        logger.LogWarning(warningMessage);
+        throw new InvalidConfigurationsException(warningMessage);
+    }
+
+    private Uri GetEndpointUri(ReportPortalLaunchPlan launchPlan)
+    {
+        if (launchPlan.TryGetEndpointUri(out var endpointUri, out var endpointFailureReason))
+            return endpointUri!;
+
+        var warningMessage = $"Could not publish results to ReportPortal: {endpointFailureReason}";
+        logger.LogWarning(warningMessage);
+        throw new InvalidConfigurationsException(warningMessage);
+    }
+
+    private string GetApiKey(ReportPortalLaunchPlan launchPlan, string projectName)
+    {
+        if (!string.IsNullOrWhiteSpace(launchPlan.ApiKey))
+            return launchPlan.ApiKey;
+
+        var warningMessage =
+            $"Could not publish results to ReportPortal project `{projectName}` because ReportPortal.ApiKey was not configured.";
+        logger.LogWarning(warningMessage);
+        throw new InvalidConfigurationsException(warningMessage);
+    }
+
+    /// <summary>
+    /// Builds and sends the ReportPortal project lookup request used by read-only validation.
+    /// </summary>
+    private async Task<HttpResponseMessage> SendProjectLookupAsync(Uri endpointUri, string projectName, string apiKey,
+        CancellationToken cancellationToken)
+    {
+        using var request = new HttpRequestMessage(HttpMethod.Get,
+            new Uri(endpointUri, $"v1/project/{Uri.EscapeDataString(projectName)}"));
+        request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", apiKey);
+        request.Headers.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
+
+        return await SendValidationRequestAsync(request, cancellationToken).ConfigureAwait(false);
+    }
+
+    /// <summary>
+    /// Sends the read-only ReportPortal project lookup used during pre-run validation.
+    /// </summary>
+    protected virtual Task<HttpResponseMessage> SendValidationRequestAsync(HttpRequestMessage request,
+        CancellationToken cancellationToken)
+    {
+        return _validationHttpClient.SendAsync(request, cancellationToken);
+    }
+
+    /// <summary>
+    /// Converts ReportPortal project lookup HTTP failures into runner configuration failures.
+    /// </summary>
+    private void EnsureProjectLookupSucceeded(HttpResponseMessage response, string responseBody, Uri endpointUri,
+        string projectName)
+    {
+        if (response.StatusCode is HttpStatusCode.Unauthorized or HttpStatusCode.Forbidden)
+        {
+            var warningMessage =
+                $"Could not publish results to ReportPortal because the configured API key was rejected for project `{projectName}`.";
+            logger.LogWarning(warningMessage);
+            throw new InvalidConfigurationsException(warningMessage);
+        }
+
+        if (response.IsSuccessStatusCode)
+            return;
+
+        var failureMessage = response.StatusCode == HttpStatusCode.NotFound
+            ? $"Could not publish results to ReportPortal because no accessible project matches `{projectName}`."
+            : $"Could not publish results to ReportPortal at {endpointUri} for project `{projectName}`. Status={(int)response.StatusCode} {response.ReasonPhrase}. Response={responseBody}";
+        logger.LogWarning(failureMessage);
+        throw new InvalidConfigurationsException(failureMessage);
+    }
+
+    /// <summary>
+    /// Verifies the project lookup response has the expected project payload shape.
+    /// </summary>
+    private void EnsureReadableProjectPayload(ReportPortalLaunchPlan launchPlan, string responseBody,
+        string projectName)
+    {
+        using var projectPayload = JsonDocument.Parse(responseBody);
+        JsonElement projectNameElement;
+        var hasProjectName =
+            projectPayload.RootElement.TryGetProperty("projectName", out projectNameElement) ||
+            projectPayload.RootElement.TryGetProperty("ProjectName", out projectNameElement);
+        var projectNameFromPayload = hasProjectName && projectNameElement.ValueKind == JsonValueKind.String
+            ? projectNameElement.GetString()
+            : null;
+
+        if (!string.IsNullOrWhiteSpace(projectNameFromPayload))
+            return;
+
+        var warningMessage =
+            $"Could not publish results to ReportPortal because the endpoint `{launchPlan.Endpoint}` returned an unreadable project payload for project `{projectName}`.";
+        logger.LogWarning(warningMessage);
+        throw new InvalidConfigurationsException(warningMessage);
+    }
+
+    /// <summary>
+    /// Opens a short-lived ReportPortal client, writes one grouped launch, and disposes the client immediately after.
+    /// </summary>
+    private async Task PublishLaunch(ReportPortalLaunchPlan launchPlan, CancellationToken cancellationToken)
+    {
+        if (!TryGetPublishAccess(launchPlan, out var endpointUri, out var projectName, out var apiKey))
+            return;
+
+        await PublishLaunchWithClient(endpointUri, projectName, apiKey, launchPlan, cancellationToken)
+            .ConfigureAwait(false);
+    }
+
+    /// <summary>
+    /// Rechecks that a launch group passed validation and still has the minimum publish configuration.
+    /// </summary>
+    private bool TryGetPublishAccess(ReportPortalLaunchPlan launchPlan, out Uri endpointUri, out string projectName,
+        out string apiKey)
+    {
+        endpointUri = default!;
+        projectName = launchPlan.Project;
+        apiKey = string.Empty;
+
+        if (!_validatedGroupKeys.Contains(launchPlan.GroupKey))
+        {
+            logger.LogWarning(
+                "Skipping ReportPortal publish for project {ProjectName} and system {SystemName} because the launch group was not validated successfully.",
+                launchPlan.Project,
+                launchPlan.System);
+            return false;
+        }
+
+        if (!launchPlan.TryGetEndpointUri(out var normalizedEndpointUri, out var endpointFailureReason) ||
+            string.IsNullOrWhiteSpace(launchPlan.Project) ||
+            string.IsNullOrWhiteSpace(launchPlan.ApiKey))
+        {
+            logger.LogWarning(
+                "Skipping ReportPortal publish for project {ProjectName} and system {SystemName} because the launch group no longer has valid publish access. Reason={FailureReason}",
+                launchPlan.Project,
+                launchPlan.System,
+                endpointFailureReason ?? "Missing ReportPortal project or API key.");
+            return false;
+        }
+
+        endpointUri = normalizedEndpointUri!;
+        projectName = launchPlan.Project;
+        apiKey = launchPlan.ApiKey;
+        return true;
+    }
+
+    /// <summary>
+    /// Creates a short-lived ReportPortal client and owns all warning-only final publish handling for one launch.
+    /// </summary>
+    private async Task PublishLaunchWithClient(Uri endpointUri, string projectName, string apiKey,
+        ReportPortalLaunchPlan launchPlan, CancellationToken cancellationToken)
+    {
+        IClientService? service = null;
+        string? launchUuid = null;
+        try
+        {
+            service = CreateClient(endpointUri, projectName, apiKey);
+            var launchStartTimeUtc = DateTime.UtcNow;
+            launchUuid = await StartLaunchAsync(service, launchPlan, projectName, launchStartTimeUtc,
+                cancellationToken).ConfigureAwait(false);
+
+            await PublishLaunchItems(service, launchPlan, projectName, launchUuid, launchStartTimeUtc,
+                    cancellationToken)
+                .ConfigureAwait(false);
+        }
+        catch (Exception exception)
+        {
+            logger.LogWarning(exception,
+                "Could not publish ReportPortal launch {LaunchUuid} for project {ProjectName} and system {SystemName}.",
+                launchUuid ?? "<not-started>",
+                projectName,
+                launchPlan.System);
+        }
+        finally
+        {
+            DisposeService(service, projectName, launchPlan.System);
+        }
+    }
+
+    /// <summary>
+    /// Creates the short-lived ReportPortal client used only during final publishing.
+    /// </summary>
+    protected virtual IClientService CreateClient(Uri endpointUri, string project, string apiKey)
+    {
+        return new Service(endpointUri, project, apiKey);
+    }
+
+    /// <summary>
+    /// Starts a ReportPortal launch and returns the launch UUID needed by item and finish calls.
+    /// </summary>
+    private async Task<string> StartLaunchAsync(IClientService service, ReportPortalLaunchPlan launchPlan,
+        string projectName, DateTime launchStartTimeUtc, CancellationToken cancellationToken)
+    {
+        var launch = await service.Launch.StartAsync(new StartLaunchRequest
+        {
+            Name = launchPlan.LaunchName,
+            Description = launchPlan.Description,
+            Mode = launchPlan.DebugMode ? LaunchMode.Debug : LaunchMode.Default,
+            StartTime = launchStartTimeUtc,
+            Attributes = launchPlan.BuildLaunchAttributes()
+        }, cancellationToken).ConfigureAwait(false);
+
+        logger.LogInformation(
+            "Started ReportPortal launch {LaunchUuid} in project {ProjectName} for system {SystemName}.",
+            launch.Uuid, projectName, launchPlan.System);
+
+        return launch.Uuid;
+    }
+
+    /// <summary>
+    /// Publishes queued assertion items and then finishes the launch.
+    /// </summary>
+    private async Task PublishLaunchItems(IClientService service, ReportPortalLaunchPlan launchPlan,
+        string projectName, string launchUuid, DateTime launchStartTimeUtc, CancellationToken cancellationToken)
+    {
+        PublishQueuedItems(service, launchUuid, launchStartTimeUtc, launchPlan);
+
+        await FinishLaunchAsync(service, launchUuid, projectName, launchPlan.System, cancellationToken)
+            .ConfigureAwait(false);
+    }
+
+    /// <summary>
+    /// Delegates queued assertion publishing back to each passive reporter in the grouped launch.
+    /// </summary>
+    private void PublishQueuedItems(IClientService service, string launchUuid, DateTime launchStartTimeUtc,
+        ReportPortalLaunchPlan launchPlan)
+    {
+        var publishContext = new ReportPortalPublishContext(service, launchUuid, launchStartTimeUtc, launchPlan);
+        foreach (var reporterResults in launchPlan.ReporterResults)
+        {
+            reporterResults.Reporter.PublishQueuedResults(publishContext, reporterResults.Results, logger);
+        }
+    }
+
+    /// <summary>
+    /// Finishes a ReportPortal launch while keeping cleanup-time finish failures warning-only.
+    /// </summary>
+    private async Task FinishLaunchAsync(IClientService service, string launchUuid, string projectName,
+        string systemName, CancellationToken cancellationToken)
+    {
+        try
+        {
+            await service.Launch.FinishAsync(launchUuid, new FinishLaunchRequest
+            {
+                EndTime = DateTime.UtcNow
+            }, cancellationToken).ConfigureAwait(false);
+            logger.LogInformation(
+                "Finished ReportPortal launch {LaunchUuid} in project {ProjectName} for system {SystemName}.",
+                launchUuid, projectName, systemName);
+        }
+        catch (Exception exception)
+        {
+            logger.LogWarning(exception,
+                "Could not finish ReportPortal launch {LaunchUuid} in project {ProjectName}.",
+                launchUuid, projectName);
+        }
+    }
+
+    /// <summary>
+    /// Disposes the short-lived ReportPortal client while keeping dispose failures warning-only.
+    /// </summary>
+    private void DisposeService(IClientService? service, string projectName, string systemName)
+    {
+        if (service is not IDisposable disposableService)
+            return;
+
+        try
+        {
+            disposableService.Dispose();
+        }
+        catch (Exception exception)
+        {
+            logger.LogWarning(exception,
+                "Could not dispose ReportPortal client service for project {ProjectName} and system {SystemName}.",
+                projectName, systemName);
+        }
+    }
+
+    /// <summary>
+    /// Releases the owned validation HTTP client, if this publisher created it.
+    /// </summary>
+    public void Dispose()
+    {
+        if (_validationHttpClientDisposed)
+            return;
+
+        _validationHttpClientDisposed = true;
+        _validationHttpClient.Dispose();
+    }
+}
+
+internal sealed record ReportPortalPublishContext(
+    IClientService Service,
+    string LaunchUuid,
+    DateTime LaunchStartTimeUtc,
+    ReportPortalLaunchPlan LaunchPlan);

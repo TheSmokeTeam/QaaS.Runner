@@ -19,16 +19,14 @@ public static class ContextMetadataExtensions
 
         context.InternalGlobalDict ??= new Dictionary<string, object?>();
         var metadataPath = context.GetMetaDataPath();
-        var metadataKey = metadataPath.Last();
 
-        if (context.InternalGlobalDict.TryGetValue(metadataKey, out var configuredMetaData) &&
+        if (TryGetValueFromGlobalDictionary(context, metadataPath, out var configuredMetaData) &&
             configuredMetaData is MetaDataConfig metaDataConfig)
         {
             return metaDataConfig;
         }
 
-        if (context.InternalGlobalDict.TryGetValue(metadataKey, out configuredMetaData) &&
-            configuredMetaData is not null)
+        if (configuredMetaData is not null)
         {
             context.Logger.LogWarning(
                 "MetaData entry at path {MetaDataPath} had unexpected type {MetaDataType}; replacing it with an empty configuration.",
@@ -42,5 +40,19 @@ public static class ContextMetadataExtensions
         var fallbackMetaData = new MetaDataConfig();
         context.InsertValueIntoGlobalDictionary(metadataPath, fallbackMetaData);
         return fallbackMetaData;
+    }
+
+    private static bool TryGetValueFromGlobalDictionary(InternalContext context, List<string> path, out object? value)
+    {
+        try
+        {
+            value = context.GetValueFromGlobalDictionary(path);
+            return true;
+        }
+        catch (KeyNotFoundException)
+        {
+            value = null;
+            return false;
+        }
     }
 }

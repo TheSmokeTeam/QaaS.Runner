@@ -1,11 +1,15 @@
 using System;
 using System.Collections.Immutable;
 using System.Collections.Generic;
+using System.IO;
 using System.Linq;
 using System.Reflection;
+using System.Text;
 using Microsoft.Extensions.Configuration;
 using NUnit.Framework;
+using QaaS.Framework.SDK;
 using QaaS.Framework.SDK.ContextObjects;
+using QaaS.Framework.SDK.Extensions;
 using QaaS.Framework.SDK.Hooks.Assertion;
 using QaaS.Framework.SDK.Session.SessionDataObjects;
 using QaaS.Runner.Assertions.AssertionObjects;
@@ -14,6 +18,7 @@ using QaaS.Runner.Assertions.ConfigurationObjects.ReporterConfigs;
 using QaaS.Runner.Assertions.Reporters;
 using QaaS.Runner.Assertions.Reporters.ReportPortal;
 using QaaS.Runner.Assertions.Tests.Mocks;
+using QaaS.Runner.Infrastructure;
 using ReportPortal.Client.Abstractions.Models;
 
 namespace QaaS.Runner.Assertions.Tests;
@@ -24,8 +29,7 @@ public class ReportPortalReporterTests
     [Test]
     public void ReporterHelpers_WithDifferentAssertionConfigurations_UseEachAssertionOptions()
     {
-        using var launchManager = new ReportPortalLaunchManager();
-        var reporter = CreateReporter(launchManager);
+        var reporter = CreateReporter();
         var sessionData = new SessionData
         {
             Name = "session-a",
@@ -56,17 +60,109 @@ public class ReportPortalReporterTests
         });
     }
 
-    private static ReportPortalReporter CreateReporter(ReportPortalLaunchManager launchManager)
+    [Test]
+    public void BuildSessionLogArtifact_WhenSaveLogsEnabled_ReturnsStoredSessionLog()
     {
+        var reporter = CreateReporter();
+        reporter.SaveLogs = true;
+        reporter.Context.AppendSessionLog("session-a", "Starting session-a");
+        reporter.Context.AppendSessionLog("session-a", "Completed session-a");
+        var sessionData = new SessionData
+        {
+            Name = "session-a"
+        };
+        var assertion = new Assertion
+        {
+            SaveLogs = false
+        };
+
+        var artifact = BuildSessionLogArtifact(reporter, sessionData, assertion);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(artifact, Is.Not.Null);
+            Assert.That(artifact!.Name, Is.EqualTo("session-a.log"));
+            Assert.That(artifact.RelativePath, Is.EqualTo(Path.Combine("SessionLogs", "session-a.log")));
+            Assert.That(artifact.ContentType, Is.EqualTo("text/plain"));
+            Assert.That(Encoding.UTF8.GetString(artifact.Content), Does.Contain("Starting session-a"));
+            Assert.That(Encoding.UTF8.GetString(artifact.Content), Does.Contain("Completed session-a"));
+        });
+    }
+
+    [Test]
+    public void BuildSessionLogArtifact_WhenSaveLogsDisabled_ReturnsNull()
+    {
+        var reporter = CreateReporter();
+        reporter.SaveLogs = false;
+        reporter.Context.AppendSessionLog("session-a", "Starting session-a");
+        var sessionData = new SessionData
+        {
+            Name = "session-a"
+        };
+        var assertion = new Assertion
+        {
+            SaveLogs = true
+        };
+
+        var artifact = BuildSessionLogArtifact(reporter, sessionData, assertion);
+
+        Assert.That(artifact, Is.Null);
+    }
+
+    [Test]
+    public void BuildSessionLogArtifact_WhenAssertionSaveLogsEnabled_ReturnsStoredSessionLog()
+    {
+        var reporter = CreateReporter();
+        reporter.Context.AppendSessionLog("session-a", "Starting session-a");
+        var sessionData = new SessionData
+        {
+            Name = "session-a"
+        };
+        var assertion = new Assertion
+        {
+            SaveLogs = true
+        };
+
+        var artifact = BuildSessionLogArtifact(reporter, sessionData, assertion);
+
+        Assert.That(artifact, Is.Not.Null);
+    }
+
+    [Test]
+    public void WriteTestResults_QueuesResultsWithoutPublishing()
+    {
+        var reporter = CreateReporter();
+        var result = CreateAssertionResult("queued", AssertionSeverity.Normal, false, true, "trace",
+            new SessionData { Name = "session-a" });
+
+        reporter.WriteTestResults(result);
+
+        Assert.That(reporter.GetQueuedResultsSnapshot(), Is.EqualTo(new[] { result }));
+    }
+
+    private static ReportPortalReporter CreateReporter()
+    {
+        ReportPortalConfig.RegisterDefaults(enabled: false);
+        var context = new InternalContext
+        {
+            Logger = Globals.Logger,
+            RootConfiguration = new ConfigurationBuilder().Build()
+        };
+        context.InsertValueIntoGlobalDictionary(context.GetMetaDataPath(), new MetaDataConfig
+        {
+            Team = "Smoke",
+            System = "QaaS"
+        });
+
         return new ReportPortalReporter
         {
-            Settings = CreateReportPortalSettings(),
-            LaunchManager = launchManager,
-            Context = new Context
+            Config = new ReportPortalConfig
             {
-                Logger = Globals.Logger,
-                RootConfiguration = new ConfigurationBuilder().Build()
+                Enabled = true,
+                Endpoint = "https://reportportal.local/api/",
+                ApiKey = "api-key"
             },
+            Context = context,
             Severity = AssertionSeverity.Normal
         };
     }
@@ -103,6 +199,14 @@ public class ReportPortalReporterTests
         return (ReportArtifact?)method.Invoke(reporter, [sessionData, assertion]);
     }
 
+    private static ReportArtifact? BuildSessionLogArtifact(ReportPortalReporter reporter, SessionData sessionData,
+        Assertion assertion)
+    {
+        var method = typeof(BaseReporter)
+            .GetMethod("BuildSessionLogArtifact", BindingFlags.Instance | BindingFlags.NonPublic)!;
+        return (ReportArtifact?)method.Invoke(reporter, [sessionData, assertion]);
+    }
+
     private static AssertionTextDetails BuildAssertionTextDetails(ReportPortalReporter reporter,
         AssertionResult assertionResult)
     {
@@ -115,23 +219,12 @@ public class ReportPortalReporterTests
     {
         var method = typeof(ReportPortalReporter)
             .GetMethod("BuildItemAttributes", BindingFlags.Instance | BindingFlags.NonPublic)!;
-        var attributes = (IList<ItemAttribute>)method.Invoke(reporter, [assertionResult])!;
+        reporter.WriteTestResults(assertionResult);
+        var launchPlan = ReportPortalLaunchPlan.Build(
+            [reporter],
+            new DateTimeOffset(2025, 1, 1, 10, 0, 0, TimeSpan.Zero),
+            requireQueuedResults: true).Single();
+        var attributes = (IList<ItemAttribute>)method.Invoke(reporter, [assertionResult, launchPlan])!;
         return attributes.Single(attribute => attribute.Key == "severity").Value;
-    }
-
-    private static ReportPortalSettings CreateReportPortalSettings()
-    {
-        return new ReportPortalSettings(
-            true,
-            "https://reportportal.local/api/",
-            "api-key",
-            "Smoke",
-            "QaaS",
-            [],
-            null,
-            null,
-            false,
-            new Dictionary<string, string>(),
-            null);
     }
 }

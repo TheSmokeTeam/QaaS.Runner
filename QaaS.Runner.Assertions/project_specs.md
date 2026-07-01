@@ -20,19 +20,17 @@ Assertion engine and reporter dispatcher.
 | `IReporter` | Abstraction for downstream reporting backends. |
 | `BaseReporter` | Shared scaffolding — open/close test, attach files, hash-dedup. |
 | `AllureReporter` (~35 KB) | Allure-format JSON + attachments. Attachments deduplicated via `ConcurrentDictionary`. |
-| `ReportPortalReporter` | Passive ReportPortal integration (PR #32). |
+| `ReportPortalReporter` | Passive ReportPortal reporter that queues assertion-result references for runner-owned final publishing. |
 | `AssertionObjects/*` | Builder + runtime wrapper around an `IAssertion` hook. |
-| `LinkBuilders/*` | Builders that compose external links into the report (Jira, Confluence, custom). |
+| `LinkBuilders/*` | Builders that compose Grafana, Kibana, and Prometheus links into the report. |
 | `ConfigurationObjects/*` | YAML-bound config records for assertions and reporters. |
 
 ## Reporter selection
 
-Reporter type is configured per assertion (or globally) and routed in
-`ReportLogic`. Recent changes:
-
-- `06e23d1` — shared reporter instances across assertions.
-- `4876603` — reuse reporters between runs of the same configured type.
-- `9da3c76` — route by configured type rather than hard-coded order.
+Reporter type is configured per assertion and routed in `ReportLogic`.
+Allure writes immediately. ReportPortal queues locally during execution; one
+runner-owned publisher validates access read-only before sessions start and
+publishes grouped launches at cleanup.
 
 ## Concurrency
 

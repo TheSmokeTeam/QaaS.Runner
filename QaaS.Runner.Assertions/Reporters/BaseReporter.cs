@@ -24,6 +24,7 @@ public abstract class BaseReporter : IReporter
     protected const string TraceDisplayFalseMessage = "Assertion configured to not display assertion trace",
         QaaSTag = "QaaS",
         RawDataAttachmentType = "application/octet-stream",
+        TextAttachmentType = "text/plain",
         JsonAttachmentType = "application/json",
         XmlAttachmentType = "application/xml",
         YamlAttachmentType = "application/yaml",
@@ -104,6 +105,25 @@ public abstract class BaseReporter : IReporter
                     DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull
                 }),
             JsonAttachmentType);
+    }
+
+    /// <summary>
+    /// Builds a text artifact containing one stored session log when log export is enabled.
+    /// </summary>
+    protected ReportArtifact? BuildSessionLogArtifact(SessionData sessionData, Assertion assertion)
+    {
+        if (!ShouldSaveLogs(assertion))
+            return null;
+
+        var sessionLog = Context.GetSessionLog(sessionData.Name);
+        if (string.IsNullOrWhiteSpace(sessionLog))
+            return null;
+
+        return new ReportArtifact(
+            $"{sessionData.Name}.log",
+            Path.Combine("SessionLogs", $"{sessionData.Name}.log"),
+            Encoding.UTF8.GetBytes(sessionLog),
+            TextAttachmentType);
     }
 
     /// <summary>

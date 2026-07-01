@@ -125,8 +125,9 @@ Top-level: `MetaData`, `Variables`, `Links`, `Storages`, `DataSources`,
   `IImmutableList<SessionData>`, collecting `AssertionResult`s.
 - `StorageLogic` (act/assert split) optionally persists/restores
   `SessionData` between phases.
-- `ReportLogic` selects reporters by type (`Allure`, `ReportPortal`) and
-  flushes attachments.
+- `ReportLogic` selects reporters by type (`Allure`, `ReportPortal`).
+  Allure writes immediately; ReportPortal queues assertion results locally
+  for runner-owned final publishing.
 - Exit code: `0` pass, `1` assertion fail, `2` configuration / parse error.
 
 ### 5.3 Concurrency invariants
@@ -160,8 +161,10 @@ DataAnnotations.
 - `IReporter` abstraction in `QaaS.Runner.Assertions`.
 - `AllureReporter` writes Allure JSON + attachments. Attachments are
   deduplicated through a `ConcurrentDictionary<hash, path>`.
-- `ReportPortalReporter` provides passive (post-run) reporting; selected
-  by `ReporterType` in YAML.
+- `ReportPortalReporter` provides passive reporting: it queues assertion
+  results during `ReportLogic`; one runner-owned publisher validates
+  ReportPortal access before execution and publishes grouped launches at
+  cleanup before execution scopes are disposed.
 - Recent change: reporters are **shared** across assertions rather than
   rebuilt per-assertion (see `06e23d1`, `4876603`, `9da3c76`).
 

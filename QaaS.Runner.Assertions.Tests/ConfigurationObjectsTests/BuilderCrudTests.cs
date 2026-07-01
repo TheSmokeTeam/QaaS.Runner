@@ -13,10 +13,7 @@ public class BuilderCrudTests
     [Test]
     public void AssertionBuilder_ShouldSupportSessionDataSourceLinkAndConfigurationCrud()
     {
-        var builder = new AssertionBuilder
-        {
-            AssertionInstance = null!
-        };
+        var builder = new AssertionBuilder();
 
         builder.AddSessionName("session-a")
             .AddSessionPattern("^session-.*$")

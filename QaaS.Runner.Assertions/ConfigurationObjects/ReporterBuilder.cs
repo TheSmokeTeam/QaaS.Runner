@@ -11,67 +11,100 @@ using YamlDotNet.Serialization;
 
 namespace QaaS.Runner.Assertions.ConfigurationObjects;
 
+/// <summary>
+/// Builder for configuring reporter behavior for assertion results.
+/// </summary>
 public class ReporterBuilder : IYamlConvertible, ICloneable<ReporterBuilder>
 {
-    public ReporterBuilder Clone() 
-    {
-        var clone = BuilderCloner.DeepClone(this);
-        clone.ReportPortalLaunchManager = ReportPortalLaunchManager;
-        return clone;
-    }
-    
-    [Description("Whether to save the session logs belonging to the assertion in the test report")]
+    public ReporterBuilder Clone() => BuilderCloner.DeepClone(this);
+
+    [Description("Whether to save the session logs belonging to the assertions in the test report. " +
+                 "If not set, each assertion will determine whether to save them.")]
     [DefaultValue(null)]
     public bool? SaveLogs { get; internal set; }
 
-    [Description("Whether to save the attachments of the assertion in the test report (true) or not (false)")]
+    [Description("Whether to save the attachments belonging to the assertions in the test report. " +
+                 "If not set, each assertion will determine whether to save them.")]
     [DefaultValue(null)]
     public bool? SaveAttachments { get; internal set; }
 
-    [Description("Whether to save the configuration template in the test report (true) or not (false)")]
+    [Description("Whether to save the configuration template belonging to the assertions in the test report. " +
+                 "If not set, each assertion will determine whether to save it.")]
     [DefaultValue(null)]
     public bool? SaveTemplate { get; internal set; }
 
-    [Description("Whether to save the data of the session's belonging to this assertion in the test report")]
+    [Description("Whether to save the session data belonging to the assertions in the test report. " +
+                 "If not set, each assertion will determine whether to save it.")]
     [DefaultValue(null)]
     public bool? SaveSessionData { get; internal set; }
 
-    [Description("Whether to display the assertion's message trace in the assertion results or not." +
-                 " Should be set to false when the assertion trace is massive and displaying it can cause performance issues")]
+    [Description("Whether to display the assertion message trace in the assertions results. " +
+                 "If not set, each assertion will determine whether to display it.")]
     [DefaultValue(null)]
     public bool? DisplayTrace { get; internal set; }
-    
-    [Description("The ReportPortal configuration to use for this reporter. If not set, the default ReportPortal configuration will be used.")]
+
+    [Description("ReportPortal configuration to use for this reporter. " +
+                 "If not set, the default ReportPortal configuration will be used.")]
     [DefaultValue(typeof(ReportPortalConfig))]
     public ReportPortalConfig? ReportPortal { get; internal set; } = new();
-    
-    internal ReportPortalLaunchManager? ReportPortalLaunchManager { get; set; }
-    internal ReportPortalLaunchDescriptor? ReportPortalRunDescriptor { get; set; }
-    
+
     /// <summary>
-    /// Configure the ReportPortal settings for this reporter. If not set, the default ReportPortal configuration will be used.
+    /// Reads the serialized configuration for the current Runner reporter builder instance.
     /// </summary>
+    /// <remarks>
+    /// This method participates in the YAML serialization surface that backs configuration-as-code support.
+    /// </remarks>
+    /// <qaas-docs group="Configuration as Code" subgroup="Reporters" />
+    public void Read(IParser parser, Type expectedType, ObjectDeserializer nestedObjectDeserializer)
+    {
+        throw new NotSupportedException(
+            $"{nameof(Read)} doesn't support custom"
+                + $" deserialization from Yaml for {nameof(ReporterBuilder)}"
+        );
+    }
+
+    /// <summary>
+    /// Writes the current Runner reporter builder configuration to the configured serializer output.
+    /// </summary>
+    /// <remarks>
+    /// This method participates in the YAML serialization surface that backs configuration-as-code support.
+    /// </remarks>
+    /// <qaas-docs group="Configuration as Code" subgroup="Reporters" />
+    public void Write(IEmitter emitter, ObjectSerializer nestedObjectSerializer)
+    {
+        nestedObjectSerializer(
+            new
+            {
+                SaveLogs,
+                SaveAttachments,
+                SaveTemplate,
+                SaveSessionData,
+                DisplayTrace,
+                ReportPortal,
+            }
+        );
+    }
+
+    /// <summary>
+    /// Sets the ReportPortal configuration used when creating a ReportPortal reporter.
+    /// </summary>
+    /// <remarks>
+    /// Use this method when working with the documented Runner reporter builder API surface in code. The change is stored on the current builder instance and is consumed by later build, validation, or execution steps.
+    /// </remarks>
+    /// <qaas-docs group="Configuration as Code" subgroup="Reporters" />
     public ReporterBuilder ConfigureReportPortal(ReportPortalConfig reportPortalConfig)
     {
         ReportPortal = reportPortalConfig;
         return this;
     }
 
-    internal ReporterBuilder WithReportPortalLaunchManager(ReportPortalLaunchManager manager)
-    {
-        ReportPortalLaunchManager = manager;
-        return this;
-    }
-    
-    internal ReporterBuilder WithReportPortalRunDescriptor(ReportPortalLaunchDescriptor descriptor)
-    {
-        ReportPortalRunDescriptor = descriptor;
-        return this;
-    }
-
     /// <summary>
-    /// Configures whether logs are saved with the reporter result.
+    /// Configures whether assertion session logs are saved with reporter results.
     /// </summary>
+    /// <remarks>
+    /// Use this method when working with the documented Runner reporter builder API surface in code. The change is stored on the current builder instance and is consumed by later build, validation, or execution steps.
+    /// </remarks>
+    /// <qaas-docs group="Configuration as Code" subgroup="Reporters" />
     public ReporterBuilder ShouldSaveLogs(bool shouldSaveLogs)
     {
         SaveLogs = shouldSaveLogs;
@@ -79,8 +112,12 @@ public class ReporterBuilder : IYamlConvertible, ICloneable<ReporterBuilder>
     }
 
     /// <summary>
-    /// Configures whether attachments are saved with the reporter result.
+    /// Configures whether assertion attachments are saved with reporter results.
     /// </summary>
+    /// <remarks>
+    /// Use this method when working with the documented Runner reporter builder API surface in code. The change is stored on the current builder instance and is consumed by later build, validation, or execution steps.
+    /// </remarks>
+    /// <qaas-docs group="Configuration as Code" subgroup="Reporters" />
     public ReporterBuilder ShouldSaveAttachments(bool shouldSaveAttachments)
     {
         SaveAttachments = shouldSaveAttachments;
@@ -88,8 +125,12 @@ public class ReporterBuilder : IYamlConvertible, ICloneable<ReporterBuilder>
     }
 
     /// <summary>
-    /// Configures whether the rendered configuration template is saved with the reporter result.
+    /// Configures whether the rendered assertion configuration template is saved with reporter results.
     /// </summary>
+    /// <remarks>
+    /// Use this method when working with the documented Runner reporter builder API surface in code. The change is stored on the current builder instance and is consumed by later build, validation, or execution steps.
+    /// </remarks>
+    /// <qaas-docs group="Configuration as Code" subgroup="Reporters" />
     public ReporterBuilder ShouldSaveTemplate(bool shouldSaveTemplate)
     {
         SaveTemplate = shouldSaveTemplate;
@@ -97,8 +138,12 @@ public class ReporterBuilder : IYamlConvertible, ICloneable<ReporterBuilder>
     }
 
     /// <summary>
-    /// Configures whether session data is saved with the reporter result.
+    /// Configures whether assertion session data is saved with reporter results.
     /// </summary>
+    /// <remarks>
+    /// Use this method when working with the documented Runner reporter builder API surface in code. The change is stored on the current builder instance and is consumed by later build, validation, or execution steps.
+    /// </remarks>
+    /// <qaas-docs group="Configuration as Code" subgroup="Reporters" />
     public ReporterBuilder ShouldSaveSessionData(bool shouldSaveSessionData)
     {
         SaveSessionData = shouldSaveSessionData;
@@ -106,19 +151,45 @@ public class ReporterBuilder : IYamlConvertible, ICloneable<ReporterBuilder>
     }
 
     /// <summary>
-    /// Configures whether the assertion trace is displayed with the reporter result.
+    /// Configures whether the assertion message trace is displayed in reporter results.
     /// </summary>
+    /// <remarks>
+    /// Use this method when working with the documented Runner reporter builder API surface in code. The behavior exposed here is part of the public surface that the generated function documentation groups under 'Configuration as Code / Reporters'.
+    /// </remarks>
+    /// <qaas-docs group="Configuration as Code" subgroup="Reporters" />
     public ReporterBuilder ShouldDisplayTrace(bool shouldDisplayTrace)
     {
         DisplayTrace = shouldDisplayTrace;
         return this;
     }
 
-    
-    internal List<IReporter> Build(Context context, DateTime testSuiteStartTimeUtc, IFileSystem? fileSystem = null)
+    /// <summary>
+    /// Builds the reporter instances that should publish assertion results for the current run.
+    /// </summary>
+    /// <remarks>
+    /// Allure is always created. ReportPortal is created only when its resolved configuration is enabled.
+    /// </remarks>
+    /// <param name="context">The QaaS execution context to attach to each reporter.</param>
+    /// <param name="testSuiteStartTimeUtc">
+    /// The UTC test-suite start time used by reporters that need an epoch-based run timestamp.
+    /// </param>
+    /// <param name="fileSystem">
+    /// Optional file-system abstraction used by reporters. When omitted, a default <see cref="FileSystem"/> is used.
+    /// </param>
+    /// <param name="executionMode">The execution mode represented by the current execution.</param>
+    /// <returns>The configured reporters for the current assertion run.</returns>
+    /// <exception cref="ArgumentOutOfRangeException">
+    /// Thrown when an unsupported <see cref="ReporterTarget"/> value is encountered.
+    /// </exception>
+    internal List<IReporter> Build(
+        Context context,
+        DateTime testSuiteStartTimeUtc,
+        IFileSystem? fileSystem = null,
+        string executionMode = "run"
+    )
     {
         var reporters = new List<IReporter>();
-        
+
         foreach (var target in Enum.GetValues<ReporterTarget>())
         {
             switch (target)
@@ -137,9 +208,9 @@ public class ReporterBuilder : IYamlConvertible, ICloneable<ReporterBuilder>
                     };
                     reporters.Add(allureReporter);
                     break;
+
                 case ReporterTarget.ReportPortal:
-                    var reportPortalSettings = ReportPortal?.Resolve(ReportPortalRunDescriptor);
-                    if (reportPortalSettings is { Enabled: true } && ReportPortalLaunchManager is not null)
+                    if (ReportPortal is { Enabled: true })
                     {
                         var reportPortalReporter = new ReportPortalReporter
                         {
@@ -150,37 +221,22 @@ public class ReporterBuilder : IYamlConvertible, ICloneable<ReporterBuilder>
                             SaveTemplate = SaveTemplate,
                             SaveSessionData = SaveSessionData,
                             FileSystem = fileSystem ?? new FileSystem(),
-                            LaunchManager = ReportPortalLaunchManager,
-                            Settings = reportPortalSettings
+                            Config = ReportPortal,
+                            ExecutionMode = executionMode,
                         };
                         reporters.Add(reportPortalReporter);
                     }
-
                     break;
+
                 default:
-                    throw new ArgumentOutOfRangeException(nameof(target), target, "Unsupported reporter target.");
+                    throw new ArgumentOutOfRangeException(
+                        nameof(target),
+                        target,
+                        "Unsupported reporter target."
+                    );
             }
         }
-        
+
         return reporters;
-    }
-
-    public void Read(IParser parser, Type expectedType, ObjectDeserializer nestedObjectDeserializer)
-    {
-        throw new NotSupportedException($"{nameof(Read)} doesn't support custom" +
-                                        $" deserialization from Yaml for {nameof(ReporterBuilder)}");
-    }
-
-    public void Write(IEmitter emitter, ObjectSerializer nestedObjectSerializer)
-    {
-        nestedObjectSerializer(new
-        {
-            SaveLogs,
-            SaveAttachments,
-            SaveTemplate,
-            SaveSessionData,
-            DisplayTrace,
-            ReportPortal
-        });
     }
 }

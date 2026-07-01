@@ -1,6 +1,6 @@
 namespace QaaS.Runner.Assertions.ConfigurationObjects.ReporterConfigs;
 
-public interface IReporterConfig
-{
-    
-}
+/// <summary>
+/// Common interface for all reporter configuration objects.
+/// </summary>
+public interface IReporterConfig;
