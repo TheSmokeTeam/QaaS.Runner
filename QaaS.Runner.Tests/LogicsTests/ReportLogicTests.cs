@@ -14,7 +14,7 @@ public class ReportLogicTests
 {
     [TestCase(1)]
     [TestCase(5)]
-    public void TestRun_WithSingleReporterType_WritesMatchingAssertionResults(int assertionCount)
+    public void TestRun_WithSingleReporter_WritesReportableAssertionResults(int assertionCount)
     {
         var reporter = new RecordingReporter();
         var assertionResults = new List<AssertionResult>();
@@ -32,7 +32,6 @@ public class ReportLogicTests
                     AssertionStatus.Skipped,
                     AssertionStatus.Unknown
                 ],
-                ReporterTypes = [typeof(RecordingReporter)],
                 AssertionName = null,
                 AssertionHook = null
             };
@@ -73,7 +72,7 @@ public class ReportLogicTests
     }
 
     [Test]
-    public void TestRun_WithMultipleReporterTypes_WritesOnlyMatchingAssertions()
+    public void TestRun_WithMultipleReporters_WritesAllReportableAssertionResultsToEachReporter()
     {
         var firstReporter = new RecordingReporter();
         var secondReporter = new AlternateRecordingReporter();
@@ -90,7 +89,6 @@ public class ReportLogicTests
                     AssertionStatus.Skipped,
                     AssertionStatus.Unknown
                 ],
-                ReporterTypes = [typeof(RecordingReporter)],
                 AssertionName = null,
                 AssertionHook = null
             },
@@ -111,7 +109,6 @@ public class ReportLogicTests
                     AssertionStatus.Skipped,
                     AssertionStatus.Unknown
                 ],
-                ReporterTypes = [typeof(AlternateRecordingReporter)],
                 AssertionName = null,
                 AssertionHook = null
             },
@@ -130,74 +127,8 @@ public class ReportLogicTests
         Assert.That(result, Is.SameAs(executionData));
         Assert.Multiple(() =>
         {
-            Assert.That(firstReporter.Results, Is.EqualTo(new[] { firstAssertionResult }));
-            Assert.That(secondReporter.Results, Is.EqualTo(new[] { secondAssertionResult }));
-        });
-    }
-
-    [Test]
-    public void TestRun_WithReporterNotInAssertionReporterTypes_DoesNotWriteResult()
-    {
-        var allureReporter = new RecordingReporter();
-        var reportPortalReporter = new AlternateRecordingReporter();
-        var assertionResult = new AssertionResult
-        {
-            Assertion = new Assertion
-            {
-                Name = "AssertionOne",
-                StatusesToReport = [AssertionStatus.Passed],
-                ReporterTypes = [typeof(RecordingReporter)],
-                AssertionName = null,
-                AssertionHook = null
-            },
-            AssertionStatus = AssertionStatus.Passed,
-            TestDurationMs = 0,
-            Flaky = null
-        };
-        var executionData = new ExecutionData();
-        executionData.AssertionResults.Add(assertionResult);
-        var reportLogic = new ReportLogic([allureReporter, reportPortalReporter], Globals.GetContextWithMetadata());
-
-        var result = reportLogic.Run(executionData);
-
-        Assert.That(result, Is.SameAs(executionData));
-        Assert.Multiple(() =>
-        {
-            Assert.That(allureReporter.Results, Is.EqualTo(new[] { assertionResult }));
-            Assert.That(reportPortalReporter.Results, Is.Empty);
-        });
-    }
-
-    [Test]
-    public void TestRun_WithReporterInAssertionReporterTypes_WritesResult()
-    {
-        var allureReporter = new RecordingReporter();
-        var reportPortalReporter = new AlternateRecordingReporter();
-        var assertionResult = new AssertionResult
-        {
-            Assertion = new Assertion
-            {
-                Name = "AssertionOne",
-                StatusesToReport = [AssertionStatus.Passed],
-                ReporterTypes = [typeof(RecordingReporter), typeof(AlternateRecordingReporter)],
-                AssertionName = null,
-                AssertionHook = null
-            },
-            AssertionStatus = AssertionStatus.Passed,
-            TestDurationMs = 0,
-            Flaky = null
-        };
-        var executionData = new ExecutionData();
-        executionData.AssertionResults.Add(assertionResult);
-        var reportLogic = new ReportLogic([allureReporter, reportPortalReporter], Globals.GetContextWithMetadata());
-
-        var result = reportLogic.Run(executionData);
-
-        Assert.That(result, Is.SameAs(executionData));
-        Assert.Multiple(() =>
-        {
-            Assert.That(allureReporter.Results, Is.EqualTo(new[] { assertionResult }));
-            Assert.That(reportPortalReporter.Results, Is.EqualTo(new[] { assertionResult }));
+            Assert.That(firstReporter.Results, Is.EqualTo(new[] { firstAssertionResult, secondAssertionResult }));
+            Assert.That(secondReporter.Results, Is.EqualTo(new[] { firstAssertionResult, secondAssertionResult }));
         });
     }
 
@@ -211,7 +142,6 @@ public class ReportLogicTests
             {
                 Name = "AssertionA",
                 StatusesToReport = [AssertionStatus.Failed],
-                ReporterTypes = [typeof(RecordingReporter)],
                 AssertionName = null,
                 AssertionHook = null
             },

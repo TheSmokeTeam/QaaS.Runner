@@ -178,9 +178,6 @@ public class ReporterBuilder : IYamlConvertible, ICloneable<ReporterBuilder>
     /// </param>
     /// <param name="executionMode">The execution mode represented by the current execution.</param>
     /// <returns>The configured reporters for the current assertion run.</returns>
-    /// <exception cref="ArgumentOutOfRangeException">
-    /// Thrown when an unsupported <see cref="ReporterTarget"/> value is encountered.
-    /// </exception>
     internal List<IReporter> Build(
         Context context,
         DateTime testSuiteStartTimeUtc,
@@ -190,51 +187,34 @@ public class ReporterBuilder : IYamlConvertible, ICloneable<ReporterBuilder>
     {
         var reporters = new List<IReporter>();
 
-        foreach (var target in Enum.GetValues<ReporterTarget>())
+        var allureReporter = new AllureReporter
         {
-            switch (target)
+            Context = context,
+            DisplayTrace = DisplayTrace,
+            SaveLogs = SaveLogs,
+            SaveAttachments = SaveAttachments,
+            SaveTemplate = SaveTemplate,
+            SaveSessionData = SaveSessionData,
+            FileSystem = fileSystem ?? new FileSystem(),
+            EpochTestSuiteStartTime = new DateTimeOffset(testSuiteStartTimeUtc).ToUnixTimeMilliseconds()
+        };
+        reporters.Add(allureReporter);
+
+        if (ReportPortal is { Enabled: true })
+        {
+            var reportPortalReporter = new ReportPortalReporter
             {
-                case ReporterTarget.Allure:
-                    var allureReporter = new AllureReporter
-                    {
-                        Context = context,
-                        DisplayTrace = DisplayTrace,
-                        SaveLogs = SaveLogs,
-                        SaveAttachments = SaveAttachments,
-                        SaveTemplate = SaveTemplate,
-                        SaveSessionData = SaveSessionData,
-                        FileSystem = fileSystem ?? new FileSystem(),
-                        EpochTestSuiteStartTime = new DateTimeOffset(testSuiteStartTimeUtc).ToUnixTimeMilliseconds()
-                    };
-                    reporters.Add(allureReporter);
-                    break;
-
-                case ReporterTarget.ReportPortal:
-                    if (ReportPortal is { Enabled: true })
-                    {
-                        var reportPortalReporter = new ReportPortalReporter
-                        {
-                            Context = context,
-                            DisplayTrace = DisplayTrace,
-                            SaveLogs = SaveLogs,
-                            SaveAttachments = SaveAttachments,
-                            SaveTemplate = SaveTemplate,
-                            SaveSessionData = SaveSessionData,
-                            FileSystem = fileSystem ?? new FileSystem(),
-                            Config = ReportPortal,
-                            ExecutionMode = executionMode,
-                        };
-                        reporters.Add(reportPortalReporter);
-                    }
-                    break;
-
-                default:
-                    throw new ArgumentOutOfRangeException(
-                        nameof(target),
-                        target,
-                        "Unsupported reporter target."
-                    );
-            }
+                Context = context,
+                DisplayTrace = DisplayTrace,
+                SaveLogs = SaveLogs,
+                SaveAttachments = SaveAttachments,
+                SaveTemplate = SaveTemplate,
+                SaveSessionData = SaveSessionData,
+                FileSystem = fileSystem ?? new FileSystem(),
+                Config = ReportPortal,
+                ExecutionMode = executionMode,
+            };
+            reporters.Add(reportPortalReporter);
         }
 
         return reporters;
