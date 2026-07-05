@@ -2,6 +2,7 @@ using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
+using System.Net;
 using NUnit.Framework;
 using QaaS.Framework.SDK.ContextObjects;
 using QaaS.Framework.SDK.Session.CommunicationDataObjects;
@@ -85,6 +86,37 @@ public class SessionExtensionsTests
 
         Assert.That(failures, Has.Count.EqualTo(1));
         Assert.That(failures.First().Reason.Message, Is.EqualTo("custom message"));
+    }
+
+    [Test]
+    public void AppendActionFailure_ForConcurrentBag_FormatsS3LikeExceptionsCompactly()
+    {
+        var failures = new ConcurrentBag<ActionFailure>();
+        var exception = new FakeAmazonS3Exception("request timed out")
+        {
+            StatusCode = HttpStatusCode.ServiceUnavailable,
+            ErrorCode = "RequestTimeout",
+            RequestId = "req-123"
+        };
+
+        failures.AppendActionFailure(
+            exception,
+            SessionName,
+            Globals.Logger,
+            "Consumer",
+            "S3Consumer",
+            actionProtocol: "S3");
+
+        var reason = failures.Single().Reason;
+        Assert.Multiple(() =>
+        {
+            Assert.That(reason.Message, Does.Contain("S3 operation failed"));
+            Assert.That(reason.Message, Does.Contain("StatusCode=503 ServiceUnavailable"));
+            Assert.That(reason.Message, Does.Contain("ErrorCode=RequestTimeout"));
+            Assert.That(reason.Message, Does.Contain("RequestId=req-123"));
+            Assert.That(reason.Description, Does.Contain("ExceptionType: FakeAmazonS3Exception"));
+            Assert.That(reason.Description, Does.Not.Contain("   at "));
+        });
     }
 
     [Test]
@@ -259,5 +291,12 @@ public class SessionExtensionsTests
         {
             throw exceptionToThrow;
         }
+    }
+
+    private sealed class FakeAmazonS3Exception(string message) : Exception(message)
+    {
+        public HttpStatusCode StatusCode { get; init; }
+        public string? ErrorCode { get; init; }
+        public string? RequestId { get; init; }
     }
 }

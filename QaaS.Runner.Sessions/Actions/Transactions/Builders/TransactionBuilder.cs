@@ -1,5 +1,6 @@
 using System.ComponentModel;
 using System.ComponentModel.DataAnnotations;
+using System.Text.Json.Serialization;
 using QaaS.Framework.Configurations;
 using QaaS.Framework.Configurations.CustomValidationAttributes;
 using QaaS.Framework.Infrastructure;
@@ -70,6 +71,7 @@ public class TransactionBuilder : ICloneable<TransactionBuilder>
     [Description("Sends an http request")] internal HttpTransactorConfig? Http { get; set; }
 
     [Description("Invokes a Grpc Method")] internal GrpcTransactorConfig? Grpc { get; set; }
+    [JsonIgnore]
     public ITransactorConfig? Configuration
     {
         get => (ITransactorConfig?)Http ?? Grpc;

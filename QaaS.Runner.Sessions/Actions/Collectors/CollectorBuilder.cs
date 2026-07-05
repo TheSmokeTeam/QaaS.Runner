@@ -1,5 +1,6 @@
 using System.ComponentModel;
 using System.ComponentModel.DataAnnotations;
+using System.Text.Json.Serialization;
 using QaaS.Framework.Configurations;
 using QaaS.Framework.Infrastructure;
 using QaaS.Framework.Protocols.ConfigurationObjects;
@@ -43,6 +44,7 @@ public class CollectorBuilder : ICloneable<CollectorBuilder>
         " vector is a result type in prometheus that represents a set of time series data, every item of" +
         " its result array represents a single value at a certain time.")]
     public PrometheusFetcherConfig? Prometheus { get; internal set; }
+    [JsonIgnore]
     public IFetcherConfig? Configuration
     {
         get => Prometheus;

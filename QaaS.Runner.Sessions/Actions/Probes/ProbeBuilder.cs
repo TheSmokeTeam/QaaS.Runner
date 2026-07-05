@@ -3,6 +3,7 @@ using System.ComponentModel.DataAnnotations;
 using System.Diagnostics.CodeAnalysis;
 using System.Text;
 using System.Text.Json;
+using System.Text.Json.Serialization;
 using Microsoft.Extensions.Configuration;
 using QaaS.Framework.Configurations;
 using QaaS.Framework.Configurations.ConfigurationBindingUtils;
@@ -43,6 +44,7 @@ public class ProbeBuilder : IYamlConvertible, ICloneable<ProbeBuilder>
     [Description("Implementation configuration for the probe, " +
                  "the configuration given here is loaded into the provided probe dynamically.")]
     public IConfiguration ProbeConfiguration { get; internal set; } = new ConfigurationBuilder().Build();
+    [JsonIgnore]
     public IConfiguration Configuration
     {
         get => ProbeConfiguration;

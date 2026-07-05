@@ -1,5 +1,6 @@
 using System.ComponentModel;
 using System.ComponentModel.DataAnnotations;
+using System.Text.Json.Serialization;
 using System.Runtime.CompilerServices;
 using System.Text;
 using System.Text.Json;
@@ -82,6 +83,7 @@ public class AssertionBuilder : IYamlConvertible, ICloneable<AssertionBuilder>
                  "the configuration given here is loaded into the provided assertion dynamically.")]
     public IConfiguration AssertionConfiguration { get; internal set; } = new ConfigurationBuilder().Build();
 
+    [JsonIgnore]
     public IConfiguration Configuration
     {
         get => AssertionConfiguration;

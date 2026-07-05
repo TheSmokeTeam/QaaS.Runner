@@ -1,3 +1,4 @@
+using System.Text.Json.Serialization;
 using QaaS.Framework.Configurations;
 using QaaS.Framework.Policies;
 using QaaS.Framework.Protocols.ConfigurationObjects;
@@ -27,6 +28,7 @@ namespace QaaS.Runner.Sessions.Actions.Publishers.Builders;
 
 public partial class PublisherBuilder
 {
+    [JsonIgnore]
     public ISenderConfig? Configuration
     {
         get => GetConfiguration();
