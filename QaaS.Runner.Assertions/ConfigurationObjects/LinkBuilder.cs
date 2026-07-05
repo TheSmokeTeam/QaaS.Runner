@@ -1,5 +1,6 @@
 using System.ComponentModel;
 using System.Runtime.CompilerServices;
+using System.Text.Json.Serialization;
 using QaaS.Framework.Configurations;
 using QaaS.Framework.Infrastructure;
 using QaaS.Runner.Assertions.ConfigurationObjects.LinkConfigs;
@@ -25,6 +26,7 @@ public class LinkBuilder : ICloneable<LinkBuilder>
     public PrometheusLinkConfig? Prometheus { get; internal set; }
     [Description("Links the grafana dashboard filtered for the test's session times to each test result.")]
     public GrafanaLinkConfig? Grafana { get; internal set; }
+    [JsonIgnore]
     public ILinkConfig? Configuration
     {
         get => GetConfiguration();

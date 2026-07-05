@@ -116,6 +116,39 @@ public class AssertionExecutionTests
     }
 
     [Test]
+    public void Execute_WhenSessionHasRepeatedFailures_DeduplicatesFlakinessReasons()
+    {
+        var assertion = CreateAssertion(new DelegateAssertionHook((_, _) => true),
+            sessionNames: ["session-1"]);
+        var flakySession = new SessionData
+        {
+            Name = "session-1",
+            SessionFailures =
+            [
+                Failure("S3 operation failed: StatusCode=503 ServiceUnavailable"),
+                Failure("S3 operation failed: StatusCode=503 ServiceUnavailable"),
+                Failure("S3 operation failed: StatusCode=403 Forbidden")
+            ]
+        };
+
+        var result = assertion.Execute(new List<SessionData?> { flakySession }.ToImmutableList(),
+            ImmutableList<DataSource>.Empty);
+
+        var sessionFailures = result.Flaky.FlakinessReasons.Single().Value;
+        Assert.Multiple(() =>
+        {
+            Assert.That(result.Flaky.IsFlaky, Is.True);
+            Assert.That(sessionFailures, Has.Count.EqualTo(2));
+            Assert.That(sessionFailures.Select(failure => failure.Reason.Message),
+                Is.EqualTo(new[]
+                {
+                    "S3 operation failed: StatusCode=503 ServiceUnavailable",
+                    "S3 operation failed: StatusCode=403 Forbidden"
+                }));
+        });
+    }
+
+    [Test]
     public void Execute_WhenDataSourcesAreNull_BuildsLinksAndUsesEmptyDataSourceList()
     {
         var assertion = CreateAssertion(new DelegateAssertionHook((_, dataSources) => dataSources.Count == 0),
@@ -159,4 +192,17 @@ public class AssertionExecutionTests
             _sessionPatterns = sessionPatterns ?? []
         };
     }
+
+    private static ActionFailure Failure(string message) =>
+        new()
+        {
+            Name = "S3Consumer",
+            Action = "S3 Consumer",
+            ActionType = "Consumer",
+            Reason = new Reason
+            {
+                Message = message,
+                Description = message
+            }
+        };
 }

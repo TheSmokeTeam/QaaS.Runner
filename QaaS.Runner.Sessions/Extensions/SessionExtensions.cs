@@ -1,4 +1,6 @@
 using System.Collections.Concurrent;
+using System.Globalization;
+using System.Reflection;
 using Microsoft.Extensions.Logging;
 using QaaS.Framework.SDK.ContextObjects;
 using QaaS.Framework.SDK.Session.CommunicationDataObjects;
@@ -59,11 +61,7 @@ public static class SessionExtensions
         {
             Name = actionRuntimeName,
             ActionType = actionType,
-            Reason = new Reason
-            {
-                Message = exception.Message,
-                Description = exception.ToString()
-            }
+            Reason = CreateFailureReason(exception)
         });
     }
 
@@ -83,11 +81,7 @@ public static class SessionExtensions
         {
             Name = actionRuntimeName,
             ActionType = actionType,
-            Reason = new Reason
-            {
-                Message = exceptionMessage ?? exception.Message,
-                Description = exception.ToString()
-            }
+            Reason = CreateFailureReason(exception, exceptionMessage)
         });
     }
 
@@ -184,7 +178,7 @@ public static class SessionExtensions
                 }
 
                 var exceptionMessage =
-                    e is OperationCanceledException ? $"Action {actionName} was canceled" : e.Message;
+                    e is OperationCanceledException ? $"Action {actionName} was canceled" : null;
                 actionFailures.AppendActionFailure(e, sessionName, context.Logger, actionType,
                     actionName, "", exceptionMessage);
                 return default;
@@ -225,5 +219,89 @@ public static class SessionExtensions
         runningCommunications
             ?.FirstOrDefault(runningCommunication => runningCommunication.Name == actionName)
             ?.DataCancellationTokenSource.Cancel();
+    }
+
+    private static Reason CreateFailureReason(Exception exception, string? exceptionMessage = null)
+    {
+        if (!string.IsNullOrWhiteSpace(exceptionMessage))
+        {
+            return new Reason
+            {
+                Message = exceptionMessage,
+                Description = exception.ToString()
+            };
+        }
+
+        return TryCreateS3FailureReason(exception, out var s3Reason)
+            ? s3Reason
+            : new Reason
+            {
+                Message = exception.Message,
+                Description = exception.ToString()
+            };
+    }
+
+    private static bool TryCreateS3FailureReason(Exception exception, out Reason reason)
+    {
+        reason = new Reason();
+        var exceptionType = exception.GetType();
+        var typeName = exceptionType.FullName ?? exceptionType.Name;
+        if (!typeName.Contains("AmazonS3Exception", StringComparison.Ordinal) &&
+            !typeName.Contains("Amazon.S3", StringComparison.Ordinal))
+        {
+            return false;
+        }
+
+        var fields = new List<KeyValuePair<string, string>>();
+        AddPropertyField(fields, exception, "StatusCode");
+        AddPropertyField(fields, exception, "ErrorCode");
+        AddPropertyField(fields, exception, "RequestId");
+        AddPropertyField(fields, exception, "AmazonId2");
+        if (!string.IsNullOrWhiteSpace(exception.Message))
+            fields.Add(new KeyValuePair<string, string>("Message", exception.Message));
+
+        var fieldText = fields.Count == 0
+            ? exception.Message
+            : string.Join(", ", fields.Select(field => $"{field.Key}={field.Value}"));
+        var descriptionLines = new List<string>
+        {
+            $"ExceptionType: {exceptionType.Name}"
+        };
+        descriptionLines.AddRange(fields.Select(field => $"{field.Key}: {field.Value}"));
+        if (exception.InnerException != null)
+        {
+            descriptionLines.Add($"InnerExceptionType: {exception.InnerException.GetType().Name}");
+            descriptionLines.Add($"InnerExceptionMessage: {exception.InnerException.Message}");
+        }
+
+        reason = new Reason
+        {
+            Message = $"S3 operation failed: {fieldText}",
+            Description = string.Join(Environment.NewLine, descriptionLines)
+        };
+        return true;
+    }
+
+    private static void AddPropertyField(ICollection<KeyValuePair<string, string>> fields, Exception exception,
+        string propertyName)
+    {
+        var propertyValue = exception.GetType()
+            .GetProperty(propertyName, BindingFlags.Instance | BindingFlags.Public)
+            ?.GetValue(exception);
+        var formattedValue = FormatFailurePropertyValue(propertyValue);
+        if (formattedValue != null)
+            fields.Add(new KeyValuePair<string, string>(propertyName, formattedValue));
+    }
+
+    private static string? FormatFailurePropertyValue(object? value)
+    {
+        return value switch
+        {
+            null => null,
+            string stringValue when string.IsNullOrWhiteSpace(stringValue) => null,
+            string stringValue => stringValue,
+            Enum enumValue => $"{Convert.ToInt64(enumValue, CultureInfo.InvariantCulture)} {enumValue}",
+            _ => Convert.ToString(value, CultureInfo.InvariantCulture)
+        };
     }
 }

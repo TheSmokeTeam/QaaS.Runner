@@ -123,9 +123,35 @@ public class Assertion
             {
                 IsFlaky = flaky,
                 FlakinessReasons = SessionDataList.Select(sessionData =>
-                        new KeyValuePair<string, List<ActionFailure>>(sessionData.Name, sessionData.SessionFailures))
+                        new KeyValuePair<string, List<ActionFailure>>(
+                            sessionData.Name,
+                            DeduplicateFlakinessReasons(sessionData.SessionFailures)))
                     .ToList()
             }
         };
     }
+
+    private static List<ActionFailure> DeduplicateFlakinessReasons(IEnumerable<ActionFailure> sessionFailures)
+    {
+        var seenFailures = new HashSet<FlakinessReasonKey>();
+        var distinctFailures = new List<ActionFailure>();
+        foreach (var sessionFailure in sessionFailures)
+        {
+            var key = new FlakinessReasonKey(
+                sessionFailure.Action ?? string.Empty,
+                sessionFailure.ActionType,
+                sessionFailure.Name,
+                sessionFailure.Reason.Message);
+            if (seenFailures.Add(key))
+                distinctFailures.Add(sessionFailure);
+        }
+
+        return distinctFailures;
+    }
+
+    private sealed record FlakinessReasonKey(
+        string Action,
+        string ActionType,
+        string Name,
+        string Message);
 }
