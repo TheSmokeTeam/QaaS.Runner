@@ -20,15 +20,20 @@ public class StorageBuilder : ICloneable<StorageBuilder>
 {
     public StorageBuilder Clone() => BuilderCloner.DeepClone(this);
 
-    [Description("The storage format used when storing jsons. Options: " +
-                 "[`Indented` - Formats the json with indents, more readable but less memory efficient /" +
-                 "`None` - Formats the json without indents, less readable but more memory efficient ]")]
+    [Description(
+        "The storage format used when storing jsons. Options: "
+            + "[`Indented` - Formats the json with indents, more readable but less memory efficient /"
+            + "`None` - Formats the json without indents, less readable but more memory efficient ]"
+    )]
     [DefaultValue(Formatting.Indented)]
     public Formatting JsonStorageFormat { get; internal set; } = Formatting.Indented;
+
     [Description("Supports storage as a file system directory")]
     public FilesInFileSystemConfig? FileSystem { get; internal set; }
+
     [Description("Supports storage as an S3 bucket with a certain prefix")]
     public S3Config? S3 { get; internal set; }
+
     [JsonIgnore]
     public IStorageConfig? Configuration
     {
@@ -44,6 +49,7 @@ public class StorageBuilder : ICloneable<StorageBuilder>
             Configure(value);
         }
     }
+
     private StorageBuilder Reset()
     {
         FileSystem = null;
@@ -78,14 +84,17 @@ public class StorageBuilder : ICloneable<StorageBuilder>
         var currentConfig = Configuration;
         if (configuration is IStorageConfig typedConfiguration)
         {
-            return Configure(currentConfig == null
-                ? typedConfiguration
-                : currentConfig.UpdateConfiguration(typedConfiguration));
+            return Configure(
+                currentConfig == null
+                    ? typedConfiguration
+                    : currentConfig.UpdateConfiguration(typedConfiguration)
+            );
         }
 
         if (currentConfig == null)
             throw new InvalidOperationException(
-                "Storage configuration is not set and cannot be inferred from an object patch. Configure a concrete storage configuration first.");
+                "Storage configuration is not set and cannot be inferred from an object patch. Configure a concrete storage configuration first."
+            );
         return Configure(currentConfig.UpdateConfiguration(configuration));
     }
 
@@ -129,17 +138,27 @@ public class StorageBuilder : ICloneable<StorageBuilder>
                 .Select(storage => storage!.GetType().Name)
                 .ToArray();
             throw new InvalidOperationException(
-                $"Multiple configurations provided for Storage: {string.Join(", ", conflictingConfigs)}. " +
-                "Only one type is allowed at a time.");
+                $"Multiple configurations provided for Storage: {string.Join(", ", conflictingConfigs)}. "
+                    + "Only one type is allowed at a time."
+            );
         }
 
-        var storageType = configuredStorages.FirstOrDefault(storage => storage != null) ??
-                          throw new InvalidOperationException("Missing supported type for storage");
+        var storageType =
+            configuredStorages.FirstOrDefault(storage => storage != null)
+            ?? throw new InvalidOperationException("Missing supported type for storage");
         BaseStorage storage = storageType! switch
         {
             S3Config => new S3Storage(S3!, JsonStorageFormat),
-            FilesInFileSystemConfig => new FileSystemStorage(FileSystem!, new FileSystem(), JsonStorageFormat),
-            _ => throw new ArgumentOutOfRangeException(nameof(storageType), storageType, "Storage not supported")
+            FilesInFileSystemConfig => new FileSystemStorage(
+                FileSystem!,
+                new FileSystem(),
+                JsonStorageFormat
+            ),
+            _ => throw new ArgumentOutOfRangeException(
+                nameof(storageType),
+                storageType,
+                "Storage not supported"
+            ),
         };
         storage._context = context;
         return storage;

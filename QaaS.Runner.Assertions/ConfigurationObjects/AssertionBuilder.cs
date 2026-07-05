@@ -1,9 +1,9 @@
 using System.ComponentModel;
 using System.ComponentModel.DataAnnotations;
-using System.Text.Json.Serialization;
 using System.Runtime.CompilerServices;
 using System.Text;
 using System.Text.Json;
+using System.Text.Json.Serialization;
 using Microsoft.Extensions.Configuration;
 using QaaS.Framework.Configurations;
 using QaaS.Framework.Configurations.ConfigurationBindingUtils;
@@ -32,12 +32,18 @@ public class AssertionBuilder : IYamlConvertible, ICloneable<AssertionBuilder>
     [Description("The name of the assertion to use")]
     public string? Assertion { get; internal set; }
 
-    [Required, Description(
-         "The name of the test as presented in the test report with this assertion's result, if none is " +
-         "given creates a name as the type of the assertion and guid")]
+    [
+        Required,
+        Description(
+            "The name of the test as presented in the test report with this assertion's result, if none is "
+                + "given creates a name as the type of the assertion and guid"
+        )
+    ]
     public string? Name { get; internal set; }
 
-    [Description("The category of the assersion. Can filter which categories to run using the -A flag")]
+    [Description(
+        "The category of the assersion. Can filter which categories to run using the -A flag"
+    )]
     public string? Category { get; internal set; }
 
     [RequiredIfAny(nameof(SessionNamePatterns), [null])]
@@ -54,7 +60,9 @@ public class AssertionBuilder : IYamlConvertible, ICloneable<AssertionBuilder>
     [Description("Regex patterns of data sources")]
     public string[] DataSourcePatterns { get; internal set; } = [];
 
-    [Description("Whether to save the data of the session's belonging to this assertion in the test report")]
+    [Description(
+        "Whether to save the data of the session's belonging to this assertion in the test report"
+    )]
     [DefaultValue(true)]
     public bool SaveSessionData { get; internal set; } = true;
 
@@ -62,26 +70,37 @@ public class AssertionBuilder : IYamlConvertible, ICloneable<AssertionBuilder>
     [DefaultValue(true)]
     public bool SaveLogs { get; internal set; } = true;
 
-    [Description("Whether to save the attachments of the assertion in the test report (true) or not (false)")]
+    [Description(
+        "Whether to save the attachments of the assertion in the test report (true) or not (false)"
+    )]
     [DefaultValue(true)]
     public bool SaveAttachments { get; internal set; } = true;
 
-    [Description("Whether to save the configuration template in the test report (true) or not (false)")]
+    [Description(
+        "Whether to save the configuration template in the test report (true) or not (false)"
+    )]
     [DefaultValue(true)]
     public bool SaveTemplate { get; internal set; } = true;
 
-    [Description("Whether to display the assertion's message trace in the assertion results or not." +
-                 " Should be set to false when the assertion trace is massive and displaying it can cause performance issues")]
+    [Description(
+        "Whether to display the assertion's message trace in the assertion results or not."
+            + " Should be set to false when the assertion trace is massive and displaying it can cause performance issues"
+    )]
     [DefaultValue(true)]
     public bool DisplayTrace { get; internal set; } = true;
 
-    [Description("The severity of the assertion, can be used to set the severity of the test in the test report.")]
+    [Description(
+        "The severity of the assertion, can be used to set the severity of the test in the test report."
+    )]
     [DefaultValue(AssertionSeverity.Normal)]
     public AssertionSeverity Severity { get; internal set; } = AssertionSeverity.Normal;
 
-    [Description("Implementation configuration for the assertion, " +
-                 "the configuration given here is loaded into the provided assertion dynamically.")]
-    public IConfiguration AssertionConfiguration { get; internal set; } = new ConfigurationBuilder().Build();
+    [Description(
+        "Implementation configuration for the assertion, "
+            + "the configuration given here is loaded into the provided assertion dynamically."
+    )]
+    public IConfiguration AssertionConfiguration { get; internal set; } =
+        new ConfigurationBuilder().Build();
 
     [JsonIgnore]
     public IConfiguration Configuration
@@ -97,11 +116,16 @@ public class AssertionBuilder : IYamlConvertible, ICloneable<AssertionBuilder>
     /// Defines which assertion statuses will appear in the final report.
     /// Statuses explicitly listed will be included in the report, while all others will be excluded.
     /// </summary>
-    [Description("Defines which assertion statuses will appear in the final report. " +
-                 "Statuses explicitly listed will be included in the report, while all others will be exluded." +
-                 $"Options: [`{nameof(AssertionStatus.Passed)}` `{nameof(AssertionStatus.Broken)}` `{nameof(AssertionStatus.Failed)}` `{nameof(AssertionStatus.Skipped)}` `{nameof(AssertionStatus.Unknown)}` ]"),
-     DefaultValue("List containing all assertion statuses")]
-    public IList<AssertionStatus> StatusesToReport { get; set; } = Enum.GetValues<AssertionStatus>().ToList();
+    [
+        Description(
+            "Defines which assertion statuses will appear in the final report. "
+                + "Statuses explicitly listed will be included in the report, while all others will be exluded."
+                + $"Options: [`{nameof(AssertionStatus.Passed)}` `{nameof(AssertionStatus.Broken)}` `{nameof(AssertionStatus.Failed)}` `{nameof(AssertionStatus.Skipped)}` `{nameof(AssertionStatus.Unknown)}` ]"
+        ),
+        DefaultValue("List containing all assertion statuses")
+    ]
+    public IList<AssertionStatus> StatusesToReport { get; set; } =
+        Enum.GetValues<AssertionStatus>().ToList();
 
     /// <summary>
     /// Reads the serialized configuration for the current Runner assertion builder instance.
@@ -112,8 +136,10 @@ public class AssertionBuilder : IYamlConvertible, ICloneable<AssertionBuilder>
     /// <qaas-docs group="Configuration as Code" subgroup="Assertions" />
     public void Read(IParser parser, Type expectedType, ObjectDeserializer nestedObjectDeserializer)
     {
-        throw new NotSupportedException($"{nameof(Read)} doesn't support custom" +
-                                        $" deserialization from Yaml for {nameof(AssertionBuilder)}");
+        throw new NotSupportedException(
+            $"{nameof(Read)} doesn't support custom"
+                + $" deserialization from Yaml for {nameof(AssertionBuilder)}"
+        );
     }
 
     /// <summary>
@@ -125,20 +151,21 @@ public class AssertionBuilder : IYamlConvertible, ICloneable<AssertionBuilder>
     /// <qaas-docs group="Configuration as Code" subgroup="Assertions" />
     public void Write(IEmitter emitter, ObjectSerializer nestedObjectSerializer)
     {
-        var assertionConfiguration = AssertionConfiguration
-            .GetDictionaryFromConfiguration();
-        nestedObjectSerializer(new
-        {
-            Assertion,
-            SessionNames,
-            DataSourceNames,
-            SaveSessionData,
-            SaveLogs,
-            SaveAttachments,
-            Name,
-            DisplayTrace,
-            AssertionConfiguration = assertionConfiguration
-        });
+        var assertionConfiguration = AssertionConfiguration.GetDictionaryFromConfiguration();
+        nestedObjectSerializer(
+            new
+            {
+                Assertion,
+                SessionNames,
+                DataSourceNames,
+                SaveSessionData,
+                SaveLogs,
+                SaveAttachments,
+                Name,
+                DisplayTrace,
+                AssertionConfiguration = assertionConfiguration,
+            }
+        );
     }
 
     /// <summary>
@@ -196,7 +223,8 @@ public class AssertionBuilder : IYamlConvertible, ICloneable<AssertionBuilder>
         return this;
     }
 
-    internal AssertionBuilder WeatherToSaveLogs(bool weatherToSaveLogs) => ShouldSaveLogs(weatherToSaveLogs);
+    internal AssertionBuilder WeatherToSaveLogs(bool weatherToSaveLogs) =>
+        ShouldSaveLogs(weatherToSaveLogs);
 
     /// <summary>
     /// Configures whether the rendered configuration template is saved with the assertion result.
@@ -211,8 +239,9 @@ public class AssertionBuilder : IYamlConvertible, ICloneable<AssertionBuilder>
         return this;
     }
 
-    internal AssertionBuilder WeatherToSaveConfigurationTemplate(bool weatherToSaveConfigurationTemplate) =>
-        ShouldSaveConfigurationTemplate(weatherToSaveConfigurationTemplate);
+    internal AssertionBuilder WeatherToSaveConfigurationTemplate(
+        bool weatherToSaveConfigurationTemplate
+    ) => ShouldSaveConfigurationTemplate(weatherToSaveConfigurationTemplate);
 
     /// <summary>
     /// Sets the severity associated with the assertion result.
@@ -346,7 +375,9 @@ public class AssertionBuilder : IYamlConvertible, ICloneable<AssertionBuilder>
     /// <qaas-docs group="Configuration as Code" subgroup="Assertions" />
     public AssertionBuilder RemoveDataSourcePattern(string dataSourcePattern)
     {
-        DataSourcePatterns = (DataSourcePatterns ?? []).Where(value => value != dataSourcePattern).ToArray();
+        DataSourcePatterns = (DataSourcePatterns ?? [])
+            .Where(value => value != dataSourcePattern)
+            .ToArray();
         return this;
     }
 
@@ -372,7 +403,8 @@ public class AssertionBuilder : IYamlConvertible, ICloneable<AssertionBuilder>
     /// <qaas-docs group="Configuration as Code" subgroup="Assertions" />
     public AssertionBuilder AddSessionName(string sessionName)
     {
-        SessionNames = SessionNames == null ? [sessionName] : SessionNames.Append(sessionName).ToArray();
+        SessionNames =
+            SessionNames == null ? [sessionName] : SessionNames.Append(sessionName).ToArray();
         return this;
     }
 
@@ -411,9 +443,10 @@ public class AssertionBuilder : IYamlConvertible, ICloneable<AssertionBuilder>
     /// <qaas-docs group="Configuration as Code" subgroup="Assertions" />
     public AssertionBuilder AddSessionPattern(string sessionPattern)
     {
-        SessionNamePatterns = SessionNamePatterns == null
-            ? [sessionPattern]
-            : SessionNamePatterns.Append(sessionPattern).ToArray();
+        SessionNamePatterns =
+            SessionNamePatterns == null
+                ? [sessionPattern]
+                : SessionNamePatterns.Append(sessionPattern).ToArray();
         return this;
     }
 
@@ -426,7 +459,9 @@ public class AssertionBuilder : IYamlConvertible, ICloneable<AssertionBuilder>
     /// <qaas-docs group="Configuration as Code" subgroup="Assertions" />
     public AssertionBuilder RemoveSessionPattern(string sessionPattern)
     {
-        SessionNamePatterns = SessionNamePatterns?.Where(value => value != sessionPattern).ToArray();
+        SessionNamePatterns = SessionNamePatterns
+            ?.Where(value => value != sessionPattern)
+            .ToArray();
         return this;
     }
 
@@ -498,7 +533,9 @@ public class AssertionBuilder : IYamlConvertible, ICloneable<AssertionBuilder>
     /// <qaas-docs group="Configuration as Code" subgroup="Assertions" />
     public AssertionBuilder Configure(object configuration)
     {
-        var stream = new MemoryStream(Encoding.UTF8.GetBytes(JsonSerializer.Serialize(configuration)));
+        var stream = new MemoryStream(
+            Encoding.UTF8.GetBytes(JsonSerializer.Serialize(configuration))
+        );
         AssertionConfiguration = new ConfigurationBuilder().AddJsonStream(stream).Build();
         return this;
     }
@@ -512,8 +549,9 @@ public class AssertionBuilder : IYamlConvertible, ICloneable<AssertionBuilder>
     /// <qaas-docs group="Configuration as Code" subgroup="Assertions" />
     public AssertionBuilder UpdateConfiguration(object configuration)
     {
-        AssertionConfiguration = (AssertionConfiguration ?? new ConfigurationBuilder().Build())
-            .UpdateConfiguration(configuration);
+        AssertionConfiguration = (
+            AssertionConfiguration ?? new ConfigurationBuilder().Build()
+        ).UpdateConfiguration(configuration);
         return this;
     }
 
@@ -548,7 +586,10 @@ public class AssertionBuilder : IYamlConvertible, ICloneable<AssertionBuilder>
     /// <summary>
     /// Binds a configured assertion hook and merges local/global link builders into runtime links.
     /// </summary>
-    internal Assertion Build(IList<KeyValuePair<string, IAssertion>> assertions, IEnumerable<LinkBuilder>? linkBuilders)
+    internal Assertion Build(
+        IList<KeyValuePair<string, IAssertion>> assertions,
+        IEnumerable<LinkBuilder>? linkBuilders
+    )
     {
         var assertion = new Assertion
         {
@@ -564,13 +605,15 @@ public class AssertionBuilder : IYamlConvertible, ICloneable<AssertionBuilder>
             SaveTemplate = SaveTemplate,
             DisplayTrace = DisplayTrace,
             Severity = Severity,
-            AssertionHook = assertions.FirstOrDefault(pair => pair.Key == Name!)
-                                .Value ??
-                            throw new ArgumentException($"Assertion {Name} of type" +
-                                                        $" {Assertion} was not found" +
-                                                        " in provided assertions."),
+            AssertionHook =
+                assertions.FirstOrDefault(pair => pair.Key == Name!).Value
+                ?? throw new ArgumentException(
+                    $"Assertion {Name} of type"
+                        + $" {Assertion} was not found"
+                        + " in provided assertions."
+                ),
             StatusesToReport = StatusesToReport,
-            AssertionName = string.Empty
+            AssertionName = string.Empty,
         };
 
         var allLinkBuilders = Links.Concat(linkBuilders ?? []).ToList();
@@ -580,5 +623,4 @@ public class AssertionBuilder : IYamlConvertible, ICloneable<AssertionBuilder>
         assertion.Links = allLinks.ToList();
         return assertion;
     }
-
 }

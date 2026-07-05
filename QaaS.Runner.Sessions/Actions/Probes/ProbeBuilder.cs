@@ -34,22 +34,31 @@ public class ProbeBuilder : IYamlConvertible, ICloneable<ProbeBuilder>
     [Required]
     [Description("The name of the probe to use")]
     public string? Probe { get; internal set; }
+
     [Description("The stage in which the Probe runs at")]
     [DefaultValue((int)OrderedActions.Probes)]
     public int Stage { get; internal set; } = (int)OrderedActions.Probes;
+
     [Description("Names of the pre defined data sources to pass to the probe")]
     public string[] DataSourceNames { get; internal set; } = [];
+
     [Description("Regex patterns of data sources")]
     public string[] DataSourcePatterns { get; internal set; } = [];
-    [Description("Implementation configuration for the probe, " +
-                 "the configuration given here is loaded into the provided probe dynamically.")]
-    public IConfiguration ProbeConfiguration { get; internal set; } = new ConfigurationBuilder().Build();
+
+    [Description(
+        "Implementation configuration for the probe, "
+            + "the configuration given here is loaded into the provided probe dynamically."
+    )]
+    public IConfiguration ProbeConfiguration { get; internal set; } =
+        new ConfigurationBuilder().Build();
+
     [JsonIgnore]
     public IConfiguration Configuration
     {
         get => ProbeConfiguration;
         internal set => ProbeConfiguration = value ?? new ConfigurationBuilder().Build();
     }
+
     /// <summary>
     /// Reads the serialized configuration for the current Runner probe builder instance.
     /// </summary>
@@ -59,8 +68,10 @@ public class ProbeBuilder : IYamlConvertible, ICloneable<ProbeBuilder>
     /// <qaas-docs group="Configuration as Code" subgroup="Probes" />
     public void Read(IParser parser, Type expectedType, ObjectDeserializer nestedObjectDeserializer)
     {
-        throw new NotSupportedException($"{nameof(Read)} doesn't support custom" +
-                                        $" deserialization from Yaml for {nameof(ProbeBuilder)}");
+        throw new NotSupportedException(
+            $"{nameof(Read)} doesn't support custom"
+                + $" deserialization from Yaml for {nameof(ProbeBuilder)}"
+        );
     }
 
     /// <summary>
@@ -72,15 +83,16 @@ public class ProbeBuilder : IYamlConvertible, ICloneable<ProbeBuilder>
     /// <qaas-docs group="Configuration as Code" subgroup="Probes" />
     public void Write(IEmitter emitter, ObjectSerializer nestedObjectSerializer)
     {
-        var probeConfiguration = ProbeConfiguration
-            .GetDictionaryFromConfiguration();
-        nestedObjectSerializer(new
-        {
-            Name,
-            Probe,
-            Stage,
-            ProbeConfiguration = probeConfiguration
-        });
+        var probeConfiguration = ProbeConfiguration.GetDictionaryFromConfiguration();
+        nestedObjectSerializer(
+            new
+            {
+                Name,
+                Probe,
+                Stage,
+                ProbeConfiguration = probeConfiguration,
+            }
+        );
     }
 
     /// <summary>
@@ -187,7 +199,9 @@ public class ProbeBuilder : IYamlConvertible, ICloneable<ProbeBuilder>
     /// <qaas-docs group="Configuration as Code" subgroup="Probes" />
     public ProbeBuilder RemoveDataSourcePattern(string dataSourcePattern)
     {
-        DataSourcePatterns = (DataSourcePatterns ?? []).Where(value => value != dataSourcePattern).ToArray();
+        DataSourcePatterns = (DataSourcePatterns ?? [])
+            .Where(value => value != dataSourcePattern)
+            .ToArray();
         return this;
     }
 
@@ -213,7 +227,9 @@ public class ProbeBuilder : IYamlConvertible, ICloneable<ProbeBuilder>
     /// <qaas-docs group="Configuration as Code" subgroup="Probes" />
     public ProbeBuilder Configure(object configuration)
     {
-        var stream = new MemoryStream(Encoding.UTF8.GetBytes(JsonSerializer.Serialize(configuration)));
+        var stream = new MemoryStream(
+            Encoding.UTF8.GetBytes(JsonSerializer.Serialize(configuration))
+        );
         ProbeConfiguration = new ConfigurationBuilder().AddJsonStream(stream).Build();
         return this;
     }
@@ -227,8 +243,9 @@ public class ProbeBuilder : IYamlConvertible, ICloneable<ProbeBuilder>
     /// <qaas-docs group="Configuration as Code" subgroup="Probes" />
     public ProbeBuilder UpdateConfiguration(object configuration)
     {
-        ProbeConfiguration = (ProbeConfiguration ?? new ConfigurationBuilder().Build())
-            .UpdateConfiguration(configuration);
+        ProbeConfiguration = (
+            ProbeConfiguration ?? new ConfigurationBuilder().Build()
+        ).UpdateConfiguration(configuration);
         return this;
     }
 
@@ -264,8 +281,12 @@ public class ProbeBuilder : IYamlConvertible, ICloneable<ProbeBuilder>
     /// Resolves the configured probe hook and constructs a runtime <see cref="Probe"/> action.
     /// Failures are captured into <paramref name="actionFailures"/> so session build can continue.
     /// </summary>
-    internal Probe? Build(InternalContext context, IList<KeyValuePair<string, IProbe>> probes,
-        IList<ActionFailure> actionFailures, string sessionName)
+    internal Probe? Build(
+        InternalContext context,
+        IList<KeyValuePair<string, IProbe>> probes,
+        IList<ActionFailure> actionFailures,
+        string sessionName
+    )
     {
         var probeName = Name ?? "<missing-probe-name>";
         var probeType = Probe ?? "<missing-probe-type>";
@@ -278,19 +299,40 @@ public class ProbeBuilder : IYamlConvertible, ICloneable<ProbeBuilder>
             }
 
             var scopedHookName = BuildScopedHookName(sessionName, Name);
-            var probeHook = probes.FirstOrDefault(pair => pair.Key == scopedHookName).Value
-                            ?? throw new ArgumentException($"Probe {Name} of type" +
-                                                           $" {Probe} in session {sessionName} was not found" +
-                                                           " in provided probes.");
+            var probeHook =
+                probes.FirstOrDefault(pair => pair.Key == scopedHookName).Value
+                ?? throw new ArgumentException(
+                    $"Probe {Name} of type"
+                        + $" {Probe} in session {sessionName} was not found"
+                        + " in provided probes."
+                );
             var probeTypeName = probeHook.GetType().Name;
-            context.Logger.LogDebugWithMetaData("Started building Probe of type {type}",
-                context.GetMetaDataOrDefault(), new object?[] { probeTypeName });
+            context.Logger.LogDebugWithMetaData(
+                "Started building Probe of type {type}",
+                context.GetMetaDataOrDefault(),
+                new object?[] { probeTypeName }
+            );
 
-            return new Probe(Name!, sessionName, Stage, probeHook, DataSourceNames, DataSourcePatterns, context.Logger);
+            return new Probe(
+                Name!,
+                sessionName,
+                Stage,
+                probeHook,
+                DataSourceNames,
+                DataSourcePatterns,
+                context.Logger
+            );
         }
         catch (Exception e)
         {
-            actionFailures.AppendActionFailure(e, sessionName, context.Logger, "Probe", probeName, probeType);
+            actionFailures.AppendActionFailure(
+                e,
+                sessionName,
+                context.Logger,
+                "Probe",
+                probeName,
+                probeType
+            );
         }
 
         return null;
@@ -303,16 +345,22 @@ public class ProbeBuilder : IYamlConvertible, ICloneable<ProbeBuilder>
         return $"{sessionName.Length}:{sessionName}{probeName}";
     }
 
-    internal static (string SessionName, string ProbeName) ParseScopedHookName(string scopedHookName)
+    internal static (string SessionName, string ProbeName) ParseScopedHookName(
+        string scopedHookName
+    )
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(scopedHookName);
 
         var delimiterIndex = scopedHookName.IndexOf(':');
-        if (delimiterIndex <= 0 ||
-            !int.TryParse(scopedHookName[..delimiterIndex], out var sessionNameLength) ||
-            sessionNameLength < 0)
+        if (
+            delimiterIndex <= 0
+            || !int.TryParse(scopedHookName[..delimiterIndex], out var sessionNameLength)
+            || sessionNameLength < 0
+        )
         {
-            throw new FormatException($"Probe scoped hook name '{scopedHookName}' is not in the expected format.");
+            throw new FormatException(
+                $"Probe scoped hook name '{scopedHookName}' is not in the expected format."
+            );
         }
 
         var sessionNameStartIndex = delimiterIndex + 1;
@@ -325,7 +373,9 @@ public class ProbeBuilder : IYamlConvertible, ICloneable<ProbeBuilder>
         var probeName = scopedHookName[(sessionNameStartIndex + sessionNameLength)..];
         if (string.IsNullOrWhiteSpace(probeName))
         {
-            throw new FormatException($"Probe scoped hook name '{scopedHookName}' is missing the probe name.");
+            throw new FormatException(
+                $"Probe scoped hook name '{scopedHookName}' is missing the probe name."
+            );
         }
 
         return (sessionName, probeName);

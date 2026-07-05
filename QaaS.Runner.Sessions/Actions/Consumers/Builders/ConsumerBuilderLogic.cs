@@ -79,7 +79,7 @@ public partial class ConsumerBuilder
         TimeoutMs = timeoutMs;
         return this;
     }
-    
+
     /// <summary>
     /// Configures timeout on the current Runner consumer builder instance.
     /// </summary>
@@ -187,14 +187,17 @@ public partial class ConsumerBuilder
         var currentConfig = Configuration;
         if (configuration is IReaderConfig typedConfiguration)
         {
-            return Configure(currentConfig == null
-                ? typedConfiguration
-                : currentConfig.UpdateConfiguration(typedConfiguration));
+            return Configure(
+                currentConfig == null
+                    ? typedConfiguration
+                    : currentConfig.UpdateConfiguration(typedConfiguration)
+            );
         }
 
         if (currentConfig == null)
             throw new InvalidOperationException(
-                "Consumer configuration is not set and cannot be inferred from an object patch. Configure a concrete consumer configuration first.");
+                "Consumer configuration is not set and cannot be inferred from an object patch. Configure a concrete consumer configuration first."
+            );
         return Configure(currentConfig.UpdateConfiguration(configuration));
     }
 
@@ -263,9 +266,18 @@ public partial class ConsumerBuilder
     /// <summary>
     /// Builds a concrete consumer action and degrades to an action failure instead of throwing on invalid setup.
     /// </summary>
-    internal BaseConsumer? Build(InternalContext context, IList<ActionFailure> actionFailures, string sessionName)
+    internal BaseConsumer? Build(
+        InternalContext context,
+        IList<ActionFailure> actionFailures,
+        string sessionName
+    )
     {
-        return BuildWithTimeZone(context, actionFailures, sessionName, TimeZoneInfoResolver.DefaultTimeZoneId);
+        return BuildWithTimeZone(
+            context,
+            actionFailures,
+            sessionName,
+            TimeZoneInfoResolver.DefaultTimeZoneId
+        );
     }
 
     /// <summary>
@@ -275,7 +287,8 @@ public partial class ConsumerBuilder
         InternalContext context,
         IList<ActionFailure> actionFailures,
         string sessionName,
-        string timeZoneId)
+        string timeZoneId
+    )
     {
         IReaderConfig? type = null;
         try
@@ -284,11 +297,21 @@ public partial class ConsumerBuilder
             var serializationType = Deserialize?.Deserializer;
             var deserializerSpecificType = Deserialize?.SpecificType?.GetConfiguredType();
             var timeout = TimeSpan.FromMilliseconds(TimeoutMs!.Value);
-            var initialTimeout = InitialTimeoutMs.HasValue ? TimeSpan.FromMilliseconds(InitialTimeoutMs.Value) : (TimeSpan?)null;
+            var initialTimeout = InitialTimeoutMs.HasValue
+                ? TimeSpan.FromMilliseconds(InitialTimeoutMs.Value)
+                : (TimeSpan?)null;
             var allTypes = new List<IReaderConfig?>
             {
-                RabbitMq, KafkaTopic, Socket, IbmMqQueue, PostgreSqlTable, OracleSqlTable, MsSqlTable, TrinoSqlTable,
-                ElasticIndices, S3Bucket
+                RabbitMq,
+                KafkaTopic,
+                Socket,
+                IbmMqQueue,
+                PostgreSqlTable,
+                OracleSqlTable,
+                MsSqlTable,
+                TrinoSqlTable,
+                ElasticIndices,
+                S3Bucket,
             };
             if (allTypes.Count(config => config != null) > 1)
             {
@@ -297,45 +320,87 @@ public partial class ConsumerBuilder
                     .Select(config => config!.GetType().Name)
                     .ToArray();
                 throw new InvalidOperationException(
-                    $"Multiple configurations provided for Consumer '{Name}': {string.Join(", ", conflictingConfigs)}. " +
-                    "Only one type is allowed at a time.");
+                    $"Multiple configurations provided for Consumer '{Name}': {string.Join(", ", conflictingConfigs)}. "
+                        + "Only one type is allowed at a time."
+                );
             }
 
-            type = allTypes.FirstOrDefault(configuredType => configuredType != null) ??
-                   throw new InvalidOperationException($"Missing supported type in consumer {Name}");
+            type =
+                allTypes.FirstOrDefault(configuredType => configuredType != null)
+                ?? throw new InvalidOperationException(
+                    $"Missing supported type in consumer {Name}"
+                );
             var readerChunkMode = ProtocolChunkSupport.ResolveReaderMode(type);
             if (readerChunkMode == ProtocolChunkMode.SingleOrChunk)
             {
                 var propertyName = ProtocolChunkSupport.GetReaderConfigurationPropertyName(type);
                 throw new InvalidOperationException(
-                    $"The {propertyName} field is ambiguous because the configured protocol supports both single and chunk reading, but consumer configuration does not expose a chunk selection option.");
+                    $"The {propertyName} field is ambiguous because the configured protocol supports both single and chunk reading, but consumer configuration does not expose a chunk selection option."
+                );
             }
 
-            var overrideRequest = new ConsumerOverrideRequest(Name!, type, context.Logger, DataFilter, timeZoneId);
-            var (reader, chunkReader) = context.GetSessionActionOverrides()?.Consumer?.Invoke(overrideRequest)
-                                        ?? ProtocolFactoryCompatibility.CreateReader(
-                                            type,
-                                            context.Logger,
-                                            DataFilter,
-                                            timeZoneId);
-            var consumerTypeName = reader?.GetType().Name ?? chunkReader?.GetType().Name ?? "Unknown";
-            
-            context.Logger.LogDebugWithMetaData("Started building Consumer of type {type}",
-                context.GetMetaDataOrDefault(), new object?[] { consumerTypeName });
+            var overrideRequest = new ConsumerOverrideRequest(
+                Name!,
+                type,
+                context.Logger,
+                DataFilter,
+                timeZoneId
+            );
+            var (reader, chunkReader) =
+                context.GetSessionActionOverrides()?.Consumer?.Invoke(overrideRequest)
+                ?? ProtocolFactoryCompatibility.CreateReader(
+                    type,
+                    context.Logger,
+                    DataFilter,
+                    timeZoneId
+                );
+            var consumerTypeName =
+                reader?.GetType().Name ?? chunkReader?.GetType().Name ?? "Unknown";
+
+            context.Logger.LogDebugWithMetaData(
+                "Started building Consumer of type {type}",
+                context.GetMetaDataOrDefault(),
+                new object?[] { consumerTypeName }
+            );
 
             return reader != null
-                ? new Consumer(Name!, reader, timeout, initialTimeout, Stage, policies, DataFilter, serializationType,
-                    deserializerSpecificType, context.Logger)
-                : chunkReader != null
-                    ? new ChunkConsumer(Name!, chunkReader, timeout, initialTimeout, Stage, policies, DataFilter,
+                    ? new Consumer(
+                        Name!,
+                        reader,
+                        timeout,
+                        initialTimeout,
+                        Stage,
+                        policies,
+                        DataFilter,
                         serializationType,
-                        deserializerSpecificType, context.Logger)
-                    : null;
+                        deserializerSpecificType,
+                        context.Logger
+                    )
+                : chunkReader != null
+                    ? new ChunkConsumer(
+                        Name!,
+                        chunkReader,
+                        timeout,
+                        initialTimeout,
+                        Stage,
+                        policies,
+                        DataFilter,
+                        serializationType,
+                        deserializerSpecificType,
+                        context.Logger
+                    )
+                : null;
         }
         catch (Exception e)
         {
-            actionFailures.AppendActionFailure(e, sessionName, context.Logger, nameof(Consumer), Name!,
-                type?.GetType().Name);
+            actionFailures.AppendActionFailure(
+                e,
+                sessionName,
+                context.Logger,
+                nameof(Consumer),
+                Name!,
+                type?.GetType().Name
+            );
         }
 
         return null;
@@ -343,15 +408,24 @@ public partial class ConsumerBuilder
 
     private IReaderConfig? GetConfiguration()
     {
-        if (RabbitMq != null) return RabbitMq;
-        if (KafkaTopic != null) return KafkaTopic;
-        if (Socket != null) return Socket;
-        if (IbmMqQueue != null) return IbmMqQueue;
-        if (PostgreSqlTable != null) return PostgreSqlTable;
-        if (OracleSqlTable != null) return OracleSqlTable;
-        if (MsSqlTable != null) return MsSqlTable;
-        if (TrinoSqlTable != null) return TrinoSqlTable;
-        if (ElasticIndices != null) return ElasticIndices;
+        if (RabbitMq != null)
+            return RabbitMq;
+        if (KafkaTopic != null)
+            return KafkaTopic;
+        if (Socket != null)
+            return Socket;
+        if (IbmMqQueue != null)
+            return IbmMqQueue;
+        if (PostgreSqlTable != null)
+            return PostgreSqlTable;
+        if (OracleSqlTable != null)
+            return OracleSqlTable;
+        if (MsSqlTable != null)
+            return MsSqlTable;
+        if (TrinoSqlTable != null)
+            return TrinoSqlTable;
+        if (ElasticIndices != null)
+            return ElasticIndices;
         return S3Bucket;
     }
 }

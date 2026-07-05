@@ -32,40 +32,53 @@ public class ReportLogic : ILogic
         _context.Logger.LogInformation("Running {Reports} Logic", "Reports");
         _context.Logger.LogInformation(
             "Started writing assertion results using {ReporterCount} reporters. ReporterTypes={ReporterTypes}",
-            Reporters.Count, reporterTypes);
+            Reporters.Count,
+            reporterTypes
+        );
 
-        var assertionResults = executionData.AssertionResults
-            .OfType<AssertionResult>()
-            .ToList();
+        var assertionResults = executionData.AssertionResults.OfType<AssertionResult>().ToList();
 
         foreach (var reporter in Reporters)
         {
             _context.Logger.LogDebug(
                 "Reporter type {ReporterType} is evaluating {AssertionCount} assertion results",
                 reporter.GetType().Name,
-                assertionResults.Count);
+                assertionResults.Count
+            );
 
             foreach (var assertionResult in assertionResults)
             {
-                if (assertionResult.Assertion.StatusesToReport.Contains(assertionResult.AssertionStatus))
+                if (
+                    assertionResult.Assertion.StatusesToReport.Contains(
+                        assertionResult.AssertionStatus
+                    )
+                )
                 {
                     _context.Logger.LogDebug(
                         "Routing assertion {AssertionName} with status {AssertionStatus} to reporter type {ReporterType}",
-                        assertionResult.Assertion.Name, assertionResult.AssertionStatus, reporter.GetType().Name);
+                        assertionResult.Assertion.Name,
+                        assertionResult.AssertionStatus,
+                        reporter.GetType().Name
+                    );
                     reporter.WriteTestResults(assertionResult);
                 }
                 else
                 {
                     _context.Logger.LogDebug(
                         "Skipping reporter type {ReporterType} for assertion {AssertionName} because status {AssertionStatus} is not configured for reporting",
-                        reporter.GetType().Name, assertionResult.Assertion.Name, assertionResult.AssertionStatus);
+                        reporter.GetType().Name,
+                        assertionResult.Assertion.Name,
+                        assertionResult.AssertionStatus
+                    );
                 }
             }
         }
 
         _context.Logger.LogInformation(
             "Finished writing assertion results using {ReporterCount} reporters. ReporterTypes={ReporterTypes}",
-            Reporters.Count, reporterTypes);
+            Reporters.Count,
+            reporterTypes
+        );
 
         return executionData;
     }

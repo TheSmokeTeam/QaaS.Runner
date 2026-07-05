@@ -23,7 +23,8 @@ public static class RunnerCaseExpansionExtensions
     public static ExecutionBuilder ExtractBaseBuilder(
         this Runner runner,
         int index = 0,
-        Action<ExecutionBuilder>? setupBase = null)
+        Action<ExecutionBuilder>? setupBase = null
+    )
     {
         ArgumentNullException.ThrowIfNull(runner);
         runner.ExecutionBuilders ??= new List<ExecutionBuilder>();
@@ -39,7 +40,8 @@ public static class RunnerCaseExpansionExtensions
                 throw new ArgumentOutOfRangeException(
                     nameof(index),
                     index,
-                    $"The runner has {runner.ExecutionBuilders.Count} execution builder(s); cannot extract index {index}.");
+                    $"The runner has {runner.ExecutionBuilders.Count} execution builder(s); cannot extract index {index}."
+                );
 
             baseBuilder = runner.ExecutionBuilders[index];
             runner.ExecutionBuilders.RemoveAt(index);
@@ -55,8 +57,10 @@ public static class RunnerCaseExpansionExtensions
     /// <param name="runner">The runner instance.</param>
     /// <param name="setupBase">Configuration block to run over the extracted base builder.</param>
     /// <returns>The extracted execution builder, or a new instance if the list was empty.</returns>
-    public static ExecutionBuilder ExtractBaseBuilder(this Runner runner, Action<ExecutionBuilder> setupBase) =>
-        runner.ExtractBaseBuilder(0, setupBase);
+    public static ExecutionBuilder ExtractBaseBuilder(
+        this Runner runner,
+        Action<ExecutionBuilder> setupBase
+    ) => runner.ExtractBaseBuilder(0, setupBase);
 
     /// <summary>
     /// Replaces the Runner's existing execution plan with builders cloned from the provided base builder,
@@ -69,7 +73,8 @@ public static class RunnerCaseExpansionExtensions
     public static Runner AddTestCases(
         this Runner runner,
         ExecutionBuilder baseBuilder,
-        params ITestCase[] cases)
+        params ITestCase[] cases
+    )
     {
         ArgumentNullException.ThrowIfNull(runner);
         ArgumentNullException.ThrowIfNull(baseBuilder);

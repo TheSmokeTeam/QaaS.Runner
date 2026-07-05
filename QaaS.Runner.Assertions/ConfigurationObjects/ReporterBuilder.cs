@@ -18,33 +18,45 @@ public class ReporterBuilder : IYamlConvertible, ICloneable<ReporterBuilder>
 {
     public ReporterBuilder Clone() => BuilderCloner.DeepClone(this);
 
-    [Description("Whether to save the session logs belonging to the assertions in the test report. " +
-                 "If not set, each assertion will determine whether to save them.")]
+    [Description(
+        "Whether to save the session logs belonging to the assertions in the test report. "
+            + "If not set, each assertion will determine whether to save them."
+    )]
     [DefaultValue(null)]
     public bool? SaveLogs { get; internal set; }
 
-    [Description("Whether to save the attachments belonging to the assertions in the test report. " +
-                 "If not set, each assertion will determine whether to save them.")]
+    [Description(
+        "Whether to save the attachments belonging to the assertions in the test report. "
+            + "If not set, each assertion will determine whether to save them."
+    )]
     [DefaultValue(null)]
     public bool? SaveAttachments { get; internal set; }
 
-    [Description("Whether to save the configuration template belonging to the assertions in the test report. " +
-                 "If not set, each assertion will determine whether to save it.")]
+    [Description(
+        "Whether to save the configuration template belonging to the assertions in the test report. "
+            + "If not set, each assertion will determine whether to save it."
+    )]
     [DefaultValue(null)]
     public bool? SaveTemplate { get; internal set; }
 
-    [Description("Whether to save the session data belonging to the assertions in the test report. " +
-                 "If not set, each assertion will determine whether to save it.")]
+    [Description(
+        "Whether to save the session data belonging to the assertions in the test report. "
+            + "If not set, each assertion will determine whether to save it."
+    )]
     [DefaultValue(null)]
     public bool? SaveSessionData { get; internal set; }
 
-    [Description("Whether to display the assertion message trace in the assertions results. " +
-                 "If not set, each assertion will determine whether to display it.")]
+    [Description(
+        "Whether to display the assertion message trace in the assertions results. "
+            + "If not set, each assertion will determine whether to display it."
+    )]
     [DefaultValue(null)]
     public bool? DisplayTrace { get; internal set; }
 
-    [Description("ReportPortal configuration to use for this reporter. " +
-                 "If not set, the default ReportPortal configuration will be used.")]
+    [Description(
+        "ReportPortal configuration to use for this reporter. "
+            + "If not set, the default ReportPortal configuration will be used."
+    )]
     [DefaultValue(typeof(ReportPortalConfig))]
     public ReportPortalConfig? ReportPortal { get; internal set; } = new();
 
@@ -196,7 +208,9 @@ public class ReporterBuilder : IYamlConvertible, ICloneable<ReporterBuilder>
             SaveTemplate = SaveTemplate,
             SaveSessionData = SaveSessionData,
             FileSystem = fileSystem ?? new FileSystem(),
-            EpochTestSuiteStartTime = new DateTimeOffset(testSuiteStartTimeUtc).ToUnixTimeMilliseconds()
+            EpochTestSuiteStartTime = new DateTimeOffset(
+                testSuiteStartTimeUtc
+            ).ToUnixTimeMilliseconds(),
         };
         reporters.Add(allureReporter);
 

@@ -30,10 +30,10 @@ public class ReportLogicTests
                     AssertionStatus.Failed,
                     AssertionStatus.Passed,
                     AssertionStatus.Skipped,
-                    AssertionStatus.Unknown
+                    AssertionStatus.Unknown,
                 ],
                 AssertionName = null,
-                AssertionHook = null
+                AssertionHook = null,
             };
             var assertionResult = new AssertionResult
             {
@@ -87,14 +87,14 @@ public class ReportLogicTests
                     AssertionStatus.Failed,
                     AssertionStatus.Passed,
                     AssertionStatus.Skipped,
-                    AssertionStatus.Unknown
+                    AssertionStatus.Unknown,
                 ],
                 AssertionName = null,
-                AssertionHook = null
+                AssertionHook = null,
             },
             AssertionStatus = AssertionStatus.Passed,
             TestDurationMs = 0,
-            Flaky = null
+            Flaky = null,
         };
         var secondAssertionResult = new AssertionResult
         {
@@ -107,17 +107,20 @@ public class ReportLogicTests
                     AssertionStatus.Failed,
                     AssertionStatus.Passed,
                     AssertionStatus.Skipped,
-                    AssertionStatus.Unknown
+                    AssertionStatus.Unknown,
                 ],
                 AssertionName = null,
-                AssertionHook = null
+                AssertionHook = null,
             },
             AssertionStatus = AssertionStatus.Passed,
             TestDurationMs = 0,
-            Flaky = null
+            Flaky = null,
         };
 
-        var reportLogic = new ReportLogic([firstReporter, secondReporter], Globals.GetContextWithMetadata());
+        var reportLogic = new ReportLogic(
+            [firstReporter, secondReporter],
+            Globals.GetContextWithMetadata()
+        );
         var executionData = new ExecutionData();
         executionData.AssertionResults.Add(firstAssertionResult);
         executionData.AssertionResults.Add(secondAssertionResult);
@@ -127,8 +130,14 @@ public class ReportLogicTests
         Assert.That(result, Is.SameAs(executionData));
         Assert.Multiple(() =>
         {
-            Assert.That(firstReporter.Results, Is.EqualTo(new[] { firstAssertionResult, secondAssertionResult }));
-            Assert.That(secondReporter.Results, Is.EqualTo(new[] { firstAssertionResult, secondAssertionResult }));
+            Assert.That(
+                firstReporter.Results,
+                Is.EqualTo(new[] { firstAssertionResult, secondAssertionResult })
+            );
+            Assert.That(
+                secondReporter.Results,
+                Is.EqualTo(new[] { firstAssertionResult, secondAssertionResult })
+            );
         });
     }
 
@@ -143,11 +152,11 @@ public class ReportLogicTests
                 Name = "AssertionA",
                 StatusesToReport = [AssertionStatus.Failed],
                 AssertionName = null,
-                AssertionHook = null
+                AssertionHook = null,
             },
             AssertionStatus = AssertionStatus.Passed,
             TestDurationMs = 0,
-            Flaky = null
+            Flaky = null,
         };
         var executionData = new ExecutionData();
         executionData.AssertionResults.Add(assertionResult);
@@ -177,7 +186,5 @@ public class ReportLogicTests
         }
     }
 
-    private sealed class AlternateRecordingReporter : RecordingReporter
-    {
-    }
+    private sealed class AlternateRecordingReporter : RecordingReporter { }
 }

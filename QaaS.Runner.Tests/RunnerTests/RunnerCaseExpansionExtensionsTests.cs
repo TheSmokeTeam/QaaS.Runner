@@ -1,10 +1,10 @@
+using System;
+using System.Collections.Generic;
+using System.Linq;
 using NUnit.Framework;
 using QaaS.Runner;
 using QaaS.Runner.Cases;
 using QaaS.Runner.Sessions.Session.Builders;
-using System;
-using System.Collections.Generic;
-using System.Linq;
 
 namespace QaaS.Runner.Tests.RunnerTests;
 
@@ -62,7 +62,7 @@ public class RunnerCaseExpansionExtensionsTests
     {
         // Arrange
         var runner = Bootstrap.New(["run", "TestData/test.qaas.yaml", "--no-process-exit"]);
-        
+
         // Act
         var baseBuilder = runner.ExtractBaseBuilder(builder =>
         {
@@ -98,14 +98,15 @@ public class RunnerCaseExpansionExtensionsTests
         Assert.That(runner.ExecutionBuilders, Is.Empty);
 
         // Act
-        runner.AddTestCases(baseBuilder, 
+        runner.AddTestCases(
+            baseBuilder,
             new DummyTestCase("Case1Session"),
             new DummyTestCase("Case2Session")
         );
 
         // Assert
         Assert.That(runner.ExecutionBuilders, Has.Count.EqualTo(2));
-        
+
         var firstClone = runner.ExecutionBuilders[0];
         var secondClone = runner.ExecutionBuilders[1];
 
@@ -118,8 +119,11 @@ public class RunnerCaseExpansionExtensionsTests
 
         Assert.That(secondClone.Sessions.Any(s => s.Name == "Case2Session"), Is.True);
         Assert.That(secondClone.Sessions.Any(s => s.Name == "Case1Session"), Is.False);
-        
+
         // Ensure base builder is unmodified (remains clean)
-        Assert.That(baseBuilder.Sessions.Any(s => s.Name == "Case1Session" || s.Name == "Case2Session"), Is.False);
+        Assert.That(
+            baseBuilder.Sessions.Any(s => s.Name == "Case1Session" || s.Name == "Case2Session"),
+            Is.False
+        );
     }
 }

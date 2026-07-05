@@ -15,9 +15,9 @@ public class Assertion
     public string Name { get; set; } = string.Empty;
 
     public string AssertionName { get; set; } = string.Empty;
-    
+
     public IAssertion AssertionHook { get; set; } = default!;
-    
+
     public IList<AssertionStatus> StatusesToReport { get; set; } = [];
 
     public IConfiguration AssertionConfiguration { get; set; } = new ConfigurationBuilder().Build();
@@ -51,31 +51,54 @@ public class Assertion
     public string[]? _sessionNames { get; set; }
     public string[]? _sessionPatterns { get; set; }
 
-    public virtual AssertionResult Execute(IImmutableList<SessionData?> sessionDataList,
-        IImmutableList<DataSource>? dataSourceList)
+    public virtual AssertionResult Execute(
+        IImmutableList<SessionData?> sessionDataList,
+        IImmutableList<DataSource>? dataSourceList
+    )
     {
-        var nonNullSessionDataList = sessionDataList.Where(sessionData => sessionData != null).Select(sd => sd!)
+        var nonNullSessionDataList = sessionDataList
+            .Where(sessionData => sessionData != null)
+            .Select(sd => sd!)
             .ToImmutableList();
         var availableDataSources = dataSourceList ?? ImmutableList<DataSource>.Empty;
 
         // Set assertion's dataSources and sessions based on provided names & patterns
-        DataSourceList = EnumerableExtensions.GetFilteredConfigurationObjectList(
+        DataSourceList = EnumerableExtensions
+            .GetFilteredConfigurationObjectList(
                 availableDataSources,
-                _dataSourcePatterns, RegexFilters.DataSource,
-                "DataSource List")
-            .Union(EnumerableExtensions.GetFilteredConfigurationObjectList(
-                availableDataSources,
-                _dataSourceNames, NameFilters.DataSource,
-                "DataSource List")).ToImmutableList();
-        SessionDataList = EnumerableExtensions.GetFilteredConfigurationObjectList(nonNullSessionDataList,
-                _sessionPatterns!, RegexFilters.SessionData,
-                "SessionData List")
-            .Union(EnumerableExtensions.GetFilteredConfigurationObjectList(nonNullSessionDataList,
-                _sessionNames!, NameFilters.SessionData,
-                "SessionData List")).ToImmutableList();
+                _dataSourcePatterns,
+                RegexFilters.DataSource,
+                "DataSource List"
+            )
+            .Union(
+                EnumerableExtensions.GetFilteredConfigurationObjectList(
+                    availableDataSources,
+                    _dataSourceNames,
+                    NameFilters.DataSource,
+                    "DataSource List"
+                )
+            )
+            .ToImmutableList();
+        SessionDataList = EnumerableExtensions
+            .GetFilteredConfigurationObjectList(
+                nonNullSessionDataList,
+                _sessionPatterns!,
+                RegexFilters.SessionData,
+                "SessionData List"
+            )
+            .Union(
+                EnumerableExtensions.GetFilteredConfigurationObjectList(
+                    nonNullSessionDataList,
+                    _sessionNames!,
+                    NameFilters.SessionData,
+                    "SessionData List"
+                )
+            )
+            .ToImmutableList();
 
         var sessionTimesList = SessionDataList
-            .Select(s => new KeyValuePair<DateTime, DateTime>(s.UtcStartTime, s.UtcEndTime)).ToList();
+            .Select(s => new KeyValuePair<DateTime, DateTime>(s.UtcStartTime, s.UtcEndTime))
+            .ToList();
 
         AssertionStatus assertionStatus;
         Exception? brokenAssertionStringException = null;
@@ -83,13 +106,15 @@ public class Assertion
         stopwatch.Start();
         try
         {
-            var assertionBooleanResult =
-                AssertionHook.Assert(SessionDataList,
-                    DataSourceList ?? ImmutableList<DataSource>.Empty);
+            var assertionBooleanResult = AssertionHook.Assert(
+                SessionDataList,
+                DataSourceList ?? ImmutableList<DataSource>.Empty
+            );
 
             // Initialized AssertionStatus overrides Assertion return value
-            assertionStatus = AssertionHook.AssertionStatus ??
-                              (assertionBooleanResult ? AssertionStatus.Passed : AssertionStatus.Failed);
+            assertionStatus =
+                AssertionHook.AssertionStatus
+                ?? (assertionBooleanResult ? AssertionStatus.Passed : AssertionStatus.Failed);
         }
         catch (Exception e)
         {
@@ -99,8 +124,9 @@ public class Assertion
 
         stopwatch.Stop();
 
-        var testDuration = stopwatch.ElapsedMilliseconds + SessionDataList.Sum(s =>
-            (long)(s.UtcEndTime - s.UtcStartTime).TotalMilliseconds);
+        var testDuration =
+            stopwatch.ElapsedMilliseconds
+            + SessionDataList.Sum(s => (long)(s.UtcEndTime - s.UtcStartTime).TotalMilliseconds);
 
         // if any failures, mark as flaky
         var flaky = SessionDataList.Any(sessionData => sessionData.SessionFailures.Count > 0);
@@ -115,16 +141,19 @@ public class Assertion
             Flaky = new Flaky
             {
                 IsFlaky = flaky,
-                FlakinessReasons = SessionDataList.Select(sessionData =>
-                        new KeyValuePair<string, List<ActionFailure>>(
-                            sessionData.Name,
-                            DeduplicateFlakinessReasons(sessionData.SessionFailures)))
-                    .ToList()
-            }
+                FlakinessReasons = SessionDataList
+                    .Select(sessionData => new KeyValuePair<string, List<ActionFailure>>(
+                        sessionData.Name,
+                        DeduplicateFlakinessReasons(sessionData.SessionFailures)
+                    ))
+                    .ToList(),
+            },
         };
     }
 
-    private static List<ActionFailure> DeduplicateFlakinessReasons(IEnumerable<ActionFailure> sessionFailures)
+    private static List<ActionFailure> DeduplicateFlakinessReasons(
+        IEnumerable<ActionFailure> sessionFailures
+    )
     {
         var seenFailures = new HashSet<FlakinessReasonKey>();
         var distinctFailures = new List<ActionFailure>();
@@ -134,7 +163,8 @@ public class Assertion
                 sessionFailure.Action ?? string.Empty,
                 sessionFailure.ActionType,
                 sessionFailure.Name,
-                sessionFailure.Reason.Message);
+                sessionFailure.Reason.Message
+            );
             if (seenFailures.Add(key))
                 distinctFailures.Add(sessionFailure);
         }
@@ -146,5 +176,6 @@ public class Assertion
         string Action,
         string ActionType,
         string Name,
-        string Message);
+        string Message
+    );
 }
