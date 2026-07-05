@@ -51,40 +51,37 @@ namespace QaaS.Runner;
 [JsonSchema]
 public class ExecutionBuilder() : BaseExecutionBuilder<InternalContext, ExecutionData>, ICloneable<ExecutionBuilder>
 {
-    
     /// <summary>
     /// Manually clone for <see cref="ExecutionBuilder" /> since it contains objects that can't be deep cloned with <see cref="BuilderCloner.DeepClone{T}(T)" />
     /// Objects such as <see cref="ILogger" /> are shared across ExecutionBuilders and can't be deep-cloned.
     /// </summary>
     /// <returns></returns>
-    public ExecutionBuilder Clone() => new(this);
-
-    /// <summary>
-    /// Constructor for cloning an <see cref="ExecutionBuilder" /> instance used by <see cref="Clone" /> method.
-    /// </summary>
-    /// <param name="source"></param>
-    private ExecutionBuilder(ExecutionBuilder source) : this()
+    public ExecutionBuilder Clone()
     {
-        DataSources = source.DataSources?.Select(dataSource => dataSource.Clone()).ToArray();
-        Sessions = source.Sessions?.Select(session => session.Clone()).ToArray();
-        Storages = source.Storages?.Select(storage => storage.Clone()).ToArray();
-        Assertions = source.Assertions?.Select(assertion => assertion.Clone()).ToArray();
-        Links = source.Links?.Select(link => link.Clone()).ToArray();
-        MetaData = source.MetaData is null ? null : BuilderCloner.DeepClone(source.MetaData);
-        Reporters = source.Reporters?.Clone();
-        Type = source.Type;
-        LoadedContext = source.LoadedContext;
-        Context = source.Context;
-        _templateSourceConfiguration = source._templateSourceConfiguration;
-        _sessionNamesToRun = source._sessionNamesToRun?.ToArray();
-        _sessionCategoriesToRun = source._sessionCategoriesToRun?.ToArray();
-        _assertionNamesToRun = source._assertionNamesToRun?.ToArray();
-        _assertionCategoriesToRun = source._assertionCategoriesToRun?.ToArray();
-        _configuredLogger = source._configuredLogger;
-        _configuredCaseName = source._configuredCaseName;
-        _configuredExecutionId = source._configuredExecutionId;
-        _globalDict = new Dictionary<string, object?>(source._globalDict);
-        _loadVariablesIntoGlobalDict = source._loadVariablesIntoGlobalDict;
+        var clone = new ExecutionBuilder(
+            LoadedContext ? CloneLoadedContext(Context) : null,
+            LoadedContext,
+            Type,
+            _sessionNamesToRun,
+            _sessionCategoriesToRun,
+            _assertionNamesToRun,
+            _assertionCategoriesToRun,
+            _templateSourceConfiguration)
+        {
+            DataSources = DataSources?.Select(dataSource => dataSource.Clone()).ToArray(),
+            Sessions = Sessions?.Select(session => session.Clone()).ToArray(),
+            Storages = Storages?.Select(storage => storage.Clone()).ToArray(),
+            Assertions = Assertions?.Select(assertion => assertion.Clone()).ToArray(),
+            Links = Links?.Select(link => link.Clone()).ToArray(),
+            MetaData = MetaData is null ? null : BuilderCloner.DeepClone(MetaData),
+            Reporters = Reporters?.Clone()
+        };
+        clone._configuredLogger = _configuredLogger;
+        clone._configuredCaseName = _configuredCaseName;
+        clone._configuredExecutionId = _configuredExecutionId;
+        clone._globalDict = new Dictionary<string, object?>(_globalDict);
+        clone._loadVariablesIntoGlobalDict = _loadVariablesIntoGlobalDict;
+        return clone;
     }
 
     /// <summary>
@@ -200,6 +197,42 @@ public class ExecutionBuilder() : BaseExecutionBuilder<InternalContext, Executio
             ? null
             : assertionCategoriesToRun;
     }
+
+    private ExecutionBuilder(
+        InternalContext? context,
+        bool loadedContext,
+        ExecutionType executionType,
+        IList<string>? sessionNamesToRun,
+        IList<string>? sessionCategoriesToRun,
+        IList<string>? assertionNamesToRun,
+        IList<string>? assertionCategoriesToRun,
+        IConfiguration? templateSourceConfiguration) : this()
+    {
+        if (context is not null)
+            Context = context;
+        LoadedContext = loadedContext;
+        Type = executionType;
+        _sessionNamesToRun = CloneList(sessionNamesToRun);
+        _sessionCategoriesToRun = CloneList(sessionCategoriesToRun);
+        _assertionNamesToRun = CloneList(assertionNamesToRun);
+        _assertionCategoriesToRun = CloneList(assertionCategoriesToRun);
+        _templateSourceConfiguration = templateSourceConfiguration;
+    }
+
+    private static IList<string>? CloneList(IList<string>? source) =>
+        source is null ? null : source.ToArray();
+
+    private static InternalContext CloneLoadedContext(InternalContext context) =>
+        new()
+        {
+            Logger = context.Logger,
+            CaseName = context.CaseName,
+            ExecutionId = context.ExecutionId,
+            RootConfiguration = context.RootConfiguration,
+            InternalRunningSessions =
+                new RunningSessions(new Dictionary<string, RunningSessionData<object, object>>()),
+            InternalGlobalDict = new Dictionary<string, object?>(context.InternalGlobalDict)
+        };
 
     /// <inheritdoc />
     protected override IEnumerable<DataSource> BuildDataSources()
