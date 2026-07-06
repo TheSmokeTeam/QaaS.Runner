@@ -92,10 +92,12 @@ public class CollectorBuilderTests
     public void Build_With_Valid_Prometheus_Config_Should_Create_Collector()
     {
         // Arrange
-        var prometheusConfig = new PrometheusFetcherConfig { Url = "https://promql:8080", Expression = "sum ()" };
-        var builder = new CollectorBuilder()
-            .Named("TestCollector")
-            .Configure(prometheusConfig);
+        var prometheusConfig = new PrometheusFetcherConfig
+        {
+            Url = "https://promql:8080",
+            Expression = "sum ()",
+        };
+        var builder = new CollectorBuilder().Named("TestCollector").Configure(prometheusConfig);
 
         // Act
         var result = builder.Build(Globals.GetContextWithMetadata(), _actionFailures, _sessionName);
@@ -109,11 +111,13 @@ public class CollectorBuilderTests
     public void Build_Without_Configuration_Should_Throw_Exception()
     {
         // Arrange
-        var builder = new CollectorBuilder()
-            .Named("TestCollector");
+        var builder = new CollectorBuilder().Named("TestCollector");
 
         // Act & Assert
-        Assert.That(builder.Build(Globals.GetContextWithMetadata(), _actionFailures, _sessionName), Is.Null);
+        Assert.That(
+            builder.Build(Globals.GetContextWithMetadata(), _actionFailures, _sessionName),
+            Is.Null
+        );
     }
 
     [Test]
@@ -125,32 +129,29 @@ public class CollectorBuilderTests
         // Act & Assert
         Assert.Throws<ArgumentException>(() =>
         {
-            new CollectorBuilder()
-                .Named("TestCollector")
-                .Configure(unsupportedConfig);
+            new CollectorBuilder().Named("TestCollector").Configure(unsupportedConfig);
         });
     }
 
     [Test]
     public void UpdateConfiguration_Without_Existing_Configuration_Should_Throw()
     {
-        var builder = new CollectorBuilder()
-            .Named("TestCollector");
+        var builder = new CollectorBuilder().Named("TestCollector");
 
         Assert.Throws<InvalidOperationException>(() =>
-            builder.UpdateConfiguration(new { Url = "https://prometheus.local" }));
+            builder.UpdateConfiguration(new { Url = "https://prometheus.local" })
+        );
     }
 
     [Test]
     public void UpdateConfiguration_WithConfigurationWithoutExistingConfiguration_ShouldConfigureIncomingType()
     {
-        var builder = new CollectorBuilder()
-            .Named("TestCollector");
+        var builder = new CollectorBuilder().Named("TestCollector");
         var config = new PrometheusFetcherConfig();
 
         builder.UpdateConfiguration(config);
 
-        Assert.That(builder.Configuration, Is.SameAs(config));
+        Assert.That(builder.Prometheus, Is.SameAs(config));
     }
 
     [Test]
@@ -158,18 +159,22 @@ public class CollectorBuilderTests
     {
         var fetcher = new Mock<IFetcher>();
         var context = Globals.GetContextWithMetadata();
-        context.SetSessionActionOverrides(new SessionActionOverrides
-        {
-            Collector = _ => fetcher.Object
-        });
+        context.SetSessionActionOverrides(
+            new SessionActionOverrides { Collector = _ => fetcher.Object }
+        );
 
         var builder = new CollectorBuilder()
             .Named("TestCollector")
-            .Configure(new PrometheusFetcherConfig { Url = "https://promql:8080", Expression = "sum ()" });
+            .Configure(
+                new PrometheusFetcherConfig { Url = "https://promql:8080", Expression = "sum ()" }
+            );
 
         var result = builder.Build(context, _actionFailures, _sessionName);
-        var fetcherField = typeof(global::QaaS.Runner.Sessions.Actions.Collectors.Collector)
-            .GetField("_fetcher", BindingFlags.Instance | BindingFlags.NonPublic)!;
+        var fetcherField =
+            typeof(global::QaaS.Runner.Sessions.Actions.Collectors.Collector).GetField(
+                "_fetcher",
+                BindingFlags.Instance | BindingFlags.NonPublic
+            )!;
 
         Assert.That(result, Is.Not.Null);
         Assert.That(fetcherField.GetValue(result!), Is.SameAs(fetcher.Object));
@@ -179,13 +184,17 @@ public class CollectorBuilderTests
     public void Build_When_Runtime_Override_Throws_ReturnsNullAndRecordsFailure()
     {
         var context = Globals.GetContextWithMetadata();
-        context.SetSessionActionOverrides(new SessionActionOverrides
-        {
-            Collector = _ => throw new InvalidOperationException("override failed")
-        });
+        context.SetSessionActionOverrides(
+            new SessionActionOverrides
+            {
+                Collector = _ => throw new InvalidOperationException("override failed"),
+            }
+        );
         var builder = new CollectorBuilder()
             .Named("TestCollector")
-            .Configure(new PrometheusFetcherConfig { Url = "https://promql:8080", Expression = "sum ()" });
+            .Configure(
+                new PrometheusFetcherConfig { Url = "https://promql:8080", Expression = "sum ()" }
+            );
 
         var result = builder.Build(context, _actionFailures, _sessionName);
 
@@ -194,4 +203,3 @@ public class CollectorBuilderTests
         Assert.That(_actionFailures[0].Reason.Message, Does.Contain("override failed"));
     }
 }
-

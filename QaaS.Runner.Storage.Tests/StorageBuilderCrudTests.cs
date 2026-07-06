@@ -12,24 +12,25 @@ public class StorageBuilderCrudTests
     [Test]
     public void StorageBuilder_ShouldSupportConfigurationCrud()
     {
-        var builder = new StorageBuilder()
-            .Configure(new FilesInFileSystemConfig { Path = "one/path" });
+        var builder = new StorageBuilder().Configure(
+            new FilesInFileSystemConfig { Path = "one/path" }
+        );
 
-        Assert.That(builder.Configuration, Is.TypeOf<FilesInFileSystemConfig>());
+        Assert.That(builder.FileSystem, Is.TypeOf<FilesInFileSystemConfig>());
 
         builder.UpdateConfiguration(new S3Config { Prefix = "prefix" });
         builder.UpdateConfiguration(new FilesInFileSystemConfig { Path = "two/path" });
-        Assert.That(builder.Configuration, Is.TypeOf<FilesInFileSystemConfig>());
+        Assert.That(builder.FileSystem, Is.TypeOf<FilesInFileSystemConfig>());
 
         builder.Configure(new S3Config { Prefix = "latest-prefix" });
-        Assert.That(builder.Configuration, Is.TypeOf<S3Config>());
+        Assert.That(builder.S3, Is.TypeOf<S3Config>());
     }
 
     [Test]
     public void StorageBuilder_UpdateConfiguration_WithConfiguration_MergesSameTypeAndPreservesExistingFields()
     {
-        var builder = new StorageBuilder()
-            .Configure(new S3Config
+        var builder = new StorageBuilder().Configure(
+            new S3Config
             {
                 StorageBucket = "bucket-a",
                 ServiceURL = "https://s3.local",
@@ -37,16 +38,15 @@ public class StorageBuilderCrudTests
                 SecretKey = "secret-key",
                 Prefix = "existing-prefix",
                 Delimiter = "/",
-                SkipEmptyObjects = true
-            });
+                SkipEmptyObjects = true,
+            }
+        );
 
-        builder.UpdateConfiguration(new S3Config
-        {
-            MaximumRetryCount = 5,
-            SkipEmptyObjects = false
-        });
+        builder.UpdateConfiguration(
+            new S3Config { MaximumRetryCount = 5, SkipEmptyObjects = false }
+        );
 
-        var mergedConfiguration = (S3Config)builder.Configuration!;
+        var mergedConfiguration = builder.S3!;
         Assert.Multiple(() =>
         {
             Assert.That(mergedConfiguration.StorageBucket, Is.EqualTo("bucket-a"));
@@ -67,18 +67,31 @@ public class StorageBuilderCrudTests
 
         var exception = Assert.Throws<TargetInvocationException>(() => InvokeBuild(builder));
         Assert.That(exception!.InnerException, Is.TypeOf<InvalidOperationException>());
-        Assert.That(exception.InnerException!.Message, Does.Contain("Multiple configurations provided"));
+        Assert.That(
+            exception.InnerException!.Message,
+            Does.Contain("Multiple configurations provided")
+        );
     }
 
     private static IStorage InvokeBuild(StorageBuilder builder)
     {
-        var buildMethod = typeof(StorageBuilder).GetMethod("Build", BindingFlags.Instance | BindingFlags.NonPublic)!;
+        var buildMethod = typeof(StorageBuilder).GetMethod(
+            "Build",
+            BindingFlags.Instance | BindingFlags.NonPublic
+        )!;
         return (IStorage)buildMethod.Invoke(builder, [Globals.Context])!;
     }
 
-    private static void SetInternalProperty(StorageBuilder builder, string propertyName, object? value)
+    private static void SetInternalProperty(
+        StorageBuilder builder,
+        string propertyName,
+        object? value
+    )
     {
-        var property = typeof(StorageBuilder).GetProperty(propertyName, BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic)!;
+        var property = typeof(StorageBuilder).GetProperty(
+            propertyName,
+            BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic
+        )!;
         property.SetValue(builder, value);
     }
 }

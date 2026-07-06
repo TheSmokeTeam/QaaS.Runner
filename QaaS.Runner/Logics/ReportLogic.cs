@@ -22,7 +22,7 @@ public class ReportLogic : ILogic
     }
 
     /// <summary>
-    /// Reports each status-eligible <see cref="AssertionResult" /> to every configured <see cref="IReporter" />.
+    /// Reports matching <see cref="AssertionResult" /> entries to each configured <see cref="IReporter" />.
     /// </summary>
     /// <param name="executionData">The mutable execution context containing assertion results.</param>
     /// <returns>The same <paramref name="executionData" /> instance after reporting completes.</returns>
@@ -40,13 +40,19 @@ public class ReportLogic : ILogic
 
         foreach (var reporter in Reporters)
         {
+            var matchingAssertionResults = assertionResults
+                .Where(assertionResult =>
+                    assertionResult.Assertion.ReporterTypes.Contains(reporter.GetType())
+                )
+                .ToList();
+
             _context.Logger.LogDebug(
-                "Reporter type {ReporterType} is evaluating {AssertionCount} assertion results",
+                "Reporter type {ReporterType} matched {AssertionCount} assertion results",
                 reporter.GetType().Name,
-                assertionResults.Count
+                matchingAssertionResults.Count
             );
 
-            foreach (var assertionResult in assertionResults)
+            foreach (var assertionResult in matchingAssertionResults)
             {
                 if (
                     assertionResult.Assertion.StatusesToReport.Contains(

@@ -18,8 +18,8 @@ using QaaS.Framework.SDK.Session;
 using QaaS.Framework.SDK.Session.SessionDataObjects;
 using QaaS.Framework.Serialization;
 using QaaS.Runner.Sessions.Actions.Consumers.Builders;
-using ConsumerAction = QaaS.Runner.Sessions.Actions.Consumers.Consumer;
 using ChunkConsumerAction = QaaS.Runner.Sessions.Actions.Consumers.ChunkConsumer;
+using ConsumerAction = QaaS.Runner.Sessions.Actions.Consumers.Consumer;
 
 namespace QaaS.Runner.Sessions.Tests.Actions.Consumer;
 
@@ -31,23 +31,44 @@ public class ConsumerBuilderTests
 
     private static IEnumerable<TestCaseData> SupportedReaderConfigurations()
     {
-        yield return new TestCaseData(new RabbitMqReaderConfig()).SetName("ReadConfiguration_WithRabbitMq_ReturnsRabbitMq");
-        yield return new TestCaseData(new KafkaTopicReaderConfig()).SetName("ReadConfiguration_WithKafkaTopic_ReturnsKafkaTopic");
-        yield return new TestCaseData(new SocketReaderConfig()).SetName("ReadConfiguration_WithSocket_ReturnsSocket");
-        yield return new TestCaseData(new IbmMqReaderConfig()).SetName("ReadConfiguration_WithIbmMq_ReturnsIbmMq");
-        yield return new TestCaseData(new PostgreSqlReaderConfig()).SetName("ReadConfiguration_WithPostgreSql_ReturnsPostgreSql");
-        yield return new TestCaseData(new OracleReaderConfig()).SetName("ReadConfiguration_WithOracle_ReturnsOracle");
-        yield return new TestCaseData(new MsSqlReaderConfig()).SetName("ReadConfiguration_WithMsSql_ReturnsMsSql");
-        yield return new TestCaseData(new TrinoReaderConfig()).SetName("ReadConfiguration_WithTrino_ReturnsTrino");
-        yield return new TestCaseData(new ElasticReaderConfig()).SetName("ReadConfiguration_WithElastic_ReturnsElastic");
-        yield return new TestCaseData(new S3BucketReaderConfig()).SetName("ReadConfiguration_WithS3_ReturnsS3");
+        yield return new TestCaseData(new RabbitMqReaderConfig()).SetName(
+            "ReadConfiguration_WithRabbitMq_ReturnsRabbitMq"
+        );
+        yield return new TestCaseData(new KafkaTopicReaderConfig()).SetName(
+            "ReadConfiguration_WithKafkaTopic_ReturnsKafkaTopic"
+        );
+        yield return new TestCaseData(new SocketReaderConfig()).SetName(
+            "ReadConfiguration_WithSocket_ReturnsSocket"
+        );
+        yield return new TestCaseData(new IbmMqReaderConfig()).SetName(
+            "ReadConfiguration_WithIbmMq_ReturnsIbmMq"
+        );
+        yield return new TestCaseData(new PostgreSqlReaderConfig()).SetName(
+            "ReadConfiguration_WithPostgreSql_ReturnsPostgreSql"
+        );
+        yield return new TestCaseData(new OracleReaderConfig()).SetName(
+            "ReadConfiguration_WithOracle_ReturnsOracle"
+        );
+        yield return new TestCaseData(new MsSqlReaderConfig()).SetName(
+            "ReadConfiguration_WithMsSql_ReturnsMsSql"
+        );
+        yield return new TestCaseData(new TrinoReaderConfig()).SetName(
+            "ReadConfiguration_WithTrino_ReturnsTrino"
+        );
+        yield return new TestCaseData(new ElasticReaderConfig()).SetName(
+            "ReadConfiguration_WithElastic_ReturnsElastic"
+        );
+        yield return new TestCaseData(new S3BucketReaderConfig()).SetName(
+            "ReadConfiguration_WithS3_ReturnsS3"
+        );
     }
 
     private static IEnumerable<TestCaseData> ReaderConfigurationsWhichCreateSingleConsumers()
     {
         yield return new TestCaseData(
             new RabbitMqReaderConfig { Host = "https://test" },
-            typeof(ConsumerAction)).SetName("RabbitMqReader_CreatesSingleConsumer");
+            typeof(ConsumerAction)
+        ).SetName("RabbitMqReader_CreatesSingleConsumer");
         yield return new TestCaseData(
             new KafkaTopicReaderConfig
             {
@@ -55,17 +76,19 @@ public class ConsumerBuilderTests
                 GroupId = "test",
                 HostNames = ["host1:8080"],
                 Username = "test",
-                Password = "test"
+                Password = "test",
             },
-            typeof(ConsumerAction)).SetName("KafkaReader_CreatesSingleConsumer");
+            typeof(ConsumerAction)
+        ).SetName("KafkaReader_CreatesSingleConsumer");
         yield return new TestCaseData(
             new SocketReaderConfig
             {
                 Host = "https:test",
                 Port = 8080,
-                ProtocolType = ProtocolType.IP
+                ProtocolType = ProtocolType.IP,
             },
-            typeof(ConsumerAction)).SetName("SocketReader_CreatesSingleConsumer");
+            typeof(ConsumerAction)
+        ).SetName("SocketReader_CreatesSingleConsumer");
         yield return new TestCaseData(
             new IbmMqReaderConfig
             {
@@ -73,9 +96,10 @@ public class ConsumerBuilderTests
                 Port = 8080,
                 Channel = "test",
                 Manager = "test",
-                QueueName = "test"
+                QueueName = "test",
             },
-            typeof(ConsumerAction)).SetName("IbmMqReader_CreatesSingleConsumer");
+            typeof(ConsumerAction)
+        ).SetName("IbmMqReader_CreatesSingleConsumer");
     }
 
     private static IEnumerable<TestCaseData> ReaderConfigurationsWhichCreateChunkConsumers()
@@ -84,23 +108,27 @@ public class ConsumerBuilderTests
             new PostgreSqlReaderConfig
             {
                 ConnectionString = "Host=trino.test.com;Port=8443;",
-                TableName = "test"
+                TableName = "test",
             },
-            typeof(ChunkConsumerAction)).SetName("PostgreSqlReader_CreatesChunkConsumer");
+            typeof(ChunkConsumerAction)
+        ).SetName("PostgreSqlReader_CreatesChunkConsumer");
         yield return new TestCaseData(
             new OracleReaderConfig
             {
                 ConnectionString = "Data Source=OracleSql.test.com;User Id=test;Password=test",
-                TableName = "test"
+                TableName = "test",
             },
-            typeof(ChunkConsumerAction)).SetName("OracleReader_CreatesChunkConsumer");
+            typeof(ChunkConsumerAction)
+        ).SetName("OracleReader_CreatesChunkConsumer");
         yield return new TestCaseData(
             new MsSqlReaderConfig
             {
-                ConnectionString = "Server=testServer;Database=testDataBase;User Id=test;Password=test;",
-                TableName = "test"
+                ConnectionString =
+                    "Server=testServer;Database=testDataBase;User Id=test;Password=test;",
+                TableName = "test",
             },
-            typeof(ChunkConsumerAction)).SetName("MsSqlReader_CreatesChunkConsumer");
+            typeof(ChunkConsumerAction)
+        ).SetName("MsSqlReader_CreatesChunkConsumer");
         yield return new TestCaseData(
             new TrinoReaderConfig
             {
@@ -111,9 +139,10 @@ public class ConsumerBuilderTests
                 ClientTag = "test",
                 Schema = "default",
                 Catalog = "hive",
-                Hostname = "https://trino.test.com"
+                Hostname = "https://trino.test.com",
             },
-            typeof(ChunkConsumerAction)).SetName("TrinoReader_CreatesChunkConsumer");
+            typeof(ChunkConsumerAction)
+        ).SetName("TrinoReader_CreatesChunkConsumer");
         yield return new TestCaseData(
             new ElasticReaderConfig
             {
@@ -125,18 +154,20 @@ public class ConsumerBuilderTests
                 IndexPattern = "*-test",
                 Url = "http://test",
                 Username = "test",
-                Password = "123456"
+                Password = "123456",
             },
-            typeof(ChunkConsumerAction)).SetName("ElasticReader_CreatesChunkConsumer");
+            typeof(ChunkConsumerAction)
+        ).SetName("ElasticReader_CreatesChunkConsumer");
         yield return new TestCaseData(
             new S3BucketReaderConfig
             {
                 StorageBucket = "test",
                 ServiceURL = "url",
                 AccessKey = "test",
-                SecretKey = "test"
+                SecretKey = "test",
             },
-            typeof(ChunkConsumerAction)).SetName("S3Reader_CreatesChunkConsumer");
+            typeof(ChunkConsumerAction)
+        ).SetName("S3Reader_CreatesChunkConsumer");
     }
 
     [SetUp]
@@ -249,10 +280,7 @@ public class ConsumerBuilderTests
     [Test]
     public void AddPolicy_WhenPoliciesIsNull_InitializesCollectionAndAddsPolicy()
     {
-        var builder = new ConsumerBuilder
-        {
-            Policies = null!
-        };
+        var builder = new ConsumerBuilder { Policies = null! };
         var policy = new PolicyBuilder();
 
         builder.AddPolicy(policy);
@@ -497,7 +525,7 @@ public class ConsumerBuilderTests
     {
         var builder = new ConsumerBuilder().Configure(config);
 
-        Assert.That(builder.Configuration, Is.SameAs(config));
+        Assert.That(GetConfiguredReader(builder, config), Is.SameAs(config));
     }
 
     [Test]
@@ -505,17 +533,14 @@ public class ConsumerBuilderTests
     {
         var builder = new ConsumerBuilder();
 
-        Assert.That(builder.Configuration, Is.Null);
+        Assert.That(GetConfiguredReaders(builder), Is.All.Null);
     }
 
     [Test]
     public void Build_With_Valid_RabbitMq_Config_Should_Create_Consumer()
     {
         // Arrange
-        var config = new RabbitMqReaderConfig
-        {
-            Host = "https://test"
-        };
+        var config = new RabbitMqReaderConfig { Host = "https://test" };
         var builder = new ConsumerBuilder()
             .Named("TestConsumer")
             .AtStage(1)
@@ -541,7 +566,7 @@ public class ConsumerBuilderTests
             GroupId = "test",
             HostNames = ["host1:8080", "host2:8081"],
             Username = "test",
-            Password = "test"
+            Password = "test",
         };
         var builder = new ConsumerBuilder()
             .Named("TestConsumer")
@@ -551,13 +576,17 @@ public class ConsumerBuilderTests
             .Configure(config);
 
         // Act
-        var result = builder.Build(Globals.GetContextWithMetadata(), _actionFailures!, _sessionName!);
+        var result = builder.Build(
+            Globals.GetContextWithMetadata(),
+            _actionFailures!,
+            _sessionName!
+        );
 
         // Assert
         Assert.That(result, Is.Not.Null);
         Assert.That(result!.Name, Is.EqualTo("TestConsumer"));
     }
-    
+
     [Test]
     public void Build_With_Valid_KafkaTopic_Config_And_InitialTimeout_Should_Create_Consumer()
     {
@@ -568,7 +597,7 @@ public class ConsumerBuilderTests
             GroupId = "test",
             HostNames = ["host1:8080", "host2:8081"],
             Username = "test",
-            Password = "test"
+            Password = "test",
         };
         var builder = new ConsumerBuilder()
             .Named("TestConsumer")
@@ -579,7 +608,11 @@ public class ConsumerBuilderTests
             .Configure(config);
 
         // Act
-        var result = builder.Build(Globals.GetContextWithMetadata(), _actionFailures!, _sessionName!);
+        var result = builder.Build(
+            Globals.GetContextWithMetadata(),
+            _actionFailures!,
+            _sessionName!
+        );
 
         // Assert
         Assert.That(result, Is.Not.Null);
@@ -594,7 +627,7 @@ public class ConsumerBuilderTests
         {
             Host = "https:test",
             Port = 8080,
-            ProtocolType = ProtocolType.IP
+            ProtocolType = ProtocolType.IP,
         };
         var builder = new ConsumerBuilder()
             .Named("TestConsumer")
@@ -621,7 +654,7 @@ public class ConsumerBuilderTests
             Port = 8080,
             Channel = "test",
             Manager = "test",
-            QueueName = "test"
+            QueueName = "test",
         };
         var builder = new ConsumerBuilder()
             .Named("TestConsumer")
@@ -645,7 +678,7 @@ public class ConsumerBuilderTests
         var config = new PostgreSqlReaderConfig
         {
             ConnectionString = "Host=trino.test.com;Port=8443;",
-            TableName = "test"
+            TableName = "test",
         };
         var builder = new ConsumerBuilder()
             .Named("TestConsumer")
@@ -669,7 +702,7 @@ public class ConsumerBuilderTests
         var config = new OracleReaderConfig
         {
             ConnectionString = "Data Source=OracleSql.test.com;User Id=test;Password=test",
-            TableName = "test"
+            TableName = "test",
         };
         var builder = new ConsumerBuilder()
             .Named("TestConsumer")
@@ -692,8 +725,9 @@ public class ConsumerBuilderTests
         // Arrange
         var config = new MsSqlReaderConfig
         {
-            ConnectionString = "Server=testServer;Database=testDataBase;User Id=test;Password=test;",
-            TableName = "test"
+            ConnectionString =
+                "Server=testServer;Database=testDataBase;User Id=test;Password=test;",
+            TableName = "test",
         };
         var builder = new ConsumerBuilder()
             .Named("TestConsumer")
@@ -723,7 +757,7 @@ public class ConsumerBuilderTests
             ClientTag = "test",
             Schema = "default",
             Catalog = "hive",
-            Hostname = "https://trino.test.com"
+            Hostname = "https://trino.test.com",
         };
         var builder = new ConsumerBuilder()
             .Named("TestConsumer")
@@ -754,7 +788,7 @@ public class ConsumerBuilderTests
             IndexPattern = "*-test",
             Url = "http://test",
             Username = "test",
-            Password = "123456"
+            Password = "123456",
         };
         var builder = new ConsumerBuilder()
             .Named("TestConsumer")
@@ -780,7 +814,7 @@ public class ConsumerBuilderTests
             StorageBucket = "test",
             ServiceURL = "url",
             AccessKey = "test",
-            SecretKey = "test"
+            SecretKey = "test",
         };
         var builder = new ConsumerBuilder()
             .Named("TestConsumer")
@@ -796,7 +830,7 @@ public class ConsumerBuilderTests
         Assert.That(result, Is.Not.Null);
         Assert.That(result!.Name, Is.EqualTo("TestConsumer"));
     }
-    
+
     [Test]
     public void Build_With_Valid_S3Bucket_Config_And_InitialTimeout_Should_Create_Consumer()
     {
@@ -806,7 +840,7 @@ public class ConsumerBuilderTests
             StorageBucket = "test",
             ServiceURL = "url",
             AccessKey = "test",
-            SecretKey = "test"
+            SecretKey = "test",
         };
         var builder = new ConsumerBuilder()
             .Named("TestConsumer")
@@ -827,7 +861,10 @@ public class ConsumerBuilderTests
     [Test]
     [TestCaseSource(nameof(ReaderConfigurationsWhichCreateSingleConsumers))]
     [TestCaseSource(nameof(ReaderConfigurationsWhichCreateChunkConsumers))]
-    public void Build_WithSupportedReaderConfig_CreatesExpectedConsumerMode(IReaderConfig config, Type expectedType)
+    public void Build_WithSupportedReaderConfig_CreatesExpectedConsumerMode(
+        IReaderConfig config,
+        Type expectedType
+    )
     {
         var builder = new ConsumerBuilder()
             .Named("TestConsumer")
@@ -844,7 +881,10 @@ public class ConsumerBuilderTests
     [Test]
     [TestCaseSource(nameof(ReaderConfigurationsWhichCreateSingleConsumers))]
     [TestCaseSource(nameof(ReaderConfigurationsWhichCreateChunkConsumers))]
-    public void Validate_WithSupportedReaderConfig_HasNoChunkModeErrors(IReaderConfig config, Type expectedType)
+    public void Validate_WithSupportedReaderConfig_HasNoChunkModeErrors(
+        IReaderConfig config,
+        Type expectedType
+    )
     {
         var builder = new ConsumerBuilder()
             .Named("TestConsumer")
@@ -859,8 +899,11 @@ public class ConsumerBuilderTests
             .ToList();
 
         Assert.That(
-            validationResults.Count(result => result.ErrorMessage!.Contains("chunk", StringComparison.OrdinalIgnoreCase)),
-            Is.EqualTo(0));
+            validationResults.Count(result =>
+                result.ErrorMessage!.Contains("chunk", StringComparison.OrdinalIgnoreCase)
+            ),
+            Is.EqualTo(0)
+        );
     }
 
     [Test]
@@ -874,7 +917,10 @@ public class ConsumerBuilderTests
             .FilterData(new DataFilter());
 
         // Act & Assert
-        Assert.That(builder.Build(Globals.GetContextWithMetadata(), _actionFailures, _sessionName), Is.Null);
+        Assert.That(
+            builder.Build(Globals.GetContextWithMetadata(), _actionFailures, _sessionName),
+            Is.Null
+        );
     }
 
     [Test]
@@ -890,7 +936,10 @@ public class ConsumerBuilderTests
             .Configure(new KafkaTopicReaderConfig());
 
         // Act & Assert
-        Assert.That(builder.Build(Globals.GetContextWithMetadata(), _actionFailures, _sessionName), Is.Null);
+        Assert.That(
+            builder.Build(Globals.GetContextWithMetadata(), _actionFailures, _sessionName),
+            Is.Null
+        );
     }
 
     [Test]
@@ -906,7 +955,10 @@ public class ConsumerBuilderTests
             .Configure(mockConfig.Object);
 
         // Act & Assert
-        Assert.That(builder.Build(Globals.GetContextWithMetadata(), _actionFailures, _sessionName), Is.Null);
+        Assert.That(
+            builder.Build(Globals.GetContextWithMetadata(), _actionFailures, _sessionName),
+            Is.Null
+        );
     }
 
     [Test]
@@ -932,7 +984,9 @@ public class ConsumerBuilderTests
     {
         var builder = new ConsumerBuilder();
 
-        Assert.Throws<InvalidOperationException>(() => builder.UpdateConfiguration(new { Host = "rabbit.local" }));
+        Assert.Throws<InvalidOperationException>(() =>
+            builder.UpdateConfiguration(new { Host = "rabbit.local" })
+        );
     }
 
     [Test]
@@ -943,7 +997,7 @@ public class ConsumerBuilderTests
 
         builder.UpdateConfiguration(config);
 
-        Assert.That(builder.Configuration, Is.SameAs(config));
+        Assert.That(builder.RabbitMq, Is.SameAs(config));
     }
 
     [Test]
@@ -965,7 +1019,9 @@ public class ConsumerBuilderTests
     {
         var builder = new ConsumerBuilder();
 
-        Assert.Throws<ArgumentOutOfRangeException>(() => builder.UpdatePolicyAt(0, new PolicyBuilder()));
+        Assert.Throws<ArgumentOutOfRangeException>(() =>
+            builder.UpdatePolicyAt(0, new PolicyBuilder())
+        );
     }
 
     [Test]
@@ -984,22 +1040,62 @@ public class ConsumerBuilderTests
             .WithTimeout(1000)
             .FilterData(new DataFilter());
 
-        typeof(ConsumerBuilder).GetProperty("RabbitMq", BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic)!
+        typeof(ConsumerBuilder)
+            .GetProperty(
+                "RabbitMq",
+                BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic
+            )!
             .SetValue(builder, new RabbitMqReaderConfig());
-        typeof(ConsumerBuilder).GetProperty("KafkaTopic", BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic)!
-            .SetValue(builder, new KafkaTopicReaderConfig
-            {
-                TopicName = "topic",
-                GroupId = "group",
-                HostNames = ["host1:9092"],
-                Username = "user",
-                Password = "pass"
-            });
+        typeof(ConsumerBuilder)
+            .GetProperty(
+                "KafkaTopic",
+                BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic
+            )!
+            .SetValue(
+                builder,
+                new KafkaTopicReaderConfig
+                {
+                    TopicName = "topic",
+                    GroupId = "group",
+                    HostNames = ["host1:9092"],
+                    Username = "user",
+                    Password = "pass",
+                }
+            );
 
         var result = builder.Build(Globals.GetContextWithMetadata(), _actionFailures, _sessionName);
 
         Assert.That(result, Is.Null);
         Assert.That(_actionFailures, Is.Not.Empty);
     }
-}
 
+    private static object? GetConfiguredReader(ConsumerBuilder builder, IReaderConfig config) =>
+        config switch
+        {
+            RabbitMqReaderConfig => builder.RabbitMq,
+            KafkaTopicReaderConfig => builder.KafkaTopic,
+            SocketReaderConfig => builder.Socket,
+            IbmMqReaderConfig => builder.IbmMqQueue,
+            PostgreSqlReaderConfig => builder.PostgreSqlTable,
+            OracleReaderConfig => builder.OracleSqlTable,
+            MsSqlReaderConfig => builder.MsSqlTable,
+            TrinoReaderConfig => builder.TrinoSqlTable,
+            ElasticReaderConfig => builder.ElasticIndices,
+            S3BucketReaderConfig => builder.S3Bucket,
+            _ => throw new ArgumentOutOfRangeException(nameof(config), config, null),
+        };
+
+    private static IEnumerable<object?> GetConfiguredReaders(ConsumerBuilder builder)
+    {
+        yield return builder.RabbitMq;
+        yield return builder.KafkaTopic;
+        yield return builder.Socket;
+        yield return builder.IbmMqQueue;
+        yield return builder.PostgreSqlTable;
+        yield return builder.OracleSqlTable;
+        yield return builder.MsSqlTable;
+        yield return builder.TrinoSqlTable;
+        yield return builder.ElasticIndices;
+        yield return builder.S3Bucket;
+    }
+}

@@ -1,6 +1,5 @@
 using System.ComponentModel;
 using System.ComponentModel.DataAnnotations;
-using System.Text.Json.Serialization;
 using QaaS.Framework.Configurations;
 using QaaS.Framework.Configurations.CustomValidationAttributes;
 using QaaS.Framework.Infrastructure;
@@ -93,22 +92,6 @@ public class TransactionBuilder : ICloneable<TransactionBuilder>
 
     [Description("Invokes a Grpc Method")]
     internal GrpcTransactorConfig? Grpc { get; set; }
-
-    [JsonIgnore]
-    public ITransactorConfig? Configuration
-    {
-        get => (ITransactorConfig?)Http ?? Grpc;
-        internal set
-        {
-            if (value == null)
-            {
-                Reset();
-                return;
-            }
-
-            Configure(value);
-        }
-    }
 
     /// <summary>
     /// Sets the name used for the current Runner transaction builder instance.
@@ -468,13 +451,16 @@ public class TransactionBuilder : ICloneable<TransactionBuilder>
     {
         ArgumentNullException.ThrowIfNull(configuration);
 
-        var currentConfig = Configuration;
+        var currentConfig = (ITransactorConfig?)Http ?? Grpc;
         if (configuration is ITransactorConfig typedConfiguration)
         {
             return Configure(
                 currentConfig == null
                     ? typedConfiguration
-                    : currentConfig.UpdateConfiguration(typedConfiguration)
+                    : ConfigurationUpdateExtensions.UpdateConfiguration<ITransactorConfig>(
+                        currentConfig,
+                        typedConfiguration
+                    )
             );
         }
 

@@ -3,7 +3,6 @@ using System.ComponentModel.DataAnnotations;
 using System.Runtime.CompilerServices;
 using System.Text;
 using System.Text.Json;
-using System.Text.Json.Serialization;
 using Microsoft.Extensions.Configuration;
 using QaaS.Framework.Configurations;
 using QaaS.Framework.Configurations.ConfigurationBindingUtils;
@@ -101,13 +100,6 @@ public class AssertionBuilder : IYamlConvertible, ICloneable<AssertionBuilder>
     )]
     public IConfiguration AssertionConfiguration { get; internal set; } =
         new ConfigurationBuilder().Build();
-
-    [JsonIgnore]
-    public IConfiguration Configuration
-    {
-        get => AssertionConfiguration;
-        internal set => AssertionConfiguration = value ?? new ConfigurationBuilder().Build();
-    }
 
     [Description("The assertion's specific links. Will be added with the general links.")]
     public List<LinkBuilder> Links { get; internal set; } = [];

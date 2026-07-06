@@ -28,7 +28,8 @@ Assertion engine and reporter dispatcher.
 ## Reporter selection
 
 `ReporterBuilder` creates the configured reporter instances for the execution.
-`ReportLogic` routes each reportable assertion result to every built reporter.
+`ReportLogic` routes each reportable assertion result to built reporters whose
+type is listed on the runtime assertion's `ReporterTypes`.
 Allure writes immediately. ReportPortal queues locally during execution; one
 runner-owned publisher validates access read-only before sessions start and
 publishes grouped launches at cleanup.

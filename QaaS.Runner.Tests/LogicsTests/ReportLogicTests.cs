@@ -6,6 +6,8 @@ using QaaS.Framework.SDK.Hooks.Assertion;
 using QaaS.Runner.Assertions;
 using QaaS.Runner.Assertions.AssertionObjects;
 using QaaS.Runner.Assertions.Reporters;
+using QaaS.Runner.Assertions.Reporters.Allure;
+using QaaS.Runner.Assertions.Reporters.ReportPortal;
 using QaaS.Runner.Logics;
 
 namespace QaaS.Runner.Tests.LogicsTests;
@@ -32,6 +34,7 @@ public class ReportLogicTests
                     AssertionStatus.Skipped,
                     AssertionStatus.Unknown,
                 ],
+                ReporterTypes = [typeof(RecordingReporter)],
                 AssertionName = null,
                 AssertionHook = null,
             };
@@ -89,6 +92,7 @@ public class ReportLogicTests
                     AssertionStatus.Skipped,
                     AssertionStatus.Unknown,
                 ],
+                ReporterTypes = [typeof(RecordingReporter), typeof(AlternateRecordingReporter)],
                 AssertionName = null,
                 AssertionHook = null,
             },
@@ -109,6 +113,7 @@ public class ReportLogicTests
                     AssertionStatus.Skipped,
                     AssertionStatus.Unknown,
                 ],
+                ReporterTypes = [typeof(RecordingReporter), typeof(AlternateRecordingReporter)],
                 AssertionName = null,
                 AssertionHook = null,
             },
@@ -142,6 +147,62 @@ public class ReportLogicTests
     }
 
     [Test]
+    public void TestRun_WhenAssertionTargetsSpecificReporter_WritesOnlyToMatchingReporterType()
+    {
+        var firstReporter = new RecordingReporter();
+        var secondReporter = new AlternateRecordingReporter();
+        var assertionResult = new AssertionResult
+        {
+            Assertion = new Assertion
+            {
+                Name = "AssertionA",
+                StatusesToReport = [AssertionStatus.Passed],
+                ReporterTypes = [typeof(RecordingReporter)],
+                AssertionName = null,
+                AssertionHook = null,
+            },
+            AssertionStatus = AssertionStatus.Passed,
+            TestDurationMs = 0,
+            Flaky = null,
+        };
+        var executionData = new ExecutionData();
+        executionData.AssertionResults.Add(assertionResult);
+        var logic = new ReportLogic(
+            [firstReporter, secondReporter],
+            Globals.GetContextWithMetadata()
+        );
+
+        var result = logic.Run(executionData);
+
+        Assert.That(result, Is.SameAs(executionData));
+        Assert.Multiple(() =>
+        {
+            Assert.That(firstReporter.Results, Is.EqualTo(new[] { assertionResult }));
+            Assert.That(secondReporter.Results, Is.Empty);
+        });
+    }
+
+    [Test]
+    public void Assertion_DefaultReporterTypes_PreserveLegacyReporterTargets()
+    {
+        var assertion = new Assertion();
+
+        Assert.That(
+            assertion.ReporterTypes,
+            Is.EquivalentTo(new[] { typeof(AllureReporter), typeof(ReportPortalReporter) })
+        );
+    }
+
+    [Test]
+    public void ReporterTarget_PublicEnum_RemainsAvailableForCompatibility()
+    {
+        Assert.That(
+            Enum.GetNames<ReporterTarget>(),
+            Is.EquivalentTo(new[] { "Allure", "ReportPortal" })
+        );
+    }
+
+    [Test]
     public void TestRun_WhenAssertionStatusIsNotConfiguredForReporting_DoesNotWriteResults()
     {
         var reporter = new RecordingReporter();
@@ -151,6 +212,7 @@ public class ReportLogicTests
             {
                 Name = "AssertionA",
                 StatusesToReport = [AssertionStatus.Failed],
+                ReporterTypes = [typeof(RecordingReporter)],
                 AssertionName = null,
                 AssertionHook = null,
             },

@@ -152,7 +152,7 @@ or `QaaS.Common.*` over baking the hook into the runner.
   per assertion (commit `4876603`).
 
 When you change reporter wiring, keep `Reporters` keyed by their configured
-type and verify with
+type, preserve `Assertion.ReporterTypes` as the per-assertion routing gate, and verify with
 `QaaS.Runner.Assertions.Tests`.
 
 ## YAML configuration shape

@@ -7,6 +7,8 @@ using QaaS.Framework.SDK.Extensions;
 using QaaS.Framework.SDK.Hooks.Assertion;
 using QaaS.Framework.SDK.Session.SessionDataObjects;
 using QaaS.Runner.Assertions.LinkBuilders;
+using QaaS.Runner.Assertions.Reporters.Allure;
+using QaaS.Runner.Assertions.Reporters.ReportPortal;
 
 namespace QaaS.Runner.Assertions.AssertionObjects;
 
@@ -23,6 +25,12 @@ public class Assertion
     public IConfiguration AssertionConfiguration { get; set; } = new ConfigurationBuilder().Build();
 
     public List<BaseLink>? Links { get; set; }
+
+    /// <summary>
+    /// Reporter implementation types that should receive this assertion result.
+    /// </summary>
+    public IList<Type> ReporterTypes { get; set; } =
+    [typeof(AllureReporter), typeof(ReportPortalReporter)];
 
     public bool SaveSessionData { get; set; }
 

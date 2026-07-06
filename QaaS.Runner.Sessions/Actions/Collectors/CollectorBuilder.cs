@@ -1,6 +1,5 @@
 using System.ComponentModel;
 using System.ComponentModel.DataAnnotations;
-using System.Text.Json.Serialization;
 using QaaS.Framework.Configurations;
 using QaaS.Framework.Infrastructure;
 using QaaS.Framework.Protocols.ConfigurationObjects;
@@ -52,22 +51,6 @@ public class CollectorBuilder : ICloneable<CollectorBuilder>
     )]
     public PrometheusFetcherConfig? Prometheus { get; internal set; }
 
-    [JsonIgnore]
-    public IFetcherConfig? Configuration
-    {
-        get => Prometheus;
-        internal set
-        {
-            if (value == null)
-            {
-                Reset();
-                return;
-            }
-
-            Configure(value);
-        }
-    }
-
     /// <summary>
     /// Sets the name used for the current Runner collector builder instance.
     /// </summary>
@@ -118,13 +101,16 @@ public class CollectorBuilder : ICloneable<CollectorBuilder>
     {
         ArgumentNullException.ThrowIfNull(configuration);
 
-        var currentConfig = Configuration;
+        IFetcherConfig? currentConfig = Prometheus;
         if (configuration is IFetcherConfig typedConfiguration)
         {
             return Configure(
                 currentConfig == null
                     ? typedConfiguration
-                    : currentConfig.UpdateConfiguration(typedConfiguration)
+                    : ConfigurationUpdateExtensions.UpdateConfiguration<IFetcherConfig>(
+                        currentConfig,
+                        typedConfiguration
+                    )
             );
         }
 

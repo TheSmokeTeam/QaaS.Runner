@@ -90,6 +90,29 @@ public class RunnerCaseExpansionExtensionsTests
     }
 
     [Test]
+    public void AddTestCases_WithExistingBuilders_PreservesThem()
+    {
+        // Arrange
+        var runner = Bootstrap.New(["run", "TestData/test.qaas.yaml", "--no-process-exit"]);
+        var preservedBuilder = new ExecutionBuilder().AddSession(
+            new SessionBuilder().Named("PreservedSession")
+        );
+        runner.ExecutionBuilders.Add(preservedBuilder);
+        var baseBuilder = runner.ExtractBaseBuilder();
+
+        // Act
+        runner.AddTestCases(baseBuilder, new DummyTestCase("CaseSession"));
+
+        // Assert
+        Assert.That(runner.ExecutionBuilders, Has.Count.EqualTo(2));
+        Assert.That(runner.ExecutionBuilders[0], Is.SameAs(preservedBuilder));
+        Assert.That(
+            runner.ExecutionBuilders[1].Sessions.Any(s => s.Name == "CaseSession"),
+            Is.True
+        );
+    }
+
+    [Test]
     public void AddTestCases_WithMultipleCases_ClonesAndConfiguresEach()
     {
         // Arrange

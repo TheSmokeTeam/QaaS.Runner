@@ -1,6 +1,5 @@
 using System.ComponentModel;
 using System.ComponentModel.DataAnnotations;
-using System.Text.Json.Serialization;
 using QaaS.Framework.Configurations;
 using QaaS.Framework.Infrastructure;
 using QaaS.Framework.SDK.ContextObjects;
@@ -43,13 +42,6 @@ public class MockerCommandBuilder : ICloneable<MockerCommandBuilder>
     [Required]
     [Description("The command action to commit")]
     public MockerCommandConfig? Command { get; internal set; }
-
-    [JsonIgnore]
-    public MockerCommandConfig? Configuration
-    {
-        get => Command;
-        internal set => Command = value;
-    }
 
     [Description("The duration the runner will try to request the mocker server instances")]
     [DefaultValue(3000)]
@@ -163,7 +155,7 @@ public class MockerCommandBuilder : ICloneable<MockerCommandBuilder>
     {
         ArgumentNullException.ThrowIfNull(configuration);
 
-        var currentConfig = Configuration;
+        var currentConfig = Command;
         if (configuration is MockerCommandConfig typedConfiguration)
         {
             Command =

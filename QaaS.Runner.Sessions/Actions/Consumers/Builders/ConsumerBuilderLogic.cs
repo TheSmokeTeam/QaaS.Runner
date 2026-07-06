@@ -1,4 +1,3 @@
-using System.Text.Json.Serialization;
 using QaaS.Framework.Configurations;
 using QaaS.Framework.Policies;
 using QaaS.Framework.Protocols.ConfigurationObjects;
@@ -25,22 +24,6 @@ namespace QaaS.Runner.Sessions.Actions.Consumers.Builders;
 
 public partial class ConsumerBuilder
 {
-    [JsonIgnore]
-    public IReaderConfig? Configuration
-    {
-        get => GetConfiguration();
-        internal set
-        {
-            if (value == null)
-            {
-                Reset();
-                return;
-            }
-
-            Configure(value);
-        }
-    }
-
     /// <summary>
     /// Sets the name used for the current Runner consumer builder instance.
     /// </summary>
@@ -184,13 +167,16 @@ public partial class ConsumerBuilder
     {
         ArgumentNullException.ThrowIfNull(configuration);
 
-        var currentConfig = Configuration;
+        var currentConfig = GetConfiguration();
         if (configuration is IReaderConfig typedConfiguration)
         {
             return Configure(
                 currentConfig == null
                     ? typedConfiguration
-                    : currentConfig.UpdateConfiguration(typedConfiguration)
+                    : ConfigurationUpdateExtensions.UpdateConfiguration<IReaderConfig>(
+                        currentConfig,
+                        typedConfiguration
+                    )
             );
         }
 

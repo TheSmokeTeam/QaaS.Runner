@@ -1,7 +1,6 @@
 using System.ComponentModel;
 using System.IO.Abstractions;
 using System.Runtime.CompilerServices;
-using System.Text.Json.Serialization;
 using QaaS.Framework.Configurations;
 using QaaS.Framework.Configurations.CommonConfigurationObjects;
 using QaaS.Framework.Infrastructure;
@@ -34,22 +33,6 @@ public class StorageBuilder : ICloneable<StorageBuilder>
     [Description("Supports storage as an S3 bucket with a certain prefix")]
     public S3Config? S3 { get; internal set; }
 
-    [JsonIgnore]
-    public IStorageConfig? Configuration
-    {
-        get => (IStorageConfig?)S3 ?? FileSystem;
-        internal set
-        {
-            if (value == null)
-            {
-                Reset();
-                return;
-            }
-
-            Configure(value);
-        }
-    }
-
     private StorageBuilder Reset()
     {
         FileSystem = null;
@@ -81,13 +64,16 @@ public class StorageBuilder : ICloneable<StorageBuilder>
     {
         ArgumentNullException.ThrowIfNull(configuration);
 
-        var currentConfig = Configuration;
+        var currentConfig = (IStorageConfig?)S3 ?? FileSystem;
         if (configuration is IStorageConfig typedConfiguration)
         {
             return Configure(
                 currentConfig == null
                     ? typedConfiguration
-                    : currentConfig.UpdateConfiguration(typedConfiguration)
+                    : ConfigurationUpdateExtensions.UpdateConfiguration<IStorageConfig>(
+                        currentConfig,
+                        typedConfiguration
+                    )
             );
         }
 

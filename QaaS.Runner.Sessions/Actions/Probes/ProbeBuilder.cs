@@ -3,7 +3,6 @@ using System.ComponentModel.DataAnnotations;
 using System.Diagnostics.CodeAnalysis;
 using System.Text;
 using System.Text.Json;
-using System.Text.Json.Serialization;
 using Microsoft.Extensions.Configuration;
 using QaaS.Framework.Configurations;
 using QaaS.Framework.Configurations.ConfigurationBindingUtils;
@@ -51,13 +50,6 @@ public class ProbeBuilder : IYamlConvertible, ICloneable<ProbeBuilder>
     )]
     public IConfiguration ProbeConfiguration { get; internal set; } =
         new ConfigurationBuilder().Build();
-
-    [JsonIgnore]
-    public IConfiguration Configuration
-    {
-        get => ProbeConfiguration;
-        internal set => ProbeConfiguration = value ?? new ConfigurationBuilder().Build();
-    }
 
     /// <summary>
     /// Reads the serialized configuration for the current Runner probe builder instance.

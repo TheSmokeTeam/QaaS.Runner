@@ -1,6 +1,5 @@
 using System.ComponentModel;
 using System.Runtime.CompilerServices;
-using System.Text.Json.Serialization;
 using QaaS.Framework.Configurations;
 using QaaS.Framework.Infrastructure;
 using QaaS.Runner.Assertions.ConfigurationObjects.LinkConfigs;
@@ -37,22 +36,6 @@ public class LinkBuilder : ICloneable<LinkBuilder>
     )]
     public GrafanaLinkConfig? Grafana { get; internal set; }
 
-    [JsonIgnore]
-    public ILinkConfig? Configuration
-    {
-        get => GetConfiguration();
-        internal set
-        {
-            if (value == null)
-            {
-                Reset();
-                return;
-            }
-
-            Configure(value);
-        }
-    }
-
     /// <summary>
     /// Sets the name used for the current Runner link builder instance.
     /// </summary>
@@ -77,7 +60,7 @@ public class LinkBuilder : ICloneable<LinkBuilder>
     {
         ArgumentNullException.ThrowIfNull(configuration);
 
-        var currentConfig = Configuration;
+        var currentConfig = GetConfiguration();
         if (configuration is ILinkConfig typedConfiguration)
         {
             return Configure(
