@@ -16,21 +16,24 @@ public partial class PublisherBuilder : IValidatableObject
     {
         ArgumentNullException.ThrowIfNull(validationContext);
 
-        var configuredProtocol = Configuration;
+        var configuredProtocol = GetConfiguration();
         if (configuredProtocol == null)
         {
             return [];
         }
 
         var chunkMode = ProtocolChunkSupport.ResolveSenderMode(configuredProtocol);
-        var propertyName = ProtocolChunkSupport.GetSenderConfigurationPropertyName(configuredProtocol);
+        var propertyName = ProtocolChunkSupport.GetSenderConfigurationPropertyName(
+            configuredProtocol
+        );
         if (Chunk == null && chunkMode == ProtocolChunkMode.ChunkOnly)
         {
             return
             [
                 new ValidationResult(
                     $"The {nameof(Chunk)} field is required when {propertyName} is configured.",
-                    [nameof(Chunk)])
+                    [nameof(Chunk)]
+                ),
             ];
         }
 
@@ -40,7 +43,8 @@ public partial class PublisherBuilder : IValidatableObject
             [
                 new ValidationResult(
                     $"The {nameof(Chunk)} field must be empty when {propertyName} is configured.",
-                    [nameof(Chunk)])
+                    [nameof(Chunk)]
+                ),
             ];
         }
 

@@ -24,66 +24,74 @@ public class TransactionBuilder : ICloneable<TransactionBuilder>
     public TransactionBuilder Clone() => BuilderCloner.DeepClone(this);
 
     [Required]
-    [Description("The communication action's name which acts as a unique identifier," +
-                 " used as the name of the communication action's produced input/output")]
+    [Description(
+        "The communication action's name which acts as a unique identifier,"
+            + " used as the name of the communication action's produced input/output"
+    )]
     public string? Name { get; internal set; }
 
     [RequiredIfAny(nameof(DataSourcePatterns), [null])]
     [Description(
-        "The name of the data sources to publish the data of" +
-        " in the order their data will be published")]
+        "The name of the data sources to publish the data of"
+            + " in the order their data will be published"
+    )]
     public string[]? DataSourceNames { get; internal set; }
+
     [RequiredIfAny(nameof(DataSourceNames), [null])]
     [Description("Patterns of the names of data sources to publish the data of off")]
     public string[]? DataSourcePatterns { get; internal set; }
+
     [Description("How much iterations of the publishing action to execute")]
     [DefaultValue(1)]
     [Range(1, int.MaxValue)]
     public int Iterations { get; internal set; } = 1;
+
     [Description("Whether to publish in loop")]
     [DefaultValue(false)]
     public bool Loop { get; internal set; }
+
     [Description("Whether to run the transaction in a specified parallelism")]
     public Parallel? Parallel { get; internal set; }
-    [Range(ulong.MinValue, ulong.MaxValue),
-     Description("The time to sleep in milliseconds in between iterations"), DefaultValue(0)]
+
+    [
+        Range(ulong.MinValue, ulong.MaxValue),
+        Description("The time to sleep in milliseconds in between iterations"),
+        DefaultValue(0)
+    ]
     public ulong SleepTimeMs { get; internal set; } = 0;
+
     [Required]
     [Description(
-        "the consumption timeout in milliseconds (timeout is the time to wait for a response after sending a request)")]
+        "the consumption timeout in milliseconds (timeout is the time to wait for a response after sending a request)"
+    )]
     public int? TimeoutMs { get; internal set; }
+
     [Description("How to filter the properties of each returned sent (input) data")]
     public DataFilter InputDataFilter { get; internal set; } = new();
+
     [Description("How to filter the properties of each returned received (output) data")]
     public DataFilter OutputDataFilter { get; internal set; } = new();
+
     [Description("The stage in which the Transaction runs at")]
     [DefaultValue((int)OrderedActions.Transactions)]
     public int Stage { get; internal set; } = (int)OrderedActions.Transactions;
+
     [Description("List of policies to use when communicating with this action's protocol")]
     public PolicyBuilder[] Policies { get; internal set; } = [];
+
     [Description("The serializer to use to serialize the sent data")]
     [DefaultValue(null)]
     public SerializeConfig? InputSerialize { get; internal set; }
+
     [Description("The deserializer to use to deserialize the received data")]
     [DefaultValue(null)]
     public DeserializeConfig? OutputDeserialize { get; internal set; }
-    [Description("Sends an http request")] internal HttpTransactorConfig? Http { get; set; }
 
-    [Description("Invokes a Grpc Method")] internal GrpcTransactorConfig? Grpc { get; set; }
-    public ITransactorConfig? Configuration
-    {
-        get => (ITransactorConfig?)Http ?? Grpc;
-        internal set
-        {
-            if (value == null)
-            {
-                Reset();
-                return;
-            }
+    [Description("Sends an http request")]
+    internal HttpTransactorConfig? Http { get; set; }
 
-            Configure(value);
-        }
-    }
+    [Description("Invokes a Grpc Method")]
+    internal GrpcTransactorConfig? Grpc { get; set; }
 
     /// <summary>
     /// Sets the name used for the current Runner transaction builder instance.
@@ -403,7 +411,9 @@ public class TransactionBuilder : ICloneable<TransactionBuilder>
     /// <qaas-docs group="Configuration as Code" subgroup="Transactions" />
     public TransactionBuilder RemoveDataSourcePattern(string dataSourcePattern)
     {
-        DataSourcePatterns = DataSourcePatterns?.Where(value => value != dataSourcePattern).ToArray();
+        DataSourcePatterns = DataSourcePatterns
+            ?.Where(value => value != dataSourcePattern)
+            .ToArray();
         return this;
     }
 
@@ -441,17 +451,23 @@ public class TransactionBuilder : ICloneable<TransactionBuilder>
     {
         ArgumentNullException.ThrowIfNull(configuration);
 
-        var currentConfig = Configuration;
+        var currentConfig = (ITransactorConfig?)Http ?? Grpc;
         if (configuration is ITransactorConfig typedConfiguration)
         {
-            return Configure(currentConfig == null
-                ? typedConfiguration
-                : currentConfig.UpdateConfiguration(typedConfiguration));
+            return Configure(
+                currentConfig == null
+                    ? typedConfiguration
+                    : ConfigurationUpdateExtensions.UpdateConfiguration<ITransactorConfig>(
+                        currentConfig,
+                        typedConfiguration
+                    )
+            );
         }
 
         if (currentConfig == null)
             throw new InvalidOperationException(
-                "Transaction configuration is not set and cannot be inferred from an object patch. Configure a concrete transaction configuration first.");
+                "Transaction configuration is not set and cannot be inferred from an object patch. Configure a concrete transaction configuration first."
+            );
         return Configure(currentConfig.UpdateConfiguration(configuration));
     }
 
@@ -489,17 +505,21 @@ public class TransactionBuilder : ICloneable<TransactionBuilder>
     /// Builds a runtime transaction action with validated transactor configuration and policy pipeline.
     /// Failures are collected in <paramref name="actionFailures"/> and return null.
     /// </summary>
-    internal Transaction? Build(InternalContext context, IList<ActionFailure> actionFailures, string sessionName)
+    internal Transaction? Build(
+        InternalContext context,
+        IList<ActionFailure> actionFailures,
+        string sessionName
+    )
     {
         ITransactorConfig? type = null;
         try
         {
-            var allTypes = new List<ITransactorConfig?>
-            {
-                Http, Grpc
-            };
-            type = allTypes.FirstOrDefault(configuredType => configuredType != null) ??
-                   throw new InvalidOperationException($"Missing supported type in transaction {Name}");
+            var allTypes = new List<ITransactorConfig?> { Http, Grpc };
+            type =
+                allTypes.FirstOrDefault(configuredType => configuredType != null)
+                ?? throw new InvalidOperationException(
+                    $"Missing supported type in transaction {Name}"
+                );
             if (allTypes.Count(config => config != null) > 1)
             {
                 var conflictingConfigs = allTypes
@@ -507,26 +527,53 @@ public class TransactionBuilder : ICloneable<TransactionBuilder>
                     .Select(config => config!.GetType().Name)
                     .ToArray();
                 throw new InvalidOperationException(
-                    $"Multiple configurations provided for Transaction '{Name}': {string.Join(", ", conflictingConfigs)}. " +
-                    "Only one type is allowed at a time.");
+                    $"Multiple configurations provided for Transaction '{Name}': {string.Join(", ", conflictingConfigs)}. "
+                        + "Only one type is allowed at a time."
+                );
             }
 
             var timeout = TimeSpan.FromMilliseconds(TimeoutMs!.Value);
             var deserializerSpecificType = OutputDeserialize?.SpecificType?.GetConfiguredType();
 
-            var overrideRequest = new TransactionOverrideRequest(Name!, type, context.Logger, timeout);
-            var transactor = context.GetSessionActionOverrides()?.Transaction?.Invoke(overrideRequest)
-                             ?? TransactorFactory.CreateTransactor(type, context.Logger, timeout);
+            var overrideRequest = new TransactionOverrideRequest(
+                Name!,
+                type,
+                context.Logger,
+                timeout
+            );
+            var transactor =
+                context.GetSessionActionOverrides()?.Transaction?.Invoke(overrideRequest)
+                ?? TransactorFactory.CreateTransactor(type, context.Logger, timeout);
 
-            return new Transaction(Name!, transactor, Stage, InputDataFilter, OutputDataFilter,
-                PolicyBuilder.BuildPolicies(Policies), Loop, Parallel?.Parallelism, Iterations, SleepTimeMs,
-                InputSerialize?.Serializer, OutputDeserialize?.Deserializer, deserializerSpecificType,
-                DataSourcePatterns, DataSourceNames, context.Logger);
+            return new Transaction(
+                Name!,
+                transactor,
+                Stage,
+                InputDataFilter,
+                OutputDataFilter,
+                PolicyBuilder.BuildPolicies(Policies),
+                Loop,
+                Parallel?.Parallelism,
+                Iterations,
+                SleepTimeMs,
+                InputSerialize?.Serializer,
+                OutputDeserialize?.Deserializer,
+                deserializerSpecificType,
+                DataSourcePatterns,
+                DataSourceNames,
+                context.Logger
+            );
         }
         catch (Exception e)
         {
-            actionFailures.AppendActionFailure(e, sessionName, context.Logger, nameof(Transaction), Name!,
-                type?.GetType().Name);
+            actionFailures.AppendActionFailure(
+                e,
+                sessionName,
+                context.Logger,
+                nameof(Transaction),
+                Name!,
+                type?.GetType().Name
+            );
         }
 
         return null;

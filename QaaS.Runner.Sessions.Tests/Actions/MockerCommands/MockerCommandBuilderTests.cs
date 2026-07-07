@@ -2,9 +2,9 @@ using System;
 using System.Collections.Generic;
 using NUnit.Framework;
 using QaaS.Framework.SDK.ContextObjects;
+using QaaS.Framework.SDK.Session.SessionDataObjects;
 using QaaS.Framework.Serialization;
 using Qaas.Mocker.CommunicationObjects.ConfigurationObjects.Command;
-using QaaS.Framework.SDK.Session.SessionDataObjects;
 using QaaS.Runner.Sessions.Actions.MockerCommands;
 using QaaS.Runner.Sessions.ConfigurationObjects;
 using QaaS.Runner.Sessions.Tests.Actions.Utils;
@@ -28,14 +28,16 @@ public class MockerCommandBuilderTests
     [Test]
     public void Build_WithMissingCommandConfiguration_ReturnsNullAndAppendsFailure()
     {
-        var builder = new MockerCommandBuilder()
-            .Named("MockerCommandWithoutConfig");
+        var builder = new MockerCommandBuilder().Named("MockerCommandWithoutConfig");
 
         var result = builder.Build(_context, _actionFailures, SessionName);
 
         Assert.That(result, Is.Null);
         Assert.That(_actionFailures, Has.Count.EqualTo(1));
-        Assert.That(_actionFailures[0].Reason.Message, Does.Contain("Missing command configuration"));
+        Assert.That(
+            _actionFailures[0].Reason.Message,
+            Does.Contain("Missing command configuration")
+        );
     }
 
     [Test]
@@ -57,21 +59,28 @@ public class MockerCommandBuilderTests
     {
         var builder = new MockerCommandBuilder()
             .Named("MockerCommandWithConflicts")
-            .Configure(new MockerCommandConfig
-            {
-                ChangeActionStub = new ChangeActionStub(),
-                TriggerAction = new TriggerAction()
-            });
+            .Configure(
+                new MockerCommandConfig
+                {
+                    ChangeActionStub = new ChangeActionStub(),
+                    TriggerAction = new TriggerAction(),
+                }
+            );
 
         var result = builder.Build(_context, _actionFailures, SessionName);
 
         Assert.That(result, Is.Null);
         Assert.That(_actionFailures, Has.Count.EqualTo(1));
-        Assert.That(_actionFailures[0].Reason.Message, Does.Contain("Multiple configurations provided"));
+        Assert.That(
+            _actionFailures[0].Reason.Message,
+            Does.Contain("Multiple configurations provided")
+        );
     }
 
     [TestCaseSource(nameof(ValidSupportedCommands))]
-    public void Build_WithSingleSupportedTypeAndMissingRedis_ReturnsNullAndAppendsFailure(MockerCommandConfig commandConfig)
+    public void Build_WithSingleSupportedTypeAndMissingRedis_ReturnsNullAndAppendsFailure(
+        MockerCommandConfig commandConfig
+    )
     {
         var builder = new MockerCommandBuilder()
             .Named("MockerCommandWithSingleType")
@@ -91,12 +100,9 @@ public class MockerCommandBuilderTests
     {
         var builder = new MockerCommandBuilder();
 
-        builder.UpdateConfiguration(new
-        {
-            TriggerAction = new TriggerAction()
-        });
+        builder.UpdateConfiguration(new { TriggerAction = new TriggerAction() });
 
-        Assert.That(builder.Configuration!.TriggerAction, Is.Not.Null);
+        Assert.That(builder.Command!.TriggerAction, Is.Not.Null);
     }
 
     [Test]
@@ -107,7 +113,7 @@ public class MockerCommandBuilderTests
 
         builder.UpdateConfiguration(config);
 
-        Assert.That(builder.Configuration, Is.SameAs(config));
+        Assert.That(builder.Command, Is.SameAs(config));
     }
 
     [Test]
@@ -117,58 +123,58 @@ public class MockerCommandBuilderTests
         var initialCommand = new MockerCommandConfig { TriggerAction = new TriggerAction() };
 
         builder.Configure(initialCommand);
-        Assert.That(builder.Configuration, Is.SameAs(initialCommand));
+        Assert.That(builder.Command, Is.SameAs(initialCommand));
 
-        builder.UpdateConfiguration(new
-        {
-            TriggerAction = new
-            {
-                TimeoutMs = 5
-            }
-        });
+        builder.UpdateConfiguration(new { TriggerAction = new { TimeoutMs = 5 } });
 
-        Assert.That(builder.Configuration!.TriggerAction!.TimeoutMs, Is.EqualTo(5));
+        Assert.That(builder.Command!.TriggerAction!.TimeoutMs, Is.EqualTo(5));
 
-        builder.Configure(new MockerCommandConfig
-        {
-            ChangeActionStub = new ChangeActionStub()
-        });
-        Assert.That(builder.Configuration, Is.Not.Null);
-        Assert.That(builder.Configuration!.ChangeActionStub, Is.Not.Null);
-        Assert.That(builder.Configuration!.TriggerAction, Is.Null);
+        builder.Configure(new MockerCommandConfig { ChangeActionStub = new ChangeActionStub() });
+        Assert.That(builder.Command, Is.Not.Null);
+        Assert.That(builder.Command!.ChangeActionStub, Is.Not.Null);
+        Assert.That(builder.Command!.TriggerAction, Is.Null);
     }
 
     [Test]
     public void UpdateConfiguration_WithConfiguration_MergesSameTypeAndPreservesExistingFields()
     {
-        var builder = new MockerCommandBuilder()
-            .Configure(new MockerCommandConfig
+        var builder = new MockerCommandBuilder().Configure(
+            new MockerCommandConfig
             {
                 Consume = new ConsumeCommandConfig
                 {
                     InputDeserialize = new DeserializeConfig
                     {
-                        Deserializer = SerializationType.Json
-                    }
-                }
-            });
-
-        builder.UpdateConfiguration(new MockerCommandConfig
-        {
-            Consume = new ConsumeCommandConfig
-            {
-                OutputDeserialize = new DeserializeConfig
-                {
-                    Deserializer = SerializationType.Binary
-                }
+                        Deserializer = SerializationType.Json,
+                    },
+                },
             }
-        });
+        );
+
+        builder.UpdateConfiguration(
+            new MockerCommandConfig
+            {
+                Consume = new ConsumeCommandConfig
+                {
+                    OutputDeserialize = new DeserializeConfig
+                    {
+                        Deserializer = SerializationType.Binary,
+                    },
+                },
+            }
+        );
 
         Assert.Multiple(() =>
         {
-            Assert.That(builder.Configuration!.Consume, Is.Not.Null);
-            Assert.That(builder.Configuration!.Consume!.InputDeserialize!.Deserializer, Is.EqualTo(SerializationType.Json));
-            Assert.That(builder.Configuration!.Consume!.OutputDeserialize!.Deserializer, Is.EqualTo(SerializationType.Binary));
+            Assert.That(builder.Command!.Consume, Is.Not.Null);
+            Assert.That(
+                builder.Command!.Consume!.InputDeserialize!.Deserializer,
+                Is.EqualTo(SerializationType.Json)
+            );
+            Assert.That(
+                builder.Command!.Consume!.OutputDeserialize!.Deserializer,
+                Is.EqualTo(SerializationType.Binary)
+            );
         });
     }
 
@@ -199,5 +205,3 @@ public class MockerCommandBuilderTests
         yield return new MockerCommandConfig { Consume = new ConsumeCommandConfig() };
     }
 }
-
-

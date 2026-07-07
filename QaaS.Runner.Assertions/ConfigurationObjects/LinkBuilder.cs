@@ -16,29 +16,26 @@ public class LinkBuilder : ICloneable<LinkBuilder>
 {
     public LinkBuilder Clone() => BuilderCloner.DeepClone(this);
 
-    [Description("The display name of the link in the test results, if none is given uses the `Type` as the name")]
+    [Description(
+        "The display name of the link in the test results, if none is given uses the `Type` as the name"
+    )]
     public string? Name { get; internal set; }
 
-    [Description("Links the kibana's discovery filtered for the test's session times to each test result.")]
+    [Description(
+        "Links the kibana's discovery filtered for the test's session times to each test result."
+    )]
     public KibanaLinkConfig? Kibana { get; internal set; }
-    [Description("Links the prometheus' graph filtered for the test's session times to each test result.")]
-    public PrometheusLinkConfig? Prometheus { get; internal set; }
-    [Description("Links the grafana dashboard filtered for the test's session times to each test result.")]
-    public GrafanaLinkConfig? Grafana { get; internal set; }
-    public ILinkConfig? Configuration
-    {
-        get => GetConfiguration();
-        internal set
-        {
-            if (value == null)
-            {
-                Reset();
-                return;
-            }
 
-            Configure(value);
-        }
-    }
+    [Description(
+        "Links the prometheus' graph filtered for the test's session times to each test result."
+    )]
+    public PrometheusLinkConfig? Prometheus { get; internal set; }
+
+    [Description(
+        "Links the grafana dashboard filtered for the test's session times to each test result."
+    )]
+    public GrafanaLinkConfig? Grafana { get; internal set; }
+
     /// <summary>
     /// Sets the name used for the current Runner link builder instance.
     /// </summary>
@@ -63,17 +60,20 @@ public class LinkBuilder : ICloneable<LinkBuilder>
     {
         ArgumentNullException.ThrowIfNull(configuration);
 
-        var currentConfig = Configuration;
+        var currentConfig = GetConfiguration();
         if (configuration is ILinkConfig typedConfiguration)
         {
-            return Configure(currentConfig == null
-                ? typedConfiguration
-                : currentConfig.UpdateConfiguration(typedConfiguration));
+            return Configure(
+                currentConfig == null
+                    ? typedConfiguration
+                    : currentConfig.UpdateConfiguration(typedConfiguration)
+            );
         }
 
         if (currentConfig == null)
             throw new InvalidOperationException(
-                "Link configuration is not set and cannot be inferred from an object patch. Configure a concrete link configuration first.");
+                "Link configuration is not set and cannot be inferred from an object patch. Configure a concrete link configuration first."
+            );
         return Configure(currentConfig.UpdateConfiguration(configuration));
     }
 
@@ -138,12 +138,10 @@ public class LinkBuilder : ICloneable<LinkBuilder>
     /// </summary>
     internal BaseLink Build()
     {
-        var allTypes = new List<ILinkConfig?>
-        {
-            Kibana, Prometheus, Grafana
-        };
-        var type = allTypes.FirstOrDefault(configuredType => configuredType != null) ??
-                   throw new InvalidOperationException("Missing supported type for policy");
+        var allTypes = new List<ILinkConfig?> { Kibana, Prometheus, Grafana };
+        var type =
+            allTypes.FirstOrDefault(configuredType => configuredType != null)
+            ?? throw new InvalidOperationException("Missing supported type for policy");
         if (allTypes.Count(config => config != null) > 1)
         {
             var conflictingConfigs = allTypes
@@ -151,8 +149,9 @@ public class LinkBuilder : ICloneable<LinkBuilder>
                 .Select(config => config!.GetType().Name)
                 .ToArray();
             throw new InvalidOperationException(
-                $"Multiple configurations provided for Link: {string.Join(", ", conflictingConfigs)}. " +
-                "Only one type is allowed at a time.");
+                $"Multiple configurations provided for Link: {string.Join(", ", conflictingConfigs)}. "
+                    + "Only one type is allowed at a time."
+            );
         }
 
         var linkName = Name ?? type.ToString()!;
@@ -161,7 +160,7 @@ public class LinkBuilder : ICloneable<LinkBuilder>
             KibanaLinkConfig => new KibanaLink(linkName, Kibana!),
             PrometheusLinkConfig => new PrometheusLink(linkName, Prometheus!),
             GrafanaLinkConfig => new GrafanaLink(linkName, Grafana!),
-            _ => throw new ArgumentException("Exception: Link must have a type.")
+            _ => throw new ArgumentException("Exception: Link must have a type."),
         };
     }
 }

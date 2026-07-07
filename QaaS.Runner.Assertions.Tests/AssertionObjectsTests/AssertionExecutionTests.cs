@@ -16,7 +16,9 @@ public class AssertionExecutionTests
 {
     private sealed class StaticLink(string linkName, string linkValue) : BaseLink(linkName)
     {
-        protected override string BuildLink(IList<KeyValuePair<DateTime, DateTime>> startEndTimesKeyValuePairs)
+        protected override string BuildLink(
+            IList<KeyValuePair<DateTime, DateTime>> startEndTimesKeyValuePairs
+        )
         {
             return linkValue;
         }
@@ -24,13 +26,16 @@ public class AssertionExecutionTests
 
     private sealed class DelegateAssertionHook(
         Func<IImmutableList<SessionData>, IImmutableList<DataSource>, bool> execute,
-        AssertionStatus? forcedStatus = null) : BaseAssertion<object>
+        AssertionStatus? forcedStatus = null
+    ) : BaseAssertion<object>
     {
-        public DelegateAssertionHook() : this((_, _) => true)
-        {
-        }
+        public DelegateAssertionHook()
+            : this((_, _) => true) { }
 
-        public override bool Assert(IImmutableList<SessionData> sessionDataList, IImmutableList<DataSource> dataSourceList)
+        public override bool Assert(
+            IImmutableList<SessionData> sessionDataList,
+            IImmutableList<DataSource> dataSourceList
+        )
         {
             AssertionStatus = forcedStatus;
             return execute(sessionDataList, dataSourceList);
@@ -40,17 +45,39 @@ public class AssertionExecutionTests
     [Test]
     public void Execute_WhenHookReturnsTrue_ReturnsPassedAndFilteredData()
     {
-        var assertion = CreateAssertion(new DelegateAssertionHook((sessions, dataSources) =>
-                sessions.Count == 2 && dataSources.Count == 0),
+        var assertion = CreateAssertion(
+            new DelegateAssertionHook(
+                (sessions, dataSources) => sessions.Count == 2 && dataSources.Count == 0
+            ),
             sessionNames: ["session-1"],
-            sessionPatterns: ["^session-2$"]);
+            sessionPatterns: ["^session-2$"]
+        );
 
-        var sessionInput = new SessionData { Name = "session-1", UtcStartTime = DateTime.UtcNow, UtcEndTime = DateTime.UtcNow };
+        var sessionInput = new SessionData
+        {
+            Name = "session-1",
+            UtcStartTime = DateTime.UtcNow,
+            UtcEndTime = DateTime.UtcNow,
+        };
         var sessionRegex = new SessionData
-            { Name = "session-2", UtcStartTime = DateTime.UtcNow, UtcEndTime = DateTime.UtcNow };
+        {
+            Name = "session-2",
+            UtcStartTime = DateTime.UtcNow,
+            UtcEndTime = DateTime.UtcNow,
+        };
         var sessionIgnored = new SessionData
-            { Name = "ignored-session", UtcStartTime = DateTime.UtcNow, UtcEndTime = DateTime.UtcNow };
-        var sessionList = new List<SessionData?> { sessionInput, sessionRegex, sessionIgnored, null }.ToImmutableList();
+        {
+            Name = "ignored-session",
+            UtcStartTime = DateTime.UtcNow,
+            UtcEndTime = DateTime.UtcNow,
+        };
+        var sessionList = new List<SessionData?>
+        {
+            sessionInput,
+            sessionRegex,
+            sessionIgnored,
+            null,
+        }.ToImmutableList();
 
         var result = assertion.Execute(sessionList, ImmutableList<DataSource>.Empty);
 
@@ -76,7 +103,9 @@ public class AssertionExecutionTests
     [Test]
     public void Execute_WhenHookOverridesStatus_UsesOverriddenStatus()
     {
-        var assertion = CreateAssertion(new DelegateAssertionHook((_, _) => false, AssertionStatus.Skipped));
+        var assertion = CreateAssertion(
+            new DelegateAssertionHook((_, _) => false, AssertionStatus.Skipped)
+        );
         var sessionList = new List<SessionData?> { new() { Name = "session-1" } }.ToImmutableList();
 
         var result = assertion.Execute(sessionList, ImmutableList<DataSource>.Empty);
@@ -87,8 +116,11 @@ public class AssertionExecutionTests
     [Test]
     public void Execute_WhenHookThrows_ReturnsBrokenAndCapturesException()
     {
-        var assertion = CreateAssertion(new DelegateAssertionHook((_, _) =>
-            throw new InvalidOperationException("expected failure")));
+        var assertion = CreateAssertion(
+            new DelegateAssertionHook(
+                (_, _) => throw new InvalidOperationException("expected failure")
+            )
+        );
         var sessionList = new List<SessionData?> { new() { Name = "session-1" } }.ToImmutableList();
 
         var result = assertion.Execute(sessionList, ImmutableList<DataSource>.Empty);
@@ -100,12 +132,14 @@ public class AssertionExecutionTests
     [Test]
     public void Execute_WhenSessionHasFailures_ReturnsFlaky()
     {
-        var assertion = CreateAssertion(new DelegateAssertionHook((_, _) => true),
-            sessionNames: ["session-1"]);
+        var assertion = CreateAssertion(
+            new DelegateAssertionHook((_, _) => true),
+            sessionNames: ["session-1"]
+        );
         var flakySession = new SessionData
         {
             Name = "session-1",
-            SessionFailures = [new ActionFailure()]
+            SessionFailures = [new ActionFailure()],
         };
         var sessionList = new List<SessionData?> { flakySession }.ToImmutableList();
 
@@ -116,16 +150,59 @@ public class AssertionExecutionTests
     }
 
     [Test]
+    public void Execute_WhenSessionHasRepeatedFailures_DeduplicatesFlakinessReasons()
+    {
+        var assertion = CreateAssertion(
+            new DelegateAssertionHook((_, _) => true),
+            sessionNames: ["session-1"]
+        );
+        var flakySession = new SessionData
+        {
+            Name = "session-1",
+            SessionFailures =
+            [
+                Failure("S3 operation failed: StatusCode=503 ServiceUnavailable"),
+                Failure("S3 operation failed: StatusCode=503 ServiceUnavailable"),
+                Failure("S3 operation failed: StatusCode=403 Forbidden"),
+            ],
+        };
+
+        var result = assertion.Execute(
+            new List<SessionData?> { flakySession }.ToImmutableList(),
+            ImmutableList<DataSource>.Empty
+        );
+
+        var sessionFailures = result.Flaky.FlakinessReasons.Single().Value;
+        Assert.Multiple(() =>
+        {
+            Assert.That(result.Flaky.IsFlaky, Is.True);
+            Assert.That(sessionFailures, Has.Count.EqualTo(2));
+            Assert.That(
+                sessionFailures.Select(failure => failure.Reason.Message),
+                Is.EqualTo(
+                    new[]
+                    {
+                        "S3 operation failed: StatusCode=503 ServiceUnavailable",
+                        "S3 operation failed: StatusCode=403 Forbidden",
+                    }
+                )
+            );
+        });
+    }
+
+    [Test]
     public void Execute_WhenDataSourcesAreNull_BuildsLinksAndUsesEmptyDataSourceList()
     {
-        var assertion = CreateAssertion(new DelegateAssertionHook((_, dataSources) => dataSources.Count == 0),
-            sessionNames: ["session-1"]);
+        var assertion = CreateAssertion(
+            new DelegateAssertionHook((_, dataSources) => dataSources.Count == 0),
+            sessionNames: ["session-1"]
+        );
         assertion.Links = [new StaticLink("grafana", "https://grafana.local/d/test")];
         var session = new SessionData
         {
             Name = "session-1",
             UtcStartTime = DateTime.UtcNow.AddSeconds(-1),
-            UtcEndTime = DateTime.UtcNow
+            UtcEndTime = DateTime.UtcNow,
         };
 
         var result = assertion.Execute(new List<SessionData?> { session }.ToImmutableList(), null);
@@ -143,9 +220,11 @@ public class AssertionExecutionTests
         });
     }
 
-    private static Assertion CreateAssertion(IAssertion hook,
+    private static Assertion CreateAssertion(
+        IAssertion hook,
         string[]? sessionNames = null,
-        string[]? sessionPatterns = null)
+        string[]? sessionPatterns = null
+    )
     {
         return new Assertion
         {
@@ -156,7 +235,16 @@ public class AssertionExecutionTests
             _dataSourceNames = [],
             _dataSourcePatterns = [],
             _sessionNames = sessionNames ?? [],
-            _sessionPatterns = sessionPatterns ?? []
+            _sessionPatterns = sessionPatterns ?? [],
         };
     }
+
+    private static ActionFailure Failure(string message) =>
+        new()
+        {
+            Name = "S3Consumer",
+            Action = "S3 Consumer",
+            ActionType = "Consumer",
+            Reason = new Reason { Message = message, Description = message },
+        };
 }

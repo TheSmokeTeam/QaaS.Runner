@@ -15,7 +15,7 @@ public partial class ConsumerBuilder : IValidatableObject
     {
         ArgumentNullException.ThrowIfNull(validationContext);
 
-        var configuredProtocol = Configuration;
+        var configuredProtocol = GetConfiguration();
         if (configuredProtocol == null)
         {
             return [];
@@ -27,12 +27,15 @@ public partial class ConsumerBuilder : IValidatableObject
             return [];
         }
 
-        var propertyName = ProtocolChunkSupport.GetReaderConfigurationPropertyName(configuredProtocol);
+        var propertyName = ProtocolChunkSupport.GetReaderConfigurationPropertyName(
+            configuredProtocol
+        );
         return
         [
             new ValidationResult(
                 $"The {propertyName} field is ambiguous because the configured protocol supports both single and chunk reading, but consumer configuration does not expose a chunk selection option.",
-                [propertyName])
+                [propertyName]
+            ),
         ];
     }
 }

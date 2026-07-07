@@ -1,4 +1,6 @@
 using System.Collections.Concurrent;
+using System.Globalization;
+using System.Reflection;
 using Microsoft.Extensions.Logging;
 using QaaS.Framework.SDK.ContextObjects;
 using QaaS.Framework.SDK.Session.CommunicationDataObjects;
@@ -14,8 +16,11 @@ public static class SessionExtensions
     /// <summary>
     ///     Disposes of an enumerable of items that extend the `IDisposable` interface
     /// </summary>
-    public static void DisposeOfEnumerable<TEnumerable>(this IEnumerable<TEnumerable>? enumerable,
-        string enumerableName, ILogger logger)
+    public static void DisposeOfEnumerable<TEnumerable>(
+        this IEnumerable<TEnumerable>? enumerable,
+        string enumerableName,
+        ILogger logger
+    )
         where TEnumerable : IDisposable
     {
         var array = (enumerable ?? Enumerable.Empty<TEnumerable>()).ToArray();
@@ -27,11 +32,19 @@ public static class SessionExtensions
             }
             catch (Exception exception)
             {
-                logger.LogWarning(exception, "Failed to dispose item from {EnumerableName}", enumerableName);
+                logger.LogWarning(
+                    exception,
+                    "Failed to dispose item from {EnumerableName}",
+                    enumerableName
+                );
             }
         }
 
-        logger.LogDebug("Disposed {EnumerableLength} item(s) from {EnumerableName}", array.Length, enumerableName);
+        logger.LogDebug(
+            "Disposed {EnumerableLength} item(s) from {EnumerableName}",
+            array.Length,
+            enumerableName
+        );
     }
 
     /// <summary>
@@ -44,8 +57,15 @@ public static class SessionExtensions
     /// <param name="actionType">The action type (Publisher, Consumer etc...)</param>
     /// <param name="actionProtocol">The action protocol (RabbitMq, KafkaTopic etc...)</param>
     /// <param name="actionRuntimeName">The action runtime name (if exists)</param>
-    public static void AppendActionFailure(this IList<ActionFailure> actionFailures, Exception exception,
-        string sessionName, ILogger logger, string actionType, string actionRuntimeName, string? actionProtocol = null)
+    public static void AppendActionFailure(
+        this IList<ActionFailure> actionFailures,
+        Exception exception,
+        string sessionName,
+        ILogger logger,
+        string actionType,
+        string actionRuntimeName,
+        string? actionProtocol = null
+    )
     {
         var failedActionDescription = string.IsNullOrWhiteSpace(actionProtocol)
             ? actionRuntimeName
@@ -53,23 +73,31 @@ public static class SessionExtensions
         logger.LogError(
             exception,
             "Action failure in session {SessionName}. ActionType={ActionType}, Action={ActionName}",
-            sessionName, actionType, failedActionDescription);
+            sessionName,
+            actionType,
+            failedActionDescription
+        );
 
-        actionFailures.Add(new ActionFailure
-        {
-            Name = actionRuntimeName,
-            ActionType = actionType,
-            Reason = new Reason
+        actionFailures.Add(
+            new ActionFailure
             {
-                Message = exception.Message,
-                Description = exception.ToString()
+                Name = actionRuntimeName,
+                ActionType = actionType,
+                Reason = CreateFailureReason(exception),
             }
-        });
+        );
     }
 
-    public static void AppendActionFailure(this ConcurrentBag<ActionFailure> actionFailures, Exception exception,
-        string sessionName, ILogger logger, string actionType, string actionRuntimeName, string? actionProtocol = null,
-        string? exceptionMessage = null)
+    public static void AppendActionFailure(
+        this ConcurrentBag<ActionFailure> actionFailures,
+        Exception exception,
+        string sessionName,
+        ILogger logger,
+        string actionType,
+        string actionRuntimeName,
+        string? actionProtocol = null,
+        string? exceptionMessage = null
+    )
     {
         var failedActionDescription = string.IsNullOrWhiteSpace(actionProtocol)
             ? actionRuntimeName
@@ -77,22 +105,26 @@ public static class SessionExtensions
         logger.LogError(
             exception,
             "Action failure in session {SessionName}. ActionType={ActionType}, Action={ActionName}",
-            sessionName, actionType, failedActionDescription);
+            sessionName,
+            actionType,
+            failedActionDescription
+        );
 
-        actionFailures.Add(new ActionFailure
-        {
-            Name = actionRuntimeName,
-            ActionType = actionType,
-            Reason = new Reason
+        actionFailures.Add(
+            new ActionFailure
             {
-                Message = exceptionMessage ?? exception.Message,
-                Description = exception.ToString()
+                Name = actionRuntimeName,
+                ActionType = actionType,
+                Reason = CreateFailureReason(exception, exceptionMessage),
             }
-        });
+        );
     }
 
-    public static void SetRunningSession(this InternalContext context, string sessionName,
-        RunningSessionData<object, object> runningSessionData)
+    public static void SetRunningSession(
+        this InternalContext context,
+        string sessionName,
+        RunningSessionData<object, object> runningSessionData
+    )
     {
         // Running session data is shared across async actions, so updates must stay serialized to
         // avoid partial state being observed by publishers, consumers, and transactions.
@@ -104,7 +136,10 @@ public static class SessionExtensions
         context.Logger.LogDebug("Registered running session state for {SessionName}", sessionName);
     }
 
-    public static RunningSessionData<object, object> GetRunningSession(this InternalContext context, string sessionName)
+    public static RunningSessionData<object, object> GetRunningSession(
+        this InternalContext context,
+        string sessionName
+    )
     {
         return context.TryGetRunningSession(sessionName, out var runningSession)
             ? runningSession!
@@ -114,13 +149,19 @@ public static class SessionExtensions
     /// <summary>
     /// Attempts to resolve the running session state under the same synchronization used for runtime updates.
     /// </summary>
-    public static bool TryGetRunningSession(this InternalContext context, string sessionName,
-        out RunningSessionData<object, object>? runningSession)
+    public static bool TryGetRunningSession(
+        this InternalContext context,
+        string sessionName,
+        out RunningSessionData<object, object>? runningSession
+    )
     {
         // Reads use the same lock as writes so action cancellation and live session lookups stay coherent.
         lock (context.InternalRunningSessions.RunningSessionsDict)
         {
-            return context.InternalRunningSessions.RunningSessionsDict.TryGetValue(sessionName, out runningSession);
+            return context.InternalRunningSessions.RunningSessionsDict.TryGetValue(
+                sessionName,
+                out runningSession
+            );
         }
     }
 
@@ -133,15 +174,22 @@ public static class SessionExtensions
             removed = context.InternalRunningSessions.RunningSessionsDict.Remove(sessionName);
         }
 
-        context.Logger.LogDebug("Removed running session state for {SessionName}: {Removed}", sessionName, removed);
+        context.Logger.LogDebug(
+            "Removed running session state for {SessionName}: {Removed}",
+            sessionName,
+            removed
+        );
         return removed;
     }
 
     /// <summary>
     /// Appends running input communication data through the synchronized running-session store.
     /// </summary>
-    public static void AddRunningInputData(this InternalContext context, string sessionName,
-        RunningCommunicationData<object> runningCommunicationData)
+    public static void AddRunningInputData(
+        this InternalContext context,
+        string sessionName,
+        RunningCommunicationData<object> runningCommunicationData
+    )
     {
         AddRunningCommunicationData(context, sessionName, runningCommunicationData, isInput: true);
     }
@@ -149,14 +197,21 @@ public static class SessionExtensions
     /// <summary>
     /// Appends running output communication data through the synchronized running-session store.
     /// </summary>
-    public static void AddRunningOutputData(this InternalContext context, string sessionName,
-        RunningCommunicationData<object> runningCommunicationData)
+    public static void AddRunningOutputData(
+        this InternalContext context,
+        string sessionName,
+        RunningCommunicationData<object> runningCommunicationData
+    )
     {
         AddRunningCommunicationData(context, sessionName, runningCommunicationData, isInput: false);
     }
 
-    public static Task<Tuple<Action, InternalCommunicationData<object>>?> CreateTaskFromAction(InternalContext context,
-        Action action, string sessionName, ConcurrentBag<ActionFailure> actionFailures)
+    public static Task<Tuple<Action, InternalCommunicationData<object>>?> CreateTaskFromAction(
+        InternalContext context,
+        Action action,
+        string sessionName,
+        ConcurrentBag<ActionFailure> actionFailures
+    )
     {
         var actionType = action.GetType().Name;
         var actionName = action.Name;
@@ -164,8 +219,12 @@ public static class SessionExtensions
         {
             try
             {
-                context.Logger.LogDebug("Starting action task {ActionType} {ActionName} in session {SessionName}",
-                    actionType, actionName, sessionName);
+                context.Logger.LogDebug(
+                    "Starting action task {ActionType} {ActionName} in session {SessionName}",
+                    actionType,
+                    actionName,
+                    sessionName
+                );
                 return new Tuple<Action, InternalCommunicationData<object>>(action, action.Act());
             }
             catch (Exception e)
@@ -180,50 +239,161 @@ public static class SessionExtensions
                 {
                     context.Logger.LogDebug(
                         "Running session state for {SessionName} was not found while handling failure for action {ActionName}",
-                        sessionName, actionName);
+                        sessionName,
+                        actionName
+                    );
                 }
 
                 var exceptionMessage =
-                    e is OperationCanceledException ? $"Action {actionName} was canceled" : e.Message;
-                actionFailures.AppendActionFailure(e, sessionName, context.Logger, actionType,
-                    actionName, "", exceptionMessage);
+                    e is OperationCanceledException ? $"Action {actionName} was canceled" : null;
+                actionFailures.AppendActionFailure(
+                    e,
+                    sessionName,
+                    context.Logger,
+                    actionType,
+                    actionName,
+                    "",
+                    exceptionMessage
+                );
                 return default;
             }
             finally
             {
-                context.Logger.LogDebug("Finished action task {ActionType} {ActionName} in session {SessionName}",
-                    actionType, actionName, sessionName);
+                context.Logger.LogDebug(
+                    "Finished action task {ActionType} {ActionName} in session {SessionName}",
+                    actionType,
+                    actionName,
+                    sessionName
+                );
             }
         });
     }
 
-    private static void AddRunningCommunicationData(this InternalContext context, string sessionName,
-        RunningCommunicationData<object> runningCommunicationData, bool isInput)
+    private static void AddRunningCommunicationData(
+        this InternalContext context,
+        string sessionName,
+        RunningCommunicationData<object> runningCommunicationData,
+        bool isInput
+    )
     {
         lock (context.InternalRunningSessions.RunningSessionsDict)
         {
-            if (!context.InternalRunningSessions.RunningSessionsDict.TryGetValue(sessionName, out var runningSession))
+            if (
+                !context.InternalRunningSessions.RunningSessionsDict.TryGetValue(
+                    sessionName,
+                    out var runningSession
+                )
+            )
                 throw new KeyNotFoundException($"Running session '{sessionName}' was not found.");
 
             if (isInput)
             {
-                (runningSession.Inputs ?? throw new InvalidOperationException(
-                    $"Running session '{sessionName}' does not have initialized input channels."))
-                    .Add(runningCommunicationData);
+                (
+                    runningSession.Inputs
+                    ?? throw new InvalidOperationException(
+                        $"Running session '{sessionName}' does not have initialized input channels."
+                    )
+                ).Add(runningCommunicationData);
                 return;
             }
 
-            (runningSession.Outputs ?? throw new InvalidOperationException(
-                $"Running session '{sessionName}' does not have initialized output channels."))
-                .Add(runningCommunicationData);
+            (
+                runningSession.Outputs
+                ?? throw new InvalidOperationException(
+                    $"Running session '{sessionName}' does not have initialized output channels."
+                )
+            ).Add(runningCommunicationData);
         }
     }
 
-    private static void CancelRunningCommunication(IEnumerable<RunningCommunicationData<object>>? runningCommunications,
-        string actionName)
+    private static void CancelRunningCommunication(
+        IEnumerable<RunningCommunicationData<object>>? runningCommunications,
+        string actionName
+    )
     {
         runningCommunications
             ?.FirstOrDefault(runningCommunication => runningCommunication.Name == actionName)
             ?.DataCancellationTokenSource.Cancel();
+    }
+
+    private static Reason CreateFailureReason(Exception exception, string? exceptionMessage = null)
+    {
+        if (!string.IsNullOrWhiteSpace(exceptionMessage))
+        {
+            return new Reason { Message = exceptionMessage, Description = exception.ToString() };
+        }
+
+        return TryCreateS3FailureReason(exception, out var s3Reason)
+            ? s3Reason
+            : new Reason { Message = exception.Message, Description = exception.ToString() };
+    }
+
+    private static bool TryCreateS3FailureReason(Exception exception, out Reason reason)
+    {
+        reason = new Reason();
+        var exceptionType = exception.GetType();
+        var typeName = exceptionType.FullName ?? exceptionType.Name;
+        if (
+            !typeName.Contains("AmazonS3Exception", StringComparison.Ordinal)
+            && !typeName.Contains("Amazon.S3", StringComparison.Ordinal)
+        )
+        {
+            return false;
+        }
+
+        var fields = new List<KeyValuePair<string, string>>();
+        AddPropertyField(fields, exception, "StatusCode");
+        AddPropertyField(fields, exception, "ErrorCode");
+        AddPropertyField(fields, exception, "RequestId");
+        AddPropertyField(fields, exception, "AmazonId2");
+        if (!string.IsNullOrWhiteSpace(exception.Message))
+            fields.Add(new KeyValuePair<string, string>("Message", exception.Message));
+
+        var fieldText =
+            fields.Count == 0
+                ? exception.Message
+                : string.Join(", ", fields.Select(field => $"{field.Key}={field.Value}"));
+        var descriptionLines = new List<string> { $"ExceptionType: {exceptionType.Name}" };
+        descriptionLines.AddRange(fields.Select(field => $"{field.Key}: {field.Value}"));
+        if (exception.InnerException != null)
+        {
+            descriptionLines.Add($"InnerExceptionType: {exception.InnerException.GetType().Name}");
+            descriptionLines.Add($"InnerExceptionMessage: {exception.InnerException.Message}");
+        }
+
+        reason = new Reason
+        {
+            Message = $"S3 operation failed: {fieldText}",
+            Description = string.Join(Environment.NewLine, descriptionLines),
+        };
+        return true;
+    }
+
+    private static void AddPropertyField(
+        ICollection<KeyValuePair<string, string>> fields,
+        Exception exception,
+        string propertyName
+    )
+    {
+        var propertyValue = exception
+            .GetType()
+            .GetProperty(propertyName, BindingFlags.Instance | BindingFlags.Public)
+            ?.GetValue(exception);
+        var formattedValue = FormatFailurePropertyValue(propertyValue);
+        if (formattedValue != null)
+            fields.Add(new KeyValuePair<string, string>(propertyName, formattedValue));
+    }
+
+    private static string? FormatFailurePropertyValue(object? value)
+    {
+        return value switch
+        {
+            null => null,
+            string stringValue when string.IsNullOrWhiteSpace(stringValue) => null,
+            string stringValue => stringValue,
+            Enum enumValue =>
+                $"{Convert.ToInt64(enumValue, CultureInfo.InvariantCulture)} {enumValue}",
+            _ => Convert.ToString(value, CultureInfo.InvariantCulture),
+        };
     }
 }

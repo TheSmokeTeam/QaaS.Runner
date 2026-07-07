@@ -145,14 +145,14 @@ or `QaaS.Common.*` over baking the hook into the runner.
 - `AllureReporter` writes Allure-format JSON + attachments (deduped via
   `ConcurrentDictionary`).
 - ReportPortal integration ships as a passive reporter; `ReportLogic`
-  queues matching assertion results locally, while one runner-owned publisher
+  queues reportable assertion results locally, while one runner-owned publisher
   validates access read-only before execution and publishes grouped launches
   during cleanup.
 - Reporters are now **shared across assertions** rather than reconstructed
   per assertion (commit `4876603`).
 
 When you change reporter wiring, keep `Reporters` keyed by their configured
-type and verify with
+type, preserve `Assertion.ReporterTypes` as the per-assertion routing gate, and verify with
 `QaaS.Runner.Assertions.Tests`.
 
 ## YAML configuration shape

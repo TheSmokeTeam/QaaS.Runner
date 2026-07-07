@@ -2,6 +2,7 @@ using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
+using System.Net;
 using NUnit.Framework;
 using QaaS.Framework.SDK.ContextObjects;
 using QaaS.Framework.SDK.Session.CommunicationDataObjects;
@@ -11,8 +12,8 @@ using QaaS.Framework.SDK.Session.SessionDataObjects.RunningSessionsObjects;
 using QaaS.Framework.Serialization;
 using QaaS.Runner.Sessions.Extensions;
 using QaaS.Runner.Sessions.Tests.Actions.Utils;
-using SessionAction = QaaS.Runner.Sessions.Actions.Action;
 using InternalCommunicationData = QaaS.Runner.Sessions.Actions.InternalCommunicationData<object>;
+using SessionAction = QaaS.Runner.Sessions.Actions.Action;
 
 namespace QaaS.Runner.Sessions.Tests.Extensions;
 
@@ -26,7 +27,9 @@ public class SessionExtensionsTests
     {
         IEnumerable<DisposableTracker>? disposables = null;
 
-        Assert.DoesNotThrow(() => disposables.DisposeOfEnumerable("DisposableTracker", Globals.Logger));
+        Assert.DoesNotThrow(() =>
+            disposables.DisposeOfEnumerable("DisposableTracker", Globals.Logger)
+        );
     }
 
     [Test]
@@ -47,8 +50,14 @@ public class SessionExtensionsTests
     {
         var failures = new List<ActionFailure>();
 
-        failures.AppendActionFailure(new InvalidOperationException("Action failed"), SessionName, Globals.Logger,
-            "Publisher", "PublishAction", "Kafka");
+        failures.AppendActionFailure(
+            new InvalidOperationException("Action failed"),
+            SessionName,
+            Globals.Logger,
+            "Publisher",
+            "PublishAction",
+            "Kafka"
+        );
 
         Assert.That(failures, Has.Count.EqualTo(1));
         Assert.That(failures[0].Name, Is.EqualTo("PublishAction"));
@@ -61,8 +70,13 @@ public class SessionExtensionsTests
     {
         var failures = new List<ActionFailure>();
 
-        failures.AppendActionFailure(new InvalidOperationException("No protocol"), SessionName, Globals.Logger,
-            "Collector", "CollectAction");
+        failures.AppendActionFailure(
+            new InvalidOperationException("No protocol"),
+            SessionName,
+            Globals.Logger,
+            "Collector",
+            "CollectAction"
+        );
 
         Assert.That(failures, Has.Count.EqualTo(1));
         Assert.That(failures[0].Name, Is.EqualTo("CollectAction"));
@@ -81,30 +95,58 @@ public class SessionExtensionsTests
             "Consumer",
             "ConsumeAction",
             actionProtocol: "Kafka",
-            exceptionMessage: "custom message");
+            exceptionMessage: "custom message"
+        );
 
         Assert.That(failures, Has.Count.EqualTo(1));
         Assert.That(failures.First().Reason.Message, Is.EqualTo("custom message"));
     }
 
     [Test]
+    public void AppendActionFailure_ForConcurrentBag_FormatsS3LikeExceptionsCompactly()
+    {
+        var failures = new ConcurrentBag<ActionFailure>();
+        var exception = new FakeAmazonS3Exception("request timed out")
+        {
+            StatusCode = HttpStatusCode.ServiceUnavailable,
+            ErrorCode = "RequestTimeout",
+            RequestId = "req-123",
+        };
+
+        failures.AppendActionFailure(
+            exception,
+            SessionName,
+            Globals.Logger,
+            "Consumer",
+            "S3Consumer",
+            actionProtocol: "S3"
+        );
+
+        var reason = failures.Single().Reason;
+        Assert.Multiple(() =>
+        {
+            Assert.That(reason.Message, Does.Contain("S3 operation failed"));
+            Assert.That(reason.Message, Does.Contain("StatusCode=503 ServiceUnavailable"));
+            Assert.That(reason.Message, Does.Contain("ErrorCode=RequestTimeout"));
+            Assert.That(reason.Message, Does.Contain("RequestId=req-123"));
+            Assert.That(reason.Description, Does.Contain("ExceptionType: FakeAmazonS3Exception"));
+            Assert.That(reason.Description, Does.Not.Contain("   at "));
+        });
+    }
+
+    [Test]
     public void InternalCommunicationData_InheritsCommunicationDataContract_ForInputData()
     {
-        var input = new List<DetailedData<string>>
-        {
-            new() { Body = "input-body" }
-        };
-        var output = new List<DetailedData<string>?>
-        {
-            new() { Body = "output-body" }
-        };
-        var internalCommunicationData = new QaaS.Runner.Sessions.Actions.InternalCommunicationData<string>
-        {
-            Input = input,
-            Output = output,
-            InputSerializationType = SerializationType.Json,
-            OutputSerializationType = SerializationType.Binary
-        };
+        var input = new List<DetailedData<string>> { new() { Body = "input-body" } };
+        var output = new List<DetailedData<string>?> { new() { Body = "output-body" } };
+        var internalCommunicationData =
+            new QaaS.Runner.Sessions.Actions.InternalCommunicationData<string>
+            {
+                Input = input,
+                Output = output,
+                InputSerializationType = SerializationType.Json,
+                OutputSerializationType = SerializationType.Binary,
+            };
 
         CommunicationData<string> communicationData = internalCommunicationData;
 
@@ -136,7 +178,10 @@ public class SessionExtensionsTests
     {
         var context = CreationalFunctions.CreateContext(SessionName, []);
         var failures = new ConcurrentBag<ActionFailure>();
-        var action = new ExceptionalAction("ExceptionalAction", new InvalidOperationException("boom"));
+        var action = new ExceptionalAction(
+            "ExceptionalAction",
+            new InvalidOperationException("boom")
+        );
 
         var task = SessionExtensions.CreateTaskFromAction(context, action, SessionName, failures);
         task.GetAwaiter().GetResult();
@@ -158,7 +203,10 @@ public class SessionExtensionsTests
 
         Assert.That(task.Result, Is.Null);
         Assert.That(failures, Has.Count.EqualTo(1));
-        Assert.That(failures.First().Reason.Message, Is.EqualTo("Action CanceledAction was canceled"));
+        Assert.That(
+            failures.First().Reason.Message,
+            Is.EqualTo("Action CanceledAction was canceled")
+        );
     }
 
     [Test]
@@ -185,10 +233,15 @@ public class SessionExtensionsTests
         var context = new InternalContext
         {
             Logger = Globals.Logger,
-            InternalRunningSessions = new RunningSessions(new Dictionary<string, RunningSessionData<object, object>>())
+            InternalRunningSessions = new RunningSessions(
+                new Dictionary<string, RunningSessionData<object, object>>()
+            ),
         };
         var failures = new ConcurrentBag<ActionFailure>();
-        var action = new ExceptionalAction("MissingSessionAction", new InvalidOperationException("boom"));
+        var action = new ExceptionalAction(
+            "MissingSessionAction",
+            new InvalidOperationException("boom")
+        );
 
         var task = SessionExtensions.CreateTaskFromAction(context, action, SessionName, failures);
 
@@ -202,15 +255,14 @@ public class SessionExtensionsTests
     public void RunningSessionHelpers_SetGetAndRemoveSessionData()
     {
         var context = CreationalFunctions.CreateContext(SessionName, []);
-        var runningSession = new RunningSessionData<object, object>
-        {
-            Inputs = [],
-            Outputs = []
-        };
+        var runningSession = new RunningSessionData<object, object> { Inputs = [], Outputs = [] };
 
         context.SetRunningSession("other-session", runningSession);
 
-        Assert.That(context.TryGetRunningSession("other-session", out var foundRunningSession), Is.True);
+        Assert.That(
+            context.TryGetRunningSession("other-session", out var foundRunningSession),
+            Is.True
+        );
         Assert.That(foundRunningSession, Is.SameAs(runningSession));
         Assert.That(context.GetRunningSession("other-session"), Is.SameAs(runningSession));
         Assert.That(context.RemoveRunningSession("other-session"), Is.True);
@@ -248,16 +300,24 @@ public class SessionExtensionsTests
         {
             return new InternalCommunicationData
             {
-                Output = [new DetailedData<object> { Body = "ok" }]
+                Output = [new DetailedData<object> { Body = "ok" }],
             };
         }
     }
 
-    private sealed class ExceptionalAction(string name, Exception exceptionToThrow) : SessionAction(name, Globals.Logger)
+    private sealed class ExceptionalAction(string name, Exception exceptionToThrow)
+        : SessionAction(name, Globals.Logger)
     {
         internal override InternalCommunicationData Act()
         {
             throw exceptionToThrow;
         }
+    }
+
+    private sealed class FakeAmazonS3Exception(string message) : Exception(message)
+    {
+        public HttpStatusCode StatusCode { get; init; }
+        public string? ErrorCode { get; init; }
+        public string? RequestId { get; init; }
     }
 }

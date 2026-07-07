@@ -520,12 +520,12 @@ public class AssertionBuilderTests
 
         Assert.Multiple(() =>
         {
-            Assert.That(builder.Configuration["InputNames:0"], Is.EqualTo("Name2"));
-            Assert.That(builder.Configuration["InputNames:1"], Is.Null);
-            Assert.That(builder.Configuration["InputNames"], Is.Null);
+            Assert.That(builder.AssertionConfiguration["InputNames:0"], Is.EqualTo("Name2"));
+            Assert.That(builder.AssertionConfiguration["InputNames:1"], Is.Null);
+            Assert.That(builder.AssertionConfiguration["InputNames"], Is.Null);
             Assert.That(
                 builder
-                    .Configuration.AsEnumerable()
+                    .AssertionConfiguration.AsEnumerable()
                     .Count(pair =>
                         pair.Key.StartsWith("InputNames:", StringComparison.OrdinalIgnoreCase)
                         && pair.Value != null

@@ -27,21 +27,6 @@ namespace QaaS.Runner.Sessions.Actions.Publishers.Builders;
 
 public partial class PublisherBuilder
 {
-    public ISenderConfig? Configuration
-    {
-        get => GetConfiguration();
-        internal set
-        {
-            if (value == null)
-            {
-                Reset();
-                return;
-            }
-
-            Configure(value);
-        }
-    }
-
     /// <summary>
     /// Sets the name used for the current Runner publisher builder instance.
     /// </summary>
@@ -228,7 +213,9 @@ public partial class PublisherBuilder
     /// <qaas-docs group="Configuration as Code" subgroup="Publishers" />
     public PublisherBuilder RemoveDataSourcePattern(string dataSourcePattern)
     {
-        DataSourcePatterns = DataSourcePatterns?.Where(value => value != dataSourcePattern).ToArray();
+        DataSourcePatterns = DataSourcePatterns
+            ?.Where(value => value != dataSourcePattern)
+            .ToArray();
         return this;
     }
 
@@ -372,17 +359,23 @@ public partial class PublisherBuilder
     {
         ArgumentNullException.ThrowIfNull(configuration);
 
-        var currentConfig = Configuration;
+        var currentConfig = GetConfiguration();
         if (configuration is ISenderConfig typedConfiguration)
         {
-            return Configure(currentConfig == null
-                ? typedConfiguration
-                : currentConfig.UpdateConfiguration(typedConfiguration));
+            return Configure(
+                currentConfig == null
+                    ? typedConfiguration
+                    : ConfigurationUpdateExtensions.UpdateConfiguration<ISenderConfig>(
+                        currentConfig,
+                        typedConfiguration
+                    )
+            );
         }
 
         if (currentConfig == null)
             throw new InvalidOperationException(
-                "Publisher configuration is not set and cannot be inferred from an object patch. Configure a concrete publisher configuration first.");
+                "Publisher configuration is not set and cannot be inferred from an object patch. Configure a concrete publisher configuration first."
+            );
         return Configure(currentConfig.UpdateConfiguration(configuration));
     }
 
@@ -456,9 +449,18 @@ public partial class PublisherBuilder
     /// Builds a concrete publisher action from the configured sender/chunk sender pair.
     /// Any construction failure is written to <paramref name="actionFailures"/> and returns null.
     /// </summary>
-    internal BasePublisher? Build(InternalContext context, IList<ActionFailure> actionFailures, string sessionName)
+    internal BasePublisher? Build(
+        InternalContext context,
+        IList<ActionFailure> actionFailures,
+        string sessionName
+    )
     {
-        return BuildWithTimeZone(context, actionFailures, sessionName, TimeZoneInfoResolver.DefaultTimeZoneId);
+        return BuildWithTimeZone(
+            context,
+            actionFailures,
+            sessionName,
+            TimeZoneInfoResolver.DefaultTimeZoneId
+        );
     }
 
     /// <summary>
@@ -469,15 +471,25 @@ public partial class PublisherBuilder
         InternalContext context,
         IList<ActionFailure> actionFailures,
         string sessionName,
-        string timeZoneId)
+        string timeZoneId
+    )
     {
         ISenderConfig? type = null;
         try
         {
             var allTypes = new List<ISenderConfig?>
             {
-                RabbitMq, KafkaTopic, Socket, Sftp, PostgreSqlTable, OracleSqlTable, MsSqlTable, ElasticIndex, Redis,
-                S3Bucket, MongoDbCollection
+                RabbitMq,
+                KafkaTopic,
+                Socket,
+                Sftp,
+                PostgreSqlTable,
+                OracleSqlTable,
+                MsSqlTable,
+                ElasticIndex,
+                Redis,
+                S3Bucket,
+                MongoDbCollection,
             };
             if (allTypes.Count(config => config != null) > 1)
             {
@@ -486,59 +498,103 @@ public partial class PublisherBuilder
                     .Select(config => config!.GetType().Name)
                     .ToArray();
                 throw new InvalidOperationException(
-                    $"Multiple configurations provided for Publisher '{Name}': {string.Join(", ", conflictingConfigs)}. " +
-                    "Only one type is allowed at a time.");
+                    $"Multiple configurations provided for Publisher '{Name}': {string.Join(", ", conflictingConfigs)}. "
+                        + "Only one type is allowed at a time."
+                );
             }
 
-            type = allTypes.FirstOrDefault(configuredType => configuredType != null) ??
-                   throw new InvalidOperationException($"Missing supported type in publisher {Name}");
+            type =
+                allTypes.FirstOrDefault(configuredType => configuredType != null)
+                ?? throw new InvalidOperationException(
+                    $"Missing supported type in publisher {Name}"
+                );
             var senderChunkMode = ProtocolChunkSupport.ResolveSenderMode(type);
             var propertyName = ProtocolChunkSupport.GetSenderConfigurationPropertyName(type);
             if (Chunk == null && senderChunkMode == ProtocolChunkMode.ChunkOnly)
             {
                 throw new InvalidOperationException(
-                    $"The {nameof(Chunk)} field is required when {propertyName} is configured.");
+                    $"The {nameof(Chunk)} field is required when {propertyName} is configured."
+                );
             }
 
             if (Chunk != null && senderChunkMode == ProtocolChunkMode.SingleOnly)
             {
                 throw new InvalidOperationException(
-                    $"The {nameof(Chunk)} field must be empty when {propertyName} is configured.");
+                    $"The {nameof(Chunk)} field must be empty when {propertyName} is configured."
+                );
             }
-            
+
             var overrideRequest = new PublisherOverrideRequest(
                 Name!,
                 type,
                 Chunk != null,
                 context.Logger,
                 DataFilter,
-                timeZoneId);
-            var (sender, chunkSender) = context.GetSessionActionOverrides()?.Publisher?.Invoke(overrideRequest)
-                                       ?? ProtocolFactoryCompatibility.CreateSender(
-                                           Chunk != null,
-                                           type,
-                                           context.Logger,
-                                           DataFilter,
-                                           timeZoneId);
-            var publisherTypeName = sender?.GetType().Name ?? chunkSender?.GetType().Name ?? "Unknown";
-            
-            context.Logger.LogDebugWithMetaData("Started building Publisher of type {type}",
-                context.GetMetaDataOrDefault(), new object?[] { publisherTypeName });
+                timeZoneId
+            );
+            var (sender, chunkSender) =
+                context.GetSessionActionOverrides()?.Publisher?.Invoke(overrideRequest)
+                ?? ProtocolFactoryCompatibility.CreateSender(
+                    Chunk != null,
+                    type,
+                    context.Logger,
+                    DataFilter,
+                    timeZoneId
+                );
+            var publisherTypeName =
+                sender?.GetType().Name ?? chunkSender?.GetType().Name ?? "Unknown";
+
+            context.Logger.LogDebugWithMetaData(
+                "Started building Publisher of type {type}",
+                context.GetMetaDataOrDefault(),
+                new object?[] { publisherTypeName }
+            );
 
             return sender != null
-                ? new Publisher(Name!, sender, Stage, DataFilter, PolicyBuilder.BuildPolicies(Policies), Loop,
-                    Parallel?.Parallelism, Iterations, SleepTimeMs, Serialize?.Serializer, DataSourcePatterns,
-                    DataSourceNames, context.Logger)
+                    ? new Publisher(
+                        Name!,
+                        sender,
+                        Stage,
+                        DataFilter,
+                        PolicyBuilder.BuildPolicies(Policies),
+                        Loop,
+                        Parallel?.Parallelism,
+                        Iterations,
+                        SleepTimeMs,
+                        Serialize?.Serializer,
+                        DataSourcePatterns,
+                        DataSourceNames,
+                        context.Logger
+                    )
                 : chunkSender != null
-                    ? new ChunkPublisher(Name!, chunkSender, Stage, DataFilter, PolicyBuilder.BuildPolicies(Policies),
-                        Parallel?.Parallelism, Chunk!.ChunkSize!.Value, Loop, Iterations, SleepTimeMs,
-                        Serialize?.Serializer, DataSourcePatterns, DataSourceNames, context.Logger)
-                    : null;
+                    ? new ChunkPublisher(
+                        Name!,
+                        chunkSender,
+                        Stage,
+                        DataFilter,
+                        PolicyBuilder.BuildPolicies(Policies),
+                        Parallel?.Parallelism,
+                        Chunk!.ChunkSize!.Value,
+                        Loop,
+                        Iterations,
+                        SleepTimeMs,
+                        Serialize?.Serializer,
+                        DataSourcePatterns,
+                        DataSourceNames,
+                        context.Logger
+                    )
+                : null;
         }
         catch (Exception e)
         {
-            actionFailures.AppendActionFailure(e, sessionName, context.Logger, nameof(Publisher), Name!,
-                type?.GetType().Name);
+            actionFailures.AppendActionFailure(
+                e,
+                sessionName,
+                context.Logger,
+                nameof(Publisher),
+                Name!,
+                type?.GetType().Name
+            );
         }
 
         return null;
@@ -546,16 +602,26 @@ public partial class PublisherBuilder
 
     private ISenderConfig? GetConfiguration()
     {
-        if (RabbitMq != null) return RabbitMq;
-        if (KafkaTopic != null) return KafkaTopic;
-        if (Socket != null) return Socket;
-        if (Sftp != null) return Sftp;
-        if (PostgreSqlTable != null) return PostgreSqlTable;
-        if (OracleSqlTable != null) return OracleSqlTable;
-        if (MsSqlTable != null) return MsSqlTable;
-        if (ElasticIndex != null) return ElasticIndex;
-        if (Redis != null) return Redis;
-        if (S3Bucket != null) return S3Bucket;
+        if (RabbitMq != null)
+            return RabbitMq;
+        if (KafkaTopic != null)
+            return KafkaTopic;
+        if (Socket != null)
+            return Socket;
+        if (Sftp != null)
+            return Sftp;
+        if (PostgreSqlTable != null)
+            return PostgreSqlTable;
+        if (OracleSqlTable != null)
+            return OracleSqlTable;
+        if (MsSqlTable != null)
+            return MsSqlTable;
+        if (ElasticIndex != null)
+            return ElasticIndex;
+        if (Redis != null)
+            return Redis;
+        if (S3Bucket != null)
+            return S3Bucket;
         return MongoDbCollection;
     }
 }

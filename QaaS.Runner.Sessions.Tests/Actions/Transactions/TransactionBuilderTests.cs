@@ -38,16 +38,17 @@ public class TransactionBuilderTests
                 new Dictionary<string, RunningSessionData<object, object>>
                 {
                     {
-                        _sessionName, new RunningSessionData<object, object>
-                        {
-                            Inputs = [],
-                            Outputs = []
-                        }
-                    }
-                }),
-            Logger = new SerilogLoggerFactory(new LoggerConfiguration().MinimumLevel
-                .Is(LogEventLevel.Information).WriteTo
-                .Console().CreateLogger()).CreateLogger("DefaultLogger")
+                        _sessionName,
+                        new RunningSessionData<object, object> { Inputs = [], Outputs = [] }
+                    },
+                }
+            ),
+            Logger = new SerilogLoggerFactory(
+                new LoggerConfiguration()
+                    .MinimumLevel.Is(LogEventLevel.Information)
+                    .WriteTo.Console()
+                    .CreateLogger()
+            ).CreateLogger("DefaultLogger"),
         };
     }
 
@@ -220,7 +221,7 @@ public class TransactionBuilderTests
 
         builder.UpdateConfiguration(config);
 
-        Assert.That(builder.Configuration, Is.SameAs(config));
+        Assert.That(builder.Http, Is.SameAs(config));
     }
 
     [Test]
@@ -260,11 +261,13 @@ public class TransactionBuilderTests
         builder.Named("Test");
         builder.WithTimeout(1000);
         builder.AddDataSourcePattern("test");
-        builder.Configure(new HttpTransactorConfig
-        {
-            Method = HttpMethods.Delete,
-            BaseAddress = "https://test.com"
-        });
+        builder.Configure(
+            new HttpTransactorConfig
+            {
+                Method = HttpMethods.Delete,
+                BaseAddress = "https://test.com",
+            }
+        );
 
         var result = builder.Build(_context, _actionFailures, _sessionName);
 
@@ -288,15 +291,19 @@ public class TransactionBuilderTests
     public void TestRequiredIfAnyDataSourceNamePatterns_ValidateBuilder_ShouldHaveFailedValidationResults()
     {
         var builder = new TransactionBuilder();
-        builder.Named("Test").WithTimeout(1000).Configure(new HttpTransactorConfig
-        {
-            Method = HttpMethods.Delete,
-            BaseAddress = "https://test.com"
-        });
+        builder
+            .Named("Test")
+            .WithTimeout(1000)
+            .Configure(
+                new HttpTransactorConfig
+                {
+                    Method = HttpMethods.Delete,
+                    BaseAddress = "https://test.com",
+                }
+            );
 
         var validationResults = new List<ValidationResult>();
-        ValidateMembers(builder, validationResults,
-            "DataSourceNames", "DataSourcePatterns");
+        ValidateMembers(builder, validationResults, "DataSourceNames", "DataSourcePatterns");
 
         Assert.That(validationResults, Is.Not.Empty);
     }
@@ -332,7 +339,9 @@ public class TransactionBuilderTests
     {
         var builder = new TransactionBuilder();
 
-        Assert.Throws<ArgumentOutOfRangeException>(() => builder.UpdatePolicyAt(0, new PolicyBuilder()));
+        Assert.Throws<ArgumentOutOfRangeException>(() =>
+            builder.UpdatePolicyAt(0, new PolicyBuilder())
+        );
     }
 
     [Test]
@@ -346,10 +355,7 @@ public class TransactionBuilderTests
     [Test]
     public void AddPolicy_WhenPoliciesIsNull_InitializesCollectionAndAddsPolicy()
     {
-        var builder = new TransactionBuilder
-        {
-            Policies = null!
-        };
+        var builder = new TransactionBuilder { Policies = null! };
         var policy = new PolicyBuilder();
 
         builder.AddPolicy(policy);
@@ -384,9 +390,24 @@ public class TransactionBuilderTests
             .WithTimeout(1000)
             .AddDataSource("source-a");
 
-        typeof(TransactionBuilder).GetProperty("Http", BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic)!
-            .SetValue(builder, new HttpTransactorConfig { Method = HttpMethods.Get, BaseAddress = "https://test.com" });
-        typeof(TransactionBuilder).GetProperty("Grpc", BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic)!
+        typeof(TransactionBuilder)
+            .GetProperty(
+                "Http",
+                BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic
+            )!
+            .SetValue(
+                builder,
+                new HttpTransactorConfig
+                {
+                    Method = HttpMethods.Get,
+                    BaseAddress = "https://test.com",
+                }
+            );
+        typeof(TransactionBuilder)
+            .GetProperty(
+                "Grpc",
+                BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic
+            )!
             .SetValue(builder, new GrpcTransactorConfig());
 
         var result = builder.Build(_context, _actionFailures, _sessionName);
@@ -395,13 +416,20 @@ public class TransactionBuilderTests
         Assert.That(_actionFailures, Is.Not.Empty);
     }
 
-    private static void ValidateMembers(object instance, ICollection<ValidationResult> validationResults,
-        params string[] propertyNames)
+    private static void ValidateMembers(
+        object instance,
+        ICollection<ValidationResult> validationResults,
+        params string[] propertyNames
+    )
     {
         foreach (var propertyName in propertyNames.Distinct(StringComparer.Ordinal))
         {
-            var property = instance.GetType()
-                .GetProperty(propertyName, BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
+            var property = instance
+                .GetType()
+                .GetProperty(
+                    propertyName,
+                    BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic
+                );
             if (property == null || property.GetIndexParameters().Length > 0)
             {
                 continue;
@@ -409,7 +437,7 @@ public class TransactionBuilderTests
 
             var validationContext = new ValidationContext(instance, null, null)
             {
-                MemberName = property.Name
+                MemberName = property.Name,
             };
             var getter = property.GetGetMethod(nonPublic: true);
             var value = getter?.Invoke(instance, null);
@@ -424,5 +452,3 @@ public class TransactionBuilderTests
         }
     }
 }
-
-
