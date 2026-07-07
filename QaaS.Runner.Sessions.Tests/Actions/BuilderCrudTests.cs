@@ -135,10 +135,18 @@ public class BuilderCrudTests
                 Delimiter = "|",
                 SkipEmptyObjects = true,
                 ReadFromRunStartTime = false,
+                ReadStorageHeaders = false,
             }
         );
 
-        builder.UpdateConfiguration(new { Delimiter = "/", ReadFromRunStartTime = true });
+        builder.UpdateConfiguration(
+            new
+            {
+                Delimiter = "/",
+                ReadFromRunStartTime = true,
+                ReadStorageHeaders = true,
+            }
+        );
 
         var mergedConfiguration = builder.S3Bucket!;
         Assert.Multiple(() =>
@@ -151,6 +159,7 @@ public class BuilderCrudTests
             Assert.That(mergedConfiguration.SkipEmptyObjects, Is.True);
             Assert.That(mergedConfiguration.Delimiter, Is.EqualTo("/"));
             Assert.That(mergedConfiguration.ReadFromRunStartTime, Is.True);
+            Assert.That(mergedConfiguration.ReadStorageHeaders, Is.True);
         });
     }
 
@@ -265,6 +274,62 @@ public class BuilderCrudTests
             Assert.That(mergedConfiguration.DefaultKafkaKey, Is.EqualTo("default-key"));
             Assert.That(mergedConfiguration.Headers, Does.ContainKey("correlation-id"));
             Assert.That(mergedConfiguration.Headers!["correlation-id"], Is.EqualTo("123"));
+        });
+    }
+
+    [Test]
+    public void PublisherBuilder_UpdateConfiguration_WithObjectPatch_MergesRabbitMqDefaultsAndPreservesExistingFields()
+    {
+        var builder = new PublisherBuilder().Configure(
+            new RabbitMqSenderConfig
+            {
+                Host = "rabbitmq.local",
+                ExchangeName = "events",
+                RoutingKey = "published",
+                ContentType = "application/json",
+            }
+        );
+
+        builder.UpdateConfiguration(
+            new
+            {
+                Headers = new Dictionary<string, object?> { ["trace-id"] = "abc" },
+                AppId = "runner",
+                ClusterId = "cluster-a",
+                ContentEncoding = "gzip",
+                CorrelationId = "correlation-1",
+                DeliveryMode = 2,
+                MessageId = "message-1",
+                Persistent = true,
+                Priority = 5,
+                ReplyTo = "replies",
+                TimestampUnixTime = 123456789L,
+                Type = "event",
+                UserId = "user-a",
+            }
+        );
+
+        var mergedConfiguration = builder.RabbitMq!;
+        Assert.Multiple(() =>
+        {
+            Assert.That(mergedConfiguration.Host, Is.EqualTo("rabbitmq.local"));
+            Assert.That(mergedConfiguration.ExchangeName, Is.EqualTo("events"));
+            Assert.That(mergedConfiguration.RoutingKey, Is.EqualTo("published"));
+            Assert.That(mergedConfiguration.ContentType, Is.EqualTo("application/json"));
+            Assert.That(mergedConfiguration.Headers, Does.ContainKey("trace-id"));
+            Assert.That(mergedConfiguration.Headers!["trace-id"], Is.EqualTo("abc"));
+            Assert.That(mergedConfiguration.AppId, Is.EqualTo("runner"));
+            Assert.That(mergedConfiguration.ClusterId, Is.EqualTo("cluster-a"));
+            Assert.That(mergedConfiguration.ContentEncoding, Is.EqualTo("gzip"));
+            Assert.That(mergedConfiguration.CorrelationId, Is.EqualTo("correlation-1"));
+            Assert.That(mergedConfiguration.DeliveryMode, Is.EqualTo(2));
+            Assert.That(mergedConfiguration.MessageId, Is.EqualTo("message-1"));
+            Assert.That(mergedConfiguration.Persistent, Is.True);
+            Assert.That(mergedConfiguration.Priority, Is.EqualTo(5));
+            Assert.That(mergedConfiguration.ReplyTo, Is.EqualTo("replies"));
+            Assert.That(mergedConfiguration.TimestampUnixTime, Is.EqualTo(123456789L));
+            Assert.That(mergedConfiguration.Type, Is.EqualTo("event"));
+            Assert.That(mergedConfiguration.UserId, Is.EqualTo("user-a"));
         });
     }
 
