@@ -122,6 +122,61 @@ public class BuilderCrudTests
     }
 
     [Test]
+    public void ConsumerBuilder_UpdateConfiguration_WithObjectPatch_MergesRabbitMqAllFieldsAndPreservesExistingFields()
+    {
+        var builder = new ConsumerBuilder().Configure(
+            new RabbitMqReaderConfig
+            {
+                Host = "rabbitmq.local",
+                Username = "guest",
+                Password = "guest",
+                Port = 5672,
+                VirtualHost = "/",
+                ContinuationTimeoutSeconds = 5,
+                RequestedConnectionTimeoutSeconds = 5,
+                HandshakeContinuationTimeoutSeconds = 10,
+                QueueName = "messages",
+                RoutingKey = "created",
+                CreatedQueueTimeToExpireMs = 300000,
+            }
+        );
+
+        builder.UpdateConfiguration(
+            new
+            {
+                Host = "rabbitmq-updated.local",
+                Username = "runner",
+                Password = "secret",
+                Port = 5673,
+                VirtualHost = "/qaas",
+                ContinuationTimeoutSeconds = 6,
+                RequestedConnectionTimeoutSeconds = 7,
+                HandshakeContinuationTimeoutSeconds = 8,
+                QueueName = "messages-updated",
+                RoutingKey = "updated",
+                CreatedQueueTimeToExpireMs = 12345d,
+            }
+        );
+
+        var mergedConfiguration = builder.RabbitMq!;
+        Assert.Multiple(() =>
+        {
+            Assert.That(mergedConfiguration.Host, Is.EqualTo("rabbitmq-updated.local"));
+            Assert.That(mergedConfiguration.Username, Is.EqualTo("runner"));
+            Assert.That(mergedConfiguration.Password, Is.EqualTo("secret"));
+            Assert.That(mergedConfiguration.Port, Is.EqualTo(5673));
+            Assert.That(mergedConfiguration.VirtualHost, Is.EqualTo("/qaas"));
+            Assert.That(mergedConfiguration.ContinuationTimeoutSeconds, Is.EqualTo(6));
+            Assert.That(mergedConfiguration.RequestedConnectionTimeoutSeconds, Is.EqualTo(7));
+            Assert.That(mergedConfiguration.HandshakeContinuationTimeoutSeconds, Is.EqualTo(8));
+            Assert.That(mergedConfiguration.ExchangeName, Is.Empty);
+            Assert.That(mergedConfiguration.QueueName, Is.EqualTo("messages-updated"));
+            Assert.That(mergedConfiguration.RoutingKey, Is.EqualTo("updated"));
+            Assert.That(mergedConfiguration.CreatedQueueTimeToExpireMs, Is.EqualTo(12345d));
+        });
+    }
+
+    [Test]
     public void ConsumerBuilder_UpdateConfiguration_WithObjectPatch_MergesS3BucketAndPreservesExistingFields()
     {
         var builder = new ConsumerBuilder().Configure(
@@ -131,26 +186,47 @@ public class BuilderCrudTests
                 ServiceURL = "http://127.0.0.1:9000",
                 AccessKey = "ak",
                 SecretKey = "sk",
+                ForcePathStyle = false,
                 Prefix = "runs/",
                 Delimiter = "|",
+                MaximumRetryCount = 3,
                 SkipEmptyObjects = true,
                 ReadFromRunStartTime = false,
+                ReadStorageHeaders = false,
             }
         );
 
-        builder.UpdateConfiguration(new { Delimiter = "/", ReadFromRunStartTime = true });
+        builder.UpdateConfiguration(
+            new
+            {
+                StorageBucket = "bucket-updated",
+                ServiceURL = "http://127.0.0.1:9001",
+                AccessKey = "ak-updated",
+                SecretKey = "sk-updated",
+                ForcePathStyle = true,
+                Prefix = "future/",
+                Delimiter = "/",
+                MaximumRetryCount = 9,
+                SkipEmptyObjects = false,
+                ReadFromRunStartTime = true,
+                ReadStorageHeaders = true,
+            }
+        );
 
         var mergedConfiguration = builder.S3Bucket!;
         Assert.Multiple(() =>
         {
-            Assert.That(mergedConfiguration.StorageBucket, Is.EqualTo("bucket"));
-            Assert.That(mergedConfiguration.ServiceURL, Is.EqualTo("http://127.0.0.1:9000"));
-            Assert.That(mergedConfiguration.AccessKey, Is.EqualTo("ak"));
-            Assert.That(mergedConfiguration.SecretKey, Is.EqualTo("sk"));
-            Assert.That(mergedConfiguration.Prefix, Is.EqualTo("runs/"));
-            Assert.That(mergedConfiguration.SkipEmptyObjects, Is.True);
+            Assert.That(mergedConfiguration.StorageBucket, Is.EqualTo("bucket-updated"));
+            Assert.That(mergedConfiguration.ServiceURL, Is.EqualTo("http://127.0.0.1:9001"));
+            Assert.That(mergedConfiguration.AccessKey, Is.EqualTo("ak-updated"));
+            Assert.That(mergedConfiguration.SecretKey, Is.EqualTo("sk-updated"));
+            Assert.That(mergedConfiguration.ForcePathStyle, Is.True);
+            Assert.That(mergedConfiguration.Prefix, Is.EqualTo("future/"));
             Assert.That(mergedConfiguration.Delimiter, Is.EqualTo("/"));
+            Assert.That(mergedConfiguration.MaximumRetryCount, Is.EqualTo(9));
+            Assert.That(mergedConfiguration.SkipEmptyObjects, Is.False);
             Assert.That(mergedConfiguration.ReadFromRunStartTime, Is.True);
+            Assert.That(mergedConfiguration.ReadStorageHeaders, Is.True);
         });
     }
 
@@ -269,6 +345,93 @@ public class BuilderCrudTests
     }
 
     [Test]
+    public void PublisherBuilder_UpdateConfiguration_WithObjectPatch_MergesRabbitMqAllFieldsAndPreservesExistingFields()
+    {
+        var builder = new PublisherBuilder().Configure(
+            new RabbitMqSenderConfig
+            {
+                Host = "rabbitmq.local",
+                Username = "guest",
+                Password = "guest",
+                Port = 5672,
+                VirtualHost = "/",
+                ContinuationTimeoutSeconds = 5,
+                RequestedConnectionTimeoutSeconds = 5,
+                HandshakeContinuationTimeoutSeconds = 10,
+                ExchangeName = "events",
+                RoutingKey = "published",
+                ContentType = "application/json",
+            }
+        );
+
+        builder.UpdateConfiguration(
+            new
+            {
+                Host = "rabbitmq-updated.local",
+                Username = "runner",
+                Password = "secret",
+                Port = 5673,
+                VirtualHost = "/qaas",
+                ContinuationTimeoutSeconds = 6,
+                RequestedConnectionTimeoutSeconds = 7,
+                HandshakeContinuationTimeoutSeconds = 8,
+                ExchangeName = "events-updated",
+                RoutingKey = "published-updated",
+                Headers = new Dictionary<string, object?> { ["trace-id"] = "abc" },
+                AppId = "runner",
+                ClusterId = "cluster-a",
+                ContentEncoding = "gzip",
+                ContentType = "application/cloudevents+json",
+                CorrelationId = "correlation-1",
+                DeliveryMode = 2,
+                Expiration = "30000",
+                MessageId = "message-1",
+                Persistent = true,
+                Priority = 5,
+                ReplyTo = "replies",
+                TimestampUnixTime = 123456789L,
+                Type = "event",
+                UserId = "user-a",
+            }
+        );
+
+        var mergedConfiguration = builder.RabbitMq!;
+        Assert.Multiple(() =>
+        {
+            Assert.That(mergedConfiguration.Host, Is.EqualTo("rabbitmq-updated.local"));
+            Assert.That(mergedConfiguration.Username, Is.EqualTo("runner"));
+            Assert.That(mergedConfiguration.Password, Is.EqualTo("secret"));
+            Assert.That(mergedConfiguration.Port, Is.EqualTo(5673));
+            Assert.That(mergedConfiguration.VirtualHost, Is.EqualTo("/qaas"));
+            Assert.That(mergedConfiguration.ContinuationTimeoutSeconds, Is.EqualTo(6));
+            Assert.That(mergedConfiguration.RequestedConnectionTimeoutSeconds, Is.EqualTo(7));
+            Assert.That(mergedConfiguration.HandshakeContinuationTimeoutSeconds, Is.EqualTo(8));
+            Assert.That(mergedConfiguration.ExchangeName, Is.EqualTo("events-updated"));
+            Assert.That(mergedConfiguration.QueueName, Is.Empty);
+            Assert.That(mergedConfiguration.RoutingKey, Is.EqualTo("published-updated"));
+            Assert.That(mergedConfiguration.Headers, Does.ContainKey("trace-id"));
+            Assert.That(mergedConfiguration.Headers!["trace-id"], Is.EqualTo("abc"));
+            Assert.That(mergedConfiguration.AppId, Is.EqualTo("runner"));
+            Assert.That(mergedConfiguration.ClusterId, Is.EqualTo("cluster-a"));
+            Assert.That(mergedConfiguration.ContentEncoding, Is.EqualTo("gzip"));
+            Assert.That(
+                mergedConfiguration.ContentType,
+                Is.EqualTo("application/cloudevents+json")
+            );
+            Assert.That(mergedConfiguration.CorrelationId, Is.EqualTo("correlation-1"));
+            Assert.That(mergedConfiguration.DeliveryMode, Is.EqualTo(2));
+            Assert.That(mergedConfiguration.Expiration, Is.EqualTo("30000"));
+            Assert.That(mergedConfiguration.MessageId, Is.EqualTo("message-1"));
+            Assert.That(mergedConfiguration.Persistent, Is.True);
+            Assert.That(mergedConfiguration.Priority, Is.EqualTo(5));
+            Assert.That(mergedConfiguration.ReplyTo, Is.EqualTo("replies"));
+            Assert.That(mergedConfiguration.TimestampUnixTime, Is.EqualTo(123456789L));
+            Assert.That(mergedConfiguration.Type, Is.EqualTo("event"));
+            Assert.That(mergedConfiguration.UserId, Is.EqualTo("user-a"));
+        });
+    }
+
+    [Test]
     public void PublisherBuilder_UpdateConfiguration_WithObjectPatch_MergesS3BucketAndPreservesExistingFields()
     {
         var builder = new PublisherBuilder().Configure(
@@ -278,28 +441,43 @@ public class BuilderCrudTests
                 ServiceURL = "http://127.0.0.1:9000",
                 AccessKey = "ak",
                 SecretKey = "sk",
+                ForcePathStyle = false,
                 Prefix = "runs/",
                 S3SentObjectsNaming = ObjectNamingGeneratorType.RandomGuid,
+                Retries = 2,
                 S3StorageClass = S3StorageClassEnum.Standard,
             }
         );
 
         builder.UpdateConfiguration(
-            new { Prefix = "future/", S3StorageClass = S3StorageClassEnum.DeepArchive }
+            new
+            {
+                StorageBucket = "bucket-updated",
+                ServiceURL = "http://127.0.0.1:9001",
+                AccessKey = "ak-updated",
+                SecretKey = "sk-updated",
+                ForcePathStyle = true,
+                Prefix = "future/",
+                S3SentObjectsNaming = ObjectNamingGeneratorType.GrowingNumericalSeries,
+                Retries = 7,
+                S3StorageClass = S3StorageClassEnum.DeepArchive,
+            }
         );
 
         var mergedConfiguration = builder.S3Bucket!;
         Assert.Multiple(() =>
         {
-            Assert.That(mergedConfiguration.StorageBucket, Is.EqualTo("bucket"));
-            Assert.That(mergedConfiguration.ServiceURL, Is.EqualTo("http://127.0.0.1:9000"));
-            Assert.That(mergedConfiguration.AccessKey, Is.EqualTo("ak"));
-            Assert.That(mergedConfiguration.SecretKey, Is.EqualTo("sk"));
+            Assert.That(mergedConfiguration.StorageBucket, Is.EqualTo("bucket-updated"));
+            Assert.That(mergedConfiguration.ServiceURL, Is.EqualTo("http://127.0.0.1:9001"));
+            Assert.That(mergedConfiguration.AccessKey, Is.EqualTo("ak-updated"));
+            Assert.That(mergedConfiguration.SecretKey, Is.EqualTo("sk-updated"));
+            Assert.That(mergedConfiguration.ForcePathStyle, Is.True);
             Assert.That(
                 mergedConfiguration.S3SentObjectsNaming,
-                Is.EqualTo(ObjectNamingGeneratorType.RandomGuid)
+                Is.EqualTo(ObjectNamingGeneratorType.GrowingNumericalSeries)
             );
             Assert.That(mergedConfiguration.Prefix, Is.EqualTo("future/"));
+            Assert.That(mergedConfiguration.Retries, Is.EqualTo(7));
             Assert.That(
                 mergedConfiguration.S3StorageClass,
                 Is.EqualTo(S3StorageClassEnum.DeepArchive)
