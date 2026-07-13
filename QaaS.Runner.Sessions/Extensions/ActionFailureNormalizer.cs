@@ -331,7 +331,11 @@ internal static class ActionFailureNormalizer
         {
             var normalizedFailure = actionFailure with
             {
-                Reason = actionFailure.Reason with { Message = stableMessage },
+                Reason = actionFailure.Reason with
+                {
+                    Message = stableMessage,
+                    Description = description,
+                },
             };
             return new NormalizedActionFailure(
                 new FailureKey(
@@ -357,7 +361,10 @@ internal static class ActionFailureNormalizer
             ),
             0,
             $"{message}\u001f{description}",
-            actionFailure
+            actionFailure with
+            {
+                Reason = actionFailure.Reason with { Message = message, Description = description },
+            }
         );
     }
 

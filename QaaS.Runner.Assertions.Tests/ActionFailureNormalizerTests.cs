@@ -9,6 +9,79 @@ namespace QaaS.Runner.Assertions.Tests;
 public class ActionFailureNormalizerTests
 {
     [Test]
+    public void Normalize_CanonicalizesEquivalentWhitespaceIndependentlyOfInputOrder()
+    {
+        var nonS3CrLf = new ActionFailure
+        {
+            Name = "Publisher",
+            ActionType = "Publisher",
+            Reason = new Reason
+            {
+                Message = "  publish failed\r\n",
+                Description = "  first line\r\nsecond line  ",
+            },
+        };
+        var nonS3Lf = nonS3CrLf with
+        {
+            Reason = new Reason
+            {
+                Message = "publish failed",
+                Description = "first line\nsecond line",
+            },
+        };
+        var s3CrLf = new ActionFailure
+        {
+            Name = "S3Consumer",
+            ActionType = "ChunkConsumer",
+            Reason = new Reason
+            {
+                Message =
+                    "  S3 operation failed: StatusCode=404 NotFound, ErrorCode=NoSuchKey, Message=missing object\r\n",
+                Description = "  RequestId: request-a\r\nAmazonId2: host-a  ",
+            },
+        };
+        var s3Lf = s3CrLf with
+        {
+            Reason = new Reason
+            {
+                Message =
+                    "S3 operation failed: StatusCode=404 NotFound, ErrorCode=NoSuchKey, Message=missing object",
+                Description = "RequestId: request-a\nAmazonId2: host-a",
+            },
+        };
+
+        var forward = ActionFailureNormalizer.Normalize([nonS3CrLf, s3Lf, nonS3Lf, s3CrLf]);
+        var reverse = ActionFailureNormalizer.Normalize([s3CrLf, nonS3Lf, s3Lf, nonS3CrLf]);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(forward, Is.EqualTo(reverse));
+            Assert.That(forward, Has.Count.EqualTo(2));
+            Assert.That(
+                forward.Single(failure => failure.Name == "Publisher").Reason,
+                Is.EqualTo(
+                    new Reason
+                    {
+                        Message = "publish failed",
+                        Description = "first line\nsecond line",
+                    }
+                )
+            );
+            Assert.That(
+                forward.Single(failure => failure.Name == "S3Consumer").Reason,
+                Is.EqualTo(
+                    new Reason
+                    {
+                        Message =
+                            "S3 operation failed: StatusCode=404 NotFound, ErrorCode=NoSuchKey, Message=missing object",
+                        Description = "RequestId: request-a\nAmazonId2: host-a",
+                    }
+                )
+            );
+        });
+    }
+
+    [Test]
     public void Normalize_CollapsesSemanticS3DuplicatesAndPreservesDistinctNonS3Causes()
     {
         var firstS3Failure = CreateS3Failure("request-z", "host-z");
