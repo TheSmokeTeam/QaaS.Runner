@@ -9,7 +9,13 @@ namespace QaaS.Runner.Sessions.Extensions;
 /// </summary>
 internal static class ActionFailureNormalizer
 {
-    private static readonly string[] S3PropertyNames =
+    private const string S3FailurePrefix = "S3 operation failed:";
+
+    private static readonly string[] S3SemanticPropertyNames = ["StatusCode", "ErrorCode"];
+
+    private static readonly string[] S3DiagnosticPropertyNames = ["RequestId", "AmazonId2"];
+
+    private static readonly string[] S3DescriptionPropertyNames =
     [
         "StatusCode",
         "ErrorCode",
@@ -37,15 +43,28 @@ internal static class ActionFailureNormalizer
     }
 
     /// <summary>
-    /// Removes exact duplicate action failures and imposes a stable order on failures collected concurrently.
+    /// Collapses semantic S3 duplicates and exact non-S3 duplicates, then imposes a stable order on failures collected
+    /// concurrently.
     /// </summary>
     public static List<ActionFailure> Normalize(IEnumerable<ActionFailure> actionFailures)
     {
         ArgumentNullException.ThrowIfNull(actionFailures);
 
         return actionFailures
-            .GroupBy(CreateFailureKey)
-            .Select(group => group.First())
+            .Select(NormalizeActionFailure)
+            .GroupBy(normalizedFailure => normalizedFailure.SemanticKey)
+            .Select(group =>
+                group
+                    .OrderByDescending(normalizedFailure =>
+                        normalizedFailure.DiagnosticCompleteness
+                    )
+                    .ThenBy(
+                        normalizedFailure => normalizedFailure.DiagnosticKey,
+                        StringComparer.Ordinal
+                    )
+                    .First()
+                    .Failure
+            )
             .OrderBy(failure => failure.Action ?? string.Empty, StringComparer.Ordinal)
             .ThenBy(failure => failure.ActionType, StringComparer.Ordinal)
             .ThenBy(failure => failure.Name, StringComparer.Ordinal)
@@ -64,11 +83,15 @@ internal static class ActionFailureNormalizer
 
         return branches
             .Select(NormalizeBranch)
-            .GroupBy(branch => branch.Key, StringComparer.Ordinal)
-            .Select(group => group.First())
-            .OrderBy(branch => branch.Key, StringComparer.Ordinal)
+            .GroupBy(branch => branch.SemanticKey, StringComparer.Ordinal)
+            .Select(group =>
+                group
+                    .OrderByDescending(branch => branch.DiagnosticCompleteness)
+                    .ThenBy(branch => branch.DiagnosticKey, StringComparer.Ordinal)
+                    .First()
+            )
+            .OrderBy(branch => branch.SemanticKey, StringComparer.Ordinal)
             .Select(branch => new NormalizedCause(
-                branch.Key,
                 new Reason
                 {
                     Message = CreateFailureMessage(branch.Exceptions, exceptionMessage),
@@ -104,19 +127,61 @@ internal static class ActionFailureNormalizer
 
     private static ExceptionBranch NormalizeBranch(IReadOnlyList<Exception> exceptions)
     {
+        var isS3Branch = exceptions.Any(IsS3Exception);
         var seenExceptions = new HashSet<string>(StringComparer.Ordinal);
         var distinctExceptions = exceptions
-            .Where(exception => seenExceptions.Add(CreateExceptionKey(exception)))
+            .Where(exception =>
+                seenExceptions.Add(CreateExceptionSemanticKey(exception, isS3Branch))
+            )
             .ToList();
-        var key = string.Join("\u001e", distinctExceptions.Select(CreateExceptionKey));
-        return new ExceptionBranch(key, distinctExceptions);
+        var semanticKey = string.Join(
+            "\u001e",
+            distinctExceptions.Select(exception =>
+                CreateExceptionSemanticKey(exception, isS3Branch)
+            )
+        );
+        var diagnosticKey = string.Join("\u001e", exceptions.Select(CreateExceptionDiagnosticKey));
+        var diagnosticCompleteness = exceptions
+            .Where(IsS3Exception)
+            .SelectMany(exception => GetS3Fields(exception, S3DiagnosticPropertyNames))
+            .Select(field => field.Key)
+            .Distinct(StringComparer.Ordinal)
+            .Count();
+        return new ExceptionBranch(
+            semanticKey,
+            diagnosticCompleteness,
+            diagnosticKey,
+            distinctExceptions
+        );
     }
 
-    private static string CreateExceptionKey(Exception exception)
+    private static string CreateExceptionSemanticKey(Exception exception, bool omitStackTrace)
     {
         var type = exception.GetType();
         var fields = IsS3Exception(exception)
-            ? GetS3Fields(exception).Select(field => $"{field.Key}={field.Value}")
+            ? GetS3Fields(exception, S3SemanticPropertyNames)
+                .Select(field => $"{field.Key}={field.Value}")
+            : [];
+        return string.Join(
+            "\u001f",
+            [
+                type.FullName ?? type.Name,
+                IsS3Exception(exception)
+                    ? string.Empty
+                    : exception.HResult.ToString("X8", CultureInfo.InvariantCulture),
+                NormalizeText(exception.Message),
+                string.Join("\u001d", fields),
+                omitStackTrace ? string.Empty : NormalizeText(exception.StackTrace),
+            ]
+        );
+    }
+
+    private static string CreateExceptionDiagnosticKey(Exception exception)
+    {
+        var type = exception.GetType();
+        var fields = IsS3Exception(exception)
+            ? GetS3Fields(exception, S3DescriptionPropertyNames)
+                .Select(field => $"{field.Key}={field.Value}")
             : [];
         return string.Join(
             "\u001f",
@@ -177,7 +242,8 @@ internal static class ActionFailureNormalizer
 
             if (IsS3Exception(exception))
                 lines.AddRange(
-                    GetS3Fields(exception).Select(field => $"{field.Key}: {field.Value}")
+                    GetS3Fields(exception, S3DescriptionPropertyNames)
+                        .Select(field => $"{field.Key}: {field.Value}")
                 );
 
             if (!omitStackTraces && !string.IsNullOrWhiteSpace(exception.StackTrace))
@@ -192,7 +258,7 @@ internal static class ActionFailureNormalizer
 
     private static string CreateS3FailureMessage(Exception exception)
     {
-        var fields = GetS3Fields(exception).ToList();
+        var fields = GetS3Fields(exception, S3SemanticPropertyNames).ToList();
         if (!string.IsNullOrWhiteSpace(exception.Message))
         {
             fields.Add(
@@ -201,8 +267,8 @@ internal static class ActionFailureNormalizer
         }
 
         return fields.Count == 0
-            ? $"S3 operation failed: {NormalizeText(exception.Message)}"
-            : $"S3 operation failed: {string.Join(", ", fields.Select(field => $"{field.Key}={field.Value}"))}";
+            ? S3FailurePrefix
+            : $"{S3FailurePrefix} {string.Join(", ", fields.Select(field => $"{field.Key}={field.Value}"))}";
     }
 
     private static bool IsS3Exception(Exception exception)
@@ -213,9 +279,12 @@ internal static class ActionFailureNormalizer
             || typeName.StartsWith("Amazon.S3.", StringComparison.Ordinal);
     }
 
-    private static IEnumerable<KeyValuePair<string, string>> GetS3Fields(Exception exception)
+    private static IEnumerable<KeyValuePair<string, string>> GetS3Fields(
+        Exception exception,
+        IEnumerable<string> propertyNames
+    )
     {
-        foreach (var propertyName in S3PropertyNames)
+        foreach (var propertyName in propertyNames)
         {
             var value = GetFailurePropertyValue(exception, propertyName);
             if (value is not null)
@@ -254,21 +323,143 @@ internal static class ActionFailureNormalizer
         };
     }
 
-    private static FailureKey CreateFailureKey(ActionFailure actionFailure) =>
-        new(
-            actionFailure.Action ?? string.Empty,
-            actionFailure.ActionType,
-            actionFailure.Name,
-            actionFailure.Reason.Message,
-            actionFailure.Reason.Description
+    private static NormalizedActionFailure NormalizeActionFailure(ActionFailure actionFailure)
+    {
+        var message = NormalizeText(actionFailure.Reason.Message);
+        var description = NormalizeText(actionFailure.Reason.Description);
+        if (TryCreateStableS3FailureMessage(message, out var stableMessage))
+        {
+            var normalizedFailure = actionFailure with
+            {
+                Reason = actionFailure.Reason with { Message = stableMessage },
+            };
+            return new NormalizedActionFailure(
+                new FailureKey(
+                    actionFailure.Action ?? string.Empty,
+                    actionFailure.ActionType,
+                    actionFailure.Name,
+                    stableMessage,
+                    string.Empty
+                ),
+                GetS3DiagnosticCompleteness(message, description),
+                $"{message}\u001f{description}",
+                normalizedFailure
+            );
+        }
+
+        return new NormalizedActionFailure(
+            new FailureKey(
+                actionFailure.Action ?? string.Empty,
+                actionFailure.ActionType,
+                actionFailure.Name,
+                message,
+                description
+            ),
+            0,
+            $"{message}\u001f{description}",
+            actionFailure
         );
+    }
+
+    private static bool TryCreateStableS3FailureMessage(string message, out string stableMessage)
+    {
+        stableMessage = message;
+        if (!message.StartsWith(S3FailurePrefix, StringComparison.Ordinal))
+            return false;
+
+        var payload = message[S3FailurePrefix.Length..].Trim();
+        if (payload.Length == 0)
+            return true;
+
+        var header = payload;
+        string? failureMessage = null;
+        const string messageFieldPrefix = "Message=";
+        const string messageFieldSeparator = ", Message=";
+        if (payload.StartsWith(messageFieldPrefix, StringComparison.Ordinal))
+        {
+            header = string.Empty;
+            failureMessage = payload[messageFieldPrefix.Length..];
+        }
+        else
+        {
+            var messageIndex = payload.IndexOf(messageFieldSeparator, StringComparison.Ordinal);
+            if (messageIndex >= 0)
+            {
+                header = payload[..messageIndex];
+                failureMessage = payload[(messageIndex + messageFieldSeparator.Length)..];
+            }
+        }
+
+        var fields = header
+            .Split(", ", StringSplitOptions.RemoveEmptyEntries)
+            .Select(field =>
+            {
+                var separatorIndex = field.IndexOf('=');
+                return separatorIndex <= 0
+                    ? new KeyValuePair<string, string>(string.Empty, field)
+                    : new KeyValuePair<string, string>(
+                        field[..separatorIndex],
+                        field[(separatorIndex + 1)..]
+                    );
+            })
+            .Where(field =>
+                !field.Key.Equals("RequestId", StringComparison.Ordinal)
+                && !field.Key.Equals("AmazonId2", StringComparison.Ordinal)
+            )
+            .OrderBy(field => GetS3FieldOrder(field.Key))
+            .ThenBy(field => field.Key, StringComparer.Ordinal)
+            .ThenBy(field => field.Value, StringComparer.Ordinal)
+            .ToList();
+        if (!string.IsNullOrWhiteSpace(failureMessage))
+        {
+            fields.Add(new KeyValuePair<string, string>("Message", NormalizeText(failureMessage)));
+        }
+
+        stableMessage =
+            fields.Count == 0
+                ? S3FailurePrefix
+                : $"{S3FailurePrefix} {string.Join(", ", fields.Select(field => string.IsNullOrEmpty(field.Key) ? field.Value : $"{field.Key}={field.Value}"))}";
+        return true;
+    }
+
+    private static int GetS3FieldOrder(string fieldName) =>
+        fieldName switch
+        {
+            "StatusCode" => 0,
+            "ErrorCode" => 1,
+            _ => 2,
+        };
+
+    private static int GetS3DiagnosticCompleteness(string message, string description)
+    {
+        var diagnosticText = $"{message}\n{description}";
+        var hasRequestId =
+            diagnosticText.Contains("RequestId=", StringComparison.Ordinal)
+            || diagnosticText.Contains("RequestId:", StringComparison.Ordinal);
+        var hasAmazonId2 =
+            diagnosticText.Contains("AmazonId2=", StringComparison.Ordinal)
+            || diagnosticText.Contains("AmazonId2:", StringComparison.Ordinal);
+        return (hasRequestId ? 1 : 0) + (hasAmazonId2 ? 1 : 0);
+    }
 
     private static string NormalizeText(string? value) =>
         (value ?? string.Empty).Replace("\r\n", "\n", StringComparison.Ordinal).Trim();
 
-    private sealed record ExceptionBranch(string Key, IReadOnlyList<Exception> Exceptions);
+    private sealed record ExceptionBranch(
+        string SemanticKey,
+        int DiagnosticCompleteness,
+        string DiagnosticKey,
+        IReadOnlyList<Exception> Exceptions
+    );
 
-    private sealed record NormalizedCause(string Key, Reason Reason);
+    private sealed record NormalizedCause(Reason Reason);
+
+    private sealed record NormalizedActionFailure(
+        FailureKey SemanticKey,
+        int DiagnosticCompleteness,
+        string DiagnosticKey,
+        ActionFailure Failure
+    );
 
     private sealed record FailureKey(
         string Action,

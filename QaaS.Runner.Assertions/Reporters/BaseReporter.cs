@@ -108,11 +108,15 @@ public abstract class BaseReporter : IReporter
         if (!ShouldSaveSessionData(assertion))
             return null;
 
+        var normalizedSessionData = sessionData with
+        {
+            SessionFailures = ActionFailureNormalizer.Normalize(sessionData.SessionFailures),
+        };
         return new ReportArtifact(
             $"{sessionData.Name}.json",
             $"{sessionData.Name}.json",
             SessionDataSerialization.SerializeSessionData(
-                sessionData,
+                normalizedSessionData,
                 new JsonSerializerOptions
                 {
                     WriteIndented = true,
