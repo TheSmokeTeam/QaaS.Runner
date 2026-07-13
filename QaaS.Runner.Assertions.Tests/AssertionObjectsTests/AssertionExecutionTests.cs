@@ -182,12 +182,43 @@ public class AssertionExecutionTests
                 Is.EqualTo(
                     new[]
                     {
-                        "S3 operation failed: StatusCode=503 ServiceUnavailable",
                         "S3 operation failed: StatusCode=403 Forbidden",
+                        "S3 operation failed: StatusCode=503 ServiceUnavailable",
                     }
                 )
             );
         });
+    }
+
+    [Test]
+    public void Execute_WhenFailuresShareAMessageButHaveDistinctDescriptions_PreservesBothCauses()
+    {
+        var assertion = CreateAssertion(
+            new DelegateAssertionHook((_, _) => true),
+            sessionNames: ["session-1"]
+        );
+        var flakySession = new SessionData
+        {
+            Name = "session-1",
+            SessionFailures =
+            [
+                Failure("same message", "cause-b"),
+                Failure("same message", "cause-a"),
+                Failure("same message", "cause-b"),
+            ],
+        };
+
+        var result = assertion.Execute(
+            new List<SessionData?> { flakySession }.ToImmutableList(),
+            ImmutableList<DataSource>.Empty
+        );
+
+        Assert.That(
+            result
+                .Flaky.FlakinessReasons.Single()
+                .Value.Select(failure => failure.Reason.Description),
+            Is.EqualTo(new[] { "cause-a", "cause-b" })
+        );
     }
 
     [Test]
@@ -239,12 +270,12 @@ public class AssertionExecutionTests
         };
     }
 
-    private static ActionFailure Failure(string message) =>
+    private static ActionFailure Failure(string message, string? description = null) =>
         new()
         {
             Name = "S3Consumer",
             Action = "S3 Consumer",
             ActionType = "Consumer",
-            Reason = new Reason { Message = message, Description = message },
+            Reason = new Reason { Message = message, Description = description ?? message },
         };
 }

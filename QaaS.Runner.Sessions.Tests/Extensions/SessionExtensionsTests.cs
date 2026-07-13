@@ -135,6 +135,107 @@ public class SessionExtensionsTests
     }
 
     [Test]
+    public void AppendActionFailure_ForNestedAggregateException_DeduplicatesRepeatedS3Causes()
+    {
+        var failures = new List<ActionFailure>();
+        var first = CreateS3Failure("repeated object read failure");
+        var second = CreateS3Failure("repeated object read failure");
+        var exception = new AggregateException(
+            new AggregateException(first),
+            new AggregateException(second, second)
+        );
+
+        failures.AppendActionFailure(
+            exception,
+            SessionName,
+            Globals.Logger,
+            "ChunkConsumer",
+            "S3Consumer",
+            actionProtocol: "S3"
+        );
+
+        Assert.That(failures, Has.Count.EqualTo(1));
+        var reason = failures.Single().Reason;
+        Assert.Multiple(() =>
+        {
+            Assert.That(reason.Message, Does.StartWith("S3 operation failed:"));
+            Assert.That(reason.Message, Does.Contain("repeated object read failure"));
+            Assert.That(reason.Message, Does.Not.Contain("One or more errors occurred"));
+            Assert.That(reason.Message, Does.Not.Contain(") ("));
+            Assert.That(
+                CountOccurrences(reason.Message, "repeated object read failure"),
+                Is.EqualTo(1)
+            );
+            Assert.That(
+                CountOccurrences(reason.Description, "repeated object read failure"),
+                Is.EqualTo(1)
+            );
+            Assert.That(reason.Description, Does.Not.Contain("Inner Exception #"));
+        });
+    }
+
+    [Test]
+    public void AppendActionFailure_ForAggregateException_PreservesDistinctCausesInStableOrder()
+    {
+        var failures = new List<ActionFailure>();
+        var exception = new AggregateException(
+            new InvalidOperationException("zeta"),
+            new AggregateException(
+                new ArgumentException("alpha"),
+                new InvalidOperationException("zeta")
+            )
+        );
+
+        failures.AppendActionFailure(
+            exception,
+            SessionName,
+            Globals.Logger,
+            "Publisher",
+            "PublishAction"
+        );
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(failures, Has.Count.EqualTo(2));
+            Assert.That(
+                failures.Select(failure => failure.Reason.Message),
+                Is.EqualTo(new[] { "alpha", "zeta" })
+            );
+            Assert.That(
+                failures.Select(failure => failure.Reason.Description),
+                Has.All.Not.Contain("One or more errors occurred")
+            );
+        });
+    }
+
+    [Test]
+    public void NormalizeActionFailures_DeduplicatesExactFailuresAndSortsDeterministically()
+    {
+        var repeated = new ActionFailure
+        {
+            Name = "action-z",
+            ActionType = "Consumer",
+            Reason = new Reason { Message = "same", Description = "same description" },
+        };
+        var distinct = repeated with
+        {
+            Name = "action-a",
+            Reason = new Reason { Message = "different", Description = "different description" },
+        };
+
+        var normalized = ActionFailureNormalizer.Normalize([repeated, distinct, repeated]);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(normalized, Has.Count.EqualTo(2));
+            Assert.That(
+                normalized.Select(failure => failure.Name),
+                Is.EqualTo(new[] { "action-a", "action-z" })
+            );
+        });
+    }
+
+    [Test]
     public void InternalCommunicationData_InheritsCommunicationDataContract_ForInputData()
     {
         var input = new List<DetailedData<string>> { new() { Body = "input-body" } };
@@ -320,4 +421,15 @@ public class SessionExtensionsTests
         public string? ErrorCode { get; init; }
         public string? RequestId { get; init; }
     }
+
+    private static FakeAmazonS3Exception CreateS3Failure(string message) =>
+        new(message)
+        {
+            StatusCode = HttpStatusCode.NotFound,
+            ErrorCode = "NoSuchKey",
+            RequestId = "same-request",
+        };
+
+    private static int CountOccurrences(string value, string expected) =>
+        value.Split(expected, StringSplitOptions.None).Length - 1;
 }

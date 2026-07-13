@@ -21,7 +21,8 @@ namespace QaaS.Runner.Assertions.Reporters;
 /// <inheritdoc />
 public abstract class BaseReporter : IReporter
 {
-    protected const string TraceDisplayFalseMessage = "Assertion configured to not display assertion trace",
+    protected const string TraceDisplayFalseMessage =
+            "Assertion configured to not display assertion trace",
         QaaSTag = "QaaS",
         RawDataAttachmentType = "application/octet-stream",
         TextAttachmentType = "text/plain",
@@ -55,16 +56,25 @@ public abstract class BaseReporter : IReporter
             return [];
 
         var artifacts = new List<ReportArtifact>();
-        foreach (var assertionAttachment in assertionResult.Assertion.AssertionHook?.AssertionAttachments ?? [])
+        foreach (
+            var assertionAttachment in assertionResult.Assertion.AssertionHook?.AssertionAttachments
+                ?? []
+        )
         {
-            var serializer = SerializerFactory.BuildSerializer(assertionAttachment.SerializationType);
-            var serializedData = serializer?.Serialize(assertionAttachment.Data) ??
-                                 (assertionAttachment.Data as byte[] ?? []);
-            artifacts.Add(new ReportArtifact(
-                assertionAttachment.Path,
-                assertionAttachment.Path,
-                serializedData,
-                GetAttachmentTypeBySerializationType(assertionAttachment.SerializationType)));
+            var serializer = SerializerFactory.BuildSerializer(
+                assertionAttachment.SerializationType
+            );
+            var serializedData =
+                serializer?.Serialize(assertionAttachment.Data)
+                ?? (assertionAttachment.Data as byte[] ?? []);
+            artifacts.Add(
+                new ReportArtifact(
+                    assertionAttachment.Path,
+                    assertionAttachment.Path,
+                    serializedData,
+                    GetAttachmentTypeBySerializationType(assertionAttachment.SerializationType)
+                )
+            );
         }
 
         return artifacts;
@@ -83,8 +93,11 @@ public abstract class BaseReporter : IReporter
             "template.yaml",
             System.Text.Encoding.UTF8.GetBytes(
                 Context.RootConfiguration.BuildConfigurationAsYaml(
-                    QaaS.Runner.Infrastructure.Constants.ConfigurationSectionNames)),
-            YamlAttachmentType);
+                    QaaS.Runner.Infrastructure.Constants.ConfigurationSectionNames
+                )
+            ),
+            YamlAttachmentType
+        );
     }
 
     /// <summary>
@@ -98,13 +111,16 @@ public abstract class BaseReporter : IReporter
         return new ReportArtifact(
             $"{sessionData.Name}.json",
             $"{sessionData.Name}.json",
-            SessionDataSerialization.SerializeSessionData(sessionData,
+            SessionDataSerialization.SerializeSessionData(
+                sessionData,
                 new JsonSerializerOptions
                 {
                     WriteIndented = true,
-                    DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull
-                }),
-            JsonAttachmentType);
+                    DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull,
+                }
+            ),
+            JsonAttachmentType
+        );
     }
 
     /// <summary>
@@ -123,7 +139,8 @@ public abstract class BaseReporter : IReporter
             $"{sessionData.Name}.log",
             Path.Combine("SessionLogs", $"{sessionData.Name}.log"),
             Encoding.UTF8.GetBytes(sessionLog),
-            TextAttachmentType);
+            TextAttachmentType
+        );
     }
 
     /// <summary>
@@ -142,34 +159,40 @@ public abstract class BaseReporter : IReporter
     /// Builds a reporter-neutral JSON artifact describing the assertion, execution, session, and metadata context that
     /// produced the current result. Downstream reporters can attach or log it without rebuilding the same structure.
     /// </summary>
-    protected ReportArtifact BuildAssertionContextArtifact(AssertionResult assertionResult, string? team = null,
-        string? system = null)
+    protected ReportArtifact BuildAssertionContextArtifact(
+        AssertionResult assertionResult,
+        string? team = null,
+        string? system = null
+    )
     {
         var metadataAttributes = BuildMetadataAttributes();
         var dataSourceSummaries = (assertionResult.Assertion.DataSourceList ?? [])
-            .Select(dataSource => new
-            {
-                dataSource.Name,
-                dataSource.Lazy
-            })
+            .Select(dataSource => new { dataSource.Name, dataSource.Lazy })
             .ToList();
-        var sessionSummaries = assertionResult.Assertion.SessionDataList
-            .Select(sessionData => new
+        var sessionSummaries = assertionResult
+            .Assertion.SessionDataList.Select(sessionData => new
             {
                 sessionData.Name,
                 sessionData.UtcStartTime,
                 sessionData.UtcEndTime,
-                DurationMs = (long)Math.Max(0, (sessionData.UtcEndTime - sessionData.UtcStartTime).TotalMilliseconds),
+                DurationMs = (long)
+                    Math.Max(
+                        0,
+                        (sessionData.UtcEndTime - sessionData.UtcStartTime).TotalMilliseconds
+                    ),
                 Inputs = (sessionData.Inputs ?? []).Select(input => input.Name).ToArray(),
                 Outputs = (sessionData.Outputs ?? []).Select(output => output.Name).ToArray(),
-                Failures = sessionData.SessionFailures.Select(actionFailure => new
-                {
-                    actionFailure.Action,
-                    actionFailure.ActionType,
-                    actionFailure.Name,
-                    actionFailure.Reason.Description,
-                    actionFailure.Reason.Message
-                }).ToArray()
+                Failures = ActionFailureNormalizer
+                    .Normalize(sessionData.SessionFailures)
+                    .Select(actionFailure => new
+                    {
+                        actionFailure.Action,
+                        actionFailure.ActionType,
+                        actionFailure.Name,
+                        actionFailure.Reason.Description,
+                        actionFailure.Reason.Message,
+                    })
+                    .ToArray(),
             })
             .ToList();
 
@@ -183,7 +206,7 @@ public abstract class BaseReporter : IReporter
                 Status = assertionResult.AssertionStatus.ToString(),
                 Severity = ResolveSeverity(assertionResult.Assertion).ToString(),
                 Flaky = assertionResult.Flaky.IsFlaky,
-                DurationMs = assertionResult.TestDurationMs
+                DurationMs = assertionResult.TestDurationMs,
             },
             Execution = new
             {
@@ -193,30 +216,43 @@ public abstract class BaseReporter : IReporter
                 System = system,
                 Identity = !string.IsNullOrWhiteSpace(team) && !string.IsNullOrWhiteSpace(system)
                     ? BuildStableReportPortalIdentity(assertionResult, team, system)
-                    : null
+                    : null,
             },
-            Links = assertionResult.Links?.Select(link => new { Name = link.Key, Url = link.Value }).ToArray() ?? [],
+            Links = assertionResult
+                .Links?.Select(link => new { Name = link.Key, Url = link.Value })
+                .ToArray()
+                ?? [],
             Metadata = metadataAttributes,
             DataSources = dataSourceSummaries,
-            Sessions = sessionSummaries
+            Sessions = sessionSummaries,
         };
 
         return new ReportArtifact(
             "assertion-context.json",
             Path.Combine("reportportal", "context", "assertion-context.json"),
-            Encoding.UTF8.GetBytes(JsonSerializer.Serialize(payload, new JsonSerializerOptions
-            {
-                WriteIndented = true,
-                DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull
-            })),
-            JsonAttachmentType);
+            Encoding.UTF8.GetBytes(
+                JsonSerializer.Serialize(
+                    payload,
+                    new JsonSerializerOptions
+                    {
+                        WriteIndented = true,
+                        DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull,
+                    }
+                )
+            ),
+            JsonAttachmentType
+        );
     }
 
     /// <summary>
     /// Builds a stable ReportPortal identity that keeps history attached to the same team/system/assertion/metadata
     /// combination across runs.
     /// </summary>
-    protected string BuildStableReportPortalIdentity(AssertionResult assertionResult, string team, string system)
+    protected string BuildStableReportPortalIdentity(
+        AssertionResult assertionResult,
+        string team,
+        string system
+    )
     {
         var identityParts = new List<string>
         {
@@ -226,15 +262,22 @@ public abstract class BaseReporter : IReporter
             NormalizeIdentitySegment(Context.CaseName),
             NormalizeIdentitySegment(assertionResult.Assertion.AssertionName),
             NormalizeIdentitySegment(assertionResult.Assertion.Name),
-            NormalizeIdentitySegment(string.Join(",",
-                assertionResult.Assertion.SessionDataList
-                    .Select(sessionData => sessionData.Name)
-                    .Where(sessionName => !string.IsNullOrWhiteSpace(sessionName))
-                    .Distinct(StringComparer.OrdinalIgnoreCase)
-                    .OrderBy(sessionName => sessionName, StringComparer.OrdinalIgnoreCase)))
+            NormalizeIdentitySegment(
+                string.Join(
+                    ",",
+                    assertionResult
+                        .Assertion.SessionDataList.Select(sessionData => sessionData.Name)
+                        .Where(sessionName => !string.IsNullOrWhiteSpace(sessionName))
+                        .Distinct(StringComparer.OrdinalIgnoreCase)
+                        .OrderBy(sessionName => sessionName, StringComparer.OrdinalIgnoreCase)
+                )
+            ),
         };
 
-        foreach (var attribute in BuildMetadataAttributes().OrderBy(attribute => attribute.Key, StringComparer.OrdinalIgnoreCase))
+        foreach (
+            var attribute in BuildMetadataAttributes()
+                .OrderBy(attribute => attribute.Key, StringComparer.OrdinalIgnoreCase)
+        )
         {
             identityParts.Add(NormalizeIdentitySegment(attribute.Key));
             identityParts.Add(NormalizeIdentitySegment(attribute.Value));
@@ -254,25 +297,31 @@ public abstract class BaseReporter : IReporter
                 assertionResult.BrokenAssertionException?.Message ?? "Broken assertion",
                 ShouldDisplayTrace(assertionResult.Assertion)
                     ? assertionResult.BrokenAssertionException?.ToString() ?? string.Empty
-                    : TraceDisplayFalseMessage);
+                    : TraceDisplayFalseMessage
+            );
         }
 
         return new AssertionTextDetails(
             assertionResult.Assertion.AssertionHook?.AssertionMessage ?? string.Empty,
             ShouldDisplayTrace(assertionResult.Assertion)
                 ? assertionResult.Assertion.AssertionHook?.AssertionTrace ?? string.Empty
-                : TraceDisplayFalseMessage);
+                : TraceDisplayFalseMessage
+        );
     }
 
-    protected bool ShouldSaveSessionData(Assertion assertion) => SaveSessionData ?? assertion.SaveSessionData;
-    
+    protected bool ShouldSaveSessionData(Assertion assertion) =>
+        SaveSessionData ?? assertion.SaveSessionData;
+
     protected bool ShouldSaveLogs(Assertion assertion) => SaveLogs ?? assertion.SaveLogs;
 
-    protected bool ShouldSaveAttachments(Assertion assertion) => SaveAttachments ?? assertion.SaveAttachments;
+    protected bool ShouldSaveAttachments(Assertion assertion) =>
+        SaveAttachments ?? assertion.SaveAttachments;
 
-    protected bool ShouldSaveTemplate(Assertion assertion) => SaveTemplate ?? assertion.SaveTemplate;
+    protected bool ShouldSaveTemplate(Assertion assertion) =>
+        SaveTemplate ?? assertion.SaveTemplate;
 
-    protected bool ShouldDisplayTrace(Assertion assertion) => DisplayTrace ?? assertion.DisplayTrace;
+    protected bool ShouldDisplayTrace(Assertion assertion) =>
+        DisplayTrace ?? assertion.DisplayTrace;
 
     protected AssertionSeverity ResolveSeverity(Assertion assertion) =>
         assertion.Severity ?? Severity;
@@ -282,41 +331,47 @@ public abstract class BaseReporter : IReporter
     /// </summary>
     protected static string BuildSessionSummaryText(SessionData sessionData)
     {
-        return
-            $"Session: {sessionData.Name}{Environment.NewLine}" +
-            $"Inputs: [{string.Join(", ", (sessionData.Inputs ?? []).Select(input => input.Name))}]{Environment.NewLine}" +
-            $"Outputs: [{string.Join(", ", (sessionData.Outputs ?? []).Select(output => output.Name))}]{Environment.NewLine}" +
-            $"Start: {sessionData.UtcStartTime:O}{Environment.NewLine}" +
-            $"End: {sessionData.UtcEndTime:O}{Environment.NewLine}" +
-            $"Failures: {sessionData.SessionFailures.Count}";
+        var actionFailures = ActionFailureNormalizer.Normalize(sessionData.SessionFailures);
+        return $"Session: {sessionData.Name}{Environment.NewLine}"
+            + $"Inputs: [{string.Join(", ", (sessionData.Inputs ?? []).Select(input => input.Name))}]{Environment.NewLine}"
+            + $"Outputs: [{string.Join(", ", (sessionData.Outputs ?? []).Select(output => output.Name))}]{Environment.NewLine}"
+            + $"Start: {sessionData.UtcStartTime:O}{Environment.NewLine}"
+            + $"End: {sessionData.UtcEndTime:O}{Environment.NewLine}"
+            + $"Failures: {actionFailures.Count}";
     }
 
     /// <summary>
     /// Builds the per-session action failure text used by downstream reporters.
     /// </summary>
-    protected static string BuildActionFailureText(SessionData sessionData, ActionFailure actionFailure)
+    protected static string BuildActionFailureText(
+        SessionData sessionData,
+        ActionFailure actionFailure
+    )
     {
-        return
-            $"Session `{sessionData.Name}` action failure.{Environment.NewLine}" +
-            $"Action: {actionFailure.Action}{Environment.NewLine}" +
-            $"Action type: {actionFailure.ActionType}{Environment.NewLine}" +
-            $"Name: {actionFailure.Name}{Environment.NewLine}" +
-            $"Reason: {actionFailure.Reason.Description}{Environment.NewLine}" +
-            $"Message: {actionFailure.Reason.Message}";
+        return $"Session `{sessionData.Name}` action failure.{Environment.NewLine}"
+            + $"Action: {actionFailure.Action}{Environment.NewLine}"
+            + $"Action type: {actionFailure.ActionType}{Environment.NewLine}"
+            + $"Name: {actionFailure.Name}{Environment.NewLine}"
+            + $"Reason: {actionFailure.Reason.Description}{Environment.NewLine}"
+            + $"Message: {actionFailure.Reason.Message}";
     }
 
     /// <summary>
     /// Builds flakiness text shared across reporters.
     /// </summary>
     protected static string BuildFlakinessText(
-        IEnumerable<KeyValuePair<string, List<ActionFailure>>> flakinessReasons)
+        IEnumerable<KeyValuePair<string, List<ActionFailure>>> flakinessReasons
+    )
     {
         var builder = new System.Text.StringBuilder("Flakiness reasons:");
         foreach (var sessionFailurePair in flakinessReasons)
         {
-            foreach (var sessionFailure in sessionFailurePair.Value)
+            foreach (
+                var sessionFailure in ActionFailureNormalizer.Normalize(sessionFailurePair.Value)
+            )
             {
-                builder.AppendLine()
+                builder
+                    .AppendLine()
                     .Append("- Session ")
                     .Append(sessionFailurePair.Key)
                     .Append(": ")
@@ -331,7 +386,9 @@ public abstract class BaseReporter : IReporter
         return builder.ToString();
     }
 
-    protected static string GetAttachmentTypeBySerializationType(SerializationType? serializationType)
+    protected static string GetAttachmentTypeBySerializationType(
+        SerializationType? serializationType
+    )
     {
         return serializationType switch
         {
@@ -343,32 +400,54 @@ public abstract class BaseReporter : IReporter
             SerializationType.XmlElement => XmlAttachmentType,
             SerializationType.MessagePack => MessagePackAttachmentType,
             null => RawDataAttachmentType,
-            _ => throw new InvalidOperationException($"Unsupported serialization type {serializationType} given")
+            _ => throw new InvalidOperationException(
+                $"Unsupported serialization type {serializationType} given"
+            ),
         };
     }
 
     /// <summary>
     /// Creates a compact multi-line string of metadata key/value pairs for reporter descriptions and logs.
     /// </summary>
-    protected static string BuildMetadataSummaryText(IReadOnlyDictionary<string, string> metadataAttributes)
+    protected static string BuildMetadataSummaryText(
+        IReadOnlyDictionary<string, string> metadataAttributes
+    )
     {
         if (metadataAttributes.Count == 0)
             return "No metadata attributes were provided.";
 
-        return string.Join(Environment.NewLine,
-            metadataAttributes.OrderBy(attribute => attribute.Key, StringComparer.OrdinalIgnoreCase)
-                .Select(attribute => $"{attribute.Key}: {attribute.Value}"));
+        return string.Join(
+            Environment.NewLine,
+            metadataAttributes
+                .OrderBy(attribute => attribute.Key, StringComparer.OrdinalIgnoreCase)
+                .Select(attribute => $"{attribute.Key}: {attribute.Value}")
+        );
     }
 
-    internal static IReadOnlyDictionary<string, string> ExtractMetadataAttributes(MetaDataConfig metaData)
+    internal static IReadOnlyDictionary<string, string> ExtractMetadataAttributes(
+        MetaDataConfig metaData
+    )
     {
         var attributes = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
         var metaDataType = metaData.GetType();
-        foreach (var property in metaDataType.GetProperties()
-                     .Where(property => property.CanRead && property.GetIndexParameters().Length == 0))
+        foreach (
+            var property in metaDataType
+                .GetProperties()
+                .Where(property => property.CanRead && property.GetIndexParameters().Length == 0)
+        )
         {
-            if (string.Equals(property.Name, nameof(MetaDataConfig.Team), StringComparison.OrdinalIgnoreCase) ||
-                string.Equals(property.Name, nameof(MetaDataConfig.System), StringComparison.OrdinalIgnoreCase))
+            if (
+                string.Equals(
+                    property.Name,
+                    nameof(MetaDataConfig.Team),
+                    StringComparison.OrdinalIgnoreCase
+                )
+                || string.Equals(
+                    property.Name,
+                    nameof(MetaDataConfig.System),
+                    StringComparison.OrdinalIgnoreCase
+                )
+            )
             {
                 continue;
             }
@@ -377,15 +456,23 @@ public abstract class BaseReporter : IReporter
             if (propertyValue is null)
                 continue;
 
-            AddMetadataProperty(attributes, property.Name, propertyValue,
-                string.Equals(property.Name, "ExtraLabels", StringComparison.OrdinalIgnoreCase));
+            AddMetadataProperty(
+                attributes,
+                property.Name,
+                propertyValue,
+                string.Equals(property.Name, "ExtraLabels", StringComparison.OrdinalIgnoreCase)
+            );
         }
 
         return attributes;
     }
 
-    private static void AddMetadataProperty(IDictionary<string, string> attributes, string propertyName, object propertyValue,
-        bool useNestedKeyOnly)
+    private static void AddMetadataProperty(
+        IDictionary<string, string> attributes,
+        string propertyName,
+        object propertyValue,
+        bool useNestedKeyOnly
+    )
     {
         if (TryConvertToString(propertyValue, out var scalarValue))
         {
@@ -420,13 +507,21 @@ public abstract class BaseReporter : IReporter
                     continue;
 
                 var itemType = item.GetType();
-                if (itemType.IsGenericType &&
-                    string.Equals(itemType.GetGenericTypeDefinition().FullName, typeof(KeyValuePair<,>).FullName,
-                        StringComparison.Ordinal))
+                if (
+                    itemType.IsGenericType
+                    && string.Equals(
+                        itemType.GetGenericTypeDefinition().FullName,
+                        typeof(KeyValuePair<,>).FullName,
+                        StringComparison.Ordinal
+                    )
+                )
                 {
                     var keyProperty = itemType.GetProperty("Key");
                     var valueProperty = itemType.GetProperty("Value");
-                    var nestedKey = Convert.ToString(keyProperty?.GetValue(item), CultureInfo.InvariantCulture);
+                    var nestedKey = Convert.ToString(
+                        keyProperty?.GetValue(item),
+                        CultureInfo.InvariantCulture
+                    );
                     var nestedValueObject = valueProperty?.GetValue(item);
                     if (string.IsNullOrWhiteSpace(nestedKey) || nestedValueObject is null)
                         continue;
@@ -434,9 +529,12 @@ public abstract class BaseReporter : IReporter
                     if (!TryConvertToString(nestedValueObject, out var nestedValue))
                         nestedValue = JsonSerializer.Serialize(nestedValueObject);
 
-                    keyValuePairs.Add(new KeyValuePair<string, string>(
-                        useNestedKeyOnly ? nestedKey : $"{propertyName}:{nestedKey}",
-                        nestedValue));
+                    keyValuePairs.Add(
+                        new KeyValuePair<string, string>(
+                            useNestedKeyOnly ? nestedKey : $"{propertyName}:{nestedKey}",
+                            nestedValue
+                        )
+                    );
                     continue;
                 }
 
@@ -469,8 +567,20 @@ public abstract class BaseReporter : IReporter
             case string stringValue when !string.IsNullOrWhiteSpace(stringValue):
                 convertedValue = stringValue.Trim();
                 return true;
-            case bool or byte or sbyte or short or ushort or int or uint or long or ulong or float or double or decimal:
-                convertedValue = Convert.ToString(value, CultureInfo.InvariantCulture) ?? string.Empty;
+            case bool
+            or byte
+            or sbyte
+            or short
+            or ushort
+            or int
+            or uint
+            or long
+            or ulong
+            or float
+            or double
+            or decimal:
+                convertedValue =
+                    Convert.ToString(value, CultureInfo.InvariantCulture) ?? string.Empty;
                 return true;
             case Guid guid when guid != Guid.Empty:
                 convertedValue = guid.ToString("D");
@@ -500,7 +610,12 @@ public abstract class BaseReporter : IReporter
 /// <summary>
 /// Reporter-neutral attachment model consumed by downstream reporters.
 /// </summary>
-public sealed record ReportArtifact(string Name, string RelativePath, byte[] Content, string ContentType);
+public sealed record ReportArtifact(
+    string Name,
+    string RelativePath,
+    byte[] Content,
+    string ContentType
+);
 
 /// <summary>
 /// Reporter-neutral assertion message/trace model.
