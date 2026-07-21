@@ -24,6 +24,8 @@ internal sealed class ReportPortalLaunchPlan
         IReadOnlyList<string> sessionNames,
         string launchName,
         string description,
+        DateTime launchStartTimeUtc,
+        DateTime launchEndTimeUtc,
         bool debugMode,
         IReadOnlyDictionary<string, string> attributes,
         IReadOnlyList<ReportPortalReporterResults> reporterResults
@@ -38,6 +40,8 @@ internal sealed class ReportPortalLaunchPlan
         SessionNames = sessionNames;
         LaunchName = launchName;
         Description = description;
+        LaunchStartTimeUtc = launchStartTimeUtc;
+        LaunchEndTimeUtc = launchEndTimeUtc;
         DebugMode = debugMode;
         Attributes = attributes;
         ReporterResults = reporterResults;
@@ -51,6 +55,8 @@ internal sealed class ReportPortalLaunchPlan
     public string System { get; }
     public string LaunchName { get; }
     public string Description { get; }
+    public DateTime LaunchStartTimeUtc { get; }
+    public DateTime LaunchEndTimeUtc { get; }
     public bool DebugMode { get; }
     public IReadOnlyDictionary<string, string> Attributes { get; }
     public IReadOnlyList<ReportPortalReporterResults> ReporterResults { get; }
@@ -60,12 +66,12 @@ internal sealed class ReportPortalLaunchPlan
     /// Builds one launch plan per normalized ReportPortal endpoint/project/system group.
     /// </summary>
     /// <param name="reporters">The ReportPortal reporters built for this runner invocation.</param>
-    /// <param name="startedAtLocal">The runner start time used in generated launch descriptions.</param>
+    /// <param name="startedAtLocal">The runner start time used for launch timing and generated descriptions.</param>
     /// <param name="requireQueuedResults">
     /// <see langword="true" /> when final publishing should skip reporters with no queued assertion results.
     /// </param>
     /// <param name="finishedAtLocal">
-    /// The runner finish time used in generated launch descriptions. Defaults to the current time.
+    /// The runner finish time used as the minimum launch end time. Defaults to the current time.
     /// </param>
     /// <returns>The grouped launch plans to validate or publish.</returns>
     public static IReadOnlyList<ReportPortalLaunchPlan> Build(
@@ -122,6 +128,13 @@ internal sealed class ReportPortalLaunchPlan
 
         return attributes;
     }
+
+    /// <summary>
+    /// Builds assertion timestamps that are contained by this launch's timing envelope.
+    /// </summary>
+    public (DateTime StartTimeUtc, DateTime EndTimeUtc) GetAssertionTiming(
+        AssertionResult assertionResult
+    ) => ResolveAssertionTiming(assertionResult, LaunchStartTimeUtc);
 
     /// <summary>
     /// Normalizes ReportPortal gateway/API endpoints to the API base URI used by validation and publishing.
@@ -207,6 +220,13 @@ internal sealed class ReportPortalLaunchPlan
             executionMode,
             firstConfig.Attributes
         );
+        var launchStartTimeUtc = startedAtLocal.UtcDateTime;
+        var executionEndTimeUtc = finishedAtLocal.UtcDateTime;
+        var launchEndTimeUtc = reporterResults
+            .SelectMany(reporter => reporter.Results)
+            .Select(result => ResolveAssertionTiming(result, launchStartTimeUtc).EndTimeUtc)
+            .Append(executionEndTimeUtc)
+            .Max();
 
         return new ReportPortalLaunchPlan(
             groupKey,
@@ -218,7 +238,9 @@ internal sealed class ReportPortalLaunchPlan
             sessionNames,
             firstConfig.LaunchName ?? BuildDefaultLaunchName(team, system, sessionNames),
             firstConfig.Description
-                ?? BuildDefaultDescription(startedAtLocal, finishedAtLocal, reporterResults),
+                ?? BuildDefaultDescription(launchStartTimeUtc, launchEndTimeUtc, reporterResults),
+            launchStartTimeUtc,
+            launchEndTimeUtc,
             firstConfig.DebugMode == true,
             attributes,
             reporterResults
@@ -300,8 +322,8 @@ internal sealed class ReportPortalLaunchPlan
     /// Builds the fallback launch description from launch timing and assertion-status percentages.
     /// </summary>
     private static string BuildDefaultDescription(
-        DateTimeOffset startedAtLocal,
-        DateTimeOffset finishedAtLocal,
+        DateTime launchStartTimeUtc,
+        DateTime launchEndTimeUtc,
         IReadOnlyList<ReportPortalReporterResults> reporterResults
     )
     {
@@ -310,7 +332,7 @@ internal sealed class ReportPortalLaunchPlan
             .Select(result => result.AssertionStatus)
             .ToList();
         var timingDescription =
-            $"Start time: {FormatLaunchTime(startedAtLocal)} | End time: {FormatLaunchTime(finishedAtLocal)}";
+            $"Start time: {FormatLaunchTime(launchStartTimeUtc)} | End time: {FormatLaunchTime(launchEndTimeUtc)}";
         var statusDescription = string.Join(
             " | ",
             Enum.GetValues<AssertionStatus>()
@@ -322,8 +344,25 @@ internal sealed class ReportPortalLaunchPlan
         return string.Join(Environment.NewLine, timingDescription, statusDescription);
     }
 
-    private static string FormatLaunchTime(DateTimeOffset timestamp) =>
-        timestamp.UtcDateTime.ToString("yyyy-MM-dd HH:mm:ss 'UTC'", CultureInfo.InvariantCulture);
+    private static string FormatLaunchTime(DateTime timestamp) =>
+        timestamp
+            .ToUniversalTime()
+            .ToString("yyyy-MM-dd HH:mm:ss 'UTC'", CultureInfo.InvariantCulture);
+
+    private static (DateTime StartTimeUtc, DateTime EndTimeUtc) ResolveAssertionTiming(
+        AssertionResult assertionResult,
+        DateTime launchStartTimeUtc
+    )
+    {
+        var requestedStartTimeUtc = assertionResult.Assertion.SessionDataList.Any()
+            ? assertionResult.Assertion.SessionDataList.Min(sessionData => sessionData.UtcStartTime)
+            : launchStartTimeUtc;
+        var startTimeUtc =
+            requestedStartTimeUtc < launchStartTimeUtc ? launchStartTimeUtc : requestedStartTimeUtc;
+        var endTimeUtc = startTimeUtc.AddMilliseconds(Math.Max(assertionResult.TestDurationMs, 1));
+
+        return (startTimeUtc, endTimeUtc);
+    }
 
     private static string FormatStatusPercentage(
         AssertionStatus status,

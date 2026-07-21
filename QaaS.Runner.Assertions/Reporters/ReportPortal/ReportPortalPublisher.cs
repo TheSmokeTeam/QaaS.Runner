@@ -342,12 +342,10 @@ internal class ReportPortalPublisher(ILogger logger) : IDisposable
         try
         {
             service = CreateClient(endpointUri, projectName, apiKey);
-            var launchStartTimeUtc = DateTime.UtcNow;
-            launchUuid = await StartLaunchAsync(service, launchPlan, projectName, launchStartTimeUtc,
+            launchUuid = await StartLaunchAsync(service, launchPlan, projectName,
                 cancellationToken).ConfigureAwait(false);
 
-            await PublishLaunchItems(service, launchPlan, projectName, launchUuid, launchStartTimeUtc,
-                    cancellationToken)
+            await PublishLaunchItems(service, launchPlan, projectName, launchUuid, cancellationToken)
                 .ConfigureAwait(false);
         }
         catch (Exception exception)
@@ -376,14 +374,14 @@ internal class ReportPortalPublisher(ILogger logger) : IDisposable
     /// Starts a ReportPortal launch and returns the launch UUID needed by item and finish calls.
     /// </summary>
     private async Task<string> StartLaunchAsync(IClientService service, ReportPortalLaunchPlan launchPlan,
-        string projectName, DateTime launchStartTimeUtc, CancellationToken cancellationToken)
+        string projectName, CancellationToken cancellationToken)
     {
         var launch = await service.Launch.StartAsync(new StartLaunchRequest
         {
             Name = launchPlan.LaunchName,
             Description = launchPlan.Description,
             Mode = launchPlan.DebugMode ? LaunchMode.Debug : LaunchMode.Default,
-            StartTime = launchStartTimeUtc,
+            StartTime = launchPlan.LaunchStartTimeUtc,
             Attributes = launchPlan.BuildLaunchAttributes()
         }, cancellationToken).ConfigureAwait(false);
 
@@ -398,21 +396,20 @@ internal class ReportPortalPublisher(ILogger logger) : IDisposable
     /// Publishes queued assertion items and then finishes the launch.
     /// </summary>
     private async Task PublishLaunchItems(IClientService service, ReportPortalLaunchPlan launchPlan,
-        string projectName, string launchUuid, DateTime launchStartTimeUtc, CancellationToken cancellationToken)
+        string projectName, string launchUuid, CancellationToken cancellationToken)
     {
-        PublishQueuedItems(service, launchUuid, launchStartTimeUtc, launchPlan);
+        PublishQueuedItems(service, launchUuid, launchPlan);
 
-        await FinishLaunchAsync(service, launchUuid, projectName, launchPlan.System, cancellationToken)
+        await FinishLaunchAsync(service, launchUuid, projectName, launchPlan, cancellationToken)
             .ConfigureAwait(false);
     }
 
     /// <summary>
     /// Delegates queued assertion publishing back to each passive reporter in the grouped launch.
     /// </summary>
-    private void PublishQueuedItems(IClientService service, string launchUuid, DateTime launchStartTimeUtc,
-        ReportPortalLaunchPlan launchPlan)
+    private void PublishQueuedItems(IClientService service, string launchUuid, ReportPortalLaunchPlan launchPlan)
     {
-        var publishContext = new ReportPortalPublishContext(service, launchUuid, launchStartTimeUtc, launchPlan);
+        var publishContext = new ReportPortalPublishContext(service, launchUuid, launchPlan);
         foreach (var reporterResults in launchPlan.ReporterResults)
         {
             reporterResults.Reporter.PublishQueuedResults(publishContext, reporterResults.Results, logger);
@@ -423,17 +420,17 @@ internal class ReportPortalPublisher(ILogger logger) : IDisposable
     /// Finishes a ReportPortal launch while keeping cleanup-time finish failures non-fatal.
     /// </summary>
     private async Task FinishLaunchAsync(IClientService service, string launchUuid, string projectName,
-        string systemName, CancellationToken cancellationToken)
+        ReportPortalLaunchPlan launchPlan, CancellationToken cancellationToken)
     {
         try
         {
             await service.Launch.FinishAsync(launchUuid, new FinishLaunchRequest
             {
-                EndTime = DateTime.UtcNow
+                EndTime = launchPlan.LaunchEndTimeUtc
             }, cancellationToken).ConfigureAwait(false);
             logger.LogInformation(
                 "Finished ReportPortal launch {LaunchUuid} in project {ProjectName} for system {SystemName}.",
-                launchUuid, projectName, systemName);
+                launchUuid, projectName, launchPlan.System);
         }
         catch (Exception exception)
         {
@@ -479,5 +476,4 @@ internal class ReportPortalPublisher(ILogger logger) : IDisposable
 internal sealed record ReportPortalPublishContext(
     IClientService Service,
     string LaunchUuid,
-    DateTime LaunchStartTimeUtc,
     ReportPortalLaunchPlan LaunchPlan);

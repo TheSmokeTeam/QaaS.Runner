@@ -124,6 +124,40 @@ public class ReportPortalLaunchPlanTests
     }
 
     [Test]
+    public void Build_WhenAssertionEndsAfterRunnerFinish_ExtendsLaunchTimingEnvelope()
+    {
+        var reporter = CreateReporter();
+        var assertionResult = CreateResult(
+            "long-assertion",
+            "Session A",
+            testDurationMs: (long)TimeSpan.FromMinutes(10).TotalMilliseconds
+        );
+        reporter.WriteTestResults(assertionResult);
+
+        var launchPlan = BuildPlan(
+            reporter,
+            requireQueuedResults: true,
+            finishedAtLocal: FinishedAt
+        );
+        var assertionTiming = launchPlan.GetAssertionTiming(assertionResult);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(
+                launchPlan.LaunchStartTimeUtc,
+                Is.EqualTo(new DateTime(2025, 1, 1, 10, 0, 0, DateTimeKind.Utc))
+            );
+            Assert.That(
+                launchPlan.LaunchEndTimeUtc,
+                Is.EqualTo(new DateTime(2025, 1, 1, 10, 10, 0, DateTimeKind.Utc))
+            );
+            Assert.That(assertionTiming.StartTimeUtc, Is.EqualTo(launchPlan.LaunchStartTimeUtc));
+            Assert.That(assertionTiming.EndTimeUtc, Is.EqualTo(launchPlan.LaunchEndTimeUtc));
+            Assert.That(launchPlan.Description, Does.Contain("End time: 2025-01-01 10:10:00 UTC"));
+        });
+    }
+
+    [Test]
     public void BuildLaunchAttributes_IncludesTeamProjectSystemSessionsConfigAttributesAndMetadataLabels()
     {
         var reporter = CreateReporter(
@@ -359,7 +393,8 @@ public class ReportPortalLaunchPlanTests
     private static AssertionResult CreateResult(
         string assertionName,
         string sessionName,
-        AssertionStatus assertionStatus = AssertionStatus.Passed
+        AssertionStatus assertionStatus = AssertionStatus.Passed,
+        long testDurationMs = 1
     )
     {
         var sessionData = new SessionData
@@ -381,7 +416,7 @@ public class ReportPortalLaunchPlanTests
                 AssertionConfiguration = new ConfigurationBuilder().Build(),
             },
             AssertionStatus = assertionStatus,
-            TestDurationMs = 1,
+            TestDurationMs = testDurationMs,
             Flaky = new Flaky { IsFlaky = false, FlakinessReasons = [] },
         };
     }

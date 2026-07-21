@@ -209,6 +209,33 @@ public class ReportPortalPublisherTests
     }
 
     [Test]
+    public async Task PublishAsync_WithLongAssertionDuration_LaunchContainsAssertionTiming()
+    {
+        var factory = new RecordingClientFactory();
+        using var publisher = CreateSuccessfulPublisher(factory, out _);
+        var reporter = CreateReporter();
+        reporter.WriteTestResults(CreateResult("long-assertion", "Session A",
+            testDurationMs: (long)TimeSpan.FromMinutes(30).TotalMilliseconds));
+
+        await publisher.ValidateAsync([reporter]);
+        await publisher.PublishAsync([reporter]);
+
+        var service = factory.Services.Single();
+        var launchStartTime = service.LaunchStartRequests.Single().StartTime;
+        var launchEndTime = service.LaunchFinishRequests.Single().EndTime;
+        var assertionStartTime = service.TestItemStartRequests.Single().StartTime;
+        var assertionEndTime = service.TestItemFinishRequests.Single().EndTime;
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(launchStartTime, Is.LessThanOrEqualTo(assertionStartTime));
+            Assert.That(launchEndTime, Is.GreaterThanOrEqualTo(assertionEndTime));
+            Assert.That(launchEndTime - launchStartTime,
+                Is.GreaterThanOrEqualTo(assertionEndTime - assertionStartTime));
+        });
+    }
+
+    [Test]
     public async Task PublishAsync_WithMixedProjectsAndSystems_PublishesSeparateLaunches()
     {
         var factory = new RecordingClientFactory();
@@ -391,7 +418,7 @@ public class ReportPortalPublisherTests
         };
     }
 
-    private static AssertionResult CreateResult(string assertionName, string sessionName)
+    private static AssertionResult CreateResult(string assertionName, string sessionName, long testDurationMs = 1)
     {
         var sessionData = new SessionData
         {
@@ -412,7 +439,7 @@ public class ReportPortalPublisherTests
                 AssertionHook = null
             },
             AssertionStatus = AssertionStatus.Passed,
-            TestDurationMs = 1,
+            TestDurationMs = testDurationMs,
             Flaky = new Flaky { IsFlaky = false, FlakinessReasons = [] }
         };
     }
@@ -490,6 +517,8 @@ public class ReportPortalPublisherTests
             _launchResource
                 .Setup(resource => resource.FinishAsync(It.IsAny<string>(), It.IsAny<FinishLaunchRequest>(),
                     It.IsAny<CancellationToken>()))
+                .Callback<string, FinishLaunchRequest, CancellationToken>((_, request, _) =>
+                    LaunchFinishRequests.Add(request))
                 .ReturnsAsync(() =>
                 {
                     if (throwOnLaunchFinish)
@@ -515,6 +544,8 @@ public class ReportPortalPublisherTests
             _testItemResource
                 .Setup(resource => resource.FinishAsync(It.IsAny<string>(), It.IsAny<FinishTestItemRequest>(),
                     It.IsAny<CancellationToken>()))
+                .Callback<string, FinishTestItemRequest, CancellationToken>((_, request, _) =>
+                    TestItemFinishRequests.Add(request))
                 .ReturnsAsync(new MessageResponse());
 
             _logItemResource
@@ -526,7 +557,9 @@ public class ReportPortalPublisherTests
         public IClientService Object => _service.Object;
         public int DisposeCount { get; private set; }
         public List<StartLaunchRequest> LaunchStartRequests { get; } = [];
+        public List<FinishLaunchRequest> LaunchFinishRequests { get; } = [];
         public List<StartTestItemRequest> TestItemStartRequests { get; } = [];
+        public List<FinishTestItemRequest> TestItemFinishRequests { get; } = [];
     }
 
     private sealed class RecordingHttpMessageHandler(Func<HttpRequestMessage, HttpResponseMessage> responseFactory)

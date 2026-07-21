@@ -79,12 +79,8 @@ public class ReportPortalReporter : BaseReporter
 
     private void PublishTestResultCore(ReportPortalPublishContext launch, AssertionResult assertionResult)
     {
-        var requestedStartTimeUtc = GetAssertionStartTime(assertionResult);
-        var startTimeUtc = requestedStartTimeUtc < launch.LaunchStartTimeUtc
-            ? launch.LaunchStartTimeUtc
-            : requestedStartTimeUtc;
-        var finishTimeUtc = startTimeUtc.AddMilliseconds(Math.Max(assertionResult.TestDurationMs, 1));
         var launchPlan = launch.LaunchPlan;
+        var assertionTiming = launchPlan.GetAssertionTiming(assertionResult);
         var itemAttributes = BuildItemAttributes(assertionResult, launchPlan);
         var stableIdentity = BuildStableReportPortalIdentity(assertionResult,
             launchPlan.Team,
@@ -94,7 +90,7 @@ public class ReportPortalReporter : BaseReporter
             LaunchUuid = launch.LaunchUuid,
             Name = assertionResult.Assertion.Name,
             Description = BuildDescription(assertionResult, launchPlan),
-            StartTime = startTimeUtc,
+            StartTime = assertionTiming.StartTimeUtc,
             Type = TestItemType.Test,
             UniqueId = stableIdentity,
             TestCaseId = stableIdentity,
@@ -116,7 +112,7 @@ public class ReportPortalReporter : BaseReporter
             launch.Service.TestItem.FinishAsync(itemUuid, new FinishTestItemRequest
             {
                 LaunchUuid = launch.LaunchUuid,
-                EndTime = finishTimeUtc,
+                EndTime = assertionTiming.EndTimeUtc,
                 Status = AssertionStatusToReportPortalStatusMap[assertionResult.AssertionStatus],
                 Description = BuildDescription(assertionResult, launchPlan),
                 Attributes = itemAttributes
@@ -277,14 +273,6 @@ public class ReportPortalReporter : BaseReporter
         }
 
         launch.Service.LogItem.CreateAsync(request).GetAwaiter().GetResult();
-    }
-
-    private static DateTime GetAssertionStartTime(AssertionResult assertionResult)
-    {
-        if (assertionResult.Assertion.SessionDataList.Any())
-            return assertionResult.Assertion.SessionDataList.Min(sessionData => sessionData.UtcStartTime);
-
-        return DateTime.UtcNow;
     }
 
     private IList<KeyValuePair<string, string>> BuildParameters(AssertionResult assertionResult,
