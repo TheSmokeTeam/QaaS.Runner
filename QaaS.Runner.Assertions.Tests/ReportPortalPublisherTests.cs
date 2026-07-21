@@ -238,6 +238,36 @@ public class ReportPortalPublisherTests
     }
 
     [Test]
+    public async Task PublishAsync_WithExecutionContext_KeepsParametersWithoutContextLogOrAttachment()
+    {
+        var factory = new RecordingClientFactory();
+        using var publisher = CreateSuccessfulPublisher(factory, out _);
+        var reporter = CreateReporter(executionId: "execution-1", caseName: "case-a");
+        reporter.WriteTestResults(CreateResult("assertion-a", "Session A"));
+
+        await publisher.ValidateAsync([reporter]);
+        await publisher.PublishAsync([reporter]);
+
+        var service = factory.Services.Single();
+        var itemRequest = service.TestItemStartRequests.Single();
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(itemRequest.Parameters,
+                Does.Contain(new KeyValuePair<string, string>("Execution Id", "execution-1")));
+            Assert.That(itemRequest.Parameters,
+                Does.Contain(new KeyValuePair<string, string>("Case Name", "case-a")));
+            Assert.That(itemRequest.Description, Does.Not.Contain("Execution context:"));
+            Assert.That(itemRequest.Description, Does.Not.Contain("execution-1"));
+            Assert.That(itemRequest.Description, Does.Not.Contain("case-a"));
+            Assert.That(service.LogItemRequests.Any(request =>
+                request.Text.Contains("Assertion context:", StringComparison.Ordinal)), Is.False);
+            Assert.That(service.LogItemRequests.Any(request =>
+                request.Attach?.Name == "assertion-context.json"), Is.False);
+        });
+    }
+
+    [Test]
     public async Task PublishAsync_WithMixedProjectsAndSystems_PublishesSeparateLaunches()
     {
         var factory = new RecordingClientFactory();
@@ -392,12 +422,16 @@ public class ReportPortalPublisherTests
         string system = "QaaS",
         string? project = null,
         string? endpoint = "http://localhost:8080",
-        string? apiKey = "api-key")
+        string? apiKey = "api-key",
+        string? executionId = null,
+        string? caseName = null)
     {
         var context = new InternalContext
         {
             Logger = Globals.Logger,
-            RootConfiguration = new ConfigurationBuilder().Build()
+            RootConfiguration = new ConfigurationBuilder().Build(),
+            ExecutionId = executionId,
+            CaseName = caseName
         };
 
         context.InsertValueIntoGlobalDictionary(context.GetMetaDataPath(), new MetaDataConfig
@@ -555,6 +589,7 @@ public class ReportPortalPublisherTests
             _logItemResource
                 .Setup(resource => resource.CreateAsync(It.IsAny<CreateLogItemRequest>(),
                     It.IsAny<CancellationToken>()))
+                .Callback<CreateLogItemRequest, CancellationToken>((request, _) => LogItemRequests.Add(request))
                 .ReturnsAsync(new LogItemCreatedResponse { Uuid = "log" });
         }
 
@@ -564,6 +599,7 @@ public class ReportPortalPublisherTests
         public List<FinishLaunchRequest> LaunchFinishRequests { get; } = [];
         public List<StartTestItemRequest> TestItemStartRequests { get; } = [];
         public List<FinishTestItemRequest> TestItemFinishRequests { get; } = [];
+        public List<CreateLogItemRequest> LogItemRequests { get; } = [];
     }
 
     private sealed class RecordingHttpMessageHandler(Func<HttpRequestMessage, HttpResponseMessage> responseFactory)

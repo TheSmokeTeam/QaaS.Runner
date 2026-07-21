@@ -89,7 +89,7 @@ public class ReportPortalReporter : BaseReporter
         {
             LaunchUuid = launch.LaunchUuid,
             Name = assertionResult.Assertion.Name,
-            Description = BuildDescription(assertionResult, launchPlan),
+            Description = BuildDescription(assertionResult),
             StartTime = assertion.StartTimeUtc,
             Type = TestItemType.Test,
             UniqueId = stableIdentity,
@@ -101,7 +101,6 @@ public class ReportPortalReporter : BaseReporter
 
         try
         {
-            WriteAssertionContextLog(launch, itemUuid, assertionResult, stableIdentity);
             WriteAssertionOutcomeLog(launch, itemUuid, assertionResult);
             WriteLinksLog(launch, itemUuid, assertionResult);
             WriteSessionDetails(launch, itemUuid, assertionResult);
@@ -114,7 +113,7 @@ public class ReportPortalReporter : BaseReporter
                 LaunchUuid = launch.LaunchUuid,
                 EndTime = assertion.EndTimeUtc,
                 Status = AssertionStatusToReportPortalStatusMap[assertionResult.AssertionStatus],
-                Description = BuildDescription(assertionResult, launchPlan),
+                Description = BuildDescription(assertionResult),
                 Attributes = itemAttributes
             }).GetAwaiter().GetResult();
         }
@@ -123,31 +122,6 @@ public class ReportPortalReporter : BaseReporter
             TryFinishAsFailed(launch, itemUuid);
             throw;
         }
-    }
-
-    private void WriteAssertionContextLog(ReportPortalPublishContext launch, string itemUuid, AssertionResult assertionResult,
-        string stableIdentity)
-    {
-        var launchPlan = launch.LaunchPlan;
-        var metadataAttributes = BuildMetadataAttributes();
-        var contextText = new StringBuilder()
-            .AppendLine("Assertion context:")
-            .AppendLine($"- Stable identity: {stableIdentity}")
-            .AppendLine($"- Team: {launchPlan.Team}")
-            .AppendLine($"- Project: {launchPlan.Project}")
-            .AppendLine($"- System: {launchPlan.System}")
-            .AppendLine($"- ExecutionId: {Context.ExecutionId ?? "<none>"}")
-            .AppendLine($"- CaseName: {Context.CaseName ?? "<none>"}")
-            .AppendLine($"- Sessions: {assertionResult.Assertion.SessionDataList.Count}")
-            .AppendLine($"- Data sources: {assertionResult.Assertion.DataSourceList?.Count ?? 0}")
-            .AppendLine()
-            .AppendLine("Metadata:")
-            .AppendLine(BuildMetadataSummaryText(metadataAttributes))
-            .ToString()
-            .Trim();
-
-        CreateLogItem(launch, itemUuid, ReportPortalLogLevel.Info, contextText,
-            BuildAssertionContextArtifact(assertionResult, launchPlan.Team, launchPlan.System));
     }
 
     private void WriteAssertionOutcomeLog(ReportPortalPublishContext launch, string itemUuid, AssertionResult assertionResult)
@@ -392,7 +366,7 @@ public class ReportPortalReporter : BaseReporter
         return attributes;
     }
 
-    private string BuildDescription(AssertionResult assertionResult, ReportPortalLaunchPlan launchPlan)
+    private string BuildDescription(AssertionResult assertionResult)
     {
         var assertionTextDetails = BuildAssertionTextDetails(assertionResult);
         var metadataAttributes = BuildMetadataAttributes();
@@ -403,16 +377,6 @@ public class ReportPortalReporter : BaseReporter
             description.AppendLine("Assertion message:")
                 .AppendLine(assertionTextDetails.Message.Trim());
         }
-
-        description.AppendLine()
-            .AppendLine("Execution context:")
-            .AppendLine($"- Team: {launchPlan.Team}")
-            .AppendLine($"- Project: {launchPlan.Project}")
-            .AppendLine($"- System: {launchPlan.System}")
-            .AppendLine($"- Execution Id: {Context.ExecutionId ?? "<none>"}")
-            .AppendLine($"- Case Name: {Context.CaseName ?? "<none>"}")
-            .AppendLine($"- Sessions: {string.Join(", ", assertionResult.Assertion.SessionDataList.Select(session => session.Name))}")
-            .AppendLine($"- Data Sources: {string.Join(", ", assertionResult.Assertion.DataSourceList?.Select(dataSource => dataSource.Name) ?? [])}");
 
         description.AppendLine()
             .AppendLine("Metadata attributes:")
