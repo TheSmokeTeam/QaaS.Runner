@@ -225,13 +225,15 @@ public class ReportPortalPublisherTests
         var launchEndTime = service.LaunchFinishRequests.Single().EndTime;
         var assertionStartTime = service.TestItemStartRequests.Single().StartTime;
         var assertionEndTime = service.TestItemFinishRequests.Single().EndTime;
+        var expectedStartTime = new DateTime(2025, 1, 1, 9, 30, 0, DateTimeKind.Utc);
 
         Assert.Multiple(() =>
         {
-            Assert.That(launchStartTime, Is.LessThanOrEqualTo(assertionStartTime));
-            Assert.That(launchEndTime, Is.GreaterThanOrEqualTo(assertionEndTime));
+            Assert.That(launchStartTime, Is.EqualTo(expectedStartTime));
+            Assert.That(launchStartTime, Is.EqualTo(assertionStartTime));
+            Assert.That(launchEndTime, Is.EqualTo(assertionEndTime));
             Assert.That(launchEndTime - launchStartTime,
-                Is.GreaterThanOrEqualTo(assertionEndTime - assertionStartTime));
+                Is.EqualTo(TimeSpan.FromMinutes(30)));
         });
     }
 
@@ -414,7 +416,9 @@ public class ReportPortalPublisherTests
                 Project = project
             },
             Context = context,
-            ExecutionMode = "run"
+            ExecutionMode = "run",
+            EpochTestSuiteStartTime = new DateTimeOffset(
+                new DateTime(2025, 1, 1, 9, 30, 0, DateTimeKind.Utc)).ToUnixTimeMilliseconds()
         };
     }
 

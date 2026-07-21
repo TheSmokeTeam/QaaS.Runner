@@ -83,7 +83,7 @@ public class ReportPortalLaunchPlanTests
         Assert.That(
             launchPlan.Description,
             Is.EqualTo(
-                $"Start time: 2025-01-01 10:00:00 UTC | End time: 2025-01-01 10:05:00 UTC{Environment.NewLine}"
+                $"Start time: 2025-01-01 10:00:00 UTC | End time: 2025-01-01 10:00:00 UTC{Environment.NewLine}"
                     + "🟢 Passed 100% | 🔴 Failed 0% | 🟠 Broken 0% | 🔵 Unknown 0% | 🟡 Skipped 0%"
             )
         );
@@ -111,7 +111,7 @@ public class ReportPortalLaunchPlanTests
             Assert.That(
                 descriptionLines[0],
                 Is.EqualTo(
-                    "Start time: 2025-01-01 10:00:00 UTC | End time: 2025-01-01 10:05:00 UTC"
+                    "Start time: 2025-01-01 10:00:00 UTC | End time: 2025-01-01 10:00:00 UTC"
                 )
             );
             Assert.That(descriptionLines[1], Does.Contain("🟢 Passed 50%"));
@@ -124,7 +124,7 @@ public class ReportPortalLaunchPlanTests
     }
 
     [Test]
-    public void Build_WhenAssertionEndsAfterRunnerFinish_ExtendsLaunchTimingEnvelope()
+    public void Build_UsesAllureEpochAndAssertionDurationForLaunchTiming()
     {
         var reporter = CreateReporter();
         var assertionResult = CreateResult(
@@ -139,7 +139,7 @@ public class ReportPortalLaunchPlanTests
             requireQueuedResults: true,
             finishedAtLocal: FinishedAt
         );
-        var assertionTiming = launchPlan.GetAssertionTiming(assertionResult);
+        var assertionPlan = launchPlan.ReporterResults.Single().Assertions.Single();
 
         Assert.Multiple(() =>
         {
@@ -151,9 +151,29 @@ public class ReportPortalLaunchPlanTests
                 launchPlan.LaunchEndTimeUtc,
                 Is.EqualTo(new DateTime(2025, 1, 1, 10, 10, 0, DateTimeKind.Utc))
             );
-            Assert.That(assertionTiming.StartTimeUtc, Is.EqualTo(launchPlan.LaunchStartTimeUtc));
-            Assert.That(assertionTiming.EndTimeUtc, Is.EqualTo(launchPlan.LaunchEndTimeUtc));
+            Assert.That(assertionPlan.Result, Is.SameAs(assertionResult));
+            Assert.That(assertionPlan.StartTimeUtc, Is.EqualTo(launchPlan.LaunchStartTimeUtc));
+            Assert.That(assertionPlan.EndTimeUtc, Is.EqualTo(launchPlan.LaunchEndTimeUtc));
             Assert.That(launchPlan.Description, Does.Contain("End time: 2025-01-01 10:10:00 UTC"));
+        });
+    }
+
+    [Test]
+    public void Build_WithZeroDuration_PreservesExactAllureDuration()
+    {
+        var reporter = CreateReporter();
+        var assertionResult = CreateResult("zero-duration", "Session A", testDurationMs: 0);
+        reporter.WriteTestResults(assertionResult);
+
+        var launchPlan = BuildPlan(reporter, requireQueuedResults: true);
+        var assertionPlan = launchPlan.ReporterResults.Single().Assertions.Single();
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(assertionPlan.StartTimeUtc, Is.EqualTo(StartedAt.UtcDateTime));
+            Assert.That(assertionPlan.EndTimeUtc, Is.EqualTo(assertionPlan.StartTimeUtc));
+            Assert.That(launchPlan.LaunchStartTimeUtc, Is.EqualTo(assertionPlan.StartTimeUtc));
+            Assert.That(launchPlan.LaunchEndTimeUtc, Is.EqualTo(assertionPlan.EndTimeUtc));
         });
     }
 
@@ -387,6 +407,7 @@ public class ReportPortalLaunchPlanTests
             },
             Context = context,
             ExecutionMode = "run",
+            EpochTestSuiteStartTime = StartedAt.ToUnixTimeMilliseconds(),
         };
     }
 

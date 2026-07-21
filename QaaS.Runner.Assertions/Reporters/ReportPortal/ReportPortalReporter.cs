@@ -57,30 +57,30 @@ public class ReportPortalReporter : BaseReporter
     }
 
     internal void PublishQueuedResults(ReportPortalPublishContext publishContext,
-        IReadOnlyList<AssertionResult> assertionResults,
+        IReadOnlyList<ReportPortalAssertionPlan> assertions,
         ILogger logger)
     {
-        foreach (var assertionResult in assertionResults)
+        foreach (var assertion in assertions)
         {
             try
             {
-                PublishTestResultCore(publishContext, assertionResult);
+                PublishTestResultCore(publishContext, assertion);
             }
             catch (Exception exception)
             {
                 logger.LogError(exception,
                     "Could not publish assertion {AssertionName} to ReportPortal for team {TeamName} and system {SystemName}. The run will continue.",
-                    assertionResult.Assertion.Name,
+                    assertion.Result.Assertion.Name,
                     publishContext.LaunchPlan.Team,
                     publishContext.LaunchPlan.System);
             }
         }
     }
 
-    private void PublishTestResultCore(ReportPortalPublishContext launch, AssertionResult assertionResult)
+    private void PublishTestResultCore(ReportPortalPublishContext launch, ReportPortalAssertionPlan assertion)
     {
         var launchPlan = launch.LaunchPlan;
-        var assertionTiming = launchPlan.GetAssertionTiming(assertionResult);
+        var assertionResult = assertion.Result;
         var itemAttributes = BuildItemAttributes(assertionResult, launchPlan);
         var stableIdentity = BuildStableReportPortalIdentity(assertionResult,
             launchPlan.Team,
@@ -90,7 +90,7 @@ public class ReportPortalReporter : BaseReporter
             LaunchUuid = launch.LaunchUuid,
             Name = assertionResult.Assertion.Name,
             Description = BuildDescription(assertionResult, launchPlan),
-            StartTime = assertionTiming.StartTimeUtc,
+            StartTime = assertion.StartTimeUtc,
             Type = TestItemType.Test,
             UniqueId = stableIdentity,
             TestCaseId = stableIdentity,
@@ -112,7 +112,7 @@ public class ReportPortalReporter : BaseReporter
             launch.Service.TestItem.FinishAsync(itemUuid, new FinishTestItemRequest
             {
                 LaunchUuid = launch.LaunchUuid,
-                EndTime = assertionTiming.EndTimeUtc,
+                EndTime = assertion.EndTimeUtc,
                 Status = AssertionStatusToReportPortalStatusMap[assertionResult.AssertionStatus],
                 Description = BuildDescription(assertionResult, launchPlan),
                 Attributes = itemAttributes

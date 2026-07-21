@@ -412,7 +412,7 @@ internal class ReportPortalPublisher(ILogger logger) : IDisposable
         var publishContext = new ReportPortalPublishContext(service, launchUuid, launchPlan);
         foreach (var reporterResults in launchPlan.ReporterResults)
         {
-            reporterResults.Reporter.PublishQueuedResults(publishContext, reporterResults.Results, logger);
+            reporterResults.Reporter.PublishQueuedResults(publishContext, reporterResults.Assertions, logger);
         }
     }
 

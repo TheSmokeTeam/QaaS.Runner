@@ -138,6 +138,7 @@ public class AssertionBuilderTests
                 new DateTime(2025, 1, 1, 10, 0, 0, DateTimeKind.Utc),
                 executionMode: "assert"
             );
+        var allureReporter = reporters.OfType<AllureReporter>().Single();
         var reportPortalReporter = reporters.OfType<ReportPortalReporter>().Single();
 
         Assert.That(reporters, Has.Count.EqualTo(2));
@@ -145,6 +146,10 @@ public class AssertionBuilderTests
         Assert.That(reportPortalReporter.Config, Is.SameAs(reportPortalConfig));
         Assert.That(reportPortalReporter.Config.Enabled, Is.True);
         Assert.That(reportPortalReporter.ExecutionMode, Is.EqualTo("assert"));
+        Assert.That(
+            reportPortalReporter.EpochTestSuiteStartTime,
+            Is.EqualTo(allureReporter.EpochTestSuiteStartTime)
+        );
     }
 
     [Test]

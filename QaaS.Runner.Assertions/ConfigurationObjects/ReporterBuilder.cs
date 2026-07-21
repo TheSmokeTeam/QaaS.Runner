@@ -227,6 +227,9 @@ public class ReporterBuilder : IYamlConvertible, ICloneable<ReporterBuilder>
                 FileSystem = fileSystem ?? new FileSystem(),
                 Config = ReportPortal,
                 ExecutionMode = executionMode,
+                EpochTestSuiteStartTime = new DateTimeOffset(
+                    testSuiteStartTimeUtc
+                ).ToUnixTimeMilliseconds(),
             };
             reporters.Add(reportPortalReporter);
         }
