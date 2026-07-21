@@ -19,6 +19,7 @@ namespace QaaS.Runner.Assertions.Tests.ConfigurationObjectsTests;
 public class ReportPortalLaunchPlanTests
 {
     private static readonly DateTimeOffset StartedAt = new(2025, 1, 1, 10, 0, 0, TimeSpan.Zero);
+    private static readonly DateTimeOffset FinishedAt = new(2025, 1, 1, 10, 5, 0, TimeSpan.Zero);
 
     [SetUp]
     public void SetUp()
@@ -63,13 +64,17 @@ public class ReportPortalLaunchPlanTests
     }
 
     [Test]
-    public void Build_WithQueuedResults_GeneratesStableLaunchNameAndDescription()
+    public void Build_WithQueuedResults_GeneratesStableLaunchNameAndSummaryDescription()
     {
         var reporter = CreateReporter();
         reporter.WriteTestResults(CreateResult("assertion-a", "Session A"));
         reporter.WriteTestResults(CreateResult("assertion-b", "Session B"));
 
-        var launchPlan = BuildPlan(reporter, requireQueuedResults: true);
+        var launchPlan = BuildPlan(
+            reporter,
+            requireQueuedResults: true,
+            finishedAtLocal: FinishedAt
+        );
 
         Assert.That(
             launchPlan.LaunchName,
@@ -77,9 +82,45 @@ public class ReportPortalLaunchPlanTests
         );
         Assert.That(
             launchPlan.Description,
-            Does.Contain("this run directly from the runner pipeline")
+            Is.EqualTo(
+                $"Start time: 2025-01-01 10:00:00 UTC | End time: 2025-01-01 10:05:00 UTC{Environment.NewLine}"
+                    + "🟢 Passed 100% | 🔴 Failed 0% | 🟠 Broken 0% | 🔵 Unknown 0% | 🟡 Skipped 0%"
+            )
         );
-        Assert.That(launchPlan.Description, Does.Contain("Sessions=[Session A, Session B]"));
+    }
+
+    [Test]
+    public void Build_WithMixedAssertionStatuses_CalculatesPercentageOfEveryStatusInLaunch()
+    {
+        var reporter = CreateReporter();
+        reporter.WriteTestResults(CreateResult("passed-a", "Session A", AssertionStatus.Passed));
+        reporter.WriteTestResults(CreateResult("passed-b", "Session B", AssertionStatus.Passed));
+        reporter.WriteTestResults(CreateResult("failed", "Session C", AssertionStatus.Failed));
+        reporter.WriteTestResults(CreateResult("broken", "Session D", AssertionStatus.Broken));
+
+        var launchPlan = BuildPlan(
+            reporter,
+            requireQueuedResults: true,
+            finishedAtLocal: FinishedAt
+        );
+        var descriptionLines = launchPlan.Description.Split(Environment.NewLine);
+
+        Assert.That(descriptionLines, Has.Length.EqualTo(2));
+        Assert.Multiple(() =>
+        {
+            Assert.That(
+                descriptionLines[0],
+                Is.EqualTo(
+                    "Start time: 2025-01-01 10:00:00 UTC | End time: 2025-01-01 10:05:00 UTC"
+                )
+            );
+            Assert.That(descriptionLines[1], Does.Contain("🟢 Passed 50%"));
+            Assert.That(descriptionLines[1], Does.Contain("🔴 Failed 25%"));
+            Assert.That(descriptionLines[1], Does.Contain("🟠 Broken 25%"));
+            Assert.That(descriptionLines[1], Does.Contain("🔵 Unknown 0%"));
+            Assert.That(descriptionLines[1], Does.Contain("🟡 Skipped 0%"));
+            Assert.That(launchPlan.Description, Does.Not.Contain("Launch timing"));
+        });
     }
 
     [Test]
@@ -250,10 +291,13 @@ public class ReportPortalLaunchPlanTests
 
     private static ReportPortalLaunchPlan BuildPlan(
         ReportPortalReporter reporter,
-        bool requireQueuedResults = false
+        bool requireQueuedResults = false,
+        DateTimeOffset? finishedAtLocal = null
     )
     {
-        return ReportPortalLaunchPlan.Build([reporter], StartedAt, requireQueuedResults).Single();
+        return ReportPortalLaunchPlan
+            .Build([reporter], StartedAt, requireQueuedResults, finishedAtLocal)
+            .Single();
     }
 
     private static ReportPortalReporter CreateReporter(
@@ -312,7 +356,11 @@ public class ReportPortalLaunchPlanTests
         };
     }
 
-    private static AssertionResult CreateResult(string assertionName, string sessionName)
+    private static AssertionResult CreateResult(
+        string assertionName,
+        string sessionName,
+        AssertionStatus assertionStatus = AssertionStatus.Passed
+    )
     {
         var sessionData = new SessionData
         {
@@ -332,7 +380,7 @@ public class ReportPortalLaunchPlanTests
                 AssertionHook = null,
                 AssertionConfiguration = new ConfigurationBuilder().Build(),
             },
-            AssertionStatus = AssertionStatus.Passed,
+            AssertionStatus = assertionStatus,
             TestDurationMs = 1,
             Flaky = new Flaky { IsFlaky = false, FlakinessReasons = [] },
         };

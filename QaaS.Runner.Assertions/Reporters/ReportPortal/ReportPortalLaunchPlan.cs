@@ -1,5 +1,7 @@
+using System.Globalization;
 using QaaS.Framework.SDK;
 using QaaS.Framework.SDK.ContextObjects;
+using QaaS.Framework.SDK.Hooks.Assertion;
 using QaaS.Runner.Assertions.AssertionObjects;
 using QaaS.Runner.Assertions.ConfigurationObjects.ReporterConfigs;
 using QaaS.Runner.Infrastructure;
@@ -62,13 +64,21 @@ internal sealed class ReportPortalLaunchPlan
     /// <param name="requireQueuedResults">
     /// <see langword="true" /> when final publishing should skip reporters with no queued assertion results.
     /// </param>
+    /// <param name="finishedAtLocal">
+    /// The runner finish time used in generated launch descriptions. Defaults to the current time.
+    /// </param>
     /// <returns>The grouped launch plans to validate or publish.</returns>
     public static IReadOnlyList<ReportPortalLaunchPlan> Build(
         IEnumerable<ReportPortalReporter> reporters,
         DateTimeOffset startedAtLocal,
-        bool requireQueuedResults
+        bool requireQueuedResults,
+        DateTimeOffset? finishedAtLocal = null
     )
     {
+        var effectiveFinishedAtLocal = finishedAtLocal ?? DateTimeOffset.Now;
+        if (effectiveFinishedAtLocal < startedAtLocal)
+            effectiveFinishedAtLocal = startedAtLocal;
+
         var reporterResults = reporters
             .Select(reporter => new ReportPortalReporterResults(
                 reporter,
@@ -81,7 +91,9 @@ internal sealed class ReportPortalLaunchPlan
 
         return reporterResults
             .GroupBy(BuildGroupKey, StringComparer.Ordinal)
-            .Select(group => BuildGroupPlan(group.Key, group.ToList(), startedAtLocal))
+            .Select(group =>
+                BuildGroupPlan(group.Key, group.ToList(), startedAtLocal, effectiveFinishedAtLocal)
+            )
             .ToList();
     }
 
@@ -150,7 +162,8 @@ internal sealed class ReportPortalLaunchPlan
     private static ReportPortalLaunchPlan BuildGroupPlan(
         string groupKey,
         IReadOnlyList<ReportPortalReporterResults> reporterResults,
-        DateTimeOffset startedAtLocal
+        DateTimeOffset startedAtLocal,
+        DateTimeOffset finishedAtLocal
     )
     {
         var firstConfig = reporterResults[0].Config;
@@ -205,13 +218,7 @@ internal sealed class ReportPortalLaunchPlan
             sessionNames,
             firstConfig.LaunchName ?? BuildDefaultLaunchName(team, system, sessionNames),
             firstConfig.Description
-                ?? BuildDefaultDescription(
-                    startedAtLocal,
-                    executionMode,
-                    system,
-                    sessionNames,
-                    attributes
-                ),
+                ?? BuildDefaultDescription(startedAtLocal, finishedAtLocal, reporterResults),
             firstConfig.DebugMode == true,
             attributes,
             reporterResults
@@ -290,24 +297,58 @@ internal sealed class ReportPortalLaunchPlan
     }
 
     /// <summary>
-    /// Builds the fallback launch description from execution mode, grouped sessions, and launch attributes.
+    /// Builds the fallback launch description from launch timing and assertion-status percentages.
     /// </summary>
     private static string BuildDefaultDescription(
         DateTimeOffset startedAtLocal,
-        string executionMode,
-        string system,
-        IReadOnlyCollection<string> sessionNames,
-        IReadOnlyDictionary<string, string> attributes
+        DateTimeOffset finishedAtLocal,
+        IReadOnlyList<ReportPortalReporterResults> reporterResults
     )
     {
-        var launchAttributeSummary = string.Join(
-            ", ",
-            attributes
-                .OrderBy(attribute => attribute.Key, StringComparer.OrdinalIgnoreCase)
-                .Select(attribute => $"{attribute.Key}={attribute.Value}")
+        var assertionStatuses = reporterResults
+            .SelectMany(reporter => reporter.Results)
+            .Select(result => result.AssertionStatus)
+            .ToList();
+        var timingDescription =
+            $"Start time: {FormatLaunchTime(startedAtLocal)} | End time: {FormatLaunchTime(finishedAtLocal)}";
+        var statusDescription = string.Join(
+            " | ",
+            Enum.GetValues<AssertionStatus>()
+                .Select(status =>
+                    $"{GetStatusColor(status)} {status} {FormatStatusPercentage(status, assertionStatuses)}%"
+                )
         );
-        return $"QaaS captured this {executionMode} directly from the runner pipeline: live sessions, real assertion outcomes, and the exact shape of {system} at {startedAtLocal:yyyy-MM-dd HH:mm:ss}. Sessions=[{string.Join(", ", sessionNames)}]. LaunchAttributes=[{launchAttributeSummary}]";
+
+        return string.Join(Environment.NewLine, timingDescription, statusDescription);
     }
+
+    private static string FormatLaunchTime(DateTimeOffset timestamp) =>
+        timestamp.UtcDateTime.ToString("yyyy-MM-dd HH:mm:ss 'UTC'", CultureInfo.InvariantCulture);
+
+    private static string FormatStatusPercentage(
+        AssertionStatus status,
+        IReadOnlyCollection<AssertionStatus> assertionStatuses
+    )
+    {
+        var percentage =
+            assertionStatuses.Count == 0
+                ? 0
+                : assertionStatuses.Count(resultStatus => resultStatus == status)
+                    * 100d
+                    / assertionStatuses.Count;
+        return percentage.ToString("0.##", CultureInfo.InvariantCulture);
+    }
+
+    private static string GetStatusColor(AssertionStatus status) =>
+        status switch
+        {
+            AssertionStatus.Passed => "🟢",
+            AssertionStatus.Failed => "🔴",
+            AssertionStatus.Broken => "🟠",
+            AssertionStatus.Unknown => "🔵",
+            AssertionStatus.Skipped => "🟡",
+            _ => "⚪",
+        };
 
     /// <summary>
     /// Produces a compact session segment for generated launch names.
