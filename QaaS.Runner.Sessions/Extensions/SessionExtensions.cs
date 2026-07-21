@@ -1,6 +1,4 @@
 using System.Collections.Concurrent;
-using System.Globalization;
-using System.Reflection;
 using Microsoft.Extensions.Logging;
 using QaaS.Framework.SDK.ContextObjects;
 using QaaS.Framework.SDK.Session.CommunicationDataObjects;
@@ -70,22 +68,23 @@ public static class SessionExtensions
         var failedActionDescription = string.IsNullOrWhiteSpace(actionProtocol)
             ? actionRuntimeName
             : $"{actionProtocol} {actionRuntimeName}";
-        logger.LogError(
-            exception,
-            "Action failure in session {SessionName}. ActionType={ActionType}, Action={ActionName}",
-            sessionName,
-            actionType,
-            failedActionDescription
-        );
-
-        actionFailures.Add(
-            new ActionFailure
-            {
-                Name = actionRuntimeName,
-                ActionType = actionType,
-                Reason = CreateFailureReason(exception),
-            }
-        );
+        foreach (
+            var actionFailure in ActionFailureNormalizer.Create(
+                exception,
+                actionType,
+                actionRuntimeName
+            )
+        )
+        {
+            LogActionFailure(
+                logger,
+                sessionName,
+                actionType,
+                failedActionDescription,
+                actionFailure
+            );
+            actionFailures.Add(actionFailure);
+        }
     }
 
     public static void AppendActionFailure(
@@ -102,22 +101,24 @@ public static class SessionExtensions
         var failedActionDescription = string.IsNullOrWhiteSpace(actionProtocol)
             ? actionRuntimeName
             : $"{actionProtocol} {actionRuntimeName}";
-        logger.LogError(
-            exception,
-            "Action failure in session {SessionName}. ActionType={ActionType}, Action={ActionName}",
-            sessionName,
-            actionType,
-            failedActionDescription
-        );
-
-        actionFailures.Add(
-            new ActionFailure
-            {
-                Name = actionRuntimeName,
-                ActionType = actionType,
-                Reason = CreateFailureReason(exception, exceptionMessage),
-            }
-        );
+        foreach (
+            var actionFailure in ActionFailureNormalizer.Create(
+                exception,
+                actionType,
+                actionRuntimeName,
+                exceptionMessage
+            )
+        )
+        {
+            LogActionFailure(
+                logger,
+                sessionName,
+                actionType,
+                failedActionDescription,
+                actionFailure
+            );
+            actionFailures.Add(actionFailure);
+        }
     }
 
     public static void SetRunningSession(
@@ -316,84 +317,22 @@ public static class SessionExtensions
             ?.DataCancellationTokenSource.Cancel();
     }
 
-    private static Reason CreateFailureReason(Exception exception, string? exceptionMessage = null)
-    {
-        if (!string.IsNullOrWhiteSpace(exceptionMessage))
-        {
-            return new Reason { Message = exceptionMessage, Description = exception.ToString() };
-        }
-
-        return TryCreateS3FailureReason(exception, out var s3Reason)
-            ? s3Reason
-            : new Reason { Message = exception.Message, Description = exception.ToString() };
-    }
-
-    private static bool TryCreateS3FailureReason(Exception exception, out Reason reason)
-    {
-        reason = new Reason();
-        var exceptionType = exception.GetType();
-        var typeName = exceptionType.FullName ?? exceptionType.Name;
-        if (
-            !typeName.Contains("AmazonS3Exception", StringComparison.Ordinal)
-            && !typeName.Contains("Amazon.S3", StringComparison.Ordinal)
-        )
-        {
-            return false;
-        }
-
-        var fields = new List<KeyValuePair<string, string>>();
-        AddPropertyField(fields, exception, "StatusCode");
-        AddPropertyField(fields, exception, "ErrorCode");
-        AddPropertyField(fields, exception, "RequestId");
-        AddPropertyField(fields, exception, "AmazonId2");
-        if (!string.IsNullOrWhiteSpace(exception.Message))
-            fields.Add(new KeyValuePair<string, string>("Message", exception.Message));
-
-        var fieldText =
-            fields.Count == 0
-                ? exception.Message
-                : string.Join(", ", fields.Select(field => $"{field.Key}={field.Value}"));
-        var descriptionLines = new List<string> { $"ExceptionType: {exceptionType.Name}" };
-        descriptionLines.AddRange(fields.Select(field => $"{field.Key}: {field.Value}"));
-        if (exception.InnerException != null)
-        {
-            descriptionLines.Add($"InnerExceptionType: {exception.InnerException.GetType().Name}");
-            descriptionLines.Add($"InnerExceptionMessage: {exception.InnerException.Message}");
-        }
-
-        reason = new Reason
-        {
-            Message = $"S3 operation failed: {fieldText}",
-            Description = string.Join(Environment.NewLine, descriptionLines),
-        };
-        return true;
-    }
-
-    private static void AddPropertyField(
-        ICollection<KeyValuePair<string, string>> fields,
-        Exception exception,
-        string propertyName
+    private static void LogActionFailure(
+        ILogger logger,
+        string sessionName,
+        string actionType,
+        string failedActionDescription,
+        ActionFailure actionFailure
     )
     {
-        var propertyValue = exception
-            .GetType()
-            .GetProperty(propertyName, BindingFlags.Instance | BindingFlags.Public)
-            ?.GetValue(exception);
-        var formattedValue = FormatFailurePropertyValue(propertyValue);
-        if (formattedValue != null)
-            fields.Add(new KeyValuePair<string, string>(propertyName, formattedValue));
-    }
-
-    private static string? FormatFailurePropertyValue(object? value)
-    {
-        return value switch
-        {
-            null => null,
-            string stringValue when string.IsNullOrWhiteSpace(stringValue) => null,
-            string stringValue => stringValue,
-            Enum enumValue =>
-                $"{Convert.ToInt64(enumValue, CultureInfo.InvariantCulture)} {enumValue}",
-            _ => Convert.ToString(value, CultureInfo.InvariantCulture),
-        };
+        logger.LogError(
+            "Action failure in session {SessionName}. ActionType={ActionType}, Action={ActionName}. Failure={FailureMessage}{NewLine}{FailureDescription}",
+            sessionName,
+            actionType,
+            failedActionDescription,
+            actionFailure.Reason.Message,
+            Environment.NewLine,
+            actionFailure.Reason.Description
+        );
     }
 }
