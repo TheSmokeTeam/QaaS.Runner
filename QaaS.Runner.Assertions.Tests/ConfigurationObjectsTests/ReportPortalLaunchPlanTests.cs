@@ -78,7 +78,7 @@ public class ReportPortalLaunchPlanTests
 
         Assert.That(
             launchPlan.LaunchName,
-            Is.EqualTo("QaaS Run | Smoke | QaaS | Session A, Session B")
+            Is.EqualTo("QaaS run | Smoke | QaaS")
         );
         Assert.That(
             launchPlan.Description,
@@ -230,7 +230,7 @@ public class ReportPortalLaunchPlanTests
     }
 
     [Test]
-    public void Build_WithManySessions_UsesCompactStableLaunchName()
+    public void Build_WithManySessions_DoesNotIncludeSessionsInLaunchName()
     {
         var reporter = CreateReporter();
         reporter.WriteTestResults(CreateResult("assertion-a", "Session A"));
@@ -241,7 +241,7 @@ public class ReportPortalLaunchPlanTests
 
         Assert.That(
             launchPlan.LaunchName,
-            Is.EqualTo("QaaS Run | Smoke | QaaS | Session A, Session B(+1)")
+            Is.EqualTo("QaaS run | Smoke | QaaS")
         );
     }
 

@@ -235,7 +235,7 @@ internal sealed class ReportPortalLaunchPlan
             team,
             system,
             sessionNames,
-            firstConfig.LaunchName ?? BuildDefaultLaunchName(team, system, sessionNames),
+            firstConfig.LaunchName ?? BuildDefaultLaunchName(team, system),
             firstConfig.Description
                 ?? BuildDefaultDescription(launchStartTimeUtc, launchEndTimeUtc, reporterResults),
             launchStartTimeUtc,
@@ -307,15 +307,8 @@ internal sealed class ReportPortalLaunchPlan
     /// <summary>
     /// Builds the fallback launch name when the ReportPortal configuration does not provide one.
     /// </summary>
-    private static string BuildDefaultLaunchName(
-        string team,
-        string system,
-        IReadOnlyList<string> sessionNames
-    )
-    {
-        var sessionSummary = BuildSessionSummary(sessionNames);
-        return $"QaaS Run | {team} | {system} | {sessionSummary}";
-    }
+    private static string BuildDefaultLaunchName(string team, string system) =>
+        $"QaaS run | {team} | {system}";
 
     /// <summary>
     /// Builds the fallback launch description from launch timing and assertion-status percentages.
@@ -384,17 +377,6 @@ internal sealed class ReportPortalLaunchPlan
             AssertionStatus.Unknown => "🔵",
             AssertionStatus.Skipped => "🟡",
             _ => "⚪",
-        };
-
-    /// <summary>
-    /// Produces a compact session segment for generated launch names.
-    /// </summary>
-    private static string BuildSessionSummary(IReadOnlyList<string> sessionNames) =>
-        sessionNames.Count switch
-        {
-            0 => "No Sessions",
-            <= 2 => string.Join(", ", sessionNames),
-            _ => $"{sessionNames[0]}, {sessionNames[1]}(+{sessionNames.Count - 2})",
         };
 
     /// <summary>
