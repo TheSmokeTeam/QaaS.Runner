@@ -40,7 +40,6 @@ public class ReportPortalReporter : BaseReporter
     
     private readonly ConcurrentQueue<AssertionResult> _queuedResults = new();
     public required ReportPortalConfig Config { get; init; }
-    public string ExecutionMode { get; init; } = "run";
 
     /// <summary>
     /// Queues one runner-produced assertion result for final ReportPortal publishing.
@@ -259,7 +258,6 @@ public class ReportPortalReporter : BaseReporter
             new("Data Sources",
                 $"[{string.Join(", ", assertionResult.Assertion.DataSourceList?.Select(dataSource => dataSource.Name) ?? [])}]"),
             new("Team", launchPlan.Team),
-            new("Project", launchPlan.Project),
             new("System", launchPlan.System)
         };
 
@@ -294,6 +292,11 @@ public class ReportPortalReporter : BaseReporter
             },
             new()
             {
+                Key = "flaky",
+                Value = assertionResult.Flaky.IsFlaky ? "true" : "false"
+            },
+            new()
+            {
                 Key = "team",
                 Value = launchPlan.Team
             },
@@ -304,15 +307,24 @@ public class ReportPortalReporter : BaseReporter
             }
         };
 
-        foreach (var sessionName in assertionResult.Assertion.SessionDataList
-                     .Select(session => session.Name)
-                     .Where(sessionName => !string.IsNullOrWhiteSpace(sessionName))
-                     .Distinct(StringComparer.OrdinalIgnoreCase))
+        var sessionNames = assertionResult.Assertion.SessionDataList
+            .Select(session => session.Name)
+            .Where(sessionName => !string.IsNullOrWhiteSpace(sessionName))
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .OrderBy(sessionName => sessionName, StringComparer.OrdinalIgnoreCase)
+            .ToArray();
+        attributes.Add(new ItemAttribute
+        {
+            Key = "sessionCount",
+            Value = sessionNames.Length.ToString()
+        });
+
+        if (sessionNames.Length > 0)
         {
             attributes.Add(new ItemAttribute
             {
-                Key = "session",
-                Value = sessionName
+                Key = "sessions",
+                Value = string.Join(", ", sessionNames)
             });
         }
 
@@ -331,15 +343,6 @@ public class ReportPortalReporter : BaseReporter
             {
                 Key = "caseName",
                 Value = Context.CaseName
-            });
-        }
-
-        foreach (var attribute in launchPlan.Attributes.Where(attribute => !string.IsNullOrWhiteSpace(attribute.Key)))
-        {
-            attributes.Add(new ItemAttribute
-            {
-                Key = attribute.Key.Trim(),
-                Value = attribute.Value?.Trim() ?? string.Empty
             });
         }
 
@@ -367,7 +370,7 @@ public class ReportPortalReporter : BaseReporter
                 .AppendLine(assertionTextDetails.Message.Trim());
         }
 
-        description.AppendLine()
+        description.AppendLine("<br />")
             .AppendLine("Assertion configuration:")
             .AppendLine("```yaml")
             .AppendLine(assertionResult.Assertion.AssertionConfiguration.BuildConfigurationAsYaml())

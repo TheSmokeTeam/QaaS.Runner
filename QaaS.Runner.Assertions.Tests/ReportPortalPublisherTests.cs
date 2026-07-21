@@ -20,6 +20,7 @@ using QaaS.Framework.SDK.Session.SessionDataObjects;
 using QaaS.Runner.Assertions.AssertionObjects;
 using QaaS.Runner.Assertions.ConfigurationObjects.ReporterConfigs;
 using QaaS.Runner.Assertions.Reporters.ReportPortal;
+using QaaS.Runner.Assertions.Tests.Mocks;
 using ReportPortal.Client.Abstractions;
 using ReportPortal.Client.Abstractions.Requests;
 using ReportPortal.Client.Abstractions.Resources;
@@ -245,7 +246,8 @@ public class ReportPortalPublisherTests
         var reporter = CreateReporter(
             executionId: "execution-1",
             caseName: "case-a",
-            extraLabels: new Dictionary<string, string> { ["Area"] = "Checkout" });
+            extraLabels: new Dictionary<string, string> { ["Area"] = "Checkout" },
+            reportPortalAttributes: new Dictionary<string, string> { ["LaunchOnly"] = "value" });
         reporter.WriteTestResults(CreateResult("assertion-a", "Session A"));
 
         await publisher.ValidateAsync([reporter]);
@@ -262,10 +264,24 @@ public class ReportPortalPublisherTests
                 Does.Contain(new KeyValuePair<string, string>("Case Name", "case-a")));
             Assert.That(itemRequest.Parameters,
                 Does.Contain(new KeyValuePair<string, string>("Area", "Checkout")));
-            Assert.That(itemRequest.Parameters,
-                Does.Contain(new KeyValuePair<string, string>("Project", "Smoke")));
+            Assert.That(itemRequest.Parameters.Any(parameter => parameter.Key == "Project"), Is.False);
             Assert.That(itemRequest.Attributes.Any(attribute =>
                 attribute.Key == "Area" && attribute.Value == "Checkout"), Is.True);
+            Assert.That(itemRequest.Attributes
+                .Where(attribute => attribute.Key == "executionId")
+                .Select(attribute => attribute.Value), Is.EqualTo(new[] { "execution-1" }));
+            Assert.That(itemRequest.Attributes
+                .Where(attribute => attribute.Key == "caseName")
+                .Select(attribute => attribute.Value), Is.EqualTo(new[] { "case-a" }));
+            Assert.That(itemRequest.Attributes.Any(attribute => attribute.Key == "executionMode"), Is.False);
+            Assert.That(itemRequest.Attributes.Any(attribute => attribute.Key == "builderCount"), Is.False);
+            Assert.That(itemRequest.Attributes.Single(attribute =>
+                attribute.Key == "sessionCount").Value, Is.EqualTo("1"));
+            Assert.That(itemRequest.Attributes.Any(attribute => attribute.Key == "caseNames"), Is.False);
+            Assert.That(itemRequest.Attributes.Any(attribute => attribute.Key == "environment"), Is.False);
+            Assert.That(itemRequest.Attributes.Any(attribute => attribute.Key == "LaunchOnly"), Is.False);
+            Assert.That(service.LaunchStartRequests.Single().Attributes.Any(attribute =>
+                attribute.Key == "LaunchOnly" && attribute.Value == "value"), Is.True);
             Assert.That(itemRequest.Description, Does.Not.Contain("Execution context:"));
             Assert.That(itemRequest.Description, Does.Not.Contain("Metadata attributes:"));
             Assert.That(itemRequest.Description, Does.Not.Contain("execution-1"));
@@ -280,6 +296,107 @@ public class ReportPortalPublisherTests
                 request.Text.Contains("Assertion context:", StringComparison.Ordinal)), Is.False);
             Assert.That(service.LogItemRequests.Any(request =>
                 request.Attach?.Name == "assertion-context.json"), Is.False);
+        });
+    }
+
+    [Test]
+    public async Task PublishAsync_WithAssertionMessage_AddsBlankLineBeforeAssertionConfiguration()
+    {
+        var factory = new RecordingClientFactory();
+        using var publisher = CreateSuccessfulPublisher(factory, out _);
+        var reporter = CreateReporter();
+        var result = CreateResult("assertion-a", "Session A");
+        result.Assertion.AssertionHook = new AssertionHookMock
+        {
+            AssertionMessage = "assertion-a-message"
+        };
+        reporter.WriteTestResults(result);
+
+        await publisher.ValidateAsync([reporter]);
+        await publisher.PublishAsync([reporter]);
+
+        var description = factory.Services.Single().TestItemStartRequests.Single().Description;
+
+        Assert.That(description, Does.Contain(
+            $"assertion-a-message{Environment.NewLine}<br />{Environment.NewLine}Assertion configuration:"));
+    }
+
+    [Test]
+    public async Task PublishAsync_WithoutAssertionMessage_AddsVisibleLineBreakBeforeAssertionConfiguration()
+    {
+        var factory = new RecordingClientFactory();
+        using var publisher = CreateSuccessfulPublisher(factory, out _);
+        var reporter = CreateReporter();
+        reporter.WriteTestResults(CreateResult("assertion-a", "Session A"));
+
+        await publisher.ValidateAsync([reporter]);
+        await publisher.PublishAsync([reporter]);
+
+        var description = factory.Services.Single().TestItemStartRequests.Single().Description;
+
+        Assert.That(description, Does.StartWith(
+            $"<br />{Environment.NewLine}Assertion configuration:"));
+    }
+
+    [Test]
+    public async Task PublishAsync_AddsAssertionScopedSessionsAndSessionCount()
+    {
+        var factory = new RecordingClientFactory();
+        using var publisher = CreateSuccessfulPublisher(factory, out _);
+        var reporter = CreateReporter();
+        var firstResult = CreateResult("assertion-a", "Session B");
+        firstResult.Assertion.SessionDataList = firstResult.Assertion.SessionDataList.Add(new SessionData
+        {
+            Name = "Session A",
+            UtcStartTime = new DateTime(2025, 1, 1, 10, 0, 0, DateTimeKind.Utc),
+            UtcEndTime = new DateTime(2025, 1, 1, 10, 0, 1, DateTimeKind.Utc)
+        });
+        reporter.WriteTestResults(firstResult);
+        reporter.WriteTestResults(CreateResult("assertion-b", "Session C"));
+
+        await publisher.ValidateAsync([reporter]);
+        await publisher.PublishAsync([reporter]);
+
+        var service = factory.Services.Single();
+        var items = service.TestItemStartRequests.ToDictionary(request => request.Name);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(items["assertion-a"].Attributes.Single(attribute =>
+                attribute.Key == "sessions").Value, Is.EqualTo("Session A, Session B"));
+            Assert.That(items["assertion-b"].Attributes.Single(attribute =>
+                attribute.Key == "sessions").Value, Is.EqualTo("Session C"));
+            Assert.That(items.Values.SelectMany(item => item.Attributes).Any(attribute =>
+                attribute.Key == "session"), Is.False);
+            Assert.That(items["assertion-a"].Attributes.Single(attribute =>
+                attribute.Key == "sessionCount").Value, Is.EqualTo("2"));
+            Assert.That(items["assertion-b"].Attributes.Single(attribute =>
+                attribute.Key == "sessionCount").Value, Is.EqualTo("1"));
+            Assert.That(service.LaunchStartRequests.Single().Attributes.Single(attribute =>
+                attribute.Key == "sessionCount").Value, Is.EqualTo("3"));
+        });
+    }
+
+    [Test]
+    public async Task PublishAsync_AddsAssertionScopedFlakyState()
+    {
+        var factory = new RecordingClientFactory();
+        using var publisher = CreateSuccessfulPublisher(factory, out _);
+        var reporter = CreateReporter();
+        reporter.WriteTestResults(CreateResult("flaky-assertion", "Session A", isFlaky: true));
+        reporter.WriteTestResults(CreateResult("stable-assertion", "Session B"));
+
+        await publisher.ValidateAsync([reporter]);
+        await publisher.PublishAsync([reporter]);
+
+        var items = factory.Services.Single().TestItemStartRequests.ToDictionary(request => request.Name);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(items["flaky-assertion"].Attributes.Single(attribute =>
+                attribute.Key == "flaky").Value, Is.EqualTo("true"));
+            Assert.That(items["stable-assertion"].Attributes.Single(attribute =>
+                attribute.Key == "flaky").Value, Is.EqualTo("false"));
         });
     }
 
@@ -441,7 +558,8 @@ public class ReportPortalPublisherTests
         string? apiKey = "api-key",
         string? executionId = null,
         string? caseName = null,
-        IReadOnlyDictionary<string, string>? extraLabels = null)
+        IReadOnlyDictionary<string, string>? extraLabels = null,
+        IReadOnlyDictionary<string, string>? reportPortalAttributes = null)
     {
         var context = new InternalContext
         {
@@ -468,16 +586,18 @@ public class ReportPortalPublisherTests
                 Enabled = enabled,
                 Endpoint = endpoint,
                 ApiKey = apiKey,
-                Project = project
+                Project = project,
+                Attributes = reportPortalAttributes?.ToDictionary(attribute => attribute.Key,
+                    attribute => attribute.Value)
             },
             Context = context,
-            ExecutionMode = "run",
             EpochTestSuiteStartTime = new DateTimeOffset(
                 new DateTime(2025, 1, 1, 9, 30, 0, DateTimeKind.Utc)).ToUnixTimeMilliseconds()
         };
     }
 
-    private static AssertionResult CreateResult(string assertionName, string sessionName, long testDurationMs = 1)
+    private static AssertionResult CreateResult(string assertionName, string sessionName, long testDurationMs = 1,
+        bool isFlaky = false)
     {
         var sessionData = new SessionData
         {
@@ -499,7 +619,7 @@ public class ReportPortalPublisherTests
             },
             AssertionStatus = AssertionStatus.Passed,
             TestDurationMs = testDurationMs,
-            Flaky = new Flaky { IsFlaky = false, FlakinessReasons = [] }
+            Flaky = new Flaky { IsFlaky = isFlaky, FlakinessReasons = [] }
         };
     }
 

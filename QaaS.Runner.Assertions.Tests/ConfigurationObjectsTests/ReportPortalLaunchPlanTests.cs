@@ -196,6 +196,7 @@ public class ReportPortalLaunchPlanTests
 
         Assert.That(attributes.Any(attribute => attribute.Key == "tool"), Is.False);
         Assert.That(attributes.Any(attribute => attribute.Key == "source"), Is.False);
+        Assert.That(attributes.Any(attribute => attribute.Key == "executionMode"), Is.False);
         Assert.That(
             attributes.Any(attribute => attribute.Key == "team" && attribute.Value == "Smoke"),
             Is.True
@@ -205,7 +206,13 @@ public class ReportPortalLaunchPlanTests
             attributes.Any(attribute => attribute.Key == "system" && attribute.Value == "QaaS"),
             Is.True
         );
-        Assert.That(attributes.Count(attribute => attribute.Key == "session"), Is.EqualTo(2));
+        Assert.That(
+            attributes.Any(attribute =>
+                attribute.Key == "sessions" && attribute.Value == "Session A, Session B"
+            ),
+            Is.True
+        );
+        Assert.That(attributes.Any(attribute => attribute.Key == "session"), Is.False);
         Assert.That(
             attributes.Any(attribute => attribute.Key == "Component" && attribute.Value == "Auth"),
             Is.True
@@ -220,6 +227,65 @@ public class ReportPortalLaunchPlanTests
             attributes.Any(attribute => attribute.Key == "Area" && attribute.Value == "Checkout"),
             Is.True
         );
+    }
+
+    [Test]
+    public void BuildLaunchAttributes_AggregatesCaseNamesAndOmitsExecutionIds()
+    {
+        var firstReporter = CreateReporter(executionId: "execution-1", caseName: "case-b");
+        var secondReporter = CreateReporter(executionId: "execution-2", caseName: "case-a");
+        firstReporter.WriteTestResults(CreateResult("assertion-a", "Session B"));
+        secondReporter.WriteTestResults(CreateResult("assertion-b", "Session A"));
+
+        var attributes = ReportPortalLaunchPlan
+            .Build([firstReporter, secondReporter], StartedAt, requireQueuedResults: true)
+            .Single()
+            .BuildLaunchAttributes();
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(attributes.Any(attribute => attribute.Key == "executionId"), Is.False);
+            Assert.That(attributes.Any(attribute => attribute.Key == "caseName"), Is.False);
+            Assert.That(
+                attributes.Any(attribute =>
+                    attribute.Key == "caseNames" && attribute.Value == "case-a, case-b"
+                ),
+                Is.True
+            );
+            Assert.That(
+                attributes.Any(attribute =>
+                    attribute.Key == "sessions" && attribute.Value == "Session A, Session B"
+                ),
+                Is.True
+            );
+            Assert.That(attributes.Any(attribute => attribute.Key == "session"), Is.False);
+        });
+    }
+
+    [TestCase(null, "Local")]
+    [TestCase("10.0.0.1", "CI")]
+    [NonParallelizable]
+    public void BuildLaunchAttributes_UsesFrameworkExecutionEnvironment(
+        string? kubernetesServiceHost,
+        string expectedEnvironment
+    )
+    {
+        var originalKubernetesServiceHost = Environment.GetEnvironmentVariable("KUBERNETES_SERVICE_HOST");
+        try
+        {
+            Environment.SetEnvironmentVariable("KUBERNETES_SERVICE_HOST", kubernetesServiceHost);
+            var reporter = CreateReporter();
+            reporter.WriteTestResults(CreateResult("assertion-a", "Session A"));
+
+            var attributes = BuildPlan(reporter, requireQueuedResults: true).BuildLaunchAttributes();
+
+            Assert.That(attributes.Single(attribute =>
+                attribute.Key == "environment").Value, Is.EqualTo(expectedEnvironment));
+        }
+        finally
+        {
+            Environment.SetEnvironmentVariable("KUBERNETES_SERVICE_HOST", originalKubernetesServiceHost);
+        }
     }
 
     [Test]
@@ -357,13 +423,17 @@ public class ReportPortalLaunchPlanTests
         string? description = null,
         bool? debugMode = false,
         IReadOnlyDictionary<string, string>? attributes = null,
-        IReadOnlyDictionary<string, string>? extraLabels = null
+        IReadOnlyDictionary<string, string>? extraLabels = null,
+        string? executionId = null,
+        string? caseName = null
     )
     {
         var context = new InternalContext
         {
             Logger = Globals.Logger,
             RootConfiguration = new ConfigurationBuilder().Build(),
+            ExecutionId = executionId,
+            CaseName = caseName,
         };
 
         context.InsertValueIntoGlobalDictionary(
@@ -399,7 +469,6 @@ public class ReportPortalLaunchPlanTests
                 ),
             },
             Context = context,
-            ExecutionMode = "run",
             EpochTestSuiteStartTime = StartedAt.ToUnixTimeMilliseconds(),
         };
     }

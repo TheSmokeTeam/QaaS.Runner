@@ -188,13 +188,11 @@ public class ReporterBuilder : IYamlConvertible, ICloneable<ReporterBuilder>
     /// <param name="fileSystem">
     /// Optional file-system abstraction used by reporters. When omitted, a default <see cref="FileSystem"/> is used.
     /// </param>
-    /// <param name="executionMode">The execution mode represented by the current execution.</param>
     /// <returns>The configured reporters for the current assertion run.</returns>
     internal List<IReporter> Build(
         Context context,
         DateTime testSuiteStartTimeUtc,
-        IFileSystem? fileSystem = null,
-        string executionMode = "run"
+        IFileSystem? fileSystem = null
     )
     {
         var reporters = new List<IReporter>();
@@ -226,7 +224,6 @@ public class ReporterBuilder : IYamlConvertible, ICloneable<ReporterBuilder>
                 SaveSessionData = SaveSessionData,
                 FileSystem = fileSystem ?? new FileSystem(),
                 Config = ReportPortal,
-                ExecutionMode = executionMode,
                 EpochTestSuiteStartTime = new DateTimeOffset(
                     testSuiteStartTimeUtc
                 ).ToUnixTimeMilliseconds(),

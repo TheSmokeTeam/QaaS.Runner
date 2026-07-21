@@ -126,7 +126,8 @@ internal sealed class ReportPortalLaunchPlan
         attributes.Add(Attr("team", Team));
         attributes.Add(Attr("system", System));
 
-        attributes.AddRange(SessionNames.Select(session => Attr("session", session)));
+        if (SessionNames.Count > 0)
+            attributes.Add(Attr("sessions", string.Join(", ", SessionNames)));
         attributes.AddRange(Attributes.Select(attribute => Attr(attribute.Key, attribute.Value)));
 
         return attributes;
@@ -200,20 +201,9 @@ internal sealed class ReportPortalLaunchPlan
             .Distinct(StringComparer.OrdinalIgnoreCase)
             .OrderBy(sessionName => sessionName, StringComparer.OrdinalIgnoreCase)
             .ToArray();
-        var executionModes = reporterResults
-            .Select(reporter =>
-                string.IsNullOrWhiteSpace(reporter.Reporter.ExecutionMode)
-                    ? "run"
-                    : reporter.Reporter.ExecutionMode
-            )
-            .Distinct(StringComparer.Ordinal)
-            .OrderBy(mode => mode, StringComparer.Ordinal)
-            .ToList();
-        var executionMode = executionModes.Count == 1 ? executionModes[0] : "mixed";
         var attributes = BuildAttributes(
             reporterResults,
             sessionNames,
-            executionMode,
             firstConfig.Attributes
         );
         var assertions = reporterResults
@@ -251,7 +241,6 @@ internal sealed class ReportPortalLaunchPlan
     private static IReadOnlyDictionary<string, string> BuildAttributes(
         IReadOnlyList<ReportPortalReporterResults> reporterResults,
         IReadOnlyList<string> sessionNames,
-        string executionMode,
         IReadOnlyDictionary<string, string>? configAttributes
     )
     {
@@ -277,9 +266,10 @@ internal sealed class ReportPortalLaunchPlan
                 StringComparer.OrdinalIgnoreCase
             );
 
-        attributes["executionMode"] = executionMode;
         attributes["builderCount"] = reporterResults.Count.ToString();
         attributes["sessionCount"] = sessionNames.Count.ToString();
+        attributes["environment"] =
+            Environment.GetEnvironmentVariable("KUBERNETES_SERVICE_HOST") is null ? "Local" : "CI";
 
         var caseNames = reporterResults
             .Select(reporter => reporter.Reporter.Context.CaseName)
@@ -288,16 +278,7 @@ internal sealed class ReportPortalLaunchPlan
             .OrderBy(caseName => caseName, StringComparer.OrdinalIgnoreCase)
             .ToArray();
         if (caseNames.Length > 0)
-            attributes["caseName"] = string.Join(", ", caseNames);
-
-        var executionIds = reporterResults
-            .Select(reporter => reporter.Reporter.Context.ExecutionId)
-            .Where(executionId => !string.IsNullOrWhiteSpace(executionId))
-            .Distinct(StringComparer.OrdinalIgnoreCase)
-            .OrderBy(executionId => executionId, StringComparer.OrdinalIgnoreCase)
-            .ToArray();
-        if (executionIds.Length > 0)
-            attributes["executionId"] = string.Join(", ", executionIds);
+            attributes["caseNames"] = string.Join(", ", caseNames);
 
         AddConfiguredAttributes(attributes, configAttributes);
         return attributes;

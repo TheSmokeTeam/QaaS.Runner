@@ -351,11 +351,7 @@ public class ExecutionBuilder()
             return [];
         var testSuiteStartTimeUtc = DateTime.UtcNow;
 
-        return Reporters.Build(
-            Context,
-            testSuiteStartTimeUtc,
-            executionMode: Type.ToString().ToLowerInvariant()
-        );
+        return Reporters.Build(Context, testSuiteStartTimeUtc);
     }
 
     private IEnumerable<IStorage> BuildStorages()
