@@ -239,6 +239,22 @@ public class ReportPortalPublisherTests
     }
 
     [Test]
+    public async Task PublishAsync_WhenLaunchFinishes_LogsReportLink()
+    {
+        const string reportLink = "http://localhost:8080/ui/#Smoke/launches/all/42";
+        var factory = new RecordingClientFactory { LaunchLink = reportLink };
+        var logger = new Mock<ILogger>();
+        using var publisher = CreateSuccessfulPublisher(factory, out _, logger.Object);
+        var reporter = CreateReporter();
+        reporter.WriteTestResults(CreateResult("assertion-a", "Session A"));
+
+        await publisher.ValidateAsync([reporter]);
+        await publisher.PublishAsync([reporter]);
+
+        VerifyInformationLoggedExactly(logger, $"ReportPortal report: {reportLink}");
+    }
+
+    [Test]
     public async Task PublishAsync_KeepsContextAndMetadataOnlyInItemDetails()
     {
         var factory = new RecordingClientFactory();
@@ -625,6 +641,7 @@ public class ReportPortalPublisherTests
 
     private sealed class RecordingClientFactory
     {
+        public string LaunchLink { get; init; } = "http://localhost:8080/ui/#Smoke/launches/all/1";
         public bool ThrowOnLaunchStart { get; init; }
         public bool ThrowOnLaunchFinish { get; init; }
         public bool ThrowOnTestItemStart { get; init; }
@@ -637,7 +654,8 @@ public class ReportPortalPublisherTests
                 ThrowOnLaunchStart,
                 ThrowOnLaunchFinish,
                 ThrowOnTestItemStart,
-                ThrowOnDispose);
+                ThrowOnDispose,
+                LaunchLink);
             Services.Add(service);
             return service.Object;
         }
@@ -668,7 +686,7 @@ public class ReportPortalPublisherTests
         private readonly Mock<ILogItemResource> _logItemResource = new();
 
         public RecordingClientService(bool throwOnLaunchStart, bool throwOnLaunchFinish,
-            bool throwOnTestItemStart, bool throwOnDispose)
+            bool throwOnTestItemStart, bool throwOnDispose, string launchLink)
         {
             _service.SetupGet(service => service.Launch).Returns(_launchResource.Object);
             _service.SetupGet(service => service.TestItem).Returns(_testItemResource.Object);
@@ -703,7 +721,7 @@ public class ReportPortalPublisherTests
                     if (throwOnLaunchFinish)
                         throw new InvalidOperationException("finish failed");
 
-                    return new LaunchFinishedResponse { Uuid = "launch" };
+                    return new LaunchFinishedResponse { Uuid = "launch", Link = launchLink };
                 });
 
             _testItemResource
@@ -772,6 +790,19 @@ public class ReportPortalPublisherTests
                 It.IsAny<EventId>(),
                 It.Is<It.IsAnyType>((value, _) =>
                     value.ToString()!.Contains(messageFragment, StringComparison.Ordinal)),
+                It.IsAny<Exception>(),
+                It.IsAny<Func<It.IsAnyType, Exception?, string>>()),
+            Times.AtLeastOnce);
+    }
+
+    private static void VerifyInformationLoggedExactly(Mock<ILogger> logger, string expectedMessage)
+    {
+        logger.Verify(
+            item => item.Log(
+                LogLevel.Information,
+                It.IsAny<EventId>(),
+                It.Is<It.IsAnyType>((value, _) =>
+                    string.Equals(value.ToString(), expectedMessage, StringComparison.Ordinal)),
                 It.IsAny<Exception>(),
                 It.IsAny<Func<It.IsAnyType, Exception?, string>>()),
             Times.AtLeastOnce);

@@ -424,13 +424,14 @@ internal class ReportPortalPublisher(ILogger logger) : IDisposable
     {
         try
         {
-            await service.Launch.FinishAsync(launchUuid, new FinishLaunchRequest
+            var finishedLaunch = await service.Launch.FinishAsync(launchUuid, new FinishLaunchRequest
             {
                 EndTime = launchPlan.LaunchEndTimeUtc
             }, cancellationToken).ConfigureAwait(false);
             logger.LogInformation(
                 "Finished ReportPortal launch {LaunchUuid} in project {ProjectName} for system {SystemName}.",
                 launchUuid, projectName, launchPlan.System);
+            logger.LogInformation("ReportPortal report: {ReportUrl}", finishedLaunch.Link);
         }
         catch (Exception exception)
         {
