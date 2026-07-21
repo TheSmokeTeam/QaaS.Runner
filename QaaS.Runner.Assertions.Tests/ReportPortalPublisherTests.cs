@@ -78,11 +78,12 @@ public class ReportPortalPublisherTests
     public void ValidateAsync_WithUnauthorizedApiKey_ThrowsConfigurationFailure()
     {
         var factory = new RecordingClientFactory();
+        var logger = new Mock<ILogger>();
         using var publisher = CreatePublisher(factory, _ =>
             new HttpResponseMessage(HttpStatusCode.Unauthorized)
             {
                 Content = new StringContent("unauthorized", Encoding.UTF8, "text/plain")
-            }, out var handler);
+            }, out var handler, logger.Object);
 
         var exception = Assert.ThrowsAsync<InvalidConfigurationsException>(
             async () => await publisher.ValidateAsync([CreateReporter()]));
@@ -93,6 +94,27 @@ public class ReportPortalPublisherTests
             Assert.That(handler.RequestCount, Is.EqualTo(1));
             Assert.That(factory.Services, Is.Empty);
         });
+        VerifyErrorLogged(logger, "configured API key was rejected");
+    }
+
+    [Test]
+    public void ValidateAsync_WhenEndpointIsUnreachable_ThrowsConfigurationFailureAndLogsError()
+    {
+        var factory = new RecordingClientFactory();
+        var logger = new Mock<ILogger>();
+        using var publisher = CreatePublisher(factory, _ => throw new HttpRequestException("Connection refused"),
+            out var handler, logger.Object);
+
+        var exception = Assert.ThrowsAsync<InvalidConfigurationsException>(
+            async () => await publisher.ValidateAsync([CreateReporter()]));
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(exception!.Message, Does.Contain("endpoint `http://localhost:8080` is unreachable"));
+            Assert.That(handler.RequestCount, Is.EqualTo(1));
+            Assert.That(factory.Services, Is.Empty);
+        });
+        VerifyErrorLogged(logger, "endpoint `http://localhost:8080` is unreachable");
     }
 
     [Test]
@@ -223,7 +245,7 @@ public class ReportPortalPublisherTests
     }
 
     [Test]
-    public async Task PublishAsync_WhenLaunchStartFails_DoesNotThrowAndLogsWarning()
+    public async Task PublishAsync_WhenLaunchStartFails_DoesNotThrowAndLogsError()
     {
         var factory = new RecordingClientFactory { ThrowOnLaunchStart = true };
         var logger = new Mock<ILogger>();
@@ -234,11 +256,11 @@ public class ReportPortalPublisherTests
         await publisher.ValidateAsync([reporter]);
 
         Assert.DoesNotThrowAsync(async () => await publisher.PublishAsync([reporter]));
-        VerifyWarningLogged(logger, "Could not publish ReportPortal launch");
+        VerifyErrorLogged(logger, "Could not publish ReportPortal launch");
     }
 
     [Test]
-    public async Task PublishAsync_WhenLaunchFinishFails_DoesNotThrowAndLogsWarning()
+    public async Task PublishAsync_WhenLaunchFinishFails_DoesNotThrowAndLogsError()
     {
         var factory = new RecordingClientFactory { ThrowOnLaunchFinish = true };
         var logger = new Mock<ILogger>();
@@ -249,11 +271,11 @@ public class ReportPortalPublisherTests
         await publisher.ValidateAsync([reporter]);
 
         Assert.DoesNotThrowAsync(async () => await publisher.PublishAsync([reporter]));
-        VerifyWarningLogged(logger, "Could not finish ReportPortal launch");
+        VerifyErrorLogged(logger, "Could not finish ReportPortal launch");
     }
 
     [Test]
-    public async Task PublishAsync_WhenItemPublishFails_DoesNotThrowAndLogsWarning()
+    public async Task PublishAsync_WhenItemPublishFails_DoesNotThrowAndLogsError()
     {
         var factory = new RecordingClientFactory { ThrowOnTestItemStart = true };
         var logger = new Mock<ILogger>();
@@ -264,7 +286,7 @@ public class ReportPortalPublisherTests
         await publisher.ValidateAsync([reporter]);
 
         Assert.DoesNotThrowAsync(async () => await publisher.PublishAsync([reporter]));
-        VerifyWarningLogged(logger, "Could not publish assertion");
+        VerifyErrorLogged(logger, "Could not publish assertion");
     }
 
     [Test]
@@ -284,7 +306,7 @@ public class ReportPortalPublisherTests
     }
 
     [Test]
-    public async Task PublishAsync_WhenClientDisposeFails_DoesNotThrowAndLogsWarning()
+    public async Task PublishAsync_WhenClientDisposeFails_DoesNotThrowAndLogsError()
     {
         var factory = new RecordingClientFactory { ThrowOnDispose = true };
         var logger = new Mock<ILogger>();
@@ -295,7 +317,7 @@ public class ReportPortalPublisherTests
         await publisher.ValidateAsync([reporter]);
 
         Assert.DoesNotThrowAsync(async () => await publisher.PublishAsync([reporter]));
-        VerifyWarningLogged(logger, "Could not dispose ReportPortal client service");
+        VerifyErrorLogged(logger, "Could not dispose ReportPortal client service");
     }
 
     private static RecordingReportPortalPublisher CreateSuccessfulPublisher(RecordingClientFactory factory,
@@ -528,11 +550,11 @@ public class ReportPortalPublisherTests
         }
     }
 
-    private static void VerifyWarningLogged(Mock<ILogger> logger, string messageFragment)
+    private static void VerifyErrorLogged(Mock<ILogger> logger, string messageFragment)
     {
         logger.Verify(
             item => item.Log(
-                LogLevel.Warning,
+                LogLevel.Error,
                 It.IsAny<EventId>(),
                 It.Is<It.IsAnyType>((value, _) =>
                     value.ToString()!.Contains(messageFragment, StringComparison.Ordinal)),

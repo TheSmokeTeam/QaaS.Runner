@@ -49,7 +49,7 @@ internal class ReportPortalPublisher(ILogger logger) : IDisposable
     /// </summary>
     /// <remarks>
     /// The runner calls this during cleanup before execution scopes are disposed. A ReportPortal client is created only
-    /// inside this method, and final publish failures are logged as warnings without changing the assertion exit code.
+    /// inside this method, and final publish failures are logged as errors without changing the assertion exit code.
     /// </remarks>
     /// <param name="reporters">The ReportPortal reporters that queued assertion results during execution.</param>
     /// <param name="cancellationToken">A token that cancels final ReportPortal publish operations.</param>
@@ -158,24 +158,24 @@ internal class ReportPortalPublisher(ILogger logger) : IDisposable
         }
         catch (TaskCanceledException)
         {
-            var warningMessage =
+            var errorMessage =
                 $"Could not publish results to ReportPortal because the endpoint `{launchPlan.Endpoint}` timed out.";
-            logger.LogWarning(warningMessage);
-            throw new InvalidConfigurationsException(warningMessage);
+            logger.LogError(errorMessage);
+            throw new InvalidConfigurationsException(errorMessage);
         }
         catch (HttpRequestException exception)
         {
-            var warningMessage =
+            var errorMessage =
                 $"Could not publish results to ReportPortal because the endpoint `{launchPlan.Endpoint}` is unreachable. {exception.Message}";
-            logger.LogWarning(warningMessage);
-            throw new InvalidConfigurationsException(warningMessage);
+            logger.LogError(errorMessage);
+            throw new InvalidConfigurationsException(errorMessage);
         }
         catch (JsonException exception)
         {
-            var warningMessage =
+            var errorMessage =
                 $"Could not publish results to ReportPortal because the endpoint `{launchPlan.Endpoint}` returned an unreadable project payload. {exception.Message}";
-            logger.LogWarning(warningMessage);
-            throw new InvalidConfigurationsException(warningMessage);
+            logger.LogError(errorMessage);
+            throw new InvalidConfigurationsException(errorMessage);
         }
     }
 
@@ -184,10 +184,10 @@ internal class ReportPortalPublisher(ILogger logger) : IDisposable
         if (!string.IsNullOrWhiteSpace(launchPlan.Project))
             return launchPlan.Project;
 
-        const string warningMessage =
+        const string errorMessage =
             "Could not publish results to ReportPortal because ReportPortal.Project was configured as an empty value.";
-        logger.LogWarning(warningMessage);
-        throw new InvalidConfigurationsException(warningMessage);
+        logger.LogError(errorMessage);
+        throw new InvalidConfigurationsException(errorMessage);
     }
 
     private Uri GetEndpointUri(ReportPortalLaunchPlan launchPlan)
@@ -195,9 +195,9 @@ internal class ReportPortalPublisher(ILogger logger) : IDisposable
         if (launchPlan.TryGetEndpointUri(out var endpointUri, out var endpointFailureReason))
             return endpointUri!;
 
-        var warningMessage = $"Could not publish results to ReportPortal: {endpointFailureReason}";
-        logger.LogWarning(warningMessage);
-        throw new InvalidConfigurationsException(warningMessage);
+        var errorMessage = $"Could not publish results to ReportPortal: {endpointFailureReason}";
+        logger.LogError(errorMessage);
+        throw new InvalidConfigurationsException(errorMessage);
     }
 
     private string GetApiKey(ReportPortalLaunchPlan launchPlan, string projectName)
@@ -205,10 +205,10 @@ internal class ReportPortalPublisher(ILogger logger) : IDisposable
         if (!string.IsNullOrWhiteSpace(launchPlan.ApiKey))
             return launchPlan.ApiKey;
 
-        var warningMessage =
+        var errorMessage =
             $"Could not publish results to ReportPortal project `{projectName}` because ReportPortal.ApiKey was not configured.";
-        logger.LogWarning(warningMessage);
-        throw new InvalidConfigurationsException(warningMessage);
+        logger.LogError(errorMessage);
+        throw new InvalidConfigurationsException(errorMessage);
     }
 
     /// <summary>
@@ -242,10 +242,10 @@ internal class ReportPortalPublisher(ILogger logger) : IDisposable
     {
         if (response.StatusCode is HttpStatusCode.Unauthorized or HttpStatusCode.Forbidden)
         {
-            var warningMessage =
+            var errorMessage =
                 $"Could not publish results to ReportPortal because the configured API key was rejected for project `{projectName}`.";
-            logger.LogWarning(warningMessage);
-            throw new InvalidConfigurationsException(warningMessage);
+            logger.LogError(errorMessage);
+            throw new InvalidConfigurationsException(errorMessage);
         }
 
         if (response.IsSuccessStatusCode)
@@ -254,7 +254,7 @@ internal class ReportPortalPublisher(ILogger logger) : IDisposable
         var failureMessage = response.StatusCode == HttpStatusCode.NotFound
             ? $"Could not publish results to ReportPortal because no accessible project matches `{projectName}`."
             : $"Could not publish results to ReportPortal at {endpointUri} for project `{projectName}`. Status={(int)response.StatusCode} {response.ReasonPhrase}. Response={responseBody}";
-        logger.LogWarning(failureMessage);
+        logger.LogError(failureMessage);
         throw new InvalidConfigurationsException(failureMessage);
     }
 
@@ -276,10 +276,10 @@ internal class ReportPortalPublisher(ILogger logger) : IDisposable
         if (!string.IsNullOrWhiteSpace(projectNameFromPayload))
             return;
 
-        var warningMessage =
+        var errorMessage =
             $"Could not publish results to ReportPortal because the endpoint `{launchPlan.Endpoint}` returned an unreadable project payload for project `{projectName}`.";
-        logger.LogWarning(warningMessage);
-        throw new InvalidConfigurationsException(warningMessage);
+        logger.LogError(errorMessage);
+        throw new InvalidConfigurationsException(errorMessage);
     }
 
     /// <summary>
@@ -306,7 +306,7 @@ internal class ReportPortalPublisher(ILogger logger) : IDisposable
 
         if (!_validatedGroupKeys.Contains(launchPlan.GroupKey))
         {
-            logger.LogWarning(
+            logger.LogError(
                 "Skipping ReportPortal publish for project {ProjectName} and system {SystemName} because the launch group was not validated successfully.",
                 launchPlan.Project,
                 launchPlan.System);
@@ -317,7 +317,7 @@ internal class ReportPortalPublisher(ILogger logger) : IDisposable
             string.IsNullOrWhiteSpace(launchPlan.Project) ||
             string.IsNullOrWhiteSpace(launchPlan.ApiKey))
         {
-            logger.LogWarning(
+            logger.LogError(
                 "Skipping ReportPortal publish for project {ProjectName} and system {SystemName} because the launch group no longer has valid publish access. Reason={FailureReason}",
                 launchPlan.Project,
                 launchPlan.System,
@@ -332,7 +332,7 @@ internal class ReportPortalPublisher(ILogger logger) : IDisposable
     }
 
     /// <summary>
-    /// Creates a short-lived ReportPortal client and owns all warning-only final publish handling for one launch.
+    /// Creates a short-lived ReportPortal client and owns all error-level final publish handling for one launch.
     /// </summary>
     private async Task PublishLaunchWithClient(Uri endpointUri, string projectName, string apiKey,
         ReportPortalLaunchPlan launchPlan, CancellationToken cancellationToken)
@@ -352,7 +352,7 @@ internal class ReportPortalPublisher(ILogger logger) : IDisposable
         }
         catch (Exception exception)
         {
-            logger.LogWarning(exception,
+            logger.LogError(exception,
                 "Could not publish ReportPortal launch {LaunchUuid} for project {ProjectName} and system {SystemName}.",
                 launchUuid ?? "<not-started>",
                 projectName,
@@ -420,7 +420,7 @@ internal class ReportPortalPublisher(ILogger logger) : IDisposable
     }
 
     /// <summary>
-    /// Finishes a ReportPortal launch while keeping cleanup-time finish failures warning-only.
+    /// Finishes a ReportPortal launch while keeping cleanup-time finish failures non-fatal.
     /// </summary>
     private async Task FinishLaunchAsync(IClientService service, string launchUuid, string projectName,
         string systemName, CancellationToken cancellationToken)
@@ -437,14 +437,14 @@ internal class ReportPortalPublisher(ILogger logger) : IDisposable
         }
         catch (Exception exception)
         {
-            logger.LogWarning(exception,
+            logger.LogError(exception,
                 "Could not finish ReportPortal launch {LaunchUuid} in project {ProjectName}.",
                 launchUuid, projectName);
         }
     }
 
     /// <summary>
-    /// Disposes the short-lived ReportPortal client while keeping dispose failures warning-only.
+    /// Disposes the short-lived ReportPortal client while keeping dispose failures non-fatal.
     /// </summary>
     private void DisposeService(IClientService? service, string projectName, string systemName)
     {
@@ -457,7 +457,7 @@ internal class ReportPortalPublisher(ILogger logger) : IDisposable
         }
         catch (Exception exception)
         {
-            logger.LogWarning(exception,
+            logger.LogError(exception,
                 "Could not dispose ReportPortal client service for project {ProjectName} and system {SystemName}.",
                 projectName, systemName);
         }

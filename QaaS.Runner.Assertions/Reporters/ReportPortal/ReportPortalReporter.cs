@@ -14,7 +14,7 @@ namespace QaaS.Runner.Assertions.Reporters.ReportPortal;
 
 /// <summary>
 /// Publishes QaaS runner assertion results into ReportPortal while preserving the existing Allure writer. Publishing is
-/// best-effort: failures are logged as warnings and never change the runner exit code.
+/// best-effort: failures are logged as errors and never change the runner exit code.
 /// </summary>
 public class ReportPortalReporter : BaseReporter
 {
@@ -68,7 +68,7 @@ public class ReportPortalReporter : BaseReporter
             }
             catch (Exception exception)
             {
-                logger.LogWarning(exception,
+                logger.LogError(exception,
                     "Could not publish assertion {AssertionName} to ReportPortal for team {TeamName} and system {SystemName}. The run will continue.",
                     assertionResult.Assertion.Name,
                     publishContext.LaunchPlan.Team,
