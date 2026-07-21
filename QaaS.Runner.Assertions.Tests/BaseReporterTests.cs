@@ -1,6 +1,5 @@
 using System;
 using System.Collections;
-using System.Collections.Generic;
 using NUnit.Framework;
 using QaaS.Framework.SDK;
 using QaaS.Framework.Serialization;
@@ -23,10 +22,6 @@ public class BaseReporterTests
             return GetAttachmentTypeBySerializationType(serializationType);
         }
 
-        public static string ResolveMetadataSummary(IReadOnlyDictionary<string, string> metadataAttributes)
-        {
-            return BuildMetadataSummaryText(metadataAttributes);
-        }
     }
 
     [TestCase(SerializationType.Binary, "application/octet-stream")]
@@ -75,15 +70,4 @@ public class BaseReporterTests
         Assert.That(attributes["Area"], Is.EqualTo("Login"));
     }
 
-    [Test]
-    public void BuildMetadataSummaryText_WithAttributes_FormatsDeterministically()
-    {
-        var summary = TestReporter.ResolveMetadataSummary(new Dictionary<string, string>
-        {
-            ["Owner"] = "Smoke",
-            ["Component"] = "Gateway"
-        });
-
-        Assert.That(summary, Is.EqualTo("Component: Gateway" + Environment.NewLine + "Owner: Smoke"));
-    }
 }

@@ -284,11 +284,6 @@ public class ReportPortalReporter : BaseReporter
         {
             new()
             {
-                Key = "tool",
-                Value = QaaSTag
-            },
-            new()
-            {
                 Key = "assertion",
                 Value = assertionResult.Assertion.AssertionName
             },
@@ -301,11 +296,6 @@ public class ReportPortalReporter : BaseReporter
             {
                 Key = "team",
                 Value = launchPlan.Team
-            },
-            new()
-            {
-                Key = "project",
-                Value = launchPlan.Project
             },
             new()
             {
@@ -369,7 +359,6 @@ public class ReportPortalReporter : BaseReporter
     private string BuildDescription(AssertionResult assertionResult)
     {
         var assertionTextDetails = BuildAssertionTextDetails(assertionResult);
-        var metadataAttributes = BuildMetadataAttributes();
         var description = new StringBuilder();
 
         if (!string.IsNullOrWhiteSpace(assertionTextDetails.Message))
@@ -377,12 +366,6 @@ public class ReportPortalReporter : BaseReporter
             description.AppendLine("Assertion message:")
                 .AppendLine(assertionTextDetails.Message.Trim());
         }
-
-        description.AppendLine()
-            .AppendLine("Metadata attributes:")
-            .AppendLine("```text")
-            .AppendLine(BuildMetadataSummaryText(metadataAttributes))
-            .AppendLine("```");
 
         description.AppendLine()
             .AppendLine("Assertion configuration:")

@@ -273,19 +273,6 @@ public abstract class BaseReporter : IReporter
         };
     }
 
-    /// <summary>
-    /// Creates a compact multi-line string of metadata key/value pairs for reporter descriptions and logs.
-    /// </summary>
-    protected static string BuildMetadataSummaryText(IReadOnlyDictionary<string, string> metadataAttributes)
-    {
-        if (metadataAttributes.Count == 0)
-            return "No metadata attributes were provided.";
-
-        return string.Join(Environment.NewLine,
-            metadataAttributes.OrderBy(attribute => attribute.Key, StringComparer.OrdinalIgnoreCase)
-                .Select(attribute => $"{attribute.Key}: {attribute.Value}"));
-    }
-
     internal static IReadOnlyDictionary<string, string> ExtractMetadataAttributes(MetaDataConfig metaData)
     {
         var attributes = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);

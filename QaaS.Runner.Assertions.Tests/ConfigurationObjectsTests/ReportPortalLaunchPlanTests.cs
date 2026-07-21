@@ -178,7 +178,7 @@ public class ReportPortalLaunchPlanTests
     }
 
     [Test]
-    public void BuildLaunchAttributes_IncludesTeamProjectSystemSessionsConfigAttributesAndMetadataLabels()
+    public void BuildLaunchAttributes_IncludesReportAttributesWithoutRedundantAutomaticAttributes()
     {
         var reporter = CreateReporter(
             project: "ConfiguredProject",
@@ -194,20 +194,13 @@ public class ReportPortalLaunchPlanTests
 
         var attributes = BuildPlan(reporter, requireQueuedResults: true).BuildLaunchAttributes();
 
-        Assert.That(
-            attributes.Any(attribute => attribute.Key == "tool" && attribute.Value == "QaaS"),
-            Is.True
-        );
+        Assert.That(attributes.Any(attribute => attribute.Key == "tool"), Is.False);
+        Assert.That(attributes.Any(attribute => attribute.Key == "source"), Is.False);
         Assert.That(
             attributes.Any(attribute => attribute.Key == "team" && attribute.Value == "Smoke"),
             Is.True
         );
-        Assert.That(
-            attributes.Any(attribute =>
-                attribute.Key == "project" && attribute.Value == "ConfiguredProject"
-            ),
-            Is.True
-        );
+        Assert.That(attributes.Any(attribute => attribute.Key == "project"), Is.False);
         Assert.That(
             attributes.Any(attribute => attribute.Key == "system" && attribute.Value == "QaaS"),
             Is.True

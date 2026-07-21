@@ -121,10 +121,9 @@ internal sealed class ReportPortalLaunchPlan
     /// <returns>The ReportPortal attributes sent with the launch start request.</returns>
     public IList<ItemAttribute> BuildLaunchAttributes()
     {
-        var attributes = new List<ItemAttribute> { Attr("tool", "QaaS"), Attr("source", "runner") };
+        var attributes = new List<ItemAttribute>();
 
         attributes.Add(Attr("team", Team));
-        attributes.Add(Attr("project", Project));
         attributes.Add(Attr("system", System));
 
         attributes.AddRange(SessionNames.Select(session => Attr("session", session)));

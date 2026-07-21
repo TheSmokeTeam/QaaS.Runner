@@ -238,11 +238,14 @@ public class ReportPortalPublisherTests
     }
 
     [Test]
-    public async Task PublishAsync_WithExecutionContext_KeepsParametersWithoutContextLogOrAttachment()
+    public async Task PublishAsync_KeepsContextAndMetadataOnlyInItemDetails()
     {
         var factory = new RecordingClientFactory();
         using var publisher = CreateSuccessfulPublisher(factory, out _);
-        var reporter = CreateReporter(executionId: "execution-1", caseName: "case-a");
+        var reporter = CreateReporter(
+            executionId: "execution-1",
+            caseName: "case-a",
+            extraLabels: new Dictionary<string, string> { ["Area"] = "Checkout" });
         reporter.WriteTestResults(CreateResult("assertion-a", "Session A"));
 
         await publisher.ValidateAsync([reporter]);
@@ -257,9 +260,22 @@ public class ReportPortalPublisherTests
                 Does.Contain(new KeyValuePair<string, string>("Execution Id", "execution-1")));
             Assert.That(itemRequest.Parameters,
                 Does.Contain(new KeyValuePair<string, string>("Case Name", "case-a")));
+            Assert.That(itemRequest.Parameters,
+                Does.Contain(new KeyValuePair<string, string>("Area", "Checkout")));
+            Assert.That(itemRequest.Parameters,
+                Does.Contain(new KeyValuePair<string, string>("Project", "Smoke")));
+            Assert.That(itemRequest.Attributes.Any(attribute =>
+                attribute.Key == "Area" && attribute.Value == "Checkout"), Is.True);
             Assert.That(itemRequest.Description, Does.Not.Contain("Execution context:"));
+            Assert.That(itemRequest.Description, Does.Not.Contain("Metadata attributes:"));
             Assert.That(itemRequest.Description, Does.Not.Contain("execution-1"));
             Assert.That(itemRequest.Description, Does.Not.Contain("case-a"));
+            Assert.That(itemRequest.Description, Does.Not.Contain("Checkout"));
+            Assert.That(itemRequest.Attributes.Any(attribute => attribute.Key == "tool"), Is.False);
+            Assert.That(itemRequest.Attributes.Any(attribute => attribute.Key == "source"), Is.False);
+            Assert.That(itemRequest.Attributes.Any(attribute => attribute.Key == "project"), Is.False);
+            Assert.That(service.LaunchStartRequests.Single().Attributes.Any(attribute =>
+                attribute.Key is "tool" or "source" or "project"), Is.False);
             Assert.That(service.LogItemRequests.Any(request =>
                 request.Text.Contains("Assertion context:", StringComparison.Ordinal)), Is.False);
             Assert.That(service.LogItemRequests.Any(request =>
@@ -424,7 +440,8 @@ public class ReportPortalPublisherTests
         string? endpoint = "http://localhost:8080",
         string? apiKey = "api-key",
         string? executionId = null,
-        string? caseName = null)
+        string? caseName = null,
+        IReadOnlyDictionary<string, string>? extraLabels = null)
     {
         var context = new InternalContext
         {
@@ -437,7 +454,11 @@ public class ReportPortalPublisherTests
         context.InsertValueIntoGlobalDictionary(context.GetMetaDataPath(), new MetaDataConfig
         {
             Team = team,
-            System = system
+            System = system,
+            ExtraLabels = extraLabels?.ToDictionary(
+                label => label.Key,
+                label => (object)label.Value,
+                StringComparer.OrdinalIgnoreCase) ?? new Dictionary<string, object>()
         });
 
         return new ReportPortalReporter
