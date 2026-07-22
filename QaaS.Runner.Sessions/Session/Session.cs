@@ -37,7 +37,8 @@ public class Session : ISession
         Collector[]? collectors,
         InternalContext context,
         ConcurrentBag<ActionFailure> actionFailures,
-        int? runUntil = null)
+        int? runUntil = null
+    )
     {
         Name = name;
         _actionFailures = actionFailures;
@@ -50,13 +51,13 @@ public class Session : ISession
         RunUntilStage = runUntil;
         _context = context;
     }
-    
+
     public string Name { get; }
     private bool SaveData { get; }
     public int SessionStage { get; }
     private uint TimeoutBeforeSessionMs { get; }
     private uint TimeoutAfterSessionMs { get; }
-    
+
     /// <summary>
     /// Executes all stages in the session, one after another by order.
     /// </summary>
@@ -83,23 +84,34 @@ public class Session : ISession
 
         try
         {
-            _context.Logger.LogDebug("Waiting {TimeoutBeforeSessionMs} ms before starting session {SessionName}",
-                TimeoutBeforeSessionMs, Name);
+            _context.Logger.LogDebug(
+                "Waiting {TimeoutBeforeSessionMs} ms before starting session {SessionName}",
+                TimeoutBeforeSessionMs,
+                Name
+            );
             await Task.Delay(TimeSpan.FromMilliseconds(TimeoutBeforeSessionMs));
 
             var (startingActionStage, startingActionCount) = GetStartingActionStageSummary();
             _context.Logger.LogInformation(
                 "Starting session {SessionName} on stage {StageNumber} with {ActionCount} action(s)",
-                Name, startingActionStage, startingActionCount);
-            _context.AppendSessionLog(Name,
-                $"Starting session {Name} on stage {startingActionStage} with {startingActionCount} action(s)");
+                Name,
+                startingActionStage,
+                startingActionCount
+            );
+            _context.AppendSessionLog(
+                Name,
+                $"Starting session {Name} on stage {startingActionStage} with {startingActionCount} action(s)"
+            );
             var sessionStartTimeUtc = GetCurrentUtcTime();
             actionsTasks = [];
 
             InitializeSessionRun(executionData);
             _context.Logger.LogDebug(
                 "Session {SessionName} contains {StageCount} stage(s) and {CollectorCount} collector(s)",
-                Name, _stages.Count, _collectors?.Length ?? 0);
+                Name,
+                _stages.Count,
+                _collectors?.Length ?? 0
+            );
             foreach (var (_, stage) in _stages.OrderBy(stage => stage.Key))
                 actionsTasks.AddRange(await stage.RunAsync());
 
@@ -114,19 +126,26 @@ public class Session : ISession
 
             // If session is configured to not save session data
             if (!SaveData)
-                _context.Logger.LogInformation("Session {SessionName} is configured not to persist output data", Name);
+                _context.Logger.LogInformation(
+                    "Session {SessionName} is configured not to persist output data",
+                    Name
+                );
         }
         finally
         {
             actionsTasks.DisposeOfEnumerable("session tasks", _context.Logger);
-            _stages.Values.SelectMany(stage => stage.GetActions())
+            _stages
+                .Values.SelectMany(stage => stage.GetActions())
                 .Concat<Action>(_collectors ?? [])
                 .DisposeOfEnumerable("session actions", _context.Logger);
             _context.RemoveRunningSession(Name);
         }
 
-        _context.Logger.LogDebug("Waiting {TimeoutAfterSessionMs} ms after finishing session {SessionName}",
-            TimeoutAfterSessionMs, Name);
+        _context.Logger.LogDebug(
+            "Waiting {TimeoutAfterSessionMs} ms after finishing session {SessionName}",
+            TimeoutAfterSessionMs,
+            Name
+        );
         await Task.Delay(TimeSpan.FromMilliseconds(TimeoutAfterSessionMs));
 
         return SaveData ? sessionData : null;
@@ -151,9 +170,16 @@ public class Session : ISession
     /// </summary>
     private void InitializeSessionRun(ExecutionData executionData)
     {
-        _context.SetRunningSession(Name, new RunningSessionData<object, object> { Inputs = [], Outputs = [] });
-        _context.Logger.LogDebug("Preparing session {SessionName} with {ExistingSessionCount} existing session result(s) and {DataSourceCount} data source(s)",
-            Name, executionData.SessionDatas.Count, executionData.DataSources.Count);
+        _context.SetRunningSession(
+            Name,
+            new RunningSessionData<object, object> { Inputs = [], Outputs = [] }
+        );
+        _context.Logger.LogDebug(
+            "Preparing session {SessionName} with {ExistingSessionCount} existing session result(s) and {DataSourceCount} data source(s)",
+            Name,
+            executionData.SessionDatas.Count,
+            executionData.DataSources.Count
+        );
         foreach (var stage in _stages.Values)
         {
             stage.ExportRunningCommunicationData();
@@ -163,17 +189,33 @@ public class Session : ISession
 
     private async Task RunPostSessionTasksAsync(
         List<Task<Tuple<Action, InternalCommunicationData<object>>?>> actionsTasks,
-        DateTime sessionStartTimeUtc, DateTime sessionEndTimeUtc)
+        DateTime sessionStartTimeUtc,
+        DateTime sessionEndTimeUtc
+    )
     {
-        _collectors?.ForEach(collector => collector.SetCollectionTimes(sessionStartTimeUtc, sessionEndTimeUtc));
-        var collectorTasks = _collectors?.Select(collector =>
-            SessionExtensions.CreateTaskFromAction(_context, collector, Name, _actionFailures)).ToList() ?? [];
+        _collectors?.ForEach(collector =>
+            collector.SetCollectionTimes(sessionStartTimeUtc, sessionEndTimeUtc)
+        );
+        var collectorTasks =
+            _collectors
+                ?.Select(collector =>
+                    SessionExtensions.CreateTaskFromAction(
+                        _context,
+                        collector,
+                        Name,
+                        _actionFailures
+                    )
+                )
+                .ToList()
+            ?? [];
         actionsTasks.AddRange(collectorTasks);
-        _context.Logger.LogDebug("Running {CollectorCount} collector task(s) after session {SessionName}",
-            collectorTasks.Count, Name);
+        _context.Logger.LogDebug(
+            "Running {CollectorCount} collector task(s) after session {SessionName}",
+            collectorTasks.Count,
+            Name
+        );
         await Task.WhenAll(collectorTasks);
     }
-
 
     /// <summary>
     ///     Creating session data object from the actions' results
@@ -182,17 +224,20 @@ public class Session : ISession
     /// <param name="sessionStartTime"></param>
     /// <param name="sessionEndTime"></param>
     /// <returns></returns>
-    private SessionData CreateSessionData(List<Task<Tuple<Action, InternalCommunicationData<object>>?>> actionsTasks,
-        DateTime sessionStartTime, DateTime sessionEndTime)
+    private SessionData CreateSessionData(
+        List<Task<Tuple<Action, InternalCommunicationData<object>>?>> actionsTasks,
+        DateTime sessionStartTime,
+        DateTime sessionEndTime
+    )
     {
         var sessionData = new SessionData
         {
             Inputs = [],
             Outputs = [],
             Name = Name,
-            SessionFailures = _actionFailures.ToList(),
+            SessionFailures = ActionFailureNormalizer.Normalize(_actionFailures),
             UtcStartTime = sessionStartTime,
-            UtcEndTime = sessionEndTime
+            UtcEndTime = sessionEndTime,
         };
 
         foreach (var actionTask in actionsTasks)
@@ -215,17 +260,26 @@ public class Session : ISession
                 // output in the same internal result object. Materialize a separate public
                 // CommunicationData instance here so SessionData.Outputs remains an isolated view.
                 var serializationType = internalCommunicationData.OutputSerializationType;
-                sessionData.Outputs.Add(new CommunicationData<object>
-                {
-                    Data = internalCommunicationData.Output.Where(output => output != null).ToList()!,
-                    Name = action!.Name, SerializationType = serializationType
-                });
+                sessionData.Outputs.Add(
+                    new CommunicationData<object>
+                    {
+                        Data = internalCommunicationData
+                            .Output.Where(output => output != null)
+                            .ToList()!,
+                        Name = action!.Name,
+                        SerializationType = serializationType,
+                    }
+                );
             }
         }
 
         _context.Logger.LogDebug(
             "Built session data for {SessionName}. Inputs={InputCount}, Outputs={OutputCount}, Failures={FailureCount}",
-            Name, sessionData.Inputs.Count, sessionData.Outputs.Count, sessionData.SessionFailures.Count);
+            Name,
+            sessionData.Inputs.Count,
+            sessionData.Outputs.Count,
+            sessionData.SessionFailures.Count
+        );
 
         return sessionData;
     }
@@ -237,14 +291,32 @@ public class Session : ISession
         _context.Logger.LogInformationWithMetaData(
             "{SessionName} Duration In Milliseconds: {SessionDurationMilliseconds}",
             _context.GetMetaDataOrDefault(),
-            new object?[] { sessionData.Name, (sessionData.UtcEndTime - sessionData.UtcStartTime).TotalMilliseconds });
-        _context.AppendSessionLog(sessionData.Name,
-            $"{sessionData.Name} Duration In Milliseconds: {(sessionData.UtcEndTime - sessionData.UtcStartTime).TotalMilliseconds}");
-        _context.Logger.LogInformation("Session Utc Start Time: {SessionUtcStartTime}",
-            sessionData.UtcStartTime);
-        _context.AppendSessionLog(sessionData.Name, $"Session Utc Start Time: {sessionData.UtcStartTime}");
-        _context.Logger.LogInformation("Session Utc End Time: {SessionUtcEndTime}", sessionData.UtcEndTime);
-        _context.AppendSessionLog(sessionData.Name, $"Session Utc End Time: {sessionData.UtcEndTime}");
+            new object?[]
+            {
+                sessionData.Name,
+                (sessionData.UtcEndTime - sessionData.UtcStartTime).TotalMilliseconds,
+            }
+        );
+        _context.AppendSessionLog(
+            sessionData.Name,
+            $"{sessionData.Name} Duration In Milliseconds: {(sessionData.UtcEndTime - sessionData.UtcStartTime).TotalMilliseconds}"
+        );
+        _context.Logger.LogInformation(
+            "Session Utc Start Time: {SessionUtcStartTime}",
+            sessionData.UtcStartTime
+        );
+        _context.AppendSessionLog(
+            sessionData.Name,
+            $"Session Utc Start Time: {sessionData.UtcStartTime}"
+        );
+        _context.Logger.LogInformation(
+            "Session Utc End Time: {SessionUtcEndTime}",
+            sessionData.UtcEndTime
+        );
+        _context.AppendSessionLog(
+            sessionData.Name,
+            $"Session Utc End Time: {sessionData.UtcEndTime}"
+        );
 
         // Inputs summary
         foreach (var input in sessionData.Inputs ?? Enumerable.Empty<CommunicationData<object>>())
@@ -252,9 +324,13 @@ public class Session : ISession
             var numberOfInputs = input.Data.Count;
             _context.Logger.LogInformation(
                 "Input Source {InputName} Contains {NumberOfInputsSentToSource} Inputs",
-                input.Name, numberOfInputs);
-            _context.AppendSessionLog(sessionData.Name,
-                $"Input Source {input.Name} Contains {numberOfInputs} Inputs");
+                input.Name,
+                numberOfInputs
+            );
+            _context.AppendSessionLog(
+                sessionData.Name,
+                $"Input Source {input.Name} Contains {numberOfInputs} Inputs"
+            );
         }
 
         // Outputs summary
@@ -263,25 +339,50 @@ public class Session : ISession
             var numberOfOutputs = output.Data.Count;
             _context.Logger.LogInformation(
                 "Output Source {OutputName} Contains {NumberOfOutputsSentToSource} Outputs",
-                output.Name, numberOfOutputs);
-            _context.AppendSessionLog(sessionData.Name,
-                $"Output Source {output.Name} Contains {numberOfOutputs} Outputs");
+                output.Name,
+                numberOfOutputs
+            );
+            _context.AppendSessionLog(
+                sessionData.Name,
+                $"Output Source {output.Name} Contains {numberOfOutputs} Outputs"
+            );
         }
 
-        _context.Logger.LogInformation("Finished session {SessionName} stage {SessionStage}", sessionData.Name,
-            SessionStage);
-        _context.AppendSessionLog(sessionData.Name, $"Finished session {sessionData.Name} stage {SessionStage}");
-        _context.Logger.LogInformation("Session {SessionName} Inputs={InputCount}", sessionData.Name,
-            sessionData.Inputs?.Count ?? 0);
-        _context.AppendSessionLog(sessionData.Name,
-            $"Session {sessionData.Name} Inputs={sessionData.Inputs?.Count ?? 0}");
-        _context.Logger.LogInformation("Session {SessionName} Outputs={OutputCount}", sessionData.Name,
-            sessionData.Outputs?.Count ?? 0);
-        _context.AppendSessionLog(sessionData.Name,
-            $"Session {sessionData.Name} Outputs={sessionData.Outputs?.Count ?? 0}");
-        _context.Logger.LogInformation("Session {SessionName} Failures={FailureCount}", sessionData.Name,
-            sessionData.SessionFailures?.Count ?? 0);
-        _context.AppendSessionLog(sessionData.Name,
-            $"Session {sessionData.Name} Failures={sessionData.SessionFailures?.Count ?? 0}");
+        _context.Logger.LogInformation(
+            "Finished session {SessionName} stage {SessionStage}",
+            sessionData.Name,
+            SessionStage
+        );
+        _context.AppendSessionLog(
+            sessionData.Name,
+            $"Finished session {sessionData.Name} stage {SessionStage}"
+        );
+        _context.Logger.LogInformation(
+            "Session {SessionName} Inputs={InputCount}",
+            sessionData.Name,
+            sessionData.Inputs?.Count ?? 0
+        );
+        _context.AppendSessionLog(
+            sessionData.Name,
+            $"Session {sessionData.Name} Inputs={sessionData.Inputs?.Count ?? 0}"
+        );
+        _context.Logger.LogInformation(
+            "Session {SessionName} Outputs={OutputCount}",
+            sessionData.Name,
+            sessionData.Outputs?.Count ?? 0
+        );
+        _context.AppendSessionLog(
+            sessionData.Name,
+            $"Session {sessionData.Name} Outputs={sessionData.Outputs?.Count ?? 0}"
+        );
+        _context.Logger.LogInformation(
+            "Session {SessionName} Failures={FailureCount}",
+            sessionData.Name,
+            sessionData.SessionFailures?.Count ?? 0
+        );
+        _context.AppendSessionLog(
+            sessionData.Name,
+            $"Session {sessionData.Name} Failures={sessionData.SessionFailures?.Count ?? 0}"
+        );
     }
 }

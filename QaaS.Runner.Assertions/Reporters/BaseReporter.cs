@@ -95,10 +95,14 @@ public abstract class BaseReporter : IReporter
         if (!ShouldSaveSessionData(assertion))
             return null;
 
+        var normalizedSessionData = sessionData with
+        {
+            SessionFailures = ActionFailureNormalizer.Normalize(sessionData.SessionFailures)
+        };
         return new ReportArtifact(
             $"{sessionData.Name}.json",
             $"{sessionData.Name}.json",
-            SessionDataSerialization.SerializeSessionData(sessionData,
+            SessionDataSerialization.SerializeSessionData(normalizedSessionData,
                 new JsonSerializerOptions
                 {
                     WriteIndented = true,
@@ -208,13 +212,14 @@ public abstract class BaseReporter : IReporter
     /// </summary>
     protected static string BuildSessionSummaryText(SessionData sessionData)
     {
+        var actionFailures = ActionFailureNormalizer.Normalize(sessionData.SessionFailures);
         return
             $"Session: {sessionData.Name}{Environment.NewLine}" +
             $"Inputs: [{string.Join(", ", (sessionData.Inputs ?? []).Select(input => input.Name))}]{Environment.NewLine}" +
             $"Outputs: [{string.Join(", ", (sessionData.Outputs ?? []).Select(output => output.Name))}]{Environment.NewLine}" +
             $"Start: {sessionData.UtcStartTime:O}{Environment.NewLine}" +
             $"End: {sessionData.UtcEndTime:O}{Environment.NewLine}" +
-            $"Failures: {sessionData.SessionFailures.Count}";
+            $"Failures: {actionFailures.Count}";
     }
 
     /// <summary>
@@ -240,7 +245,7 @@ public abstract class BaseReporter : IReporter
         var builder = new System.Text.StringBuilder("Flakiness reasons:");
         foreach (var sessionFailurePair in flakinessReasons)
         {
-            foreach (var sessionFailure in sessionFailurePair.Value)
+            foreach (var sessionFailure in ActionFailureNormalizer.Normalize(sessionFailurePair.Value))
             {
                 builder.AppendLine()
                     .Append("- Session ")

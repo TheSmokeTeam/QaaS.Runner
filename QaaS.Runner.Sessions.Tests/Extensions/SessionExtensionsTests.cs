@@ -128,9 +128,287 @@ public class SessionExtensionsTests
             Assert.That(reason.Message, Does.Contain("S3 operation failed"));
             Assert.That(reason.Message, Does.Contain("StatusCode=503 ServiceUnavailable"));
             Assert.That(reason.Message, Does.Contain("ErrorCode=RequestTimeout"));
-            Assert.That(reason.Message, Does.Contain("RequestId=req-123"));
+            Assert.That(reason.Message, Does.Not.Contain("RequestId"));
             Assert.That(reason.Description, Does.Contain("ExceptionType: FakeAmazonS3Exception"));
+            Assert.That(reason.Description, Does.Contain("RequestId: req-123"));
             Assert.That(reason.Description, Does.Not.Contain("   at "));
+        });
+    }
+
+    [Test]
+    public void AppendActionFailure_ForNestedAggregateException_DeduplicatesRepeatedS3Causes()
+    {
+        var failures = new List<ActionFailure>();
+        var first = CreateS3Failure("repeated object read failure");
+        var second = CreateS3Failure("repeated object read failure");
+        var exception = new AggregateException(
+            new AggregateException(first),
+            new AggregateException(second, second)
+        );
+
+        failures.AppendActionFailure(
+            exception,
+            SessionName,
+            Globals.Logger,
+            "ChunkConsumer",
+            "S3Consumer",
+            actionProtocol: "S3"
+        );
+
+        Assert.That(failures, Has.Count.EqualTo(1));
+        var reason = failures.Single().Reason;
+        Assert.Multiple(() =>
+        {
+            Assert.That(reason.Message, Does.StartWith("S3 operation failed:"));
+            Assert.That(reason.Message, Does.Contain("repeated object read failure"));
+            Assert.That(reason.Message, Does.Not.Contain("One or more errors occurred"));
+            Assert.That(reason.Message, Does.Not.Contain(") ("));
+            Assert.That(
+                CountOccurrences(reason.Message, "repeated object read failure"),
+                Is.EqualTo(1)
+            );
+            Assert.That(
+                CountOccurrences(reason.Description, "repeated object read failure"),
+                Is.EqualTo(1)
+            );
+            Assert.That(reason.Description, Does.Not.Contain("Inner Exception #"));
+        });
+    }
+
+    [Test]
+    public void AppendActionFailure_ForS3AggregateWithDifferentRequestIds_DeduplicatesSemantically()
+    {
+        var firstOrderFailures = new List<ActionFailure>();
+        var reverseOrderFailures = new List<ActionFailure>();
+        var first = CreateS3Failure(
+            "repeated object read failure",
+            requestId: "request-z",
+            amazonId2: "host-z"
+        );
+        var second = CreateS3Failure(
+            "repeated object read failure",
+            requestId: "request-a",
+            amazonId2: "host-a"
+        );
+
+        firstOrderFailures.AppendActionFailure(
+            new AggregateException(first, second),
+            SessionName,
+            Globals.Logger,
+            "ChunkConsumer",
+            "S3Consumer",
+            actionProtocol: "S3"
+        );
+        reverseOrderFailures.AppendActionFailure(
+            new AggregateException(second, first),
+            SessionName,
+            Globals.Logger,
+            "ChunkConsumer",
+            "S3Consumer",
+            actionProtocol: "S3"
+        );
+
+        const string expectedMessage =
+            "S3 operation failed: StatusCode=404 NotFound, ErrorCode=NoSuchKey, Message=repeated object read failure";
+        Assert.Multiple(() =>
+        {
+            Assert.That(firstOrderFailures, Has.Count.EqualTo(1));
+            Assert.That(reverseOrderFailures, Has.Count.EqualTo(1));
+            Assert.That(firstOrderFailures.Single(), Is.EqualTo(reverseOrderFailures.Single()));
+            Assert.That(firstOrderFailures.Single().Reason.Message, Is.EqualTo(expectedMessage));
+            Assert.That(firstOrderFailures.Single().Reason.Message, Does.Not.Contain("RequestId"));
+            Assert.That(firstOrderFailures.Single().Reason.Message, Does.Not.Contain("AmazonId2"));
+            Assert.That(
+                firstOrderFailures.Single().Reason.Message,
+                Does.Not.Contain("One or more errors occurred")
+            );
+            Assert.That(firstOrderFailures.Single().Reason.Message, Does.Not.Contain(") ("));
+            Assert.That(
+                firstOrderFailures.Single().Reason.Description,
+                Does.Contain("RequestId: request-a")
+            );
+            Assert.That(
+                firstOrderFailures.Single().Reason.Description,
+                Does.Contain("AmazonId2: host-a")
+            );
+            Assert.That(
+                firstOrderFailures.Single().Reason.Description,
+                Does.Not.Contain("request-z")
+            );
+        });
+    }
+
+    [Test]
+    public void AppendActionFailure_ForAggregateException_PreservesDistinctCausesInStableOrder()
+    {
+        var failures = new List<ActionFailure>();
+        var exception = new AggregateException(
+            new InvalidOperationException("zeta"),
+            new AggregateException(
+                new ArgumentException("alpha"),
+                new InvalidOperationException("zeta")
+            )
+        );
+
+        failures.AppendActionFailure(
+            exception,
+            SessionName,
+            Globals.Logger,
+            "Publisher",
+            "PublishAction"
+        );
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(failures, Has.Count.EqualTo(2));
+            Assert.That(
+                failures.Select(failure => failure.Reason.Message),
+                Is.EqualTo(new[] { "alpha", "zeta" })
+            );
+            Assert.That(
+                failures.Select(failure => failure.Reason.Description),
+                Has.All.Not.Contain("One or more errors occurred")
+            );
+        });
+    }
+
+    [Test]
+    public void NormalizeActionFailures_DeduplicatesExactFailuresAndSortsDeterministically()
+    {
+        var repeated = new ActionFailure
+        {
+            Name = "action-z",
+            ActionType = "Consumer",
+            Reason = new Reason { Message = "same", Description = "same description" },
+        };
+        var distinct = repeated with
+        {
+            Name = "action-a",
+            Reason = new Reason { Message = "different", Description = "different description" },
+        };
+
+        var normalized = ActionFailureNormalizer.Normalize([repeated, distinct, repeated]);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(normalized, Has.Count.EqualTo(2));
+            Assert.That(
+                normalized.Select(failure => failure.Name),
+                Is.EqualTo(new[] { "action-a", "action-z" })
+            );
+        });
+    }
+
+    [Test]
+    public void NormalizeActionFailures_CanonicalizesEquivalentWhitespaceIndependentlyOfInputOrder()
+    {
+        var nonS3CrLf = new ActionFailure
+        {
+            Name = "Publisher",
+            ActionType = "Publisher",
+            Reason = new Reason
+            {
+                Message = "  publish failed\r\n",
+                Description = "  first line\r\nsecond line  ",
+            },
+        };
+        var nonS3Lf = nonS3CrLf with
+        {
+            Reason = new Reason
+            {
+                Message = "publish failed",
+                Description = "first line\nsecond line",
+            },
+        };
+        var s3CrLf = new ActionFailure
+        {
+            Name = "S3Consumer",
+            ActionType = "ChunkConsumer",
+            Reason = new Reason
+            {
+                Message =
+                    "  S3 operation failed: StatusCode=404 NotFound, ErrorCode=NoSuchKey, Message=missing object\r\n",
+                Description = "  RequestId: request-a\r\nAmazonId2: host-a  ",
+            },
+        };
+        var s3Lf = s3CrLf with
+        {
+            Reason = new Reason
+            {
+                Message =
+                    "S3 operation failed: StatusCode=404 NotFound, ErrorCode=NoSuchKey, Message=missing object",
+                Description = "RequestId: request-a\nAmazonId2: host-a",
+            },
+        };
+
+        var forward = ActionFailureNormalizer.Normalize([nonS3CrLf, s3Lf, nonS3Lf, s3CrLf]);
+        var reverse = ActionFailureNormalizer.Normalize([s3CrLf, nonS3Lf, s3Lf, nonS3CrLf]);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(forward, Is.EqualTo(reverse));
+            Assert.That(forward, Has.Count.EqualTo(2));
+            Assert.That(
+                forward.Single(failure => failure.Name == "Publisher").Reason,
+                Is.EqualTo(
+                    new Reason
+                    {
+                        Message = "publish failed",
+                        Description = "first line\nsecond line",
+                    }
+                )
+            );
+            Assert.That(
+                forward.Single(failure => failure.Name == "S3Consumer").Reason,
+                Is.EqualTo(
+                    new Reason
+                    {
+                        Message =
+                            "S3 operation failed: StatusCode=404 NotFound, ErrorCode=NoSuchKey, Message=missing object",
+                        Description = "RequestId: request-a\nAmazonId2: host-a",
+                    }
+                )
+            );
+        });
+    }
+
+    [Test]
+    public void NormalizeActionFailures_CollapsesStructuredS3FailuresWithDifferentDiagnostics()
+    {
+        var first = new ActionFailure
+        {
+            Name = "S3Consumer",
+            ActionType = "ChunkConsumer",
+            Reason = new Reason
+            {
+                Message =
+                    "S3 operation failed: StatusCode=404 NotFound, ErrorCode=NoSuchKey, RequestId=request-z, AmazonId2=host-z, Message=missing object",
+                Description = "RequestId: request-z\nAmazonId2: host-z",
+            },
+        };
+        var second = first with
+        {
+            Reason = new Reason
+            {
+                Message =
+                    "S3 operation failed: StatusCode=404 NotFound, ErrorCode=NoSuchKey, RequestId=request-a, AmazonId2=host-a, Message=missing object",
+                Description = "RequestId: request-a\nAmazonId2: host-a",
+            },
+        };
+
+        var normalized = ActionFailureNormalizer.Normalize([first, second]);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(normalized, Has.Count.EqualTo(1));
+            Assert.That(
+                normalized.Single().Reason.Message,
+                Is.EqualTo(
+                    "S3 operation failed: StatusCode=404 NotFound, ErrorCode=NoSuchKey, Message=missing object"
+                )
+            );
+            Assert.That(normalized.Single().Reason.Description, Does.Contain("request-a"));
+            Assert.That(normalized.Single().Reason.Description, Does.Contain("host-a"));
         });
     }
 
@@ -319,5 +597,22 @@ public class SessionExtensionsTests
         public HttpStatusCode StatusCode { get; init; }
         public string? ErrorCode { get; init; }
         public string? RequestId { get; init; }
+        public string? AmazonId2 { get; init; }
     }
+
+    private static FakeAmazonS3Exception CreateS3Failure(
+        string message,
+        string requestId = "same-request",
+        string amazonId2 = "same-host"
+    ) =>
+        new(message)
+        {
+            StatusCode = HttpStatusCode.NotFound,
+            ErrorCode = "NoSuchKey",
+            RequestId = requestId,
+            AmazonId2 = amazonId2,
+        };
+
+    private static int CountOccurrences(string value, string expected) =>
+        value.Split(expected, StringSplitOptions.None).Length - 1;
 }

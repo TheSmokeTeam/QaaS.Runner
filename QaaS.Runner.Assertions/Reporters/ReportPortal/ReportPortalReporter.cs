@@ -173,14 +173,15 @@ public class ReportPortalReporter : BaseReporter
     {
         foreach (var sessionData in assertionResult.Assertion.SessionDataList)
         {
+            var actionFailures = ActionFailureNormalizer.Normalize(sessionData.SessionFailures);
             var summary = BuildSessionSummaryText(sessionData);
             var sessionArtifact = BuildSessionArtifact(sessionData, assertionResult.Assertion);
             CreateLogItem(launch, itemUuid,
-                sessionData.SessionFailures.Any() ? ReportPortalLogLevel.Error : ReportPortalLogLevel.Info,
+                actionFailures.Count > 0 ? ReportPortalLogLevel.Error : ReportPortalLogLevel.Info,
                 summary,
                 sessionArtifact);
 
-            foreach (var actionFailure in sessionData.SessionFailures)
+            foreach (var actionFailure in actionFailures)
             {
                 CreateLogItem(launch, itemUuid, ReportPortalLogLevel.Error,
                     BuildActionFailureText(sessionData, actionFailure), null);
