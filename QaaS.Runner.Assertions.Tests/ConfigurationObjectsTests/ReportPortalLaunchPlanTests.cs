@@ -84,7 +84,7 @@ public class ReportPortalLaunchPlanTests
             launchPlan.Description,
             Is.EqualTo(
                 $"Start time: 2025-01-01 10:00:00 UTC | End time: 2025-01-01 10:00:00 UTC{Environment.NewLine}"
-                    + "🟢 Passed 100% | 🔴 Failed 0% | 🟠 Broken 0% | 🔵 Unknown 0% | 🟡 Skipped 0%"
+                    + "🟢 Passed 100% | 🔴 Failed 0% | 🟡 Broken 0% | 🟣 Unknown 0% | ⚪ Skipped 0%"
             )
         );
     }
@@ -116,9 +116,9 @@ public class ReportPortalLaunchPlanTests
             );
             Assert.That(descriptionLines[1], Does.Contain("🟢 Passed 50%"));
             Assert.That(descriptionLines[1], Does.Contain("🔴 Failed 25%"));
-            Assert.That(descriptionLines[1], Does.Contain("🟠 Broken 25%"));
-            Assert.That(descriptionLines[1], Does.Contain("🔵 Unknown 0%"));
-            Assert.That(descriptionLines[1], Does.Contain("🟡 Skipped 0%"));
+            Assert.That(descriptionLines[1], Does.Contain("🟡 Broken 25%"));
+            Assert.That(descriptionLines[1], Does.Contain("🟣 Unknown 0%"));
+            Assert.That(descriptionLines[1], Does.Contain("⚪ Skipped 0%"));
             Assert.That(launchPlan.Description, Does.Not.Contain("Launch timing"));
         });
     }

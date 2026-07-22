@@ -353,10 +353,10 @@ internal sealed class ReportPortalLaunchPlan
         {
             AssertionStatus.Passed => "🟢",
             AssertionStatus.Failed => "🔴",
-            AssertionStatus.Broken => "🟠",
-            AssertionStatus.Unknown => "🔵",
-            AssertionStatus.Skipped => "🟡",
-            _ => "⚪",
+            AssertionStatus.Broken => "🟡",
+            AssertionStatus.Unknown => "🟣",
+            AssertionStatus.Skipped => "⚪",
+            _ => "⚫",
         };
 
     /// <summary>
