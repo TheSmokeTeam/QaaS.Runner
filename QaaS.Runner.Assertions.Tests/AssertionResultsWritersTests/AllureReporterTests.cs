@@ -332,7 +332,7 @@ public class AllureReporterTests
         Assert.AreEqual(
             expectedItemCount,
             FileSystem
-                .Directory.GetFiles(AllureResultsFolder, "", SearchOption.AllDirectories)
+                .Directory.GetFiles(AllureResultsFolder, "", SearchOption.TopDirectoryOnly)
                 .Length
         );
     }
@@ -599,7 +599,7 @@ public class AllureReporterTests
             );
             Assert.That(
                 Directory.Exists(Path.Combine(AllureResultsFolder, "SessionLogs")),
-                Is.False
+                Is.True
             );
             Assert.That(File.Exists(logAttachmentPath), Is.True);
             Assert.That(
@@ -667,7 +667,7 @@ public class AllureReporterTests
     }
 
     [Test]
-    public void WriteTestResults_WithSessionArtifacts_UsesAllureCompatibleAttachmentSources()
+    public void WriteTestResults_WithSessionArtifacts_PreservesLegacyCopiesAndUsesAllureCompatibleSources()
     {
         Reporter!.SaveSessionData = true;
         Reporter.SaveTemplate = true;
@@ -750,18 +750,18 @@ public class AllureReporterTests
             Assert.That(File.ReadAllText(templateAttachment), Does.Contain("RabbitRoundTrip"));
             Assert.That(
                 Directory.Exists(Path.Combine(AllureResultsFolder, "SessionsData")),
-                Is.False
+                Is.True
             );
             Assert.That(
                 Directory.Exists(Path.Combine(AllureResultsFolder, "SessionLogs")),
-                Is.False
+                Is.True
             );
-            Assert.That(Directory.Exists(Path.Combine(AllureResultsFolder, "Templates")), Is.False);
+            Assert.That(Directory.Exists(Path.Combine(AllureResultsFolder, "Templates")), Is.True);
         });
     }
 
     [Test]
-    public void WriteTestResults_WithCustomAttachments_UsesAllureCompatibleAttachmentSource()
+    public void WriteTestResults_WithCustomAttachments_PreservesLegacyCopyAndUsesAllureCompatibleSource()
     {
         Reporter!.SaveSessionData = false;
         Reporter.SaveTemplate = false;
@@ -815,9 +815,281 @@ public class AllureReporterTests
             Assert.That(attachment.GetProperty("type").GetString(), Is.EqualTo("application/json"));
             Assert.That(
                 Directory.Exists(Path.Combine(AllureResultsFolder, "AssertionsAttachments")),
-                Is.False
+                Is.True
             );
             Assert.That(File.ReadAllText(attachmentFile), Does.Contain("\"Value\":5"));
+        });
+    }
+
+    [TestCase(0)]
+    [TestCase(1)]
+    [TestCase(5)]
+    [TestCase(10)]
+    public void WriteTestResults_WithMultipleCustomAttachments_WritesEveryAttachment(
+        int attachmentCount
+    )
+    {
+        Reporter!.SaveSessionData = false;
+        Reporter.SaveTemplate = false;
+        Reporter.SaveAttachments = true;
+        var assertionAttachments = Enumerable
+            .Range(0, attachmentCount)
+            .Select(index => new AssertionAttachment
+            {
+                Path = $"payloads-{index}/payload-{index}.json",
+                SerializationType = SerializationType.Json,
+                Data = new { Index = index },
+            })
+            .ToList();
+        var assertionResult = new AssertionResult
+        {
+            Assertion = new Assertion
+            {
+                Name = "multiple-custom-attachments",
+                AssertionName = "MultipleCustomAttachmentsAssertion",
+                AssertionHook = new AssertionHookMock
+                {
+                    AssertionAttachments = assertionAttachments,
+                },
+                SessionDataList = [],
+                StatusesToReport = null,
+            },
+            AssertionStatus = AssertionStatus.Passed,
+            TestDurationMs = 10,
+            Flaky = new Flaky { IsFlaky = false, FlakinessReasons = [] },
+        };
+
+        Reporter.WriteTestResults(assertionResult);
+        var resultFile = Directory
+            .GetFiles(AllureResultsFolder, "*-result.json", SearchOption.TopDirectoryOnly)
+            .Single();
+        using var resultDocument = JsonDocument.Parse(File.ReadAllText(resultFile));
+        var attachments = GetAttachments(resultDocument.RootElement).ToList();
+        var attachmentSources = GetAttachmentSources(resultDocument.RootElement).ToList();
+        var portableFiles = Directory.GetFiles(
+            AllureResultsFolder,
+            "*-attachment.json",
+            SearchOption.TopDirectoryOnly
+        );
+        var legacyRoot = Path.Combine(AllureResultsFolder, "AssertionsAttachments");
+        var legacyFiles = Directory.Exists(legacyRoot)
+            ? Directory.GetFiles(legacyRoot, "*.json", SearchOption.AllDirectories)
+            : [];
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(attachments, Has.Count.EqualTo(attachmentCount));
+            Assert.That(attachmentSources, Has.Count.EqualTo(attachmentCount));
+            Assert.That(attachmentSources.Distinct().Count(), Is.EqualTo(attachmentCount));
+            Assert.That(portableFiles, Has.Length.EqualTo(attachmentCount));
+            Assert.That(legacyFiles, Has.Length.EqualTo(attachmentCount));
+            AssertAllureAttachmentSourceContract(attachmentSources);
+            Assert.That(
+                attachments.Select(attachment =>
+                    NormalizePathSeparators(attachment.GetProperty("name").GetString()!)
+                ),
+                Is.EquivalentTo(
+                    Enumerable
+                        .Range(0, attachmentCount)
+                        .Select(index => $"payloads-{index}/payload-{index}.json")
+                )
+            );
+            Assert.That(
+                attachments.Select(attachment => attachment.GetProperty("type").GetString()),
+                Is.All.EqualTo("application/json")
+            );
+            foreach (var index in Enumerable.Range(0, attachmentCount))
+            {
+                Assert.That(
+                    portableFiles,
+                    Has.Some.Matches<string>(path =>
+                        File.ReadAllText(path).Contains($"\"Index\":{index}")
+                    )
+                );
+                Assert.That(
+                    legacyFiles,
+                    Has.Some.Matches<string>(path =>
+                        File.ReadAllText(path).Contains($"\"Index\":{index}")
+                    )
+                );
+            }
+        });
+    }
+
+    [TestCase(false)]
+    [TestCase(true)]
+    public void WriteTestResults_WithNoCustomAttachments_WritesResultWithoutAttachments(
+        bool useEmptyHook
+    )
+    {
+        Reporter!.SaveSessionData = false;
+        Reporter.SaveTemplate = false;
+        Reporter.SaveAttachments = true;
+        var assertion = new Assertion
+        {
+            Name = "no-custom-attachments",
+            AssertionName = "NoCustomAttachmentsAssertion",
+            SessionDataList = [],
+            StatusesToReport = null,
+        };
+        if (useEmptyHook)
+            assertion.AssertionHook = new AssertionHookMock { AssertionAttachments = [] };
+        var assertionResult = new AssertionResult
+        {
+            Assertion = assertion,
+            AssertionStatus = AssertionStatus.Passed,
+            TestDurationMs = 10,
+            Flaky = new Flaky { IsFlaky = false, FlakinessReasons = [] },
+        };
+
+        Assert.DoesNotThrow(() => Reporter.WriteTestResults(assertionResult));
+        var resultFile = Directory
+            .GetFiles(AllureResultsFolder, "*-result.json", SearchOption.TopDirectoryOnly)
+            .Single();
+        using var resultDocument = JsonDocument.Parse(File.ReadAllText(resultFile));
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(GetAttachments(resultDocument.RootElement), Is.Empty);
+            Assert.That(
+                Directory.GetFiles(
+                    AllureResultsFolder,
+                    "*-attachment*",
+                    SearchOption.TopDirectoryOnly
+                ),
+                Is.Empty
+            );
+            Assert.That(
+                Directory.Exists(Path.Combine(AllureResultsFolder, "AssertionsAttachments")),
+                Is.False
+            );
+        });
+    }
+
+    [Test]
+    public void WriteTestResults_WithRepeatedLogicalAttachment_PreservesFirstWriterContent()
+    {
+        Reporter!.SaveSessionData = false;
+        Reporter.SaveTemplate = false;
+        Reporter.SaveAttachments = true;
+
+        AssertionResult CreateResult(int value) =>
+            new()
+            {
+                Assertion = new Assertion
+                {
+                    Name = "repeated-logical-attachment",
+                    AssertionName = "RepeatedLogicalAttachmentAssertion",
+                    AssertionHook = new AssertionHookMock
+                    {
+                        AssertionAttachments =
+                        [
+                            new AssertionAttachment
+                            {
+                                Path = "payload.json",
+                                SerializationType = SerializationType.Json,
+                                Data = new { Value = value },
+                            },
+                        ],
+                    },
+                    SessionDataList = [],
+                    StatusesToReport = null,
+                },
+                AssertionStatus = AssertionStatus.Passed,
+                TestDurationMs = 10,
+                Flaky = new Flaky { IsFlaky = false, FlakinessReasons = [] },
+            };
+
+        Reporter.WriteTestResults(CreateResult(1));
+        Reporter.WriteTestResults(CreateResult(2));
+        var resultFiles = Directory.GetFiles(
+            AllureResultsFolder,
+            "*-result.json",
+            SearchOption.TopDirectoryOnly
+        );
+        var attachmentSources = resultFiles
+            .SelectMany(resultFile =>
+            {
+                using var document = JsonDocument.Parse(File.ReadAllText(resultFile));
+                return GetAttachmentSources(document.RootElement).ToList();
+            })
+            .ToList();
+        var portableAttachment = Directory
+            .GetFiles(AllureResultsFolder, "*-attachment.json", SearchOption.TopDirectoryOnly)
+            .Single();
+        var legacyAttachment = Directory
+            .GetFiles(
+                Path.Combine(AllureResultsFolder, "AssertionsAttachments"),
+                "payload.json",
+                SearchOption.AllDirectories
+            )
+            .Single();
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(resultFiles, Has.Length.EqualTo(2));
+            Assert.That(attachmentSources, Has.Count.EqualTo(2));
+            Assert.That(attachmentSources.Distinct().Count(), Is.EqualTo(1));
+            Assert.That(File.ReadAllText(portableAttachment), Does.Contain("\"Value\":1"));
+            Assert.That(File.ReadAllText(portableAttachment), Does.Not.Contain("\"Value\":2"));
+            Assert.That(File.ReadAllText(legacyAttachment), Does.Contain("\"Value\":1"));
+            Assert.That(File.ReadAllText(legacyAttachment), Does.Not.Contain("\"Value\":2"));
+        });
+    }
+
+    [Test]
+    public void WriteTestResults_WithOverriddenAttachmentWriter_InvokesProtectedCompatibilityHook()
+    {
+        var reporter = new TrackingAllureReporter
+        {
+            Context = new Context { Logger = Globals.Logger },
+            FileSystem = new FileSystem(),
+            SaveSessionData = false,
+            SaveTemplate = false,
+            SaveAttachments = true,
+        };
+        var assertionResult = new AssertionResult
+        {
+            Assertion = new Assertion
+            {
+                Name = "overridden-writer",
+                AssertionName = "OverriddenWriterAssertion",
+                AssertionHook = new AssertionHookMock
+                {
+                    AssertionAttachments =
+                    [
+                        new AssertionAttachment
+                        {
+                            Path = "payload.json",
+                            SerializationType = SerializationType.Json,
+                            Data = new { Value = 5 },
+                        },
+                    ],
+                },
+                SessionDataList = [],
+                StatusesToReport = null,
+            },
+            AssertionStatus = AssertionStatus.Passed,
+            TestDurationMs = 10,
+            Flaky = new Flaky { IsFlaky = false, FlakinessReasons = [] },
+        };
+
+        reporter.WriteTestResults(assertionResult);
+        var resultFile = Directory
+            .GetFiles(AllureResultsFolder, "*-result.json", SearchOption.TopDirectoryOnly)
+            .Single();
+        using var resultDocument = JsonDocument.Parse(File.ReadAllText(resultFile));
+        var attachmentSource = GetAttachmentSources(resultDocument.RootElement).Single();
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(reporter.SaveCalls, Is.EqualTo(1));
+            Assert.That(
+                NormalizePathSeparators(reporter.LastAttachmentDirectory!),
+                Does.StartWith("AssertionsAttachments/")
+            );
+            Assert.That(reporter.LastAttachmentFileName, Is.EqualTo("payload.json"));
+            AssertAllureAttachmentSourceContract([attachmentSource]);
         });
     }
 
@@ -957,12 +1229,16 @@ public class AllureReporterTests
     {
         var realFileSystem = new FileSystem();
         var file = new Mock<IFile>();
-        var writeAttempts = 0;
+        var flatWriteAttempts = 0;
+        var resultsDirectory = Path.GetFullPath(AllureResultsFolder);
         file.Setup(fileSystem => fileSystem.WriteAllBytes(It.IsAny<string>(), It.IsAny<byte[]>()))
             .Callback(
                 (string path, byte[] content) =>
                 {
-                    if (Interlocked.Increment(ref writeAttempts) == 1)
+                    var isPortableAttachment =
+                        Path.GetDirectoryName(Path.GetFullPath(path)) == resultsDirectory
+                        && Path.GetFileName(path).Contains(AllureConstants.ATTACHMENT_FILE_SUFFIX);
+                    if (isPortableAttachment && Interlocked.Increment(ref flatWriteAttempts) == 1)
                         throw new IOException("simulated attachment write failure");
                     realFileSystem.File.WriteAllBytes(path, content);
                 }
@@ -1007,7 +1283,7 @@ public class AllureReporterTests
         var attachmentSource = GetAttachmentSources(resultDocument.RootElement).Single();
         Assert.Multiple(() =>
         {
-            Assert.That(writeAttempts, Is.EqualTo(2));
+            Assert.That(flatWriteAttempts, Is.EqualTo(2));
             AssertAllureAttachmentSourceContract([attachmentSource]);
             Assert.That(
                 File.ReadAllText(Path.Combine(AllureResultsFolder, attachmentSource)),
@@ -1655,5 +1931,28 @@ public class AllureReporterTests
             Assert.That(step.attachments, Is.Null);
             Assert.That(step.steps, Is.Null);
         });
+    }
+
+    private sealed class TrackingAllureReporter : AllureReporter
+    {
+        public int SaveCalls { get; private set; }
+        public string? LastAttachmentDirectory { get; private set; }
+        public string? LastAttachmentFileName { get; private set; }
+
+        protected override void SaveAttachmentIfNotAlreadySaved(
+            byte[] attachmentContent,
+            string attachmentDirectory,
+            string attachmentFileName
+        )
+        {
+            SaveCalls++;
+            LastAttachmentDirectory = attachmentDirectory;
+            LastAttachmentFileName = attachmentFileName;
+            base.SaveAttachmentIfNotAlreadySaved(
+                attachmentContent,
+                attachmentDirectory,
+                attachmentFileName
+            );
+        }
     }
 }

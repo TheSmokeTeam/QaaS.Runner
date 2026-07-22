@@ -1,6 +1,8 @@
 using System.ComponentModel;
 using System.ComponentModel.DataAnnotations;
+using System.Runtime.CompilerServices;
 using QaaS.Framework.Configurations;
+using QaaS.Framework.Configurations.CustomValidationAttributes;
 using QaaS.Framework.Infrastructure;
 using QaaS.Framework.Policies;
 using QaaS.Framework.Protocols.ConfigurationObjects;
@@ -20,6 +22,11 @@ namespace QaaS.Runner.Sessions.Actions.Transactions.Builders;
 
 public partial class TransactionBuilder : ICloneable<TransactionBuilder>
 {
+    // Present empty selectors only in explicit empty-request mode so the legacy RequiredIfAny
+    // attributes and their reflection-visible metadata remain unchanged.
+    private string[]? _dataSourceNames;
+    private string[]? _dataSourcePatterns;
+
     public TransactionBuilder Clone() => BuilderCloner.DeepClone(this);
 
     [Required]
@@ -29,14 +36,26 @@ public partial class TransactionBuilder : ICloneable<TransactionBuilder>
     )]
     public string? Name { get; internal set; }
 
+    [RequiredIfAny(nameof(DataSourcePatterns), [null])]
     [Description(
         "The name of the data sources to publish the data of"
             + " in the order their data will be published"
     )]
-    public string[]? DataSourceNames { get; internal set; }
+    public string[]? DataSourceNames
+    {
+        [CompilerGenerated]
+        get => SendEmptyRequest ? _dataSourceNames ?? [] : _dataSourceNames;
+        internal set => _dataSourceNames = value;
+    }
 
+    [RequiredIfAny(nameof(DataSourceNames), [null])]
     [Description("Patterns of the names of data sources to publish the data of off")]
-    public string[]? DataSourcePatterns { get; internal set; }
+    public string[]? DataSourcePatterns
+    {
+        [CompilerGenerated]
+        get => SendEmptyRequest ? _dataSourcePatterns ?? [] : _dataSourcePatterns;
+        internal set => _dataSourcePatterns = value;
+    }
 
     /// <summary>
     /// Gets whether this transaction sends a bodyless HTTP GET without reading from a data source.

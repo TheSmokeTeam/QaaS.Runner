@@ -3,7 +3,9 @@ using System.Collections.Generic;
 using System.ComponentModel.DataAnnotations;
 using System.Linq;
 using System.Reflection;
+using System.Runtime.CompilerServices;
 using NUnit.Framework;
+using QaaS.Framework.Configurations.CustomValidationAttributes;
 using QaaS.Framework.Policies;
 using QaaS.Framework.Protocols.ConfigurationObjects.Grpc;
 using QaaS.Framework.Protocols.ConfigurationObjects.Http;
@@ -351,6 +353,117 @@ public class TransactionBuilderTests
         builder.DataSourcePatterns = [];
 
         Assert.That(Validate(builder), Is.Empty);
+    }
+
+    [TestCase(0, 0, false)]
+    [TestCase(0, 1, true)]
+    [TestCase(0, 2, true)]
+    [TestCase(1, 0, true)]
+    [TestCase(1, 1, true)]
+    [TestCase(1, 2, true)]
+    [TestCase(2, 0, true)]
+    [TestCase(2, 1, true)]
+    [TestCase(2, 2, true)]
+    public void Validate_LegacySelectorTruthTable_IsPreserved(
+        int dataSourceNamesState,
+        int dataSourcePatternsState,
+        bool expectedValid
+    )
+    {
+        static string[]? SelectorFor(int state) =>
+            state switch
+            {
+                0 => null,
+                1 => [],
+                2 => ["source"],
+                _ => throw new ArgumentOutOfRangeException(nameof(state)),
+            };
+
+        var builder = CreateHttpBuilder();
+        builder.DataSourceNames = SelectorFor(dataSourceNamesState);
+        builder.DataSourcePatterns = SelectorFor(dataSourcePatternsState);
+
+        Assert.That(Validate(builder).Count == 0, Is.EqualTo(expectedValid));
+    }
+
+    [TestCase(nameof(TransactionBuilder.DataSourceNames))]
+    [TestCase(nameof(TransactionBuilder.DataSourcePatterns))]
+    public void ValidateProperty_LegacyRequiredIfAnyMetadata_RemainsConditionalOnEmptyRequest(
+        string propertyName
+    )
+    {
+        var builder = CreateHttpBuilder();
+        var property = typeof(TransactionBuilder).GetProperty(propertyName)!;
+        var validationResults = new List<ValidationResult>();
+        var validationContext = new ValidationContext(builder) { MemberName = propertyName };
+
+        var isValidWithoutOptIn = Validator.TryValidateProperty(
+            null,
+            validationContext,
+            validationResults
+        );
+        builder.WithEmptyRequest();
+        validationResults.Clear();
+        var isValidWithOptIn = Validator.TryValidateProperty(
+            null,
+            validationContext,
+            validationResults
+        );
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(isValidWithoutOptIn, Is.False);
+            Assert.That(isValidWithOptIn, Is.True);
+            Assert.That(
+                property
+                    .GetCustomAttributes(false)
+                    .Count(attribute => attribute.GetType() == typeof(RequiredIfAnyAttribute)),
+                Is.EqualTo(1)
+            );
+            Assert.That(
+                property.GetMethod!.IsDefined(typeof(CompilerGeneratedAttribute), false),
+                Is.True
+            );
+            Assert.That(builder.DataSourceNames, Is.Empty);
+            Assert.That(builder.DataSourcePatterns, Is.Empty);
+        });
+    }
+
+    [TestCase(false)]
+    [TestCase(true)]
+    public void Validate_PublicFluentRemovalToEmptySelector_PreservesCodeFirstNoOp(bool usePattern)
+    {
+        var builder = CreateHttpBuilder();
+        if (usePattern)
+            builder.AddDataSourcePattern("source-.*").RemoveDataSourcePattern("source-.*");
+        else
+            builder.AddDataSource("source").RemoveDataSource("source");
+
+        Assert.That(Validate(builder), Is.Empty);
+    }
+
+    [Test]
+    public void Validate_LegacyMode_DoesNotApplyEmptyRequestProtocolOrSerializerRestrictions()
+    {
+        var builder = CreateHttpBuilder(HttpMethods.Post)
+            .AddDataSource("source")
+            .WithSerializer(new SerializeConfig { Serializer = SerializationType.Json });
+
+        Assert.That(Validate(builder), Is.Empty);
+    }
+
+    [Test]
+    public void Clone_PreservesEmptyRequestMode()
+    {
+        var builder = CreateHttpBuilder().WithEmptyRequest();
+
+        var clone = builder.Clone();
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(clone, Is.Not.SameAs(builder));
+            Assert.That(clone.SendEmptyRequest, Is.True);
+        });
     }
 
     [TestCase(false)]

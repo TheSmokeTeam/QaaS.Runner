@@ -46,6 +46,18 @@
       <None Update="TestData\http-get-empty-request.qaas.yaml">
         <CopyToOutputDirectory>Always</CopyToOutputDirectory>
       </None>
+      <None Update="TestData\http-get-data-source-regression.qaas.yaml">
+        <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+      </None>
+      <None Update="TestData\http-get-no-selector-regression.qaas.yaml">
+        <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+      </None>
+      <None Update="TestData\http-get-empty-names-regression.qaas.yaml">
+        <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+      </None>
+      <None Update="TestData\http-get-empty-patterns-regression.qaas.yaml">
+        <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+      </None>
       <None Update="TestData\test.qaas.yaml">
         <CopyToOutputDirectory>Always</CopyToOutputDirectory>
       </None>

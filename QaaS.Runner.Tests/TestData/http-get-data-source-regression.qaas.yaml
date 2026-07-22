@@ -1,0 +1,27 @@
+MetaData:
+  Team: regression
+  System: runner
+
+DataSources:
+  - Name: request-data
+    Generator: RegressionPayloadGenerator
+
+Sessions:
+  - Name: data-driven-http-get
+    Stages:
+      - StageNumber: 2
+        TimeoutAfter: 0
+    Transactions:
+      - Name: read
+        TimeoutMs: 100
+        Iterations: 2
+        SendEmptyRequest: false
+        DataSourceNames:
+          - request-data
+        InputSerialize:
+          Serializer: Json
+        Http:
+          Method: Get
+          BaseAddress: http://127.0.0.1
+          Port: 1
+          Route: /

@@ -43,7 +43,63 @@ public class AllureReporter : BaseReporter
         { AssertionSeverity.Blocker, SeverityLevel.blocker },
     };
 
+    private readonly ConcurrentDictionary<string, byte> _alreadySavedAttachments = new();
     private readonly ConcurrentDictionary<string, Lazy<string>> _savedAttachmentSources = new();
+
+    /// <summary>
+    /// Saves an attachment under its logical results-directory path unless that path was already
+    /// saved by this reporter.
+    /// </summary>
+    /// <remarks>
+    /// This protected extension point is retained for compatibility with existing reporter
+    /// subclasses and raw-results consumers. Allure result JSON references the additional flat,
+    /// portable copy created by the reporter.
+    /// </remarks>
+    protected virtual void SaveAttachmentIfNotAlreadySaved(
+        byte[] attachmentContent,
+        string attachmentDirectory,
+        string attachmentFileName
+    )
+    {
+        var safeAttachmentDirectory = RunnerFileSystemExtensions.NormalizeRelativePath(
+            attachmentDirectory
+        );
+        var safeAttachmentFileName = RunnerFileSystemExtensions.MakeValidFileName(
+            attachmentFileName
+        );
+        if (string.IsNullOrWhiteSpace(safeAttachmentFileName))
+            throw new InvalidOperationException("Attachment file name must be set.");
+
+        var attachmentKey = Path.Join(safeAttachmentDirectory, safeAttachmentFileName);
+        if (!_alreadySavedAttachments.TryAdd(attachmentKey, 0))
+            return;
+
+        try
+        {
+            var resultsDirectory = Path.GetFullPath(AllureLifecycle.Instance.ResultsDirectory);
+            var attachmentDirectoryPath = RunnerFileSystemExtensions.CombineUnderRoot(
+                resultsDirectory,
+                safeAttachmentDirectory
+            );
+            if (!FileSystem.Directory.Exists(attachmentDirectoryPath))
+                FileSystem.Directory.CreateDirectory(attachmentDirectoryPath);
+
+            var attachmentFullPath = RunnerFileSystemExtensions.CombineUnderRoot(
+                attachmentDirectoryPath,
+                safeAttachmentFileName
+            );
+            FileSystem.File.WriteAllBytes(attachmentFullPath, attachmentContent);
+            Context.Logger.LogDebug(
+                "Saved compatibility attachment to {AttachmentFullPath}",
+                attachmentFullPath
+            );
+        }
+        catch
+        {
+            _alreadySavedAttachments.TryRemove(attachmentKey, out _);
+            throw;
+        }
+    }
 
     private static string BuildAttachmentSegment(string? value, string segmentName)
     {
@@ -155,6 +211,11 @@ public class AllureReporter : BaseReporter
                 EnsureResultsDirectoryExists();
                 var source =
                     $"{Guid.NewGuid():N}{AllureConstants.ATTACHMENT_FILE_SUFFIX}{ResolveAttachmentExtension(safeAttachmentFileName, attachmentType)}";
+                SaveAttachmentIfNotAlreadySaved(
+                    attachmentContent,
+                    safeAttachmentDirectory,
+                    safeAttachmentFileName
+                );
                 var resultsDirectory = Path.GetFullPath(AllureLifecycle.Instance.ResultsDirectory);
                 var attachmentFullPath = RunnerFileSystemExtensions.CombineUnderRoot(
                     resultsDirectory,
