@@ -19,6 +19,7 @@ namespace QaaS.Runner.Assertions.Tests.ConfigurationObjectsTests;
 public class ReportPortalLaunchPlanTests
 {
     private static readonly DateTimeOffset StartedAt = new(2025, 1, 1, 10, 0, 0, TimeSpan.Zero);
+    private static readonly DateTimeOffset FinishedAt = new(2025, 1, 1, 10, 5, 0, TimeSpan.Zero);
 
     [SetUp]
     public void SetUp()
@@ -63,27 +64,121 @@ public class ReportPortalLaunchPlanTests
     }
 
     [Test]
-    public void Build_WithQueuedResults_GeneratesStableLaunchNameAndDescription()
+    public void Build_WithQueuedResults_GeneratesStableLaunchNameAndSummaryDescription()
     {
         var reporter = CreateReporter();
         reporter.WriteTestResults(CreateResult("assertion-a", "Session A"));
         reporter.WriteTestResults(CreateResult("assertion-b", "Session B"));
 
-        var launchPlan = BuildPlan(reporter, requireQueuedResults: true);
+        var launchPlan = BuildPlan(
+            reporter,
+            requireQueuedResults: true,
+            finishedAtLocal: FinishedAt
+        );
 
         Assert.That(
             launchPlan.LaunchName,
-            Is.EqualTo("QaaS Run | Smoke | QaaS | Session A, Session B")
+            Is.EqualTo("QaaS run | Smoke | QaaS")
         );
         Assert.That(
             launchPlan.Description,
-            Does.Contain("this run directly from the runner pipeline")
+            Is.EqualTo(
+                $"Start time: 2025-01-01 10:00:00 UTC | End time: 2025-01-01 10:00:00 UTC{Environment.NewLine}"
+                    + "🟢 Passed 100% | 🔴 Failed 0% | 🟡 Broken 0% | 🟣 Unknown 0% | ⚪ Skipped 0%"
+            )
         );
-        Assert.That(launchPlan.Description, Does.Contain("Sessions=[Session A, Session B]"));
     }
 
     [Test]
-    public void BuildLaunchAttributes_IncludesTeamProjectSystemSessionsConfigAttributesAndMetadataLabels()
+    public void Build_WithMixedAssertionStatuses_CalculatesPercentageOfEveryStatusInLaunch()
+    {
+        var reporter = CreateReporter();
+        reporter.WriteTestResults(CreateResult("passed-a", "Session A", AssertionStatus.Passed));
+        reporter.WriteTestResults(CreateResult("passed-b", "Session B", AssertionStatus.Passed));
+        reporter.WriteTestResults(CreateResult("failed", "Session C", AssertionStatus.Failed));
+        reporter.WriteTestResults(CreateResult("broken", "Session D", AssertionStatus.Broken));
+
+        var launchPlan = BuildPlan(
+            reporter,
+            requireQueuedResults: true,
+            finishedAtLocal: FinishedAt
+        );
+        var descriptionLines = launchPlan.Description.Split(Environment.NewLine);
+
+        Assert.That(descriptionLines, Has.Length.EqualTo(2));
+        Assert.Multiple(() =>
+        {
+            Assert.That(
+                descriptionLines[0],
+                Is.EqualTo(
+                    "Start time: 2025-01-01 10:00:00 UTC | End time: 2025-01-01 10:00:00 UTC"
+                )
+            );
+            Assert.That(descriptionLines[1], Does.Contain("🟢 Passed 50%"));
+            Assert.That(descriptionLines[1], Does.Contain("🔴 Failed 25%"));
+            Assert.That(descriptionLines[1], Does.Contain("🟡 Broken 25%"));
+            Assert.That(descriptionLines[1], Does.Contain("🟣 Unknown 0%"));
+            Assert.That(descriptionLines[1], Does.Contain("⚪ Skipped 0%"));
+            Assert.That(launchPlan.Description, Does.Not.Contain("Launch timing"));
+        });
+    }
+
+    [Test]
+    public void Build_UsesAllureEpochAndAssertionDurationForLaunchTiming()
+    {
+        var reporter = CreateReporter();
+        var assertionResult = CreateResult(
+            "long-assertion",
+            "Session A",
+            testDurationMs: (long)TimeSpan.FromMinutes(10).TotalMilliseconds
+        );
+        reporter.WriteTestResults(assertionResult);
+
+        var launchPlan = BuildPlan(
+            reporter,
+            requireQueuedResults: true,
+            finishedAtLocal: FinishedAt
+        );
+        var assertionPlan = launchPlan.ReporterResults.Single().Assertions.Single();
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(
+                launchPlan.LaunchStartTimeUtc,
+                Is.EqualTo(new DateTime(2025, 1, 1, 10, 0, 0, DateTimeKind.Utc))
+            );
+            Assert.That(
+                launchPlan.LaunchEndTimeUtc,
+                Is.EqualTo(new DateTime(2025, 1, 1, 10, 10, 0, DateTimeKind.Utc))
+            );
+            Assert.That(assertionPlan.Result, Is.SameAs(assertionResult));
+            Assert.That(assertionPlan.StartTimeUtc, Is.EqualTo(launchPlan.LaunchStartTimeUtc));
+            Assert.That(assertionPlan.EndTimeUtc, Is.EqualTo(launchPlan.LaunchEndTimeUtc));
+            Assert.That(launchPlan.Description, Does.Contain("End time: 2025-01-01 10:10:00 UTC"));
+        });
+    }
+
+    [Test]
+    public void Build_WithZeroDuration_PreservesExactAllureDuration()
+    {
+        var reporter = CreateReporter();
+        var assertionResult = CreateResult("zero-duration", "Session A", testDurationMs: 0);
+        reporter.WriteTestResults(assertionResult);
+
+        var launchPlan = BuildPlan(reporter, requireQueuedResults: true);
+        var assertionPlan = launchPlan.ReporterResults.Single().Assertions.Single();
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(assertionPlan.StartTimeUtc, Is.EqualTo(StartedAt.UtcDateTime));
+            Assert.That(assertionPlan.EndTimeUtc, Is.EqualTo(assertionPlan.StartTimeUtc));
+            Assert.That(launchPlan.LaunchStartTimeUtc, Is.EqualTo(assertionPlan.StartTimeUtc));
+            Assert.That(launchPlan.LaunchEndTimeUtc, Is.EqualTo(assertionPlan.EndTimeUtc));
+        });
+    }
+
+    [Test]
+    public void BuildLaunchAttributes_IncludesReportAttributesWithoutRedundantAutomaticAttributes()
     {
         var reporter = CreateReporter(
             project: "ConfiguredProject",
@@ -99,25 +194,25 @@ public class ReportPortalLaunchPlanTests
 
         var attributes = BuildPlan(reporter, requireQueuedResults: true).BuildLaunchAttributes();
 
-        Assert.That(
-            attributes.Any(attribute => attribute.Key == "tool" && attribute.Value == "QaaS"),
-            Is.True
-        );
+        Assert.That(attributes.Any(attribute => attribute.Key == "tool"), Is.False);
+        Assert.That(attributes.Any(attribute => attribute.Key == "source"), Is.False);
+        Assert.That(attributes.Any(attribute => attribute.Key == "executionMode"), Is.False);
         Assert.That(
             attributes.Any(attribute => attribute.Key == "team" && attribute.Value == "Smoke"),
             Is.True
         );
-        Assert.That(
-            attributes.Any(attribute =>
-                attribute.Key == "project" && attribute.Value == "ConfiguredProject"
-            ),
-            Is.True
-        );
+        Assert.That(attributes.Any(attribute => attribute.Key == "project"), Is.False);
         Assert.That(
             attributes.Any(attribute => attribute.Key == "system" && attribute.Value == "QaaS"),
             Is.True
         );
-        Assert.That(attributes.Count(attribute => attribute.Key == "session"), Is.EqualTo(2));
+        Assert.That(
+            attributes.Any(attribute =>
+                attribute.Key == "sessions" && attribute.Value == "Session A, Session B"
+            ),
+            Is.True
+        );
+        Assert.That(attributes.Any(attribute => attribute.Key == "session"), Is.False);
         Assert.That(
             attributes.Any(attribute => attribute.Key == "Component" && attribute.Value == "Auth"),
             Is.True
@@ -135,7 +230,66 @@ public class ReportPortalLaunchPlanTests
     }
 
     [Test]
-    public void Build_WithManySessions_UsesCompactStableLaunchName()
+    public void BuildLaunchAttributes_AggregatesCaseNamesAndOmitsExecutionIds()
+    {
+        var firstReporter = CreateReporter(executionId: "execution-1", caseName: "case-b");
+        var secondReporter = CreateReporter(executionId: "execution-2", caseName: "case-a");
+        firstReporter.WriteTestResults(CreateResult("assertion-a", "Session B"));
+        secondReporter.WriteTestResults(CreateResult("assertion-b", "Session A"));
+
+        var attributes = ReportPortalLaunchPlan
+            .Build([firstReporter, secondReporter], StartedAt, requireQueuedResults: true)
+            .Single()
+            .BuildLaunchAttributes();
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(attributes.Any(attribute => attribute.Key == "executionId"), Is.False);
+            Assert.That(attributes.Any(attribute => attribute.Key == "caseName"), Is.False);
+            Assert.That(
+                attributes.Any(attribute =>
+                    attribute.Key == "caseNames" && attribute.Value == "case-a, case-b"
+                ),
+                Is.True
+            );
+            Assert.That(
+                attributes.Any(attribute =>
+                    attribute.Key == "sessions" && attribute.Value == "Session A, Session B"
+                ),
+                Is.True
+            );
+            Assert.That(attributes.Any(attribute => attribute.Key == "session"), Is.False);
+        });
+    }
+
+    [TestCase(null, "local")]
+    [TestCase("10.0.0.1", "k8s")]
+    [NonParallelizable]
+    public void BuildLaunchAttributes_UsesFrameworkExecutionEnvironment(
+        string? kubernetesServiceHost,
+        string expectedEnvironment
+    )
+    {
+        var originalKubernetesServiceHost = Environment.GetEnvironmentVariable("KUBERNETES_SERVICE_HOST");
+        try
+        {
+            Environment.SetEnvironmentVariable("KUBERNETES_SERVICE_HOST", kubernetesServiceHost);
+            var reporter = CreateReporter();
+            reporter.WriteTestResults(CreateResult("assertion-a", "Session A"));
+
+            var attributes = BuildPlan(reporter, requireQueuedResults: true).BuildLaunchAttributes();
+
+            Assert.That(attributes.Single(attribute =>
+                attribute.Key == "environment").Value, Is.EqualTo(expectedEnvironment));
+        }
+        finally
+        {
+            Environment.SetEnvironmentVariable("KUBERNETES_SERVICE_HOST", originalKubernetesServiceHost);
+        }
+    }
+
+    [Test]
+    public void Build_WithManySessions_DoesNotIncludeSessionsInLaunchName()
     {
         var reporter = CreateReporter();
         reporter.WriteTestResults(CreateResult("assertion-a", "Session A"));
@@ -146,7 +300,7 @@ public class ReportPortalLaunchPlanTests
 
         Assert.That(
             launchPlan.LaunchName,
-            Is.EqualTo("QaaS Run | Smoke | QaaS | Session A, Session B(+1)")
+            Is.EqualTo("QaaS run | Smoke | QaaS")
         );
     }
 
@@ -250,10 +404,13 @@ public class ReportPortalLaunchPlanTests
 
     private static ReportPortalLaunchPlan BuildPlan(
         ReportPortalReporter reporter,
-        bool requireQueuedResults = false
+        bool requireQueuedResults = false,
+        DateTimeOffset? finishedAtLocal = null
     )
     {
-        return ReportPortalLaunchPlan.Build([reporter], StartedAt, requireQueuedResults).Single();
+        return ReportPortalLaunchPlan
+            .Build([reporter], StartedAt, requireQueuedResults, finishedAtLocal)
+            .Single();
     }
 
     private static ReportPortalReporter CreateReporter(
@@ -266,13 +423,17 @@ public class ReportPortalLaunchPlanTests
         string? description = null,
         bool? debugMode = false,
         IReadOnlyDictionary<string, string>? attributes = null,
-        IReadOnlyDictionary<string, string>? extraLabels = null
+        IReadOnlyDictionary<string, string>? extraLabels = null,
+        string? executionId = null,
+        string? caseName = null
     )
     {
         var context = new InternalContext
         {
             Logger = Globals.Logger,
             RootConfiguration = new ConfigurationBuilder().Build(),
+            ExecutionId = executionId,
+            CaseName = caseName,
         };
 
         context.InsertValueIntoGlobalDictionary(
@@ -308,11 +469,16 @@ public class ReportPortalLaunchPlanTests
                 ),
             },
             Context = context,
-            ExecutionMode = "run",
+            EpochTestSuiteStartTime = StartedAt.ToUnixTimeMilliseconds(),
         };
     }
 
-    private static AssertionResult CreateResult(string assertionName, string sessionName)
+    private static AssertionResult CreateResult(
+        string assertionName,
+        string sessionName,
+        AssertionStatus assertionStatus = AssertionStatus.Passed,
+        long testDurationMs = 1
+    )
     {
         var sessionData = new SessionData
         {
@@ -332,8 +498,8 @@ public class ReportPortalLaunchPlanTests
                 AssertionHook = null,
                 AssertionConfiguration = new ConfigurationBuilder().Build(),
             },
-            AssertionStatus = AssertionStatus.Passed,
-            TestDurationMs = 1,
+            AssertionStatus = assertionStatus,
+            TestDurationMs = testDurationMs,
             Flaky = new Flaky { IsFlaky = false, FlakinessReasons = [] },
         };
     }

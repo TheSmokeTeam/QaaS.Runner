@@ -20,6 +20,7 @@ using QaaS.Framework.SDK.Session.SessionDataObjects;
 using QaaS.Runner.Assertions.AssertionObjects;
 using QaaS.Runner.Assertions.ConfigurationObjects.ReporterConfigs;
 using QaaS.Runner.Assertions.Reporters.ReportPortal;
+using QaaS.Runner.Assertions.Tests.Mocks;
 using ReportPortal.Client.Abstractions;
 using ReportPortal.Client.Abstractions.Requests;
 using ReportPortal.Client.Abstractions.Resources;
@@ -78,11 +79,12 @@ public class ReportPortalPublisherTests
     public void ValidateAsync_WithUnauthorizedApiKey_ThrowsConfigurationFailure()
     {
         var factory = new RecordingClientFactory();
+        var logger = new Mock<ILogger>();
         using var publisher = CreatePublisher(factory, _ =>
             new HttpResponseMessage(HttpStatusCode.Unauthorized)
             {
                 Content = new StringContent("unauthorized", Encoding.UTF8, "text/plain")
-            }, out var handler);
+            }, out var handler, logger.Object);
 
         var exception = Assert.ThrowsAsync<InvalidConfigurationsException>(
             async () => await publisher.ValidateAsync([CreateReporter()]));
@@ -93,6 +95,27 @@ public class ReportPortalPublisherTests
             Assert.That(handler.RequestCount, Is.EqualTo(1));
             Assert.That(factory.Services, Is.Empty);
         });
+        VerifyErrorLogged(logger, "configured API key was rejected");
+    }
+
+    [Test]
+    public void ValidateAsync_WhenEndpointIsUnreachable_ThrowsConfigurationFailureAndLogsError()
+    {
+        var factory = new RecordingClientFactory();
+        var logger = new Mock<ILogger>();
+        using var publisher = CreatePublisher(factory, _ => throw new HttpRequestException("Connection refused"),
+            out var handler, logger.Object);
+
+        var exception = Assert.ThrowsAsync<InvalidConfigurationsException>(
+            async () => await publisher.ValidateAsync([CreateReporter()]));
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(exception!.Message, Does.Contain("endpoint `http://localhost:8080` is unreachable"));
+            Assert.That(handler.RequestCount, Is.EqualTo(1));
+            Assert.That(factory.Services, Is.Empty);
+        });
+        VerifyErrorLogged(logger, "endpoint `http://localhost:8080` is unreachable");
     }
 
     [Test]
@@ -187,6 +210,236 @@ public class ReportPortalPublisherTests
     }
 
     [Test]
+    public async Task PublishAsync_WithLongAssertionDuration_LaunchContainsAssertionTiming()
+    {
+        var factory = new RecordingClientFactory();
+        using var publisher = CreateSuccessfulPublisher(factory, out _);
+        var reporter = CreateReporter();
+        reporter.WriteTestResults(CreateResult("long-assertion", "Session A",
+            testDurationMs: (long)TimeSpan.FromMinutes(30).TotalMilliseconds));
+
+        await publisher.ValidateAsync([reporter]);
+        await publisher.PublishAsync([reporter]);
+
+        var service = factory.Services.Single();
+        var launchStartTime = service.LaunchStartRequests.Single().StartTime;
+        var launchEndTime = service.LaunchFinishRequests.Single().EndTime;
+        var assertionStartTime = service.TestItemStartRequests.Single().StartTime;
+        var assertionEndTime = service.TestItemFinishRequests.Single().EndTime;
+        var expectedStartTime = new DateTime(2025, 1, 1, 9, 30, 0, DateTimeKind.Utc);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(launchStartTime, Is.EqualTo(expectedStartTime));
+            Assert.That(launchStartTime, Is.EqualTo(assertionStartTime));
+            Assert.That(launchEndTime, Is.EqualTo(assertionEndTime));
+            Assert.That(launchEndTime - launchStartTime,
+                Is.EqualTo(TimeSpan.FromMinutes(30)));
+        });
+    }
+
+    [Test]
+    public async Task PublishAsync_KeepsLogTimesInsideAssertionWindow()
+    {
+        var factory = new RecordingClientFactory();
+        using var publisher = CreateSuccessfulPublisher(factory, out _);
+        var reporter = CreateReporter();
+        reporter.WriteTestResults(CreateResult("assertion-a", "Session A", testDurationMs: 5_000));
+
+        await publisher.ValidateAsync([reporter]);
+        await publisher.PublishAsync([reporter]);
+
+        var service = factory.Services.Single();
+        var assertionStartTime = service.TestItemStartRequests.Single().StartTime;
+        var assertionEndTime = service.TestItemFinishRequests.Single().EndTime;
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(service.LogItemRequests, Is.Not.Empty);
+            Assert.That(service.LogItemRequests.All(request =>
+                request.Time >= assertionStartTime && request.Time <= assertionEndTime), Is.True);
+        });
+    }
+
+    [Test]
+    public async Task PublishAsync_WhenLaunchFinishes_LogsReportLink()
+    {
+        const string reportLink = "http://localhost:8080/ui/#Smoke/launches/all/42";
+        var factory = new RecordingClientFactory { LaunchLink = reportLink };
+        var logger = new Mock<ILogger>();
+        using var publisher = CreateSuccessfulPublisher(factory, out _, logger.Object);
+        var reporter = CreateReporter();
+        reporter.WriteTestResults(CreateResult("assertion-a", "Session A"));
+
+        await publisher.ValidateAsync([reporter]);
+        await publisher.PublishAsync([reporter]);
+
+        VerifyInformationLoggedExactly(logger, $"ReportPortal report: {reportLink}");
+    }
+
+    [Test]
+    public async Task PublishAsync_KeepsContextAndMetadataOnlyInItemDetails()
+    {
+        var factory = new RecordingClientFactory();
+        using var publisher = CreateSuccessfulPublisher(factory, out _);
+        var reporter = CreateReporter(
+            executionId: "execution-1",
+            caseName: "case-a",
+            extraLabels: new Dictionary<string, string> { ["Area"] = "Checkout" },
+            reportPortalAttributes: new Dictionary<string, string> { ["LaunchOnly"] = "value" });
+        reporter.WriteTestResults(CreateResult("assertion-a", "Session A"));
+
+        await publisher.ValidateAsync([reporter]);
+        await publisher.PublishAsync([reporter]);
+
+        var service = factory.Services.Single();
+        var itemRequest = service.TestItemStartRequests.Single();
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(itemRequest.Parameters,
+                Does.Contain(new KeyValuePair<string, string>("Execution Id", "execution-1")));
+            Assert.That(itemRequest.Parameters,
+                Does.Contain(new KeyValuePair<string, string>("Case Name", "case-a")));
+            Assert.That(itemRequest.Parameters,
+                Does.Contain(new KeyValuePair<string, string>("Area", "Checkout")));
+            Assert.That(itemRequest.Parameters.Any(parameter => parameter.Key == "Project"), Is.False);
+            Assert.That(itemRequest.Attributes.Any(attribute =>
+                attribute.Key == "Area" && attribute.Value == "Checkout"), Is.True);
+            Assert.That(itemRequest.Attributes
+                .Where(attribute => attribute.Key == "executionId")
+                .Select(attribute => attribute.Value), Is.EqualTo(new[] { "execution-1" }));
+            Assert.That(itemRequest.Attributes
+                .Where(attribute => attribute.Key == "caseName")
+                .Select(attribute => attribute.Value), Is.EqualTo(new[] { "case-a" }));
+            Assert.That(itemRequest.Attributes.Any(attribute => attribute.Key == "executionMode"), Is.False);
+            Assert.That(itemRequest.Attributes.Any(attribute => attribute.Key == "builderCount"), Is.False);
+            Assert.That(itemRequest.Attributes.Single(attribute =>
+                attribute.Key == "sessionCount").Value, Is.EqualTo("1"));
+            Assert.That(itemRequest.Attributes.Any(attribute => attribute.Key == "caseNames"), Is.False);
+            Assert.That(itemRequest.Attributes.Any(attribute => attribute.Key == "environment"), Is.False);
+            Assert.That(itemRequest.Attributes.Any(attribute => attribute.Key == "LaunchOnly"), Is.False);
+            Assert.That(service.LaunchStartRequests.Single().Attributes.Any(attribute =>
+                attribute.Key == "LaunchOnly" && attribute.Value == "value"), Is.True);
+            Assert.That(itemRequest.Description, Does.Not.Contain("Execution context:"));
+            Assert.That(itemRequest.Description, Does.Not.Contain("Metadata attributes:"));
+            Assert.That(itemRequest.Description, Does.Not.Contain("execution-1"));
+            Assert.That(itemRequest.Description, Does.Not.Contain("case-a"));
+            Assert.That(itemRequest.Description, Does.Not.Contain("Checkout"));
+            Assert.That(itemRequest.Attributes.Any(attribute => attribute.Key == "tool"), Is.False);
+            Assert.That(itemRequest.Attributes.Any(attribute => attribute.Key == "source"), Is.False);
+            Assert.That(itemRequest.Attributes.Any(attribute => attribute.Key == "project"), Is.False);
+            Assert.That(service.LaunchStartRequests.Single().Attributes.Any(attribute =>
+                attribute.Key is "tool" or "source" or "project"), Is.False);
+            Assert.That(service.LogItemRequests.Any(request =>
+                request.Text.Contains("Assertion context:", StringComparison.Ordinal)), Is.False);
+            Assert.That(service.LogItemRequests.Any(request =>
+                request.Attach?.Name == "assertion-context.json"), Is.False);
+        });
+    }
+
+    [Test]
+    public async Task PublishAsync_WithAssertionMessage_AddsBlankLineBeforeAssertionConfiguration()
+    {
+        var factory = new RecordingClientFactory();
+        using var publisher = CreateSuccessfulPublisher(factory, out _);
+        var reporter = CreateReporter();
+        var result = CreateResult("assertion-a", "Session A");
+        result.Assertion.AssertionHook = new AssertionHookMock
+        {
+            AssertionMessage = "assertion-a-message"
+        };
+        reporter.WriteTestResults(result);
+
+        await publisher.ValidateAsync([reporter]);
+        await publisher.PublishAsync([reporter]);
+
+        var description = factory.Services.Single().TestItemStartRequests.Single().Description;
+
+        Assert.That(description, Does.Contain(
+            $"assertion-a-message{Environment.NewLine}<br />{Environment.NewLine}Assertion configuration:"));
+    }
+
+    [Test]
+    public async Task PublishAsync_WithoutAssertionMessage_AddsVisibleLineBreakBeforeAssertionConfiguration()
+    {
+        var factory = new RecordingClientFactory();
+        using var publisher = CreateSuccessfulPublisher(factory, out _);
+        var reporter = CreateReporter();
+        reporter.WriteTestResults(CreateResult("assertion-a", "Session A"));
+
+        await publisher.ValidateAsync([reporter]);
+        await publisher.PublishAsync([reporter]);
+
+        var description = factory.Services.Single().TestItemStartRequests.Single().Description;
+
+        Assert.That(description, Does.StartWith(
+            $"<br />{Environment.NewLine}Assertion configuration:"));
+    }
+
+    [Test]
+    public async Task PublishAsync_AddsAssertionScopedSessionsAndSessionCount()
+    {
+        var factory = new RecordingClientFactory();
+        using var publisher = CreateSuccessfulPublisher(factory, out _);
+        var reporter = CreateReporter();
+        var firstResult = CreateResult("assertion-a", "Session B");
+        firstResult.Assertion.SessionDataList = firstResult.Assertion.SessionDataList.Add(new SessionData
+        {
+            Name = "Session A",
+            UtcStartTime = new DateTime(2025, 1, 1, 10, 0, 0, DateTimeKind.Utc),
+            UtcEndTime = new DateTime(2025, 1, 1, 10, 0, 1, DateTimeKind.Utc)
+        });
+        reporter.WriteTestResults(firstResult);
+        reporter.WriteTestResults(CreateResult("assertion-b", "Session C"));
+
+        await publisher.ValidateAsync([reporter]);
+        await publisher.PublishAsync([reporter]);
+
+        var service = factory.Services.Single();
+        var items = service.TestItemStartRequests.ToDictionary(request => request.Name);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(items["assertion-a"].Attributes.Single(attribute =>
+                attribute.Key == "sessions").Value, Is.EqualTo("Session A, Session B"));
+            Assert.That(items["assertion-b"].Attributes.Single(attribute =>
+                attribute.Key == "sessions").Value, Is.EqualTo("Session C"));
+            Assert.That(items.Values.SelectMany(item => item.Attributes).Any(attribute =>
+                attribute.Key == "session"), Is.False);
+            Assert.That(items["assertion-a"].Attributes.Single(attribute =>
+                attribute.Key == "sessionCount").Value, Is.EqualTo("2"));
+            Assert.That(items["assertion-b"].Attributes.Single(attribute =>
+                attribute.Key == "sessionCount").Value, Is.EqualTo("1"));
+            Assert.That(service.LaunchStartRequests.Single().Attributes.Single(attribute =>
+                attribute.Key == "sessionCount").Value, Is.EqualTo("3"));
+        });
+    }
+
+    [Test]
+    public async Task PublishAsync_AddsAssertionScopedFlakyState()
+    {
+        var factory = new RecordingClientFactory();
+        using var publisher = CreateSuccessfulPublisher(factory, out _);
+        var reporter = CreateReporter();
+        reporter.WriteTestResults(CreateResult("flaky-assertion", "Session A", isFlaky: true));
+        reporter.WriteTestResults(CreateResult("stable-assertion", "Session B"));
+
+        await publisher.ValidateAsync([reporter]);
+        await publisher.PublishAsync([reporter]);
+
+        var items = factory.Services.Single().TestItemStartRequests.ToDictionary(request => request.Name);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(items["flaky-assertion"].Attributes.Single(attribute =>
+                attribute.Key == "flaky").Value, Is.EqualTo("true"));
+            Assert.That(items["stable-assertion"].Attributes.Single(attribute =>
+                attribute.Key == "flaky").Value, Is.EqualTo("false"));
+        });
+    }
+
+    [Test]
     public async Task PublishAsync_WithMixedProjectsAndSystems_PublishesSeparateLaunches()
     {
         var factory = new RecordingClientFactory();
@@ -223,7 +476,7 @@ public class ReportPortalPublisherTests
     }
 
     [Test]
-    public async Task PublishAsync_WhenLaunchStartFails_DoesNotThrowAndLogsWarning()
+    public async Task PublishAsync_WhenLaunchStartFails_DoesNotThrowAndLogsError()
     {
         var factory = new RecordingClientFactory { ThrowOnLaunchStart = true };
         var logger = new Mock<ILogger>();
@@ -234,11 +487,11 @@ public class ReportPortalPublisherTests
         await publisher.ValidateAsync([reporter]);
 
         Assert.DoesNotThrowAsync(async () => await publisher.PublishAsync([reporter]));
-        VerifyWarningLogged(logger, "Could not publish ReportPortal launch");
+        VerifyErrorLogged(logger, "Could not publish ReportPortal launch");
     }
 
     [Test]
-    public async Task PublishAsync_WhenLaunchFinishFails_DoesNotThrowAndLogsWarning()
+    public async Task PublishAsync_WhenLaunchFinishFails_DoesNotThrowAndLogsError()
     {
         var factory = new RecordingClientFactory { ThrowOnLaunchFinish = true };
         var logger = new Mock<ILogger>();
@@ -249,11 +502,11 @@ public class ReportPortalPublisherTests
         await publisher.ValidateAsync([reporter]);
 
         Assert.DoesNotThrowAsync(async () => await publisher.PublishAsync([reporter]));
-        VerifyWarningLogged(logger, "Could not finish ReportPortal launch");
+        VerifyErrorLogged(logger, "Could not finish ReportPortal launch");
     }
 
     [Test]
-    public async Task PublishAsync_WhenItemPublishFails_DoesNotThrowAndLogsWarning()
+    public async Task PublishAsync_WhenItemPublishFails_DoesNotThrowAndLogsError()
     {
         var factory = new RecordingClientFactory { ThrowOnTestItemStart = true };
         var logger = new Mock<ILogger>();
@@ -264,7 +517,7 @@ public class ReportPortalPublisherTests
         await publisher.ValidateAsync([reporter]);
 
         Assert.DoesNotThrowAsync(async () => await publisher.PublishAsync([reporter]));
-        VerifyWarningLogged(logger, "Could not publish assertion");
+        VerifyErrorLogged(logger, "Could not publish assertion");
     }
 
     [Test]
@@ -284,7 +537,7 @@ public class ReportPortalPublisherTests
     }
 
     [Test]
-    public async Task PublishAsync_WhenClientDisposeFails_DoesNotThrowAndLogsWarning()
+    public async Task PublishAsync_WhenClientDisposeFails_DoesNotThrowAndLogsError()
     {
         var factory = new RecordingClientFactory { ThrowOnDispose = true };
         var logger = new Mock<ILogger>();
@@ -295,7 +548,7 @@ public class ReportPortalPublisherTests
         await publisher.ValidateAsync([reporter]);
 
         Assert.DoesNotThrowAsync(async () => await publisher.PublishAsync([reporter]));
-        VerifyWarningLogged(logger, "Could not dispose ReportPortal client service");
+        VerifyErrorLogged(logger, "Could not dispose ReportPortal client service");
     }
 
     private static RecordingReportPortalPublisher CreateSuccessfulPublisher(RecordingClientFactory factory,
@@ -341,18 +594,28 @@ public class ReportPortalPublisherTests
         string system = "QaaS",
         string? project = null,
         string? endpoint = "http://localhost:8080",
-        string? apiKey = "api-key")
+        string? apiKey = "api-key",
+        string? executionId = null,
+        string? caseName = null,
+        IReadOnlyDictionary<string, string>? extraLabels = null,
+        IReadOnlyDictionary<string, string>? reportPortalAttributes = null)
     {
         var context = new InternalContext
         {
             Logger = Globals.Logger,
-            RootConfiguration = new ConfigurationBuilder().Build()
+            RootConfiguration = new ConfigurationBuilder().Build(),
+            ExecutionId = executionId,
+            CaseName = caseName
         };
 
         context.InsertValueIntoGlobalDictionary(context.GetMetaDataPath(), new MetaDataConfig
         {
             Team = team,
-            System = system
+            System = system,
+            ExtraLabels = extraLabels?.ToDictionary(
+                label => label.Key,
+                label => (object)label.Value,
+                StringComparer.OrdinalIgnoreCase) ?? new Dictionary<string, object>()
         });
 
         return new ReportPortalReporter
@@ -362,14 +625,18 @@ public class ReportPortalPublisherTests
                 Enabled = enabled,
                 Endpoint = endpoint,
                 ApiKey = apiKey,
-                Project = project
+                Project = project,
+                Attributes = reportPortalAttributes?.ToDictionary(attribute => attribute.Key,
+                    attribute => attribute.Value)
             },
             Context = context,
-            ExecutionMode = "run"
+            EpochTestSuiteStartTime = new DateTimeOffset(
+                new DateTime(2025, 1, 1, 9, 30, 0, DateTimeKind.Utc)).ToUnixTimeMilliseconds()
         };
     }
 
-    private static AssertionResult CreateResult(string assertionName, string sessionName)
+    private static AssertionResult CreateResult(string assertionName, string sessionName, long testDurationMs = 1,
+        bool isFlaky = false)
     {
         var sessionData = new SessionData
         {
@@ -390,13 +657,14 @@ public class ReportPortalPublisherTests
                 AssertionHook = null
             },
             AssertionStatus = AssertionStatus.Passed,
-            TestDurationMs = 1,
-            Flaky = new Flaky { IsFlaky = false, FlakinessReasons = [] }
+            TestDurationMs = testDurationMs,
+            Flaky = new Flaky { IsFlaky = isFlaky, FlakinessReasons = [] }
         };
     }
 
     private sealed class RecordingClientFactory
     {
+        public string LaunchLink { get; init; } = "http://localhost:8080/ui/#Smoke/launches/all/1";
         public bool ThrowOnLaunchStart { get; init; }
         public bool ThrowOnLaunchFinish { get; init; }
         public bool ThrowOnTestItemStart { get; init; }
@@ -409,7 +677,8 @@ public class ReportPortalPublisherTests
                 ThrowOnLaunchStart,
                 ThrowOnLaunchFinish,
                 ThrowOnTestItemStart,
-                ThrowOnDispose);
+                ThrowOnDispose,
+                LaunchLink);
             Services.Add(service);
             return service.Object;
         }
@@ -440,7 +709,7 @@ public class ReportPortalPublisherTests
         private readonly Mock<ILogItemResource> _logItemResource = new();
 
         public RecordingClientService(bool throwOnLaunchStart, bool throwOnLaunchFinish,
-            bool throwOnTestItemStart, bool throwOnDispose)
+            bool throwOnTestItemStart, bool throwOnDispose, string launchLink)
         {
             _service.SetupGet(service => service.Launch).Returns(_launchResource.Object);
             _service.SetupGet(service => service.TestItem).Returns(_testItemResource.Object);
@@ -468,12 +737,14 @@ public class ReportPortalPublisherTests
             _launchResource
                 .Setup(resource => resource.FinishAsync(It.IsAny<string>(), It.IsAny<FinishLaunchRequest>(),
                     It.IsAny<CancellationToken>()))
+                .Callback<string, FinishLaunchRequest, CancellationToken>((_, request, _) =>
+                    LaunchFinishRequests.Add(request))
                 .ReturnsAsync(() =>
                 {
                     if (throwOnLaunchFinish)
                         throw new InvalidOperationException("finish failed");
 
-                    return new LaunchFinishedResponse { Uuid = "launch" };
+                    return new LaunchFinishedResponse { Uuid = "launch", Link = launchLink };
                 });
 
             _testItemResource
@@ -493,18 +764,24 @@ public class ReportPortalPublisherTests
             _testItemResource
                 .Setup(resource => resource.FinishAsync(It.IsAny<string>(), It.IsAny<FinishTestItemRequest>(),
                     It.IsAny<CancellationToken>()))
+                .Callback<string, FinishTestItemRequest, CancellationToken>((_, request, _) =>
+                    TestItemFinishRequests.Add(request))
                 .ReturnsAsync(new MessageResponse());
 
             _logItemResource
                 .Setup(resource => resource.CreateAsync(It.IsAny<CreateLogItemRequest>(),
                     It.IsAny<CancellationToken>()))
+                .Callback<CreateLogItemRequest, CancellationToken>((request, _) => LogItemRequests.Add(request))
                 .ReturnsAsync(new LogItemCreatedResponse { Uuid = "log" });
         }
 
         public IClientService Object => _service.Object;
         public int DisposeCount { get; private set; }
         public List<StartLaunchRequest> LaunchStartRequests { get; } = [];
+        public List<FinishLaunchRequest> LaunchFinishRequests { get; } = [];
         public List<StartTestItemRequest> TestItemStartRequests { get; } = [];
+        public List<FinishTestItemRequest> TestItemFinishRequests { get; } = [];
+        public List<CreateLogItemRequest> LogItemRequests { get; } = [];
     }
 
     private sealed class RecordingHttpMessageHandler(Func<HttpRequestMessage, HttpResponseMessage> responseFactory)
@@ -528,14 +805,27 @@ public class ReportPortalPublisherTests
         }
     }
 
-    private static void VerifyWarningLogged(Mock<ILogger> logger, string messageFragment)
+    private static void VerifyErrorLogged(Mock<ILogger> logger, string messageFragment)
     {
         logger.Verify(
             item => item.Log(
-                LogLevel.Warning,
+                LogLevel.Error,
                 It.IsAny<EventId>(),
                 It.Is<It.IsAnyType>((value, _) =>
                     value.ToString()!.Contains(messageFragment, StringComparison.Ordinal)),
+                It.IsAny<Exception>(),
+                It.IsAny<Func<It.IsAnyType, Exception?, string>>()),
+            Times.AtLeastOnce);
+    }
+
+    private static void VerifyInformationLoggedExactly(Mock<ILogger> logger, string expectedMessage)
+    {
+        logger.Verify(
+            item => item.Log(
+                LogLevel.Information,
+                It.IsAny<EventId>(),
+                It.Is<It.IsAnyType>((value, _) =>
+                    string.Equals(value.ToString(), expectedMessage, StringComparison.Ordinal)),
                 It.IsAny<Exception>(),
                 It.IsAny<Func<It.IsAnyType, Exception?, string>>()),
             Times.AtLeastOnce);

@@ -133,18 +133,18 @@ public class AssertionBuilderTests
 
         var reporters = new ReporterBuilder()
             .ConfigureReportPortal(reportPortalConfig)
-            .Build(
-                context,
-                new DateTime(2025, 1, 1, 10, 0, 0, DateTimeKind.Utc),
-                executionMode: "assert"
-            );
+            .Build(context, new DateTime(2025, 1, 1, 10, 0, 0, DateTimeKind.Utc));
+        var allureReporter = reporters.OfType<AllureReporter>().Single();
         var reportPortalReporter = reporters.OfType<ReportPortalReporter>().Single();
 
         Assert.That(reporters, Has.Count.EqualTo(2));
         Assert.That(reporters.OfType<AllureReporter>(), Has.Exactly(1).Items);
         Assert.That(reportPortalReporter.Config, Is.SameAs(reportPortalConfig));
         Assert.That(reportPortalReporter.Config.Enabled, Is.True);
-        Assert.That(reportPortalReporter.ExecutionMode, Is.EqualTo("assert"));
+        Assert.That(
+            reportPortalReporter.EpochTestSuiteStartTime,
+            Is.EqualTo(allureReporter.EpochTestSuiteStartTime)
+        );
     }
 
     [Test]

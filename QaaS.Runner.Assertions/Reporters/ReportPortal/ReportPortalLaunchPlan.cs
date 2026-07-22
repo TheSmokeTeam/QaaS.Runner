@@ -1,5 +1,7 @@
+using System.Globalization;
 using QaaS.Framework.SDK;
 using QaaS.Framework.SDK.ContextObjects;
+using QaaS.Framework.SDK.Hooks.Assertion;
 using QaaS.Runner.Assertions.AssertionObjects;
 using QaaS.Runner.Assertions.ConfigurationObjects.ReporterConfigs;
 using QaaS.Runner.Infrastructure;
@@ -22,6 +24,8 @@ internal sealed class ReportPortalLaunchPlan
         IReadOnlyList<string> sessionNames,
         string launchName,
         string description,
+        DateTime launchStartTimeUtc,
+        DateTime launchEndTimeUtc,
         bool debugMode,
         IReadOnlyDictionary<string, string> attributes,
         IReadOnlyList<ReportPortalReporterResults> reporterResults
@@ -36,6 +40,8 @@ internal sealed class ReportPortalLaunchPlan
         SessionNames = sessionNames;
         LaunchName = launchName;
         Description = description;
+        LaunchStartTimeUtc = launchStartTimeUtc;
+        LaunchEndTimeUtc = launchEndTimeUtc;
         DebugMode = debugMode;
         Attributes = attributes;
         ReporterResults = reporterResults;
@@ -49,6 +55,8 @@ internal sealed class ReportPortalLaunchPlan
     public string System { get; }
     public string LaunchName { get; }
     public string Description { get; }
+    public DateTime LaunchStartTimeUtc { get; }
+    public DateTime LaunchEndTimeUtc { get; }
     public bool DebugMode { get; }
     public IReadOnlyDictionary<string, string> Attributes { get; }
     public IReadOnlyList<ReportPortalReporterResults> ReporterResults { get; }
@@ -58,30 +66,44 @@ internal sealed class ReportPortalLaunchPlan
     /// Builds one launch plan per normalized ReportPortal endpoint/project/system group.
     /// </summary>
     /// <param name="reporters">The ReportPortal reporters built for this runner invocation.</param>
-    /// <param name="startedAtLocal">The runner start time used in generated launch descriptions.</param>
+    /// <param name="startedAtLocal">The fallback launch start time when no assertion results are queued.</param>
     /// <param name="requireQueuedResults">
     /// <see langword="true" /> when final publishing should skip reporters with no queued assertion results.
+    /// </param>
+    /// <param name="finishedAtLocal">
+    /// The fallback launch end time when no assertion results are queued. Defaults to the current time.
     /// </param>
     /// <returns>The grouped launch plans to validate or publish.</returns>
     public static IReadOnlyList<ReportPortalLaunchPlan> Build(
         IEnumerable<ReportPortalReporter> reporters,
         DateTimeOffset startedAtLocal,
-        bool requireQueuedResults
+        bool requireQueuedResults,
+        DateTimeOffset? finishedAtLocal = null
     )
     {
+        var effectiveFinishedAtLocal = finishedAtLocal ?? DateTimeOffset.Now;
+        if (effectiveFinishedAtLocal < startedAtLocal)
+            effectiveFinishedAtLocal = startedAtLocal;
+
         var reporterResults = reporters
-            .Select(reporter => new ReportPortalReporterResults(
-                reporter,
-                reporter.Config,
-                requireQueuedResults ? reporter.GetQueuedResultsSnapshot() : []
-            ))
+            .Select(reporter =>
+            {
+                var assertions = requireQueuedResults
+                    ? reporter.GetQueuedResultsSnapshot()
+                        .Select(result => BuildAssertionPlan(reporter, result))
+                        .ToList()
+                    : [];
+                return new ReportPortalReporterResults(reporter, reporter.Config, assertions);
+            })
             .Where(reporter => reporter.Config.Enabled == true)
-            .Where(reporter => !requireQueuedResults || reporter.Results.Count > 0)
+            .Where(reporter => !requireQueuedResults || reporter.Assertions.Count > 0)
             .ToList();
 
         return reporterResults
             .GroupBy(BuildGroupKey, StringComparer.Ordinal)
-            .Select(group => BuildGroupPlan(group.Key, group.ToList(), startedAtLocal))
+            .Select(group =>
+                BuildGroupPlan(group.Key, group.ToList(), startedAtLocal, effectiveFinishedAtLocal)
+            )
             .ToList();
     }
 
@@ -99,13 +121,13 @@ internal sealed class ReportPortalLaunchPlan
     /// <returns>The ReportPortal attributes sent with the launch start request.</returns>
     public IList<ItemAttribute> BuildLaunchAttributes()
     {
-        var attributes = new List<ItemAttribute> { Attr("tool", "QaaS"), Attr("source", "runner") };
+        var attributes = new List<ItemAttribute>();
 
         attributes.Add(Attr("team", Team));
-        attributes.Add(Attr("project", Project));
         attributes.Add(Attr("system", System));
 
-        attributes.AddRange(SessionNames.Select(session => Attr("session", session)));
+        if (SessionNames.Count > 0)
+            attributes.Add(Attr("sessions", string.Join(", ", SessionNames)));
         attributes.AddRange(Attributes.Select(attribute => Attr(attribute.Key, attribute.Value)));
 
         return attributes;
@@ -150,7 +172,8 @@ internal sealed class ReportPortalLaunchPlan
     private static ReportPortalLaunchPlan BuildGroupPlan(
         string groupKey,
         IReadOnlyList<ReportPortalReporterResults> reporterResults,
-        DateTimeOffset startedAtLocal
+        DateTimeOffset startedAtLocal,
+        DateTimeOffset finishedAtLocal
     )
     {
         var firstConfig = reporterResults[0].Config;
@@ -170,30 +193,28 @@ internal sealed class ReportPortalLaunchPlan
             nameof(MetaDataConfig.System)
         );
         var sessionNames = reporterResults
-            .SelectMany(reporter => reporter.Results)
-            .SelectMany(result => result.Assertion.SessionDataList)
+            .SelectMany(reporter => reporter.Assertions)
+            .SelectMany(assertion => assertion.Result.Assertion.SessionDataList)
             .Select(session => session.Name)
             .Where(sessionName => !string.IsNullOrWhiteSpace(sessionName))
             .Select(sessionName => sessionName!)
             .Distinct(StringComparer.OrdinalIgnoreCase)
             .OrderBy(sessionName => sessionName, StringComparer.OrdinalIgnoreCase)
             .ToArray();
-        var executionModes = reporterResults
-            .Select(reporter =>
-                string.IsNullOrWhiteSpace(reporter.Reporter.ExecutionMode)
-                    ? "run"
-                    : reporter.Reporter.ExecutionMode
-            )
-            .Distinct(StringComparer.Ordinal)
-            .OrderBy(mode => mode, StringComparer.Ordinal)
-            .ToList();
-        var executionMode = executionModes.Count == 1 ? executionModes[0] : "mixed";
         var attributes = BuildAttributes(
             reporterResults,
             sessionNames,
-            executionMode,
             firstConfig.Attributes
         );
+        var assertions = reporterResults
+            .SelectMany(reporter => reporter.Assertions)
+            .ToList();
+        var launchStartTimeUtc = assertions.Count == 0
+            ? startedAtLocal.UtcDateTime
+            : assertions.Min(assertion => assertion.StartTimeUtc);
+        var launchEndTimeUtc = assertions.Count == 0
+            ? finishedAtLocal.UtcDateTime
+            : assertions.Max(assertion => assertion.EndTimeUtc);
 
         return new ReportPortalLaunchPlan(
             groupKey,
@@ -203,15 +224,11 @@ internal sealed class ReportPortalLaunchPlan
             team,
             system,
             sessionNames,
-            firstConfig.LaunchName ?? BuildDefaultLaunchName(team, system, sessionNames),
+            firstConfig.LaunchName ?? BuildDefaultLaunchName(team, system),
             firstConfig.Description
-                ?? BuildDefaultDescription(
-                    startedAtLocal,
-                    executionMode,
-                    system,
-                    sessionNames,
-                    attributes
-                ),
+                ?? BuildDefaultDescription(launchStartTimeUtc, launchEndTimeUtc, reporterResults),
+            launchStartTimeUtc,
+            launchEndTimeUtc,
             firstConfig.DebugMode == true,
             attributes,
             reporterResults
@@ -224,7 +241,6 @@ internal sealed class ReportPortalLaunchPlan
     private static IReadOnlyDictionary<string, string> BuildAttributes(
         IReadOnlyList<ReportPortalReporterResults> reporterResults,
         IReadOnlyList<string> sessionNames,
-        string executionMode,
         IReadOnlyDictionary<string, string>? configAttributes
     )
     {
@@ -250,9 +266,10 @@ internal sealed class ReportPortalLaunchPlan
                 StringComparer.OrdinalIgnoreCase
             );
 
-        attributes["executionMode"] = executionMode;
         attributes["builderCount"] = reporterResults.Count.ToString();
         attributes["sessionCount"] = sessionNames.Count.ToString();
+        attributes["environment"] =
+            Environment.GetEnvironmentVariable("KUBERNETES_SERVICE_HOST") is null ? "local" : "k8s";
 
         var caseNames = reporterResults
             .Select(reporter => reporter.Reporter.Context.CaseName)
@@ -261,16 +278,7 @@ internal sealed class ReportPortalLaunchPlan
             .OrderBy(caseName => caseName, StringComparer.OrdinalIgnoreCase)
             .ToArray();
         if (caseNames.Length > 0)
-            attributes["caseName"] = string.Join(", ", caseNames);
-
-        var executionIds = reporterResults
-            .Select(reporter => reporter.Reporter.Context.ExecutionId)
-            .Where(executionId => !string.IsNullOrWhiteSpace(executionId))
-            .Distinct(StringComparer.OrdinalIgnoreCase)
-            .OrderBy(executionId => executionId, StringComparer.OrdinalIgnoreCase)
-            .ToArray();
-        if (executionIds.Length > 0)
-            attributes["executionId"] = string.Join(", ", executionIds);
+            attributes["caseNames"] = string.Join(", ", caseNames);
 
         AddConfiguredAttributes(attributes, configAttributes);
         return attributes;
@@ -279,45 +287,76 @@ internal sealed class ReportPortalLaunchPlan
     /// <summary>
     /// Builds the fallback launch name when the ReportPortal configuration does not provide one.
     /// </summary>
-    private static string BuildDefaultLaunchName(
-        string team,
-        string system,
-        IReadOnlyList<string> sessionNames
-    )
-    {
-        var sessionSummary = BuildSessionSummary(sessionNames);
-        return $"QaaS Run | {team} | {system} | {sessionSummary}";
-    }
+    private static string BuildDefaultLaunchName(string team, string system) =>
+        $"QaaS run | {team} | {system}";
 
     /// <summary>
-    /// Builds the fallback launch description from execution mode, grouped sessions, and launch attributes.
+    /// Builds the fallback launch description from launch timing and assertion-status percentages.
     /// </summary>
     private static string BuildDefaultDescription(
-        DateTimeOffset startedAtLocal,
-        string executionMode,
-        string system,
-        IReadOnlyCollection<string> sessionNames,
-        IReadOnlyDictionary<string, string> attributes
+        DateTime launchStartTimeUtc,
+        DateTime launchEndTimeUtc,
+        IReadOnlyList<ReportPortalReporterResults> reporterResults
     )
     {
-        var launchAttributeSummary = string.Join(
-            ", ",
-            attributes
-                .OrderBy(attribute => attribute.Key, StringComparer.OrdinalIgnoreCase)
-                .Select(attribute => $"{attribute.Key}={attribute.Value}")
+        var assertionStatuses = reporterResults
+            .SelectMany(reporter => reporter.Assertions)
+            .Select(assertion => assertion.Result.AssertionStatus)
+            .ToList();
+        var timingDescription =
+            $"Start time: {FormatLaunchTime(launchStartTimeUtc)} | End time: {FormatLaunchTime(launchEndTimeUtc)}";
+        var statusDescription = string.Join(
+            " | ",
+            Enum.GetValues<AssertionStatus>()
+                .Select(status =>
+                    $"{GetStatusColor(status)} {status} {FormatStatusPercentage(status, assertionStatuses)}%"
+                )
         );
-        return $"QaaS captured this {executionMode} directly from the runner pipeline: live sessions, real assertion outcomes, and the exact shape of {system} at {startedAtLocal:yyyy-MM-dd HH:mm:ss}. Sessions=[{string.Join(", ", sessionNames)}]. LaunchAttributes=[{launchAttributeSummary}]";
+
+        return string.Join(Environment.NewLine, timingDescription, statusDescription);
     }
 
-    /// <summary>
-    /// Produces a compact session segment for generated launch names.
-    /// </summary>
-    private static string BuildSessionSummary(IReadOnlyList<string> sessionNames) =>
-        sessionNames.Count switch
+    private static string FormatLaunchTime(DateTime timestamp) =>
+        timestamp
+            .ToUniversalTime()
+            .ToString("yyyy-MM-dd HH:mm:ss 'UTC'", CultureInfo.InvariantCulture);
+
+    private static ReportPortalAssertionPlan BuildAssertionPlan(
+        ReportPortalReporter reporter,
+        AssertionResult assertionResult
+    )
+    {
+        var startTimeUtc = DateTimeOffset
+            .FromUnixTimeMilliseconds(reporter.EpochTestSuiteStartTime)
+            .UtcDateTime;
+        var endTimeUtc = startTimeUtc.AddMilliseconds(assertionResult.TestDurationMs);
+
+        return new ReportPortalAssertionPlan(assertionResult, startTimeUtc, endTimeUtc);
+    }
+
+    private static string FormatStatusPercentage(
+        AssertionStatus status,
+        IReadOnlyCollection<AssertionStatus> assertionStatuses
+    )
+    {
+        var percentage =
+            assertionStatuses.Count == 0
+                ? 0
+                : assertionStatuses.Count(resultStatus => resultStatus == status)
+                    * 100d
+                    / assertionStatuses.Count;
+        return percentage.ToString("0.##", CultureInfo.InvariantCulture);
+    }
+
+    private static string GetStatusColor(AssertionStatus status) =>
+        status switch
         {
-            0 => "No Sessions",
-            <= 2 => string.Join(", ", sessionNames),
-            _ => $"{sessionNames[0]}, {sessionNames[1]}(+{sessionNames.Count - 2})",
+            AssertionStatus.Passed => "🟢",
+            AssertionStatus.Failed => "🔴",
+            AssertionStatus.Broken => "🟡",
+            AssertionStatus.Unknown => "🟣",
+            AssertionStatus.Skipped => "⚪",
+            _ => "⚫",
         };
 
     /// <summary>
@@ -438,5 +477,14 @@ internal sealed class ReportPortalLaunchPlan
 internal sealed record ReportPortalReporterResults(
     ReportPortalReporter Reporter,
     ReportPortalConfig Config,
-    IReadOnlyList<AssertionResult> Results
+    IReadOnlyList<ReportPortalAssertionPlan> Assertions
+);
+
+/// <summary>
+/// Couples an assertion result with its finalized ReportPortal timestamps.
+/// </summary>
+internal sealed record ReportPortalAssertionPlan(
+    AssertionResult Result,
+    DateTime StartTimeUtc,
+    DateTime EndTimeUtc
 );
