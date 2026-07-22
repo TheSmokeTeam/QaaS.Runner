@@ -239,6 +239,29 @@ public class ReportPortalPublisherTests
     }
 
     [Test]
+    public async Task PublishAsync_KeepsLogTimesInsideAssertionWindow()
+    {
+        var factory = new RecordingClientFactory();
+        using var publisher = CreateSuccessfulPublisher(factory, out _);
+        var reporter = CreateReporter();
+        reporter.WriteTestResults(CreateResult("assertion-a", "Session A", testDurationMs: 5_000));
+
+        await publisher.ValidateAsync([reporter]);
+        await publisher.PublishAsync([reporter]);
+
+        var service = factory.Services.Single();
+        var assertionStartTime = service.TestItemStartRequests.Single().StartTime;
+        var assertionEndTime = service.TestItemFinishRequests.Single().EndTime;
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(service.LogItemRequests, Is.Not.Empty);
+            Assert.That(service.LogItemRequests.All(request =>
+                request.Time >= assertionStartTime && request.Time <= assertionEndTime), Is.True);
+        });
+    }
+
+    [Test]
     public async Task PublishAsync_WhenLaunchFinishes_LogsReportLink()
     {
         const string reportLink = "http://localhost:8080/ui/#Smoke/launches/all/42";

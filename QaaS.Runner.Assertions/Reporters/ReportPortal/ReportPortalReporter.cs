@@ -100,12 +100,12 @@ public class ReportPortalReporter : BaseReporter
 
         try
         {
-            WriteAssertionOutcomeLog(launch, itemUuid, assertionResult);
-            WriteLinksLog(launch, itemUuid, assertionResult);
-            WriteSessionDetails(launch, itemUuid, assertionResult);
-            WriteSessionLogAttachments(launch, itemUuid, assertionResult);
-            WriteTemplateAttachment(launch, itemUuid, assertionResult);
-            WriteAssertionAttachments(launch, itemUuid, assertionResult);
+            WriteAssertionOutcomeLog(launch, itemUuid, assertionResult, assertion.EndTimeUtc);
+            WriteLinksLog(launch, itemUuid, assertionResult, assertion.EndTimeUtc);
+            WriteSessionDetails(launch, itemUuid, assertionResult, assertion.EndTimeUtc);
+            WriteSessionLogAttachments(launch, itemUuid, assertionResult, assertion.EndTimeUtc);
+            WriteTemplateAttachment(launch, itemUuid, assertionResult, assertion.EndTimeUtc);
+            WriteAssertionAttachments(launch, itemUuid, assertionResult, assertion.EndTimeUtc);
 
             launch.Service.TestItem.FinishAsync(itemUuid, new FinishTestItemRequest
             {
@@ -123,7 +123,8 @@ public class ReportPortalReporter : BaseReporter
         }
     }
 
-    private void WriteAssertionOutcomeLog(ReportPortalPublishContext launch, string itemUuid, AssertionResult assertionResult)
+    private void WriteAssertionOutcomeLog(ReportPortalPublishContext launch, string itemUuid,
+        AssertionResult assertionResult, DateTime logTimeUtc)
     {
         var logLevel = assertionResult.AssertionStatus switch
         {
@@ -149,10 +150,11 @@ public class ReportPortalReporter : BaseReporter
                 .AppendLine(assertionTextDetails.Trace);
         }
 
-        CreateLogItem(launch, itemUuid, logLevel, text.ToString().Trim(), null);
+        CreateLogItem(launch, itemUuid, logLevel, text.ToString().Trim(), logTimeUtc, null);
     }
 
-    private void WriteLinksLog(ReportPortalPublishContext launch, string itemUuid, AssertionResult assertionResult)
+    private void WriteLinksLog(ReportPortalPublishContext launch, string itemUuid, AssertionResult assertionResult,
+        DateTime logTimeUtc)
     {
         if (assertionResult.Links is null)
             return;
@@ -166,10 +168,11 @@ public class ReportPortalReporter : BaseReporter
             .AppendJoin(Environment.NewLine, links.Select(link => $"- {link.Key}: {link.Value}"))
             .ToString();
 
-        CreateLogItem(launch, itemUuid, ReportPortalLogLevel.Info, text, null);
+        CreateLogItem(launch, itemUuid, ReportPortalLogLevel.Info, text, logTimeUtc, null);
     }
 
-    private void WriteSessionDetails(ReportPortalPublishContext launch, string itemUuid, AssertionResult assertionResult)
+    private void WriteSessionDetails(ReportPortalPublishContext launch, string itemUuid, AssertionResult assertionResult,
+        DateTime logTimeUtc)
     {
         foreach (var sessionData in assertionResult.Assertion.SessionDataList)
         {
@@ -179,18 +182,19 @@ public class ReportPortalReporter : BaseReporter
             CreateLogItem(launch, itemUuid,
                 actionFailures.Count > 0 ? ReportPortalLogLevel.Error : ReportPortalLogLevel.Info,
                 summary,
+                logTimeUtc,
                 sessionArtifact);
 
             foreach (var actionFailure in actionFailures)
             {
                 CreateLogItem(launch, itemUuid, ReportPortalLogLevel.Error,
-                    BuildActionFailureText(sessionData, actionFailure), null);
+                    BuildActionFailureText(sessionData, actionFailure), logTimeUtc, null);
             }
         }
     }
 
     private void WriteSessionLogAttachments(ReportPortalPublishContext launch, string itemUuid,
-        AssertionResult assertionResult)
+        AssertionResult assertionResult, DateTime logTimeUtc)
     {
         foreach (var sessionData in assertionResult.Assertion.SessionDataList)
         {
@@ -200,33 +204,37 @@ public class ReportPortalReporter : BaseReporter
 
             CreateLogItem(launch, itemUuid, ReportPortalLogLevel.Info,
                 $"Session log: {sessionData.Name}",
+                logTimeUtc,
                 sessionLogArtifact);
         }
     }
 
     private void WriteTemplateAttachment(ReportPortalPublishContext launch, string itemUuid,
-        AssertionResult assertionResult)
+        AssertionResult assertionResult, DateTime logTimeUtc)
     {
         var templateArtifact = BuildTemplateArtifact(assertionResult.Assertion);
         if (templateArtifact is null)
             return;
 
         CreateLogItem(launch, itemUuid, ReportPortalLogLevel.Info, "Execution configuration template.",
-            templateArtifact);
+            logTimeUtc, templateArtifact);
     }
 
-    private void WriteAssertionAttachments(ReportPortalPublishContext launch, string itemUuid, AssertionResult assertionResult)
+    private void WriteAssertionAttachments(ReportPortalPublishContext launch, string itemUuid,
+        AssertionResult assertionResult, DateTime logTimeUtc)
     {
         foreach (var artifact in BuildAssertionArtifacts(assertionResult))
         {
             CreateLogItem(launch, itemUuid, ReportPortalLogLevel.Info,
                 $"Assertion attachment: {artifact.RelativePath}",
+                logTimeUtc,
                 artifact);
         }
     }
 
     private void CreateLogItem(ReportPortalPublishContext launch, string itemUuid, ReportPortalLogLevel level,
         string text,
+        DateTime timeUtc,
         ReportArtifact? artifact)
     {
         var request = new CreateLogItemRequest
@@ -235,7 +243,7 @@ public class ReportPortalReporter : BaseReporter
             TestItemUuid = itemUuid,
             Level = level,
             Text = text,
-            Time = DateTime.UtcNow
+            Time = timeUtc
         };
 
         if (artifact is not null)
