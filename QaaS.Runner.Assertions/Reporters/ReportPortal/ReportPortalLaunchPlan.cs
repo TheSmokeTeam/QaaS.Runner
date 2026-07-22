@@ -269,7 +269,7 @@ internal sealed class ReportPortalLaunchPlan
         attributes["builderCount"] = reporterResults.Count.ToString();
         attributes["sessionCount"] = sessionNames.Count.ToString();
         attributes["environment"] =
-            Environment.GetEnvironmentVariable("KUBERNETES_SERVICE_HOST") is null ? "Local" : "CI";
+            Environment.GetEnvironmentVariable("KUBERNETES_SERVICE_HOST") is null ? "local" : "k8s";
 
         var caseNames = reporterResults
             .Select(reporter => reporter.Reporter.Context.CaseName)
