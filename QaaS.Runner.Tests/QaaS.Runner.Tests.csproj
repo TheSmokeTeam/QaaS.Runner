@@ -43,6 +43,9 @@
       <None Update="TestData\logger.yaml">
         <CopyToOutputDirectory>Always</CopyToOutputDirectory>
       </None>
+      <None Update="TestData\http-get-empty-request.qaas.yaml">
+        <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+      </None>
       <None Update="TestData\test.qaas.yaml">
         <CopyToOutputDirectory>Always</CopyToOutputDirectory>
       </None>

@@ -1,7 +1,6 @@
 using System.ComponentModel;
 using System.ComponentModel.DataAnnotations;
 using QaaS.Framework.Configurations;
-using QaaS.Framework.Configurations.CustomValidationAttributes;
 using QaaS.Framework.Infrastructure;
 using QaaS.Framework.Policies;
 using QaaS.Framework.Protocols.ConfigurationObjects;
@@ -19,7 +18,7 @@ using Parallel = QaaS.Runner.Sessions.ConfigurationObjects.Parallel;
 
 namespace QaaS.Runner.Sessions.Actions.Transactions.Builders;
 
-public class TransactionBuilder : ICloneable<TransactionBuilder>
+public partial class TransactionBuilder : ICloneable<TransactionBuilder>
 {
     public TransactionBuilder Clone() => BuilderCloner.DeepClone(this);
 
@@ -30,16 +29,27 @@ public class TransactionBuilder : ICloneable<TransactionBuilder>
     )]
     public string? Name { get; internal set; }
 
-    [RequiredIfAny(nameof(DataSourcePatterns), [null])]
     [Description(
         "The name of the data sources to publish the data of"
             + " in the order their data will be published"
     )]
     public string[]? DataSourceNames { get; internal set; }
 
-    [RequiredIfAny(nameof(DataSourceNames), [null])]
     [Description("Patterns of the names of data sources to publish the data of off")]
     public string[]? DataSourcePatterns { get; internal set; }
+
+    /// <summary>
+    /// Gets whether this transaction sends a bodyless HTTP GET without reading from a data source.
+    /// </summary>
+    /// <remarks>
+    /// When enabled, the transaction sends exactly one request per iteration. This option is valid only for HTTP GET,
+    /// cannot be combined with non-empty data-source selectors, and does not support input serialization.
+    /// </remarks>
+    [Description(
+        "Whether to send one bodyless HTTP GET per iteration without reading from a data source"
+    )]
+    [DefaultValue(false)]
+    public bool SendEmptyRequest { get; internal set; }
 
     [Description("How much iterations of the publishing action to execute")]
     [DefaultValue(1)]
@@ -224,6 +234,20 @@ public class TransactionBuilder : ICloneable<TransactionBuilder>
         var dataSourcePatternsList = DataSourcePatterns?.ToList() ?? [];
         dataSourcePatternsList.Add(dataSourcePattern);
         DataSourcePatterns = dataSourcePatternsList.ToArray();
+        return this;
+    }
+
+    /// <summary>
+    /// Configures the transaction to send one bodyless HTTP GET per iteration without reading from a data source.
+    /// </summary>
+    /// <remarks>
+    /// Configure an HTTP GET before building the transaction. Non-empty data-source selectors and input serialization
+    /// are mutually exclusive with this mode.
+    /// </remarks>
+    /// <qaas-docs group="Transactions" subgroup="Configuration" />
+    public TransactionBuilder WithEmptyRequest()
+    {
+        SendEmptyRequest = true;
         return this;
     }
 
@@ -561,7 +585,8 @@ public class TransactionBuilder : ICloneable<TransactionBuilder>
                 deserializerSpecificType,
                 DataSourcePatterns,
                 DataSourceNames,
-                context.Logger
+                context.Logger,
+                SendEmptyRequest
             );
         }
         catch (Exception e)

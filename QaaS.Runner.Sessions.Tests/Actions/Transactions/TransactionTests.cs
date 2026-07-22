@@ -166,6 +166,101 @@ public class TransactionTests
     }
 
     [Test]
+    public void Act_WithEmptyRequestAndSerializer_TransactsOncePerOuterIterationWithoutSerializingPayload()
+    {
+        const int iterations = 3;
+        var capturedRequests = new List<Data<object>>();
+        var transactor = new Mock<ITransactor>();
+        transactor
+            .Setup(instance => instance.Transact(It.IsAny<Data<object>>()))
+            .Returns<Data<object>>(request =>
+            {
+                capturedRequests.Add(request);
+                return new Tuple<DetailedData<object>, DetailedData<object>?>(
+                    request.CloneDetailed(),
+                    null
+                );
+            });
+        var transaction = new Sessions.Actions.Transactions.Transaction(
+            "EmptyGet",
+            transactor.Object,
+            0,
+            new DataFilter { Body = true, Timestamp = true, MetaData = true },
+            new DataFilter { Body = true, Timestamp = true, MetaData = true },
+            null,
+            false,
+            null,
+            iterations,
+            0,
+            SerializationType.Json,
+            null,
+            null,
+            null,
+            null,
+            Globals.Logger,
+            true
+        );
+
+        transaction.InitializeIterableSerializableSaveIterator([], []);
+        var result = transaction.Act();
+
+        Assert.Multiple(() =>
+        {
+            transactor.Verify(
+                instance => instance.Transact(It.IsAny<Data<object>>()),
+                Times.Exactly(iterations)
+            );
+            Assert.That(capturedRequests, Has.Count.EqualTo(iterations));
+            Assert.That(
+                capturedRequests,
+                Has.All.Matches<Data<object>>(request =>
+                    request.Body is byte[] bytes && bytes.Length == 0
+                )
+            );
+            Assert.That(result.Input, Has.Count.EqualTo(iterations));
+            Assert.That(result.InputSerializationType, Is.Null);
+            Assert.That(result.Output, Is.Empty);
+        });
+    }
+
+    [Test]
+    public void Act_WithCodeFirstEmptyDataSourceCollections_DoesNotTransact()
+    {
+        var transactor = new Mock<ITransactor>();
+        var transaction = new Sessions.Actions.Transactions.Transaction(
+            "EmptySelectors",
+            transactor.Object,
+            0,
+            new DataFilter { Body = true, Timestamp = true, MetaData = true },
+            new DataFilter { Body = true, Timestamp = true, MetaData = true },
+            null,
+            false,
+            null,
+            1,
+            0,
+            null,
+            null,
+            null,
+            [],
+            [],
+            Globals.Logger
+        );
+
+        transaction.InitializeIterableSerializableSaveIterator([], []);
+        var result = transaction.Act();
+
+        Assert.Multiple(() =>
+        {
+            transactor.Verify(
+                instance => instance.Transact(It.IsAny<Data<object>>()),
+                Times.Never
+            );
+            Assert.That(result.Input, Is.Empty);
+            Assert.That(result.Output, Is.Empty);
+        });
+    }
+
+    [Test]
     public void Act_WithBinaryOutputDeserializerAndNoSpecificType_DeserializesToOriginalPayloadType()
     {
         var payload = new BinaryPayload { Value = "transaction-output" };

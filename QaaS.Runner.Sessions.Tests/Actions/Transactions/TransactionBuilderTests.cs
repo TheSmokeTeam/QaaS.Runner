@@ -166,6 +166,16 @@ public class TransactionBuilderTests
     }
 
     [Test]
+    public void WithEmptyRequest_Should_Enable_Source_Free_Request_Mode()
+    {
+        var builder = new TransactionBuilder();
+
+        builder.WithEmptyRequest();
+
+        Assert.That(builder.SendEmptyRequest, Is.True);
+    }
+
+    [Test]
     public void InLoops_Should_Set_Loop_True()
     {
         var builder = new TransactionBuilder();
@@ -288,24 +298,96 @@ public class TransactionBuilderTests
     }
 
     [Test]
-    public void TestRequiredIfAnyDataSourceNamePatterns_ValidateBuilder_ShouldHaveFailedValidationResults()
+    public void Validate_WithoutSelectorsOrEmptyRequest_ShouldBeInvalid()
     {
-        var builder = new TransactionBuilder();
-        builder
+        var builder = CreateHttpBuilder();
+
+        Assert.That(Validate(builder), Is.Not.Empty);
+    }
+
+    [TestCase(false)]
+    [TestCase(true)]
+    public void Validate_EmptyRequestHttpGetWithNoUsableSelectors_ShouldBeValid(
+        bool configureEmptyArrays
+    )
+    {
+        var builder = CreateHttpBuilder().WithEmptyRequest();
+        if (configureEmptyArrays)
+        {
+            builder.DataSourceNames = [];
+            builder.DataSourcePatterns = [];
+        }
+
+        Assert.That(Validate(builder), Is.Empty);
+    }
+
+    [TestCase(HttpMethods.Post)]
+    [TestCase(HttpMethods.Put)]
+    [TestCase(HttpMethods.Delete)]
+    public void Validate_EmptyRequestForNonGetHttpMethod_ShouldBeInvalid(HttpMethods method)
+    {
+        var builder = CreateHttpBuilder(method).WithEmptyRequest();
+
+        Assert.That(Validate(builder), Is.Not.Empty);
+    }
+
+    [Test]
+    public void Validate_EmptyRequestForGrpcTransaction_ShouldBeInvalid()
+    {
+        var builder = new TransactionBuilder()
             .Named("Test")
             .WithTimeout(1000)
-            .Configure(
-                new HttpTransactorConfig
-                {
-                    Method = HttpMethods.Delete,
-                    BaseAddress = "https://test.com",
-                }
-            );
+            .WithEmptyRequest()
+            .Configure(new GrpcTransactorConfig());
 
-        var validationResults = new List<ValidationResult>();
-        ValidateMembers(builder, validationResults, "DataSourceNames", "DataSourcePatterns");
+        Assert.That(Validate(builder), Is.Not.Empty);
+    }
 
-        Assert.That(validationResults, Is.Not.Empty);
+    [Test]
+    public void Validate_EmptyDataSourceCollectionsWithoutEmptyRequest_ShouldPreserveCodeFirstCompatibility()
+    {
+        var builder = CreateHttpBuilder();
+        builder.DataSourceNames = [];
+        builder.DataSourcePatterns = [];
+
+        Assert.That(Validate(builder), Is.Empty);
+    }
+
+    [TestCase(false)]
+    [TestCase(true)]
+    public void Validate_EmptyRequestWithNonEmptySelector_ShouldBeInvalid(bool usePattern)
+    {
+        var builder = CreateHttpBuilder().WithEmptyRequest();
+        if (usePattern)
+            builder.AddDataSourcePattern("payload-.*");
+        else
+            builder.AddDataSource("payload");
+
+        Assert.That(Validate(builder), Is.Not.Empty);
+    }
+
+    [Test]
+    public void Validate_EmptyRequestWithInputSerializer_ShouldBeInvalid()
+    {
+        var builder = CreateHttpBuilder().WithEmptyRequest().WithSerializer(new SerializeConfig());
+
+        var validationResults = Validate(builder);
+
+        Assert.That(
+            validationResults,
+            Has.Some.Matches<ValidationResult>(result =>
+                result.MemberNames.Contains(nameof(TransactionBuilder.InputSerialize))
+            )
+        );
+    }
+
+    [Test]
+    public void Validate_EmptyRequestWithMultipleProtocols_ShouldBeInvalid()
+    {
+        var builder = CreateHttpBuilder().WithEmptyRequest();
+        builder.Grpc = new GrpcTransactorConfig();
+
+        Assert.That(Validate(builder), Is.Not.Empty);
     }
 
     [Test]
@@ -322,6 +404,7 @@ public class TransactionBuilderTests
         Assert.That(builder.Policies, Is.Empty);
         Assert.That(builder.InputSerialize, Is.Null);
         Assert.That(builder.OutputDeserialize, Is.Null);
+        Assert.That(builder.SendEmptyRequest, Is.False);
         Assert.That(builder.Http, Is.Null);
         Assert.That(builder.Grpc, Is.Null);
     }
@@ -416,39 +499,25 @@ public class TransactionBuilderTests
         Assert.That(_actionFailures, Is.Not.Empty);
     }
 
-    private static void ValidateMembers(
-        object instance,
-        ICollection<ValidationResult> validationResults,
-        params string[] propertyNames
-    )
+    private static List<ValidationResult> Validate(TransactionBuilder builder)
     {
-        foreach (var propertyName in propertyNames.Distinct(StringComparer.Ordinal))
-        {
-            var property = instance
-                .GetType()
-                .GetProperty(
-                    propertyName,
-                    BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic
-                );
-            if (property == null || property.GetIndexParameters().Length > 0)
-            {
-                continue;
-            }
+        var validationResults = new List<ValidationResult>();
+        Validator.TryValidateObject(
+            builder,
+            new ValidationContext(builder),
+            validationResults,
+            true
+        );
+        return validationResults;
+    }
 
-            var validationContext = new ValidationContext(instance, null, null)
-            {
-                MemberName = property.Name,
-            };
-            var getter = property.GetGetMethod(nonPublic: true);
-            var value = getter?.Invoke(instance, null);
-            foreach (var validationAttribute in property.GetCustomAttributes<ValidationAttribute>())
-            {
-                var result = validationAttribute.GetValidationResult(value, validationContext);
-                if (result != null && result != ValidationResult.Success)
-                {
-                    validationResults.Add(result);
-                }
-            }
-        }
+    private static TransactionBuilder CreateHttpBuilder(HttpMethods method = HttpMethods.Get)
+    {
+        return new TransactionBuilder()
+            .Named("Test")
+            .WithTimeout(1000)
+            .Configure(
+                new HttpTransactorConfig { Method = method, BaseAddress = "https://test.com" }
+            );
     }
 }
