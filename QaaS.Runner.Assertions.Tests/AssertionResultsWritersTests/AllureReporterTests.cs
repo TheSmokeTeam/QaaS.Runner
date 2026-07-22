@@ -6,8 +6,11 @@ using System.IO.Abstractions;
 using System.Linq;
 using System.Reflection;
 using System.Text.Json;
+using System.Threading;
+using System.Threading.Tasks;
 using Allure.Commons;
 using Microsoft.Extensions.Configuration;
+using Moq;
 using NUnit.Framework;
 using QaaS.Framework.SDK.ContextObjects;
 using QaaS.Framework.SDK.Hooks.Assertion;
@@ -24,22 +27,6 @@ namespace QaaS.Runner.Assertions.Tests.AssertionResultsWritersTests;
 [TestFixture]
 public class AllureReporterTests
 {
-    private sealed class ExposedAllureReporter : AllureReporter
-    {
-        public void SaveAttachment(
-            byte[] attachmentContent,
-            string attachmentDirectory,
-            string attachmentFileName
-        )
-        {
-            SaveAttachmentIfNotAlreadySaved(
-                attachmentContent,
-                attachmentDirectory,
-                attachmentFileName
-            );
-        }
-    }
-
     [SetUp]
     public void SetUp()
     {
@@ -72,12 +59,17 @@ public class AllureReporterTests
         return value.Replace('\\', '/');
     }
 
-    private static void AssertContentContainsPathSegment(
-        string contents,
-        string expectedPathSegment
-    )
+    private static void AssertAllureAttachmentSourceContract(IEnumerable<string> sources)
     {
-        Assert.That(NormalizePathSeparators(contents), Does.Contain(expectedPathSegment));
+        var resultsDirectory = Path.GetFullPath(AllureResultsFolder);
+        foreach (var source in sources)
+        {
+            Assert.That(source, Does.Match("^[a-zA-Z0-9._-]{1,100}$"));
+            Assert.That(Path.GetFileName(source), Is.EqualTo(source));
+            var attachmentPath = Path.GetFullPath(Path.Combine(resultsDirectory, source));
+            Assert.That(Path.GetDirectoryName(attachmentPath), Is.EqualTo(resultsDirectory));
+            Assert.That(File.Exists(attachmentPath), Is.True);
+        }
     }
 
     private static string GetAllureParameter(JsonElement step, string parameterName)
@@ -87,6 +79,30 @@ public class AllureReporterTests
             .Single(parameter => parameter.GetProperty("name").GetString() == parameterName)
             .GetProperty("value")
             .GetString()!;
+    }
+
+    private static IEnumerable<JsonElement> GetAttachments(JsonElement executableItem)
+    {
+        if (
+            executableItem.TryGetProperty("attachments", out var attachments)
+            && attachments.ValueKind == JsonValueKind.Array
+        )
+            foreach (var attachment in attachments.EnumerateArray())
+                yield return attachment;
+
+        if (
+            executableItem.TryGetProperty("steps", out var steps)
+            && steps.ValueKind == JsonValueKind.Array
+        )
+            foreach (var step in steps.EnumerateArray())
+            foreach (var attachment in GetAttachments(step))
+                yield return attachment;
+    }
+
+    private static IEnumerable<string> GetAttachmentSources(JsonElement executableItem)
+    {
+        return GetAttachments(executableItem)
+            .Select(attachment => attachment.GetProperty("source").GetString()!);
     }
 
     private static IEnumerable<TestCaseData> TestWriteTestResultsEnumerableCaseSource()
@@ -322,6 +338,71 @@ public class AllureReporterTests
     }
 
     [Test]
+    public void WriteTestResults_RepeatedLogicalTest_UsesDistinctUuidsAndStableHistoryId()
+    {
+        Reporter!.SaveSessionData = false;
+        Reporter.SaveLogs = false;
+        Reporter.SaveTemplate = false;
+        Reporter.SaveAttachments = false;
+        Reporter.Context = new Context
+        {
+            Logger = Globals.Logger,
+            ExecutionId = "exec-1",
+            CaseName = "case-a",
+        };
+        var assertionResult = new AssertionResult
+        {
+            Assertion = new Assertion
+            {
+                Name = "stable-assertion",
+                AssertionName = "StableAssertion",
+                SessionDataList = [],
+                StatusesToReport = null,
+            },
+            AssertionStatus = AssertionStatus.Passed,
+            TestDurationMs = 10,
+            Flaky = new Flaky { IsFlaky = false, FlakinessReasons = [] },
+        };
+
+        Reporter.WriteTestResults(assertionResult);
+        Reporter.WriteTestResults(assertionResult);
+
+        var uuids = new List<string>();
+        var historyIds = new List<string>();
+        var hasNonNullRerunOf = false;
+        foreach (
+            var resultFile in Directory.GetFiles(
+                AllureResultsFolder,
+                "*-result.json",
+                SearchOption.TopDirectoryOnly
+            )
+        )
+        {
+            using var resultDocument = JsonDocument.Parse(File.ReadAllText(resultFile));
+            uuids.Add(resultDocument.RootElement.GetProperty("uuid").GetString()!);
+            historyIds.Add(resultDocument.RootElement.GetProperty("historyId").GetString()!);
+            hasNonNullRerunOf |=
+                resultDocument.RootElement.TryGetProperty("rerunOf", out var rerunOf)
+                && rerunOf.ValueKind != JsonValueKind.Null;
+        }
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(uuids, Has.Count.EqualTo(2));
+            Assert.That(
+                uuids,
+                Has.All.Matches<string>(uuid => Guid.TryParseExact(uuid, "D", out _))
+            );
+            Assert.That(uuids, Is.Unique);
+            Assert.That(
+                historyIds,
+                Is.EqualTo(new[] { "stable-assertionexec-1case-a", "stable-assertionexec-1case-a" })
+            );
+            Assert.That(hasNonNullRerunOf, Is.False);
+        });
+    }
+
+    [Test]
     [TestCase("BaseDirectory", "SpecificAssertion", "Run", "Case1")]
     [TestCase("BaseDirectory", "SpecificAssertion", "Run", null)]
     [TestCase("AssertionDirectory", null, null, "Case3")]
@@ -381,69 +462,11 @@ public class AllureReporterTests
     }
 
     [Test]
-    [TestCase(0)]
-    [TestCase(1)]
-    [TestCase(5)]
-    [TestCase(10)]
-    public void TestSaveAssertionAttachmentsToAllure_CallFunctionWithXAttachmentsToSave_FunctionReturnXAttachments(
-        int numberOfAttachments
-    )
+    public void WriteTestResults_WithTraversalInCustomAttachmentPath_ThrowsInvalidOperationException()
     {
-        // Arrange
-        var attachments = new List<AssertionAttachment>();
-        for (var i = 0; i < numberOfAttachments; i++)
-        {
-            var attachment = new AssertionAttachment
-            {
-                Path = $"attachment-{i}.txt",
-                SerializationType = SerializationType.Json,
-                Data = new byte[] { 0x48, 0x65, 0x6C, 0x6C, 0x6F },
-            };
-            attachments.Add(attachment);
-        }
-
-        var assertionResult = new AssertionResult
-        {
-            Assertion = new Assertion
-            {
-                AssertionHook = new AssertionHookMock { AssertionAttachments = attachments },
-                Name = null,
-                AssertionName = null,
-                StatusesToReport = null,
-            },
-            AssertionStatus = AssertionStatus.Passed,
-            TestDurationMs = 0,
-            Flaky = null,
-        };
-
-        var saveAssertionAttachmentsToAllureMethod = Reporter
-            ?.GetType()
-            .GetMethod(
-                "SaveAssertionAttachmentsToAllure",
-                BindingFlags.NonPublic | BindingFlags.Instance
-            )!;
-
-        // Act
-        var result =
-            (List<Attachment>)
-                saveAssertionAttachmentsToAllureMethod.Invoke(Reporter, [assertionResult])!;
-
-        // Assert
-        Assert.That(result, Is.Not.Null);
-        Assert.That(result.Count, Is.EqualTo(numberOfAttachments));
-
-        // Verify that each attachment has the expected properties
-        for (var i = 0; i < numberOfAttachments; i++)
-        {
-            Assert.That(result[i].name, Is.Not.Null.And.Not.Empty);
-            Assert.That(result[i].source, Is.Not.Null.And.Not.Empty);
-            Assert.That(result[i].type, Is.Not.Null.And.Not.Empty);
-        }
-    }
-
-    [Test]
-    public void SaveAssertionAttachmentsToAllure_WithTraversalPath_ThrowsInvalidOperationException()
-    {
+        Reporter!.SaveSessionData = false;
+        Reporter.SaveTemplate = false;
+        Reporter.SaveAttachments = true;
         var assertionResult = new AssertionResult
         {
             Assertion = new Assertion
@@ -462,52 +485,71 @@ public class AllureReporterTests
                 },
                 Name = "unsafe-assertion",
                 AssertionName = "AssertionOne",
+                SessionDataList = [],
                 StatusesToReport = null,
             },
             AssertionStatus = AssertionStatus.Passed,
             TestDurationMs = 0,
-            Flaky = null,
+            Flaky = new Flaky { IsFlaky = false, FlakinessReasons = [] },
         };
 
-        var saveAssertionAttachmentsToAllureMethod = Reporter
-            ?.GetType()
-            .GetMethod(
-                "SaveAssertionAttachmentsToAllure",
-                BindingFlags.NonPublic | BindingFlags.Instance
-            )!;
-
-        var exception = Assert.Throws<TargetInvocationException>(() =>
-            saveAssertionAttachmentsToAllureMethod.Invoke(Reporter, [assertionResult])
-        );
-
-        Assert.That(exception!.InnerException, Is.TypeOf<InvalidOperationException>());
+        Assert.Throws<InvalidOperationException>(() => Reporter.WriteTestResults(assertionResult));
     }
 
     [Test]
-    public void SaveConfigurationTemplateToAllure_WithRenderedTemplate_UsesStoredTemplateContent()
+    public void WriteTestResults_WithRenderedTemplate_UsesStoredTemplateContent()
     {
         const string renderedTemplate = "Sessions:\n  - Name: RabbitRoundTrip\n";
-        Reporter!.Context.InsertValueIntoGlobalDictionary(
-            ["__RunnerArtifacts", "RenderedTemplate"],
-            renderedTemplate
-        );
         var configuration = new ConfigurationBuilder()
             .AddInMemoryCollection(
                 new Dictionary<string, string?> { ["Sessions:0:Name"] = "incomplete" }
             )
             .Build();
+        Reporter!.SaveSessionData = false;
+        Reporter.SaveTemplate = true;
+        Reporter.SaveAttachments = false;
+        Reporter.Context = new Context
+        {
+            Logger = Globals.Logger,
+            RootConfiguration = configuration,
+        };
+        Reporter.Context.InsertValueIntoGlobalDictionary(
+            ["__RunnerArtifacts", "RenderedTemplate"],
+            renderedTemplate
+        );
+        var assertionResult = new AssertionResult
+        {
+            Assertion = new Assertion
+            {
+                Name = "template-assertion",
+                AssertionName = "TemplateAssertion",
+                SessionDataList = [],
+                StatusesToReport = null,
+            },
+            AssertionStatus = AssertionStatus.Passed,
+            TestDurationMs = 0,
+            Flaky = new Flaky { IsFlaky = false, FlakinessReasons = [] },
+        };
 
-        var method = Reporter
-            .GetType()
-            .GetMethod(
-                "SaveConfigurationTemplateToAllure",
-                BindingFlags.NonPublic | BindingFlags.Instance
-            )!;
-        var attachment = (Attachment)method.Invoke(Reporter, [configuration])!;
-        var attachmentPath = Path.Combine(AllureResultsFolder, attachment.source);
+        Reporter.WriteTestResults(assertionResult);
+        var resultFile = Directory
+            .GetFiles(AllureResultsFolder, "*-result.json", SearchOption.TopDirectoryOnly)
+            .Single();
+        using var resultDocument = JsonDocument.Parse(File.ReadAllText(resultFile));
+        var attachment = resultDocument
+            .RootElement.GetProperty("attachments")
+            .EnumerateArray()
+            .Single();
+        var attachmentSource = attachment.GetProperty("source").GetString()!;
+        var attachmentPath = Path.Combine(AllureResultsFolder, attachmentSource);
 
-        Assert.That(File.Exists(attachmentPath), Is.True);
-        Assert.That(File.ReadAllText(attachmentPath), Is.EqualTo(renderedTemplate));
+        Assert.Multiple(() =>
+        {
+            AssertAllureAttachmentSourceContract([attachmentSource]);
+            Assert.That(attachment.GetProperty("type").GetString(), Is.EqualTo("application/yaml"));
+            Assert.That(File.Exists(attachmentPath), Is.True);
+            Assert.That(File.ReadAllText(attachmentPath), Is.EqualTo(renderedTemplate));
+        });
     }
 
     [Test]
@@ -545,24 +587,19 @@ public class AllureReporterTests
             .GetFiles(AllureResultsFolder, "*-result.json", SearchOption.TopDirectoryOnly)
             .Single();
         var logAttachmentPath = Directory
-            .GetFiles(
-                Path.Combine(AllureResultsFolder, "SessionLogs"),
-                "*.log",
-                SearchOption.AllDirectories
-            )
+            .GetFiles(AllureResultsFolder, "*-attachment.log", SearchOption.TopDirectoryOnly)
             .Single();
 
         Assert.Multiple(() =>
         {
             Assert.That(File.ReadAllText(resultFile), Does.Contain("SessionLog"));
-            AssertContentContainsPathSegment(File.ReadAllText(resultFile), "SessionLogs/");
             Assert.That(
-                Directory.GetFiles(
-                    AllureResultsFolder,
-                    "*-attachment*",
-                    SearchOption.TopDirectoryOnly
-                ),
-                Is.Empty
+                File.ReadAllText(resultFile),
+                Does.Contain(Path.GetFileName(logAttachmentPath))
+            );
+            Assert.That(
+                Directory.Exists(Path.Combine(AllureResultsFolder, "SessionLogs")),
+                Is.False
             );
             Assert.That(File.Exists(logAttachmentPath), Is.True);
             Assert.That(
@@ -630,7 +667,7 @@ public class AllureReporterTests
     }
 
     [Test]
-    public void WriteTestResults_WithSessionArtifacts_StoresAttachmentsOnlyInsideLegacyFolders()
+    public void WriteTestResults_WithSessionArtifacts_UsesAllureCompatibleAttachmentSources()
     {
         Reporter!.SaveSessionData = true;
         Reporter.SaveTemplate = true;
@@ -671,52 +708,60 @@ public class AllureReporterTests
             .GetFiles(AllureResultsFolder, "*-result.json", SearchOption.TopDirectoryOnly)
             .Single();
         var contents = File.ReadAllText(resultFile);
-        var sessionsDataCopy = Directory
-            .GetFiles(
-                Path.Combine(AllureResultsFolder, "SessionsData"),
-                "*.json",
-                SearchOption.AllDirectories
-            )
+        using var resultDocument = JsonDocument.Parse(contents);
+        var attachments = GetAttachments(resultDocument.RootElement).ToList();
+        var attachmentSources = attachments
+            .Select(attachment => attachment.GetProperty("source").GetString()!)
+            .ToList();
+        var sessionsDataAttachment = Directory
+            .GetFiles(AllureResultsFolder, "*-attachment.json", SearchOption.TopDirectoryOnly)
             .Single();
-        var sessionLogCopy = Directory
-            .GetFiles(
-                Path.Combine(AllureResultsFolder, "SessionLogs"),
-                "*.log",
-                SearchOption.AllDirectories
-            )
+        var sessionLogAttachment = Directory
+            .GetFiles(AllureResultsFolder, "*-attachment.log", SearchOption.TopDirectoryOnly)
             .Single();
-        var templateCopy = Directory
-            .GetFiles(
-                Path.Combine(AllureResultsFolder, "Templates"),
-                "*.yaml",
-                SearchOption.AllDirectories
-            )
+        var templateAttachment = Directory
+            .GetFiles(AllureResultsFolder, "*-attachment.yaml", SearchOption.TopDirectoryOnly)
             .Single();
 
         Assert.Multiple(() =>
         {
-            AssertContentContainsPathSegment(contents, "SessionsData/");
-            AssertContentContainsPathSegment(contents, "SessionLogs/");
-            AssertContentContainsPathSegment(contents, "Templates/");
+            AssertAllureAttachmentSourceContract(attachmentSources);
+            Assert.That(attachmentSources, Has.Count.EqualTo(3));
             Assert.That(
-                Directory.GetFiles(
-                    AllureResultsFolder,
-                    "*-attachment*",
-                    SearchOption.TopDirectoryOnly
-                ),
-                Is.Empty
+                attachments.Select(attachment => attachment.GetProperty("type").GetString()),
+                Is.EquivalentTo(new[] { "application/json", "text/plain", "application/yaml" })
             );
             Assert.That(
-                File.ReadAllText(sessionsDataCopy),
+                attachmentSources,
+                Is.EquivalentTo(
+                    new[]
+                    {
+                        Path.GetFileName(sessionsDataAttachment),
+                        Path.GetFileName(sessionLogAttachment),
+                        Path.GetFileName(templateAttachment),
+                    }
+                )
+            );
+            Assert.That(
+                File.ReadAllText(sessionsDataAttachment),
                 Does.Contain("\"Name\": \"test-session\"")
             );
-            Assert.That(File.ReadAllText(sessionLogCopy), Does.Contain("session-log-entry"));
-            Assert.That(File.ReadAllText(templateCopy), Does.Contain("RabbitRoundTrip"));
+            Assert.That(File.ReadAllText(sessionLogAttachment), Does.Contain("session-log-entry"));
+            Assert.That(File.ReadAllText(templateAttachment), Does.Contain("RabbitRoundTrip"));
+            Assert.That(
+                Directory.Exists(Path.Combine(AllureResultsFolder, "SessionsData")),
+                Is.False
+            );
+            Assert.That(
+                Directory.Exists(Path.Combine(AllureResultsFolder, "SessionLogs")),
+                Is.False
+            );
+            Assert.That(Directory.Exists(Path.Combine(AllureResultsFolder, "Templates")), Is.False);
         });
     }
 
     [Test]
-    public void WriteTestResults_WithCustomAttachments_StoresAttachmentOnlyInsideAssertionFolders()
+    public void WriteTestResults_WithCustomAttachments_UsesAllureCompatibleAttachmentSource()
     {
         Reporter!.SaveSessionData = false;
         Reporter.SaveTemplate = false;
@@ -751,116 +796,278 @@ public class AllureReporterTests
         var resultFile = Directory
             .GetFiles(AllureResultsFolder, "*-result.json", SearchOption.TopDirectoryOnly)
             .Single();
-        var legacyAttachmentCopy = Directory
-            .GetFiles(
-                Path.Combine(AllureResultsFolder, "AssertionsAttachments"),
-                "payload.json",
-                SearchOption.AllDirectories
-            )
+        var attachmentFile = Directory
+            .GetFiles(AllureResultsFolder, "*-attachment.json", SearchOption.TopDirectoryOnly)
             .Single();
         var contents = File.ReadAllText(resultFile);
+        using var resultDocument = JsonDocument.Parse(contents);
+        var attachment = GetAttachments(resultDocument.RootElement).Single();
+        var attachmentSource = attachment.GetProperty("source").GetString()!;
 
         Assert.Multiple(() =>
         {
-            AssertContentContainsPathSegment(contents, "AssertionsAttachments/");
+            Assert.That(attachmentSource, Is.EqualTo(Path.GetFileName(attachmentFile)));
+            AssertAllureAttachmentSourceContract([attachmentSource]);
             Assert.That(
-                Directory.GetFiles(
-                    AllureResultsFolder,
-                    "*-attachment*",
-                    SearchOption.TopDirectoryOnly
-                ),
-                Is.Empty
+                NormalizePathSeparators(attachment.GetProperty("name").GetString()!),
+                Is.EqualTo("payloads/payload.json")
             );
-            Assert.That(File.ReadAllText(legacyAttachmentCopy), Does.Contain("\"Value\":5"));
+            Assert.That(attachment.GetProperty("type").GetString(), Is.EqualTo("application/json"));
+            Assert.That(
+                Directory.Exists(Path.Combine(AllureResultsFolder, "AssertionsAttachments")),
+                Is.False
+            );
+            Assert.That(File.ReadAllText(attachmentFile), Does.Contain("\"Value\":5"));
         });
     }
 
     [Test]
-    public void SaveAttachmentIfNotAlreadySaved_WhenDuplicateAttachmentIsSaved_WritesFileOnlyOnce()
+    public void WriteTestResults_WithRepeatedSessionData_ReusesSinglePhysicalAttachment()
     {
-        var reporter = new ExposedAllureReporter
+        Reporter!.SaveSessionData = true;
+        Reporter.SaveLogs = false;
+        Reporter.SaveTemplate = false;
+        Reporter.SaveAttachments = false;
+        var sessionData = new SessionData
         {
-            Context = new Context { Logger = Globals.Logger },
-            FileSystem = new FileSystem(),
+            Name = "repeated-session",
+            UtcStartTime = DateTime.UtcNow.AddSeconds(-1),
+            UtcEndTime = DateTime.UtcNow,
+            SessionFailures = [],
+        };
+        var assertionResult = new AssertionResult
+        {
+            Assertion = new Assertion
+            {
+                Name = "repeated-session-assertion",
+                AssertionName = "RepeatedSessionAssertion",
+                SessionDataList = new List<SessionData>
+                {
+                    sessionData,
+                    sessionData,
+                }.ToImmutableList(),
+                StatusesToReport = null,
+            },
+            AssertionStatus = AssertionStatus.Passed,
+            TestDurationMs = 10,
+            Flaky = new Flaky { IsFlaky = false, FlakinessReasons = [] },
         };
 
-        reporter.SaveAttachment([0x01], "Attachments", "duplicate.txt");
-        reporter.SaveAttachment([0x02], "Attachments", "duplicate.txt");
+        Reporter.WriteTestResults(assertionResult);
+        var resultFile = Directory
+            .GetFiles(AllureResultsFolder, "*-result.json", SearchOption.TopDirectoryOnly)
+            .Single();
+        using var resultDocument = JsonDocument.Parse(File.ReadAllText(resultFile));
+        var attachmentSources = GetAttachmentSources(resultDocument.RootElement).ToList();
+        var physicalAttachments = Directory.GetFiles(
+            AllureResultsFolder,
+            "*-attachment.json",
+            SearchOption.TopDirectoryOnly
+        );
 
-        var savedFile = Path.Combine(AllureResultsFolder, "Attachments", "duplicate.txt");
         Assert.Multiple(() =>
         {
-            Assert.That(File.Exists(savedFile), Is.True);
-            Assert.That(File.ReadAllBytes(savedFile), Is.EqualTo(new byte[] { 0x01 }));
+            AssertAllureAttachmentSourceContract(attachmentSources);
+            Assert.That(attachmentSources, Has.Count.EqualTo(2));
+            Assert.That(attachmentSources.Distinct().Count(), Is.EqualTo(1));
+            Assert.That(physicalAttachments, Has.Length.EqualTo(1));
             Assert.That(
-                Directory.GetFiles(Path.Combine(AllureResultsFolder, "Attachments")),
+                Path.GetFileName(physicalAttachments.Single()),
+                Is.EqualTo(attachmentSources.First())
+            );
+            Assert.That(
+                File.ReadAllText(physicalAttachments.Single()),
+                Does.Contain("\"Name\": \"repeated-session\"")
+            );
+        });
+    }
+
+    [Test]
+    public async Task WriteTestResults_ConcurrentAssertions_ReusesSharedPhysicalAttachment()
+    {
+        Reporter!.SaveSessionData = true;
+        Reporter.SaveLogs = false;
+        Reporter.SaveTemplate = false;
+        Reporter.SaveAttachments = false;
+        var sessionData = new SessionData
+        {
+            Name = "concurrent-session",
+            UtcStartTime = DateTime.UtcNow.AddSeconds(-1),
+            UtcEndTime = DateTime.UtcNow,
+            SessionFailures = [],
+        };
+        AssertionResult BuildAssertionResult(string name) =>
+            new()
+            {
+                Assertion = new Assertion
+                {
+                    Name = name,
+                    AssertionName = "ConcurrentAssertion",
+                    SessionDataList = new List<SessionData> { sessionData }.ToImmutableList(),
+                    StatusesToReport = null,
+                },
+                AssertionStatus = AssertionStatus.Passed,
+                TestDurationMs = 10,
+                Flaky = new Flaky { IsFlaky = false, FlakinessReasons = [] },
+            };
+
+        using var startBarrier = new Barrier(2);
+        var writes = new[] { "concurrent-assertion-a", "concurrent-assertion-b" }
+            .Select(name =>
+                Task.Run(() =>
+                {
+                    startBarrier.SignalAndWait();
+                    Reporter.WriteTestResults(BuildAssertionResult(name));
+                })
+            )
+            .ToArray();
+        await Task.WhenAll(writes);
+
+        var attachmentSources = new List<string>();
+        foreach (
+            var resultFile in Directory.GetFiles(
+                AllureResultsFolder,
+                "*-result.json",
+                SearchOption.TopDirectoryOnly
+            )
+        )
+        {
+            using var resultDocument = JsonDocument.Parse(File.ReadAllText(resultFile));
+            attachmentSources.AddRange(GetAttachmentSources(resultDocument.RootElement));
+        }
+
+        Assert.Multiple(() =>
+        {
+            AssertAllureAttachmentSourceContract(attachmentSources);
+            Assert.That(attachmentSources, Has.Count.EqualTo(2));
+            Assert.That(attachmentSources.Distinct().Count(), Is.EqualTo(1));
+            Assert.That(
+                Directory.GetFiles(
+                    AllureResultsFolder,
+                    "*-attachment.json",
+                    SearchOption.TopDirectoryOnly
+                ),
                 Has.Length.EqualTo(1)
             );
         });
     }
 
     [Test]
-    public void SaveAttachmentIfNotAlreadySaved_WithNullFileName_ThrowsInvalidOperationException()
+    public void WriteTestResults_AttachmentWriteFails_RemovesCacheEntryAndAllowsRetry()
     {
-        var reporter = new ExposedAllureReporter
+        var realFileSystem = new FileSystem();
+        var file = new Mock<IFile>();
+        var writeAttempts = 0;
+        file.Setup(fileSystem => fileSystem.WriteAllBytes(It.IsAny<string>(), It.IsAny<byte[]>()))
+            .Callback(
+                (string path, byte[] content) =>
+                {
+                    if (Interlocked.Increment(ref writeAttempts) == 1)
+                        throw new IOException("simulated attachment write failure");
+                    realFileSystem.File.WriteAllBytes(path, content);
+                }
+            );
+        var fileSystem = new Mock<IFileSystem>();
+        fileSystem.SetupGet(candidate => candidate.Directory).Returns(realFileSystem.Directory);
+        fileSystem.SetupGet(candidate => candidate.File).Returns(file.Object);
+
+        Reporter!.FileSystem = fileSystem.Object;
+        Reporter.SaveSessionData = true;
+        Reporter.SaveLogs = false;
+        Reporter.SaveTemplate = false;
+        Reporter.SaveAttachments = false;
+        var sessionData = new SessionData
         {
-            Context = new Context { Logger = Globals.Logger },
-            FileSystem = new FileSystem(),
+            Name = "retry-session",
+            UtcStartTime = DateTime.UtcNow.AddSeconds(-1),
+            UtcEndTime = DateTime.UtcNow,
+            SessionFailures = [],
         };
-
-        Assert.Throws<InvalidOperationException>(() =>
-            reporter.SaveAttachment([0x01], "Attachments", null!)
-        );
-    }
-
-    [Test]
-    public void SaveSessionLogToAllure_WhenNoLogWasStored_ReturnsNull()
-    {
-        var method = Reporter!
-            .GetType()
-            .GetMethod("SaveSessionLogToAllure", BindingFlags.NonPublic | BindingFlags.Instance)!;
-
-        var attachment = method.Invoke(
-            Reporter,
-            [new SessionData { Name = "missing-log-session" }]
-        );
-
-        Assert.That(attachment, Is.Null);
-    }
-
-    [Test]
-    public void SaveAssertionAttachmentsToAllure_WhenAssertionHookIsMissing_ReturnsEmptyList()
-    {
         var assertionResult = new AssertionResult
         {
             Assertion = new Assertion
             {
-                Name = "no-hook",
-                AssertionName = "NoHookAssertion",
-                AssertionHook = null,
+                Name = "retry-assertion",
+                AssertionName = "RetryAssertion",
+                SessionDataList = new List<SessionData> { sessionData }.ToImmutableList(),
                 StatusesToReport = null,
             },
             AssertionStatus = AssertionStatus.Passed,
-            TestDurationMs = 0,
-            Flaky = null,
+            TestDurationMs = 10,
+            Flaky = new Flaky { IsFlaky = false, FlakinessReasons = [] },
         };
 
-        var attachments =
-            (List<Attachment>)
-                Reporter!
-                    .GetType()
-                    .GetMethod(
-                        "SaveAssertionAttachmentsToAllure",
-                        BindingFlags.NonPublic | BindingFlags.Instance
-                    )!
-                    .Invoke(Reporter, [assertionResult])!;
+        Assert.Throws<IOException>(() => Reporter.WriteTestResults(assertionResult));
+        Assert.DoesNotThrow(() => Reporter.WriteTestResults(assertionResult));
 
-        Assert.That(attachments, Is.Empty);
+        var resultFile = Directory
+            .GetFiles(AllureResultsFolder, "*-result.json", SearchOption.TopDirectoryOnly)
+            .Single();
+        using var resultDocument = JsonDocument.Parse(File.ReadAllText(resultFile));
+        var attachmentSource = GetAttachmentSources(resultDocument.RootElement).Single();
+        Assert.Multiple(() =>
+        {
+            Assert.That(writeAttempts, Is.EqualTo(2));
+            AssertAllureAttachmentSourceContract([attachmentSource]);
+            Assert.That(
+                File.ReadAllText(Path.Combine(AllureResultsFolder, attachmentSource)),
+                Does.Contain("\"Name\": \"retry-session\"")
+            );
+        });
     }
 
     [Test]
-    public void SaveAssertionAttachmentsToAllure_WithDuplicateNormalizedPaths_ThrowsInvalidOperationException()
+    public void WriteTestResults_WithHostileLongCustomExtension_UsesSafeMediaTypeExtension()
     {
+        Reporter!.SaveSessionData = false;
+        Reporter.SaveTemplate = false;
+        Reporter.SaveAttachments = true;
+        var assertionResult = new AssertionResult
+        {
+            Assertion = new Assertion
+            {
+                Name = "unsupported-extension",
+                AssertionName = "UnsupportedExtensionAssertion",
+                AssertionHook = new AssertionHookMock
+                {
+                    AssertionAttachments =
+                    [
+                        new AssertionAttachment
+                        {
+                            Path = $"payload.{new string('x', 120)}!",
+                            SerializationType = SerializationType.Json,
+                            Data = new { Value = 5 },
+                        },
+                    ],
+                },
+                SessionDataList = [],
+                StatusesToReport = null,
+            },
+            AssertionStatus = AssertionStatus.Passed,
+            TestDurationMs = 10,
+            Flaky = new Flaky { IsFlaky = false, FlakinessReasons = [] },
+        };
+
+        Reporter.WriteTestResults(assertionResult);
+        var resultFile = Directory
+            .GetFiles(AllureResultsFolder, "*-result.json", SearchOption.TopDirectoryOnly)
+            .Single();
+        using var resultDocument = JsonDocument.Parse(File.ReadAllText(resultFile));
+        var attachmentSource = GetAttachmentSources(resultDocument.RootElement).Single();
+
+        Assert.Multiple(() =>
+        {
+            AssertAllureAttachmentSourceContract([attachmentSource]);
+            Assert.That(attachmentSource, Does.EndWith("-attachment.json"));
+        });
+    }
+
+    [Test]
+    public void WriteTestResults_WithDuplicateNormalizedCustomAttachmentPaths_ThrowsInvalidOperationException()
+    {
+        Reporter!.SaveSessionData = false;
+        Reporter.SaveTemplate = false;
+        Reporter.SaveAttachments = true;
         var assertionResult = new AssertionResult
         {
             Assertion = new Assertion
@@ -885,29 +1092,23 @@ public class AllureReporterTests
                 },
                 Name = "duplicate-attachments",
                 AssertionName = "DuplicateAttachmentAssertion",
+                SessionDataList = [],
                 StatusesToReport = null,
             },
             AssertionStatus = AssertionStatus.Passed,
             TestDurationMs = 0,
-            Flaky = null,
+            Flaky = new Flaky { IsFlaky = false, FlakinessReasons = [] },
         };
 
-        var method = Reporter!
-            .GetType()
-            .GetMethod(
-                "SaveAssertionAttachmentsToAllure",
-                BindingFlags.NonPublic | BindingFlags.Instance
-            )!;
-
-        var exception = Assert.Throws<TargetInvocationException>(() =>
-            method.Invoke(Reporter, [assertionResult])
-        );
-        Assert.That(exception!.InnerException, Is.TypeOf<InvalidOperationException>());
+        Assert.Throws<InvalidOperationException>(() => Reporter.WriteTestResults(assertionResult));
     }
 
     [Test]
-    public void SaveAssertionAttachmentsToAllure_WithMissingFileName_ThrowsInvalidOperationException()
+    public void WriteTestResults_WithMissingCustomAttachmentFileName_ThrowsInvalidOperationException()
     {
+        Reporter!.SaveSessionData = false;
+        Reporter.SaveTemplate = false;
+        Reporter.SaveAttachments = true;
         var assertionResult = new AssertionResult
         {
             Assertion = new Assertion
@@ -926,29 +1127,23 @@ public class AllureReporterTests
                 },
                 Name = "missing-file-name",
                 AssertionName = "MissingFileNameAssertion",
+                SessionDataList = [],
                 StatusesToReport = null,
             },
             AssertionStatus = AssertionStatus.Passed,
             TestDurationMs = 0,
-            Flaky = null,
+            Flaky = new Flaky { IsFlaky = false, FlakinessReasons = [] },
         };
 
-        var method = Reporter!
-            .GetType()
-            .GetMethod(
-                "SaveAssertionAttachmentsToAllure",
-                BindingFlags.NonPublic | BindingFlags.Instance
-            )!;
-
-        var exception = Assert.Throws<TargetInvocationException>(() =>
-            method.Invoke(Reporter, [assertionResult])
-        );
-        Assert.That(exception!.InnerException, Is.TypeOf<InvalidOperationException>());
+        Assert.Throws<InvalidOperationException>(() => Reporter.WriteTestResults(assertionResult));
     }
 
     [Test]
-    public void GetCoveragesAsAttachments_FiltersByExecutionCaseAndSessionName()
+    public void WriteTestResults_WithCoverage_FiltersAndCopiesItToAllureCompatibleAttachmentSource()
     {
+        Reporter!.SaveSessionData = false;
+        Reporter.SaveTemplate = false;
+        Reporter.SaveAttachments = false;
         Reporter!.Context = new Context
         {
             Logger = Globals.Logger,
@@ -979,7 +1174,13 @@ public class AllureReporterTests
                 AssertionName = "CoverageAssertion",
                 SessionDataList = new List<SessionData>
                 {
-                    new() { Name = "session-a", SessionFailures = [] },
+                    new()
+                    {
+                        Name = "session-a",
+                        UtcStartTime = DateTime.UtcNow.AddSeconds(-1),
+                        UtcEndTime = DateTime.UtcNow,
+                        SessionFailures = [],
+                    },
                 }.ToImmutableList(),
                 StatusesToReport = null,
             },
@@ -988,18 +1189,29 @@ public class AllureReporterTests
             Flaky = new Flaky { IsFlaky = false, FlakinessReasons = [] },
         };
 
-        var method = Reporter
-            .GetType()
-            .GetMethod(
-                "GetCoveragesAsAttachments",
-                BindingFlags.NonPublic | BindingFlags.Instance
-            )!;
-        var attachments = (List<Attachment>)method.Invoke(Reporter, [assertionResult])!;
+        Reporter.WriteTestResults(assertionResult);
+        var resultFile = Directory
+            .GetFiles(AllureResultsFolder, "*-result.json", SearchOption.TopDirectoryOnly)
+            .Single();
+        using var resultDocument = JsonDocument.Parse(File.ReadAllText(resultFile));
+        var attachment = resultDocument
+            .RootElement.GetProperty("attachments")
+            .EnumerateArray()
+            .Single();
+        var attachmentSource = attachment.GetProperty("source").GetString()!;
+        var attachmentFile = Path.Combine(AllureResultsFolder, attachmentSource);
 
-        Assert.That(
-            attachments.Select(attachment => attachment.name),
-            Is.EqualTo(new[] { "exec-1-case-a-session-a.xml" })
-        );
+        Assert.Multiple(() =>
+        {
+            Assert.That(
+                attachment.GetProperty("name").GetString(),
+                Is.EqualTo("exec-1-case-a-session-a.xml")
+            );
+            Assert.That(attachment.GetProperty("type").GetString(), Is.EqualTo("application/xml"));
+            AssertAllureAttachmentSourceContract([attachmentSource]);
+            Assert.That(File.ReadAllText(attachmentFile), Is.EqualTo("match"));
+            Assert.That(Directory.GetFiles(coverageDirectory), Has.Length.EqualTo(4));
+        });
     }
 
     [TestCase(AssertionStatus.Passed, "hook-message", "hook-trace")]
@@ -1236,165 +1448,6 @@ public class AllureReporterTests
     }
 
     [Test]
-    public void GetAttachmentsForAssertion_WithSaveFlagsDisabledAndNoCoverage_ReturnsEmptyList()
-    {
-        Reporter!.SaveAttachments = false;
-        Reporter.SaveTemplate = false;
-        var assertionResult = new AssertionResult
-        {
-            Assertion = new Assertion
-            {
-                Name = "no-attachments",
-                AssertionName = "NoAttachmentsAssertion",
-                SessionDataList = [],
-                StatusesToReport = null,
-            },
-            AssertionStatus = AssertionStatus.Passed,
-            Flaky = new Flaky { IsFlaky = false, FlakinessReasons = [] },
-        };
-
-        var attachments =
-            (List<Attachment>)
-                Reporter
-                    .GetType()
-                    .GetMethod(
-                        "GetAttachmentsForAssertion",
-                        BindingFlags.NonPublic | BindingFlags.Instance
-                    )!
-                    .Invoke(Reporter, [assertionResult])!;
-
-        Assert.That(attachments, Is.Empty);
-    }
-
-    [Test]
-    public void GetAttachmentsForAssertion_WithTemplateOnly_ReturnsTemplateAttachment()
-    {
-        Reporter!.SaveAttachments = false;
-        Reporter.SaveTemplate = true;
-        Reporter.Context = new Context
-        {
-            Logger = Globals.Logger,
-            RootConfiguration = new ConfigurationBuilder()
-                .AddInMemoryCollection(
-                    new Dictionary<string, string?>
-                    {
-                        ["MetaData:System"] = "QaaS",
-                        ["MetaData:Team"] = "Smoke",
-                    }
-                )
-                .Build(),
-        };
-        var assertionResult = new AssertionResult
-        {
-            Assertion = new Assertion
-            {
-                Name = "template-only",
-                AssertionName = "TemplateOnlyAssertion",
-                SessionDataList = [],
-                StatusesToReport = null,
-            },
-            AssertionStatus = AssertionStatus.Passed,
-            Flaky = new Flaky { IsFlaky = false, FlakinessReasons = [] },
-        };
-
-        var attachments =
-            (List<Attachment>)
-                Reporter
-                    .GetType()
-                    .GetMethod(
-                        "GetAttachmentsForAssertion",
-                        BindingFlags.NonPublic | BindingFlags.Instance
-                    )!
-                    .Invoke(Reporter, [assertionResult])!;
-
-        Assert.That(attachments, Has.Count.EqualTo(1));
-        Assert.That(attachments[0].source, Does.EndWith("template.yaml"));
-        Assert.That(attachments[0].type, Is.EqualTo("application/yaml"));
-    }
-
-    [Test]
-    public void GetAttachmentsForAssertion_WithCustomAttachmentsOnly_ReturnsCustomAttachment()
-    {
-        Reporter!.SaveAttachments = true;
-        Reporter.SaveTemplate = false;
-        var assertionResult = new AssertionResult
-        {
-            Assertion = new Assertion
-            {
-                Name = "custom-attachments",
-                AssertionName = "CustomAttachmentAssertion",
-                AssertionHook = new AssertionHookMock
-                {
-                    AssertionAttachments =
-                    [
-                        new AssertionAttachment
-                        {
-                            Path = "payload.json",
-                            SerializationType = SerializationType.Json,
-                            Data = new { Value = 5 },
-                        },
-                    ],
-                },
-                SessionDataList = [],
-                StatusesToReport = null,
-            },
-            AssertionStatus = AssertionStatus.Passed,
-            Flaky = new Flaky { IsFlaky = false, FlakinessReasons = [] },
-        };
-
-        var attachments =
-            (List<Attachment>)
-                Reporter
-                    .GetType()
-                    .GetMethod(
-                        "GetAttachmentsForAssertion",
-                        BindingFlags.NonPublic | BindingFlags.Instance
-                    )!
-                    .Invoke(Reporter, [assertionResult])!;
-
-        Assert.That(attachments, Has.Count.EqualTo(1));
-        Assert.That(attachments[0].source, Does.EndWith("payload.json"));
-        Assert.That(File.Exists(Path.Combine(AllureResultsFolder, attachments[0].source)), Is.True);
-    }
-
-    [Test]
-    public void SaveDataToAllure_WithNullFileName_ThrowsInvalidOperationException()
-    {
-        var method = Reporter!
-            .GetType()
-            .GetMethod("SaveDataToAllure", BindingFlags.NonPublic | BindingFlags.Instance)!;
-
-        var exception = Assert.Throws<TargetInvocationException>(() =>
-            method.Invoke(
-                Reporter,
-                [new byte[] { 0x01 }, null, "Attachments", "attachment", "text/plain"]
-            )
-        );
-
-        Assert.That(exception!.InnerException, Is.TypeOf<InvalidOperationException>());
-    }
-
-    [Test]
-    public void SaveDataToAllure_WithEmptyAttachmentDirectory_UsesFileNameAsSource()
-    {
-        var method = Reporter!
-            .GetType()
-            .GetMethod("SaveDataToAllure", BindingFlags.NonPublic | BindingFlags.Instance)!;
-
-        var attachment = (Attachment)
-            method.Invoke(
-                Reporter,
-                [new byte[] { 0x01 }, "root-file.txt", string.Empty, "root-file", "text/plain"]
-            )!;
-
-        Assert.Multiple(() =>
-        {
-            Assert.That(attachment.source, Is.EqualTo("root-file.txt"));
-            Assert.That(File.Exists(Path.Combine(AllureResultsFolder, "root-file.txt")), Is.True);
-        });
-    }
-
-    [Test]
     public void AddTestCaseLabelsIfIsPartOfTestCase_AddsSuiteLabelsOnlyWhenCaseExists()
     {
         var method = Reporter!
@@ -1576,13 +1629,18 @@ public class AllureReporterTests
     {
         Reporter!.SaveSessionData = false;
         Reporter.SaveLogs = false;
-        var assertion = new Assertion { SaveSessionData = false, SaveLogs = false };
         var sessionData = new SessionData
         {
             Name = "clean-session",
             UtcStartTime = DateTime.UtcNow.AddSeconds(-1),
             UtcEndTime = DateTime.UtcNow,
             SessionFailures = [],
+        };
+        var assertion = new Assertion
+        {
+            Name = "clean-assertion",
+            AssertionName = "CleanAssertion",
+            StatusesToReport = null,
         };
 
         var step = (StepResult)
