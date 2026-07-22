@@ -262,8 +262,8 @@ public class ReportPortalLaunchPlanTests
         });
     }
 
-    [TestCase(null, "Local")]
-    [TestCase("10.0.0.1", "CI")]
+    [TestCase(null, "local")]
+    [TestCase("10.0.0.1", "k8s")]
     [NonParallelizable]
     public void BuildLaunchAttributes_UsesFrameworkExecutionEnvironment(
         string? kubernetesServiceHost,
