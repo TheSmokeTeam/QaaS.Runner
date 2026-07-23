@@ -1,0 +1,18 @@
+MetaData:
+  Team: investigation
+  System: runner
+
+Sessions:
+  - Name: empty-http-get
+    Stages:
+      - StageNumber: 2
+        TimeoutAfter: 0
+    Transactions:
+      - Name: ping
+        TimeoutMs: 100
+        SendEmptyRequest: true
+        Http:
+          Method: Get
+          BaseAddress: http://127.0.0.1
+          Port: 1
+          Route: /

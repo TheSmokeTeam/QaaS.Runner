@@ -1,0 +1,19 @@
+MetaData:
+  Team: regression
+  System: runner
+
+Sessions:
+  - Name: invalid-http-get
+    Stages:
+      - StageNumber: 2
+        TimeoutAfter: 0
+    Transactions:
+      - Name: read
+        TimeoutMs: 100
+        SendEmptyRequest: false
+        DataSourceNames: []
+        Http:
+          Method: Get
+          BaseAddress: http://127.0.0.1
+          Port: 1
+          Route: /

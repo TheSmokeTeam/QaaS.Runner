@@ -37,6 +37,7 @@ public class Transaction : StagedAction
 
     private readonly SerializationType? _serializationType;
     private readonly ISerializer? _serializer;
+    private readonly bool _sendEmptyRequest;
     private readonly ITransactor _transactor;
 
     private IEnumerable<Data<object>>? _generatedData;
@@ -50,6 +51,18 @@ public class Transaction : StagedAction
         Policy? policies, bool loop, int? parallelism, int iterations, ulong sleepTimeMs,
         SerializationType? serializationType, SerializationType? deserializationType, Type? deserializerSpecificType,
         string[]? dataSourcePatterns, string[]? dataSourceNames, ILogger logger) :
+        this(name, transactor, stage, inputDataFilter, outputDataFilter, policies, loop, parallelism, iterations,
+            sleepTimeMs, serializationType, deserializationType, deserializerSpecificType, dataSourcePatterns,
+            dataSourceNames, logger, false)
+    {
+    }
+
+    internal Transaction(string name,
+        ITransactor transactor,
+        int stage, DataFilter inputDataFilter, DataFilter outputDataFilter,
+        Policy? policies, bool loop, int? parallelism, int iterations, ulong sleepTimeMs,
+        SerializationType? serializationType, SerializationType? deserializationType, Type? deserializerSpecificType,
+        string[]? dataSourcePatterns, string[]? dataSourceNames, ILogger logger, bool sendEmptyRequest) :
         base(name, stage, policies, logger)
     {
         _transactor = transactor;
@@ -62,11 +75,12 @@ public class Transaction : StagedAction
         _parallelism = parallelism;
         _parallelismSemaphore = parallelism is { } p ? new SemaphoreSlim(p, p) : null;
         _iterations = iterations;
-        _serializationType = serializationType;
+        _serializationType = sendEmptyRequest ? null : serializationType;
         _deserializationType = deserializationType;
         _deserializer = DeserializerFactory.BuildDeserializer(deserializationType);
         _deserializerSpecificType = deserializerSpecificType;
-        _serializer = SerializerFactory.BuildSerializer(serializationType);
+        _serializer = SerializerFactory.BuildSerializer(_serializationType);
+        _sendEmptyRequest = sendEmptyRequest;
         Logger.LogInformation(
             "Initializing Transaction {Name} with transactor of type {TransactorType} with Input Serializer {Serializer} and Output Deserializer {Deserializer}",
             Name, transactor.GetType(), _serializer, _deserializer);
@@ -84,20 +98,29 @@ public class Transaction : StagedAction
 
     public void InitializeIterableSerializableSaveIterator(List<SessionData?> ranSessions, List<DataSource> dataSources)
     {
-        _generatedData = EnumerableExtensions.GetFilteredConfigurationObjectList(dataSources.ToImmutableList(),
-                _dataSourcePatterns,
-                RegexFilters.DataSource,
-                "DataSource List")
-            .Union(EnumerableExtensions.GetFilteredConfigurationObjectList(dataSources.ToImmutableList(),
-                _dataSourceNames,
-                NameFilters.DataSource,
-                "DataSource List")).SelectMany(ds =>
-                ds.Retrieve(ranSessions.Where(sessionData => sessionData != null).ToImmutableList()!));
-        _iterableSerializableSaveIterator = new IterableSerializableDataIterator(_generatedData, _serializer);
+        if (_sendEmptyRequest)
+        {
+            _generatedData = [new Data<object> { Body = Array.Empty<byte>() }];
+            _iterableSerializableSaveIterator = new IterableSerializableDataIterator(_generatedData, null);
+        }
+        else
+        {
+            _generatedData = EnumerableExtensions.GetFilteredConfigurationObjectList(dataSources.ToImmutableList(),
+                    _dataSourcePatterns,
+                    RegexFilters.DataSource,
+                    "DataSource List")
+                .Union(EnumerableExtensions.GetFilteredConfigurationObjectList(dataSources.ToImmutableList(),
+                    _dataSourceNames,
+                    NameFilters.DataSource,
+                    "DataSource List")).SelectMany(ds =>
+                    ds.Retrieve(ranSessions.Where(sessionData => sessionData != null).ToImmutableList()!));
+            _iterableSerializableSaveIterator = new IterableSerializableDataIterator(_generatedData, _serializer);
+        }
         Logger.LogDebug(
-            "Prepared transaction {ActionName}. DataSourceNames={DataSourceNames}, DataSourcePatterns={DataSourcePatterns}, Parallelism={Parallelism}",
+            "Prepared transaction {ActionName}. DataSourceNames={DataSourceNames}, DataSourcePatterns={DataSourcePatterns}, SendEmptyRequest={SendEmptyRequest}, Parallelism={Parallelism}",
             Name, _dataSourceNames == null ? "<none>" : string.Join(", ", _dataSourceNames),
-            _dataSourcePatterns == null ? "<none>" : string.Join(", ", _dataSourcePatterns), _parallelism);
+            _dataSourcePatterns == null ? "<none>" : string.Join(", ", _dataSourcePatterns), _sendEmptyRequest,
+            _parallelism);
     }
 
     internal override InternalCommunicationData<object> Act()
