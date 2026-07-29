@@ -127,7 +127,7 @@ internal sealed class ReportPortalLaunchPlan
         attributes.Add(Attr("system", System));
 
         if (SessionNames.Count > 0)
-            attributes.Add(Attr("sessions", string.Join(", ", SessionNames)));
+            attributes.Add(Attr("sessionNames", string.Join(", ", SessionNames)));
         attributes.AddRange(Attributes.Select(attribute => Attr(attribute.Key, attribute.Value)));
 
         return attributes;
@@ -279,6 +279,16 @@ internal sealed class ReportPortalLaunchPlan
         if (caseNames.Length > 0)
             attributes["caseNames"] = string.Join(", ", caseNames);
 
+        var executionIds = reporterResults
+            .Select(reporter => reporter.Reporter.Context.ExecutionId)
+            .Where(executionId => !string.IsNullOrWhiteSpace(executionId))
+            .Select(executionId => executionId!)
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .OrderBy(executionId => executionId, StringComparer.OrdinalIgnoreCase)
+            .ToArray();
+        if (executionIds.Length > 0)
+            attributes["executionIds"] = string.Join(", ", executionIds);
+
         AddConfiguredAttributes(attributes, configAttributes);
         return attributes;
     }
@@ -287,7 +297,7 @@ internal sealed class ReportPortalLaunchPlan
     /// Builds the fallback launch name when the ReportPortal configuration does not provide one.
     /// </summary>
     private static string BuildDefaultLaunchName(string team, string system) =>
-        $"QaaS run | {team} | {system}";
+        $"{team} | {system}";
 
     /// <summary>
     /// Builds the fallback launch description from assertion-status percentages.

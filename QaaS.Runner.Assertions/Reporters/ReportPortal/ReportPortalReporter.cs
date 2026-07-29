@@ -332,7 +332,7 @@ public class ReportPortalReporter : BaseReporter
         {
             attributes.Add(new ItemAttribute
             {
-                Key = "sessions",
+                Key = "sessionNames",
                 Value = string.Join(", ", sessionNames)
             });
         }

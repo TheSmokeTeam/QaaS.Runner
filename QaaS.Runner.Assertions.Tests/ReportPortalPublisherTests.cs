@@ -278,7 +278,7 @@ public class ReportPortalPublisherTests
     }
 
     [Test]
-    public async Task PublishAsync_KeepsContextAndMetadataOnlyInItemDetails()
+    public async Task PublishAsync_AddsExecutionIdsToLaunchAndExecutionIdToItemDetails()
     {
         var factory = new RecordingClientFactory();
         using var publisher = CreateSuccessfulPublisher(factory, out _);
@@ -321,6 +321,8 @@ public class ReportPortalPublisherTests
             Assert.That(itemRequest.Attributes.Any(attribute => attribute.Key == "LaunchOnly"), Is.False);
             Assert.That(service.LaunchStartRequests.Single().Attributes.Any(attribute =>
                 attribute.Key == "LaunchOnly" && attribute.Value == "value"), Is.True);
+            Assert.That(service.LaunchStartRequests.Single().Attributes.Any(attribute =>
+                attribute.Key == "executionIds" && attribute.Value == "execution-1"), Is.True);
             Assert.That(itemRequest.Description, Does.Not.Contain("Execution context:"));
             Assert.That(itemRequest.Description, Does.Not.Contain("Metadata attributes:"));
             Assert.That(itemRequest.Description, Does.Not.Contain("execution-1"));
@@ -378,7 +380,7 @@ public class ReportPortalPublisherTests
     }
 
     [Test]
-    public async Task PublishAsync_AddsAssertionScopedSessionsAndSessionCount()
+    public async Task PublishAsync_AddsAssertionScopedSessionNamesAndSessionCount()
     {
         var factory = new RecordingClientFactory();
         using var publisher = CreateSuccessfulPublisher(factory, out _);
@@ -402,9 +404,11 @@ public class ReportPortalPublisherTests
         Assert.Multiple(() =>
         {
             Assert.That(items["assertion-a"].Attributes.Single(attribute =>
-                attribute.Key == "sessions").Value, Is.EqualTo("Session A, Session B"));
+                attribute.Key == "sessionNames").Value, Is.EqualTo("Session A, Session B"));
             Assert.That(items["assertion-b"].Attributes.Single(attribute =>
-                attribute.Key == "sessions").Value, Is.EqualTo("Session C"));
+                attribute.Key == "sessionNames").Value, Is.EqualTo("Session C"));
+            Assert.That(items.Values.SelectMany(item => item.Attributes).Any(attribute =>
+                attribute.Key == "sessions"), Is.False);
             Assert.That(items.Values.SelectMany(item => item.Attributes).Any(attribute =>
                 attribute.Key == "session"), Is.False);
             Assert.That(items["assertion-a"].Attributes.Single(attribute =>

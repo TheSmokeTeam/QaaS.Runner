@@ -78,7 +78,7 @@ public class ReportPortalLaunchPlanTests
 
         Assert.That(
             launchPlan.LaunchName,
-            Is.EqualTo("QaaS run | Smoke | QaaS")
+            Is.EqualTo("Smoke | QaaS")
         );
         Assert.That(
             launchPlan.Description,
@@ -204,10 +204,11 @@ public class ReportPortalLaunchPlanTests
         );
         Assert.That(
             attributes.Any(attribute =>
-                attribute.Key == "sessions" && attribute.Value == "Session A, Session B"
+                attribute.Key == "sessionNames" && attribute.Value == "Session A, Session B"
             ),
             Is.True
         );
+        Assert.That(attributes.Any(attribute => attribute.Key == "sessions"), Is.False);
         Assert.That(attributes.Any(attribute => attribute.Key == "session"), Is.False);
         Assert.That(
             attributes.Any(attribute => attribute.Key == "Component" && attribute.Value == "Auth"),
@@ -226,10 +227,10 @@ public class ReportPortalLaunchPlanTests
     }
 
     [Test]
-    public void BuildLaunchAttributes_AggregatesCaseNamesAndOmitsExecutionIds()
+    public void BuildLaunchAttributes_AggregatesCaseNamesAndExecutionIds()
     {
-        var firstReporter = CreateReporter(executionId: "execution-1", caseName: "case-b");
-        var secondReporter = CreateReporter(executionId: "execution-2", caseName: "case-a");
+        var firstReporter = CreateReporter(executionId: "execution-2", caseName: "case-b");
+        var secondReporter = CreateReporter(executionId: "execution-1", caseName: "case-a");
         firstReporter.WriteTestResults(CreateResult("assertion-a", "Session B"));
         secondReporter.WriteTestResults(CreateResult("assertion-b", "Session A"));
 
@@ -240,6 +241,13 @@ public class ReportPortalLaunchPlanTests
 
         Assert.Multiple(() =>
         {
+            Assert.That(
+                attributes.Any(attribute =>
+                    attribute.Key == "executionIds"
+                    && attribute.Value == "execution-1, execution-2"
+                ),
+                Is.True
+            );
             Assert.That(attributes.Any(attribute => attribute.Key == "executionId"), Is.False);
             Assert.That(attributes.Any(attribute => attribute.Key == "caseName"), Is.False);
             Assert.That(
@@ -250,10 +258,11 @@ public class ReportPortalLaunchPlanTests
             );
             Assert.That(
                 attributes.Any(attribute =>
-                    attribute.Key == "sessions" && attribute.Value == "Session A, Session B"
+                    attribute.Key == "sessionNames" && attribute.Value == "Session A, Session B"
                 ),
                 Is.True
             );
+            Assert.That(attributes.Any(attribute => attribute.Key == "sessions"), Is.False);
             Assert.That(attributes.Any(attribute => attribute.Key == "session"), Is.False);
         });
     }
@@ -296,7 +305,7 @@ public class ReportPortalLaunchPlanTests
 
         Assert.That(
             launchPlan.LaunchName,
-            Is.EqualTo("QaaS run | Smoke | QaaS")
+            Is.EqualTo("Smoke | QaaS")
         );
     }
 
