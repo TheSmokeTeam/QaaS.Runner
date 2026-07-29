@@ -225,8 +225,7 @@ internal sealed class ReportPortalLaunchPlan
             system,
             sessionNames,
             firstConfig.LaunchName ?? BuildDefaultLaunchName(team, system),
-            firstConfig.Description
-                ?? BuildDefaultDescription(launchStartTimeUtc, launchEndTimeUtc, reporterResults),
+            firstConfig.Description ?? BuildDefaultDescription(reporterResults),
             launchStartTimeUtc,
             launchEndTimeUtc,
             firstConfig.DebugMode == true,
@@ -291,11 +290,9 @@ internal sealed class ReportPortalLaunchPlan
         $"QaaS run | {team} | {system}";
 
     /// <summary>
-    /// Builds the fallback launch description from launch timing and assertion-status percentages.
+    /// Builds the fallback launch description from assertion-status percentages.
     /// </summary>
     private static string BuildDefaultDescription(
-        DateTime launchStartTimeUtc,
-        DateTime launchEndTimeUtc,
         IReadOnlyList<ReportPortalReporterResults> reporterResults
     )
     {
@@ -303,23 +300,15 @@ internal sealed class ReportPortalLaunchPlan
             .SelectMany(reporter => reporter.Assertions)
             .Select(assertion => assertion.Result.AssertionStatus)
             .ToList();
-        var timingDescription =
-            $"Start time: {FormatLaunchTime(launchStartTimeUtc)} | End time: {FormatLaunchTime(launchEndTimeUtc)}";
-        var statusDescription = string.Join(
+
+        return string.Join(
             " | ",
             Enum.GetValues<AssertionStatus>()
                 .Select(status =>
                     $"{GetStatusColor(status)} {status} {FormatStatusPercentage(status, assertionStatuses)}%"
                 )
         );
-
-        return string.Join(Environment.NewLine, timingDescription, statusDescription);
     }
-
-    private static string FormatLaunchTime(DateTime timestamp) =>
-        timestamp
-            .ToUniversalTime()
-            .ToString("yyyy-MM-dd HH:mm:ss 'UTC'", CultureInfo.InvariantCulture);
 
     private static ReportPortalAssertionPlan BuildAssertionPlan(
         ReportPortalReporter reporter,
