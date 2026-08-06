@@ -383,3 +383,11 @@ Chart.lock
 
 # local restore scratch directories created during CI/debug verification
 .tmp-packages-*/
+
+# macOS metadata
+.DS_Store
+
+# graphify
+/.codex/
+/.claude/
+/graphify-out/

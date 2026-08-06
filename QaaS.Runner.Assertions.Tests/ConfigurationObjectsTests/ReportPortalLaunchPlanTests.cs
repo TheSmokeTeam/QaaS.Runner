@@ -64,7 +64,7 @@ public class ReportPortalLaunchPlanTests
     }
 
     [Test]
-    public void Build_WithQueuedResults_GeneratesStableLaunchNameAndSummaryDescription()
+    public void Build_WithQueuedResults_GeneratesStableLaunchNameAndStatusOnlyDescription()
     {
         var reporter = CreateReporter();
         reporter.WriteTestResults(CreateResult("assertion-a", "Session A"));
@@ -78,13 +78,12 @@ public class ReportPortalLaunchPlanTests
 
         Assert.That(
             launchPlan.LaunchName,
-            Is.EqualTo("QaaS run | Smoke | QaaS")
+            Is.EqualTo("Smoke | QaaS")
         );
         Assert.That(
             launchPlan.Description,
             Is.EqualTo(
-                $"Start time: 2025-01-01 10:00:00 UTC | End time: 2025-01-01 10:00:00 UTC{Environment.NewLine}"
-                    + "🟢 Passed 100% | 🔴 Failed 0% | 🟡 Broken 0% | 🟣 Unknown 0% | ⚪ Skipped 0%"
+                "🟢 Passed 100% | 🔴 Failed 0% | 🟡 Broken 0% | 🟣 Unknown 0% | ⚪ Skipped 0%"
             )
         );
     }
@@ -105,20 +104,16 @@ public class ReportPortalLaunchPlanTests
         );
         var descriptionLines = launchPlan.Description.Split(Environment.NewLine);
 
-        Assert.That(descriptionLines, Has.Length.EqualTo(2));
+        Assert.That(descriptionLines, Has.Length.EqualTo(1));
         Assert.Multiple(() =>
         {
-            Assert.That(
-                descriptionLines[0],
-                Is.EqualTo(
-                    "Start time: 2025-01-01 10:00:00 UTC | End time: 2025-01-01 10:00:00 UTC"
-                )
-            );
-            Assert.That(descriptionLines[1], Does.Contain("🟢 Passed 50%"));
-            Assert.That(descriptionLines[1], Does.Contain("🔴 Failed 25%"));
-            Assert.That(descriptionLines[1], Does.Contain("🟡 Broken 25%"));
-            Assert.That(descriptionLines[1], Does.Contain("🟣 Unknown 0%"));
-            Assert.That(descriptionLines[1], Does.Contain("⚪ Skipped 0%"));
+            Assert.That(descriptionLines[0], Does.Contain("🟢 Passed 50%"));
+            Assert.That(descriptionLines[0], Does.Contain("🔴 Failed 25%"));
+            Assert.That(descriptionLines[0], Does.Contain("🟡 Broken 25%"));
+            Assert.That(descriptionLines[0], Does.Contain("🟣 Unknown 0%"));
+            Assert.That(descriptionLines[0], Does.Contain("⚪ Skipped 0%"));
+            Assert.That(launchPlan.Description, Does.Not.Contain("Start time"));
+            Assert.That(launchPlan.Description, Does.Not.Contain("End time"));
             Assert.That(launchPlan.Description, Does.Not.Contain("Launch timing"));
         });
     }
@@ -154,7 +149,8 @@ public class ReportPortalLaunchPlanTests
             Assert.That(assertionPlan.Result, Is.SameAs(assertionResult));
             Assert.That(assertionPlan.StartTimeUtc, Is.EqualTo(launchPlan.LaunchStartTimeUtc));
             Assert.That(assertionPlan.EndTimeUtc, Is.EqualTo(launchPlan.LaunchEndTimeUtc));
-            Assert.That(launchPlan.Description, Does.Contain("End time: 2025-01-01 10:10:00 UTC"));
+            Assert.That(launchPlan.Description, Does.Not.Contain("Start time"));
+            Assert.That(launchPlan.Description, Does.Not.Contain("End time"));
         });
     }
 
@@ -208,10 +204,11 @@ public class ReportPortalLaunchPlanTests
         );
         Assert.That(
             attributes.Any(attribute =>
-                attribute.Key == "sessions" && attribute.Value == "Session A, Session B"
+                attribute.Key == "sessionNames" && attribute.Value == "Session A, Session B"
             ),
             Is.True
         );
+        Assert.That(attributes.Any(attribute => attribute.Key == "sessions"), Is.False);
         Assert.That(attributes.Any(attribute => attribute.Key == "session"), Is.False);
         Assert.That(
             attributes.Any(attribute => attribute.Key == "Component" && attribute.Value == "Auth"),
@@ -230,10 +227,10 @@ public class ReportPortalLaunchPlanTests
     }
 
     [Test]
-    public void BuildLaunchAttributes_AggregatesCaseNamesAndOmitsExecutionIds()
+    public void BuildLaunchAttributes_AggregatesCaseNamesAndExecutionIds()
     {
-        var firstReporter = CreateReporter(executionId: "execution-1", caseName: "case-b");
-        var secondReporter = CreateReporter(executionId: "execution-2", caseName: "case-a");
+        var firstReporter = CreateReporter(executionId: "execution-2", caseName: "case-b");
+        var secondReporter = CreateReporter(executionId: "execution-1", caseName: "case-a");
         firstReporter.WriteTestResults(CreateResult("assertion-a", "Session B"));
         secondReporter.WriteTestResults(CreateResult("assertion-b", "Session A"));
 
@@ -244,6 +241,13 @@ public class ReportPortalLaunchPlanTests
 
         Assert.Multiple(() =>
         {
+            Assert.That(
+                attributes.Any(attribute =>
+                    attribute.Key == "executionIds"
+                    && attribute.Value == "execution-1, execution-2"
+                ),
+                Is.True
+            );
             Assert.That(attributes.Any(attribute => attribute.Key == "executionId"), Is.False);
             Assert.That(attributes.Any(attribute => attribute.Key == "caseName"), Is.False);
             Assert.That(
@@ -254,10 +258,11 @@ public class ReportPortalLaunchPlanTests
             );
             Assert.That(
                 attributes.Any(attribute =>
-                    attribute.Key == "sessions" && attribute.Value == "Session A, Session B"
+                    attribute.Key == "sessionNames" && attribute.Value == "Session A, Session B"
                 ),
                 Is.True
             );
+            Assert.That(attributes.Any(attribute => attribute.Key == "sessions"), Is.False);
             Assert.That(attributes.Any(attribute => attribute.Key == "session"), Is.False);
         });
     }
@@ -300,7 +305,7 @@ public class ReportPortalLaunchPlanTests
 
         Assert.That(
             launchPlan.LaunchName,
-            Is.EqualTo("QaaS run | Smoke | QaaS")
+            Is.EqualTo("Smoke | QaaS")
         );
     }
 

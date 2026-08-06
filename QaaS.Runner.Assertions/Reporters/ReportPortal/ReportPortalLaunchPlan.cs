@@ -127,7 +127,7 @@ internal sealed class ReportPortalLaunchPlan
         attributes.Add(Attr("system", System));
 
         if (SessionNames.Count > 0)
-            attributes.Add(Attr("sessions", string.Join(", ", SessionNames)));
+            attributes.Add(Attr("sessionNames", string.Join(", ", SessionNames)));
         attributes.AddRange(Attributes.Select(attribute => Attr(attribute.Key, attribute.Value)));
 
         return attributes;
@@ -225,8 +225,7 @@ internal sealed class ReportPortalLaunchPlan
             system,
             sessionNames,
             firstConfig.LaunchName ?? BuildDefaultLaunchName(team, system),
-            firstConfig.Description
-                ?? BuildDefaultDescription(launchStartTimeUtc, launchEndTimeUtc, reporterResults),
+            firstConfig.Description ?? BuildDefaultDescription(reporterResults),
             launchStartTimeUtc,
             launchEndTimeUtc,
             firstConfig.DebugMode == true,
@@ -280,6 +279,16 @@ internal sealed class ReportPortalLaunchPlan
         if (caseNames.Length > 0)
             attributes["caseNames"] = string.Join(", ", caseNames);
 
+        var executionIds = reporterResults
+            .Select(reporter => reporter.Reporter.Context.ExecutionId)
+            .Where(executionId => !string.IsNullOrWhiteSpace(executionId))
+            .Select(executionId => executionId!)
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .OrderBy(executionId => executionId, StringComparer.OrdinalIgnoreCase)
+            .ToArray();
+        if (executionIds.Length > 0)
+            attributes["executionIds"] = string.Join(", ", executionIds);
+
         AddConfiguredAttributes(attributes, configAttributes);
         return attributes;
     }
@@ -288,14 +297,12 @@ internal sealed class ReportPortalLaunchPlan
     /// Builds the fallback launch name when the ReportPortal configuration does not provide one.
     /// </summary>
     private static string BuildDefaultLaunchName(string team, string system) =>
-        $"QaaS run | {team} | {system}";
+        $"{team} | {system}";
 
     /// <summary>
-    /// Builds the fallback launch description from launch timing and assertion-status percentages.
+    /// Builds the fallback launch description from assertion-status percentages.
     /// </summary>
     private static string BuildDefaultDescription(
-        DateTime launchStartTimeUtc,
-        DateTime launchEndTimeUtc,
         IReadOnlyList<ReportPortalReporterResults> reporterResults
     )
     {
@@ -303,23 +310,15 @@ internal sealed class ReportPortalLaunchPlan
             .SelectMany(reporter => reporter.Assertions)
             .Select(assertion => assertion.Result.AssertionStatus)
             .ToList();
-        var timingDescription =
-            $"Start time: {FormatLaunchTime(launchStartTimeUtc)} | End time: {FormatLaunchTime(launchEndTimeUtc)}";
-        var statusDescription = string.Join(
+
+        return string.Join(
             " | ",
             Enum.GetValues<AssertionStatus>()
                 .Select(status =>
                     $"{GetStatusColor(status)} {status} {FormatStatusPercentage(status, assertionStatuses)}%"
                 )
         );
-
-        return string.Join(Environment.NewLine, timingDescription, statusDescription);
     }
-
-    private static string FormatLaunchTime(DateTime timestamp) =>
-        timestamp
-            .ToUniversalTime()
-            .ToString("yyyy-MM-dd HH:mm:ss 'UTC'", CultureInfo.InvariantCulture);
 
     private static ReportPortalAssertionPlan BuildAssertionPlan(
         ReportPortalReporter reporter,
