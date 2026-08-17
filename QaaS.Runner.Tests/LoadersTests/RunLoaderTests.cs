@@ -330,6 +330,65 @@ namespace QaaS.Runner.Tests.LoadersTests
             }
         }
 
+        [TestCase(false, "ReferenceFirstFirstSession", "ReferenceSecondSecondSession")]
+        [TestCase(true, "FirstSession", "SecondSession")]
+        public void BuildContext_PreserveReferenceNames_AppliesToEveryReferenceBundle(
+            bool preserveReferenceNames,
+            string expectedFirstSessionName,
+            string expectedSecondSessionName)
+        {
+            var configurationFile = Path.Combine(Path.GetTempPath(), $"{Guid.NewGuid():N}.qaas.yaml");
+            var firstReferenceFile = Path.Combine(Path.GetTempPath(), $"{Guid.NewGuid():N}.yaml");
+            var secondReferenceFile = Path.Combine(Path.GetTempPath(), $"{Guid.NewGuid():N}.yaml");
+            File.WriteAllText(configurationFile,
+                "Sessions:\n  - ReferenceFirst\n  - ReferenceSecond\nAssertions:\n  - ReferenceFirst\n  - ReferenceSecond\n");
+            File.WriteAllText(firstReferenceFile,
+                "Sessions:\n  - Name: FirstSession\nAssertions:\n  - Name: FirstAssertion\n    SessionNames: [FirstSession]\n");
+            File.WriteAllText(secondReferenceFile,
+                "Sessions:\n  - Name: SecondSession\nAssertions:\n  - Name: SecondAssertion\n    SessionNames: [SecondSession]\n");
+
+            try
+            {
+                var options = new RunOptions
+                {
+                    ConfigurationFile = configurationFile,
+                    PushReferences =
+                    [
+                        "ReferenceFirst",
+                        firstReferenceFile,
+                        "ReferenceSecond",
+                        secondReferenceFile
+                    ],
+                    PreserveReferenceNames = preserveReferenceNames,
+                    DontResolveWithEnvironmentVariables = true,
+                    SendLogs = false
+                };
+                var loader = new RunLoader<Runner, RunOptions>(options);
+
+                var context = (InternalContext)BuildContextMethodInfo.Invoke(loader, [null, null, null])!;
+
+                Assert.Multiple(() =>
+                {
+                    Assert.That(context.RootConfiguration["Sessions:0:Name"], Is.EqualTo(expectedFirstSessionName));
+                    Assert.That(context.RootConfiguration["Sessions:1:Name"], Is.EqualTo(expectedSecondSessionName));
+                    Assert.That(context.RootConfiguration["Assertions:0:SessionNames:0"],
+                        Is.EqualTo(expectedFirstSessionName));
+                    Assert.That(context.RootConfiguration["Assertions:1:SessionNames:0"],
+                        Is.EqualTo(expectedSecondSessionName));
+                    Assert.That(context.RootConfiguration["Assertions:0:Name"],
+                        Is.EqualTo(preserveReferenceNames ? "FirstAssertion" : "ReferenceFirstFirstAssertion"));
+                    Assert.That(context.RootConfiguration["Assertions:1:Name"],
+                        Is.EqualTo(preserveReferenceNames ? "SecondAssertion" : "ReferenceSecondSecondAssertion"));
+                });
+            }
+            finally
+            {
+                File.Delete(configurationFile);
+                File.Delete(firstReferenceFile);
+                File.Delete(secondReferenceFile);
+            }
+        }
+
         [Test]
         public void GetLoadedContexts_WithoutCasesRootDirectory_BuildsSingleContext()
         {
