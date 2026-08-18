@@ -84,7 +84,7 @@ public abstract class BaseReporter : IReporter
             System.Text.Encoding.UTF8.GetBytes(
                 Context.RootConfiguration.BuildConfigurationAsYaml(
                     QaaS.Runner.Infrastructure.Constants.ConfigurationSectionNames)),
-            YamlAttachmentType);
+            TextAttachmentType);
     }
 
     /// <summary>

@@ -267,6 +267,7 @@ public class ReportPortalPublisherTests
         var factory = new RecordingClientFactory();
         using var publisher = CreateSuccessfulPublisher(factory, out _);
         var reporter = CreateReporter();
+        reporter.SaveTemplate = true;
         reporter.WriteTestResults(CreateResult("assertion-a", "Session A", testDurationMs: 5_000));
 
         await publisher.ValidateAsync([reporter]);
@@ -275,10 +276,12 @@ public class ReportPortalPublisherTests
         var service = factory.Services.Single();
         var assertionStartTime = service.TestItemStartRequests.Single().StartTime;
         var assertionEndTime = service.TestItemFinishRequests.Single().EndTime;
+        var templateAttachment = service.LogItemRequests
+            .Single(request => request.Attach?.Name == "template.yaml").Attach!;
 
         Assert.Multiple(() =>
         {
-            Assert.That(service.LogItemRequests, Is.Not.Empty);
+            Assert.That(templateAttachment.MimeType, Is.EqualTo("text/plain"));
             Assert.That(service.LogItemRequests.All(request =>
                 request.Time >= assertionStartTime && request.Time <= assertionEndTime), Is.True);
         });
