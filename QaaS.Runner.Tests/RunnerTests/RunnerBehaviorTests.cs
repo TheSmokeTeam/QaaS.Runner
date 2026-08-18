@@ -97,6 +97,7 @@ public class RunnerBehaviorTests
         Serilog.ILogger serilogLogger) : Runner(scope, executionBuilders, logger, serilogLogger)
     {
         public List<string> Calls { get; } = [];
+        public string? ExecutionLogPathAtPublish { get; private set; }
 
         protected override void Setup() => Calls.Add("setup");
 
@@ -114,6 +115,7 @@ public class RunnerBehaviorTests
 
         protected override void PublishReportPortalResults(IEnumerable<Execution>? executions)
         {
+            ExecutionLogPathAtPublish = ReportPortalPublisher.ExecutionLogPath;
             Calls.Add("publish-reportportal");
         }
 
@@ -662,14 +664,23 @@ public class RunnerBehaviorTests
     }
 
     [Test]
+    [NonParallelizable]
     public void RunAndGetExitCode_PublishesReportPortalResultsBeforeDisposingExecutions()
     {
         using var scope = BuildScope();
-        var runner = new PublishOrderRunner(scope, [], Globals.Logger, new Mock<Serilog.ILogger>().Object);
+        var originalOut = Console.Out;
+        var originalError = Console.Error;
+        var runner = new PublishOrderRunner(scope,
+            [CreateTemplateExecutionBuilder("case", reportPortalEnabled: true)], Globals.Logger,
+            new Mock<Serilog.ILogger>().Object);
 
         var exitCode = runner.RunAndGetExitCode();
 
         Assert.That(exitCode, Is.Zero);
+        Assert.That(runner.ExecutionLogPathAtPublish, Is.Not.Null);
+        Assert.That(File.Exists(runner.ExecutionLogPathAtPublish), Is.False);
+        Assert.That(Console.Out, Is.SameAs(originalOut));
+        Assert.That(Console.Error, Is.SameAs(originalError));
         Assert.That(runner.Calls,
             Is.EqualTo(new[]
             {

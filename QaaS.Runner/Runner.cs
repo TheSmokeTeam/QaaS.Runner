@@ -246,14 +246,8 @@ public class Runner : IRunner, IDisposable
     /// <param name="executions">The executions whose ReportPortal reporters may have queued assertion results.</param>
     protected virtual void PublishReportPortalResults(IEnumerable<Execution>? executions)
     {
-        StopExecutionLogCapture();
-        ReportPortalPublisher.ExecutionLogPath = _executionLog?.Path;
-        try
-        {
-            var reportPortalReporters = GetReportPortalReporters(executions).ToList();
-            ReportPortalPublisher.PublishAsync(reportPortalReporters).GetAwaiter().GetResult();
-        }
-        finally { DeleteExecutionLog(); }
+        var reportPortalReporters = GetReportPortalReporters(executions).ToList();
+        ReportPortalPublisher.PublishAsync(reportPortalReporters).GetAwaiter().GetResult();
     }
 
     private static IEnumerable<ReportPortalReporter> GetReportPortalReporters(IEnumerable<Execution>? executions)
@@ -488,13 +482,21 @@ public class Runner : IRunner, IDisposable
         Logger.LogDebug("Runner cleanup started");
 
         var cleanupFailures = new List<Exception>();
-        RunCleanupStep("publish ReportPortal results", () => PublishReportPortalResults(executions), cleanupFailures);
+        RunCleanupStep("publish ReportPortal results", () => PublishReportPortalResultsWithCleanup(executions), cleanupFailures);
         RunCleanupStep("dispose executions", () => DisposeExecutions(executions), cleanupFailures);
         RunCleanupStep("teardown", Teardown, cleanupFailures);
         RunCleanupStep("dispose runner", Dispose, cleanupFailures);
 
         Logger.LogDebug("Runner cleanup completed. FailureCount={FailureCount}", cleanupFailures.Count);
         return cleanupFailures;
+    }
+
+    private void PublishReportPortalResultsWithCleanup(IEnumerable<Execution>? executions)
+    {
+        StopExecutionLogCapture();
+        ReportPortalPublisher.ExecutionLogPath = _executionLog?.Path;
+        try { PublishReportPortalResults(executions); }
+        finally { DeleteExecutionLog(); }
     }
 
     private void StartExecutionLogCapture()
