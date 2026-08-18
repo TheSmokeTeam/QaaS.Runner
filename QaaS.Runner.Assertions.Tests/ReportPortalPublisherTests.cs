@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Collections.Immutable;
+using System.IO;
 using System.Linq;
 using System.Net;
 using System.Net.Http;
@@ -207,6 +208,28 @@ public class ReportPortalPublisherTests
             Assert.That(factory.Services[0].LaunchStartRequests, Has.Count.EqualTo(1));
             Assert.That(factory.Services[0].TestItemStartRequests, Has.Count.EqualTo(2));
         });
+    }
+
+    [TestCase(true, 1)]
+    [TestCase(false, 0)]
+    public async Task PublishAsync_WithExecutionLog_RespectsConfiguration(bool enabled, int expected)
+    {
+        var path = Path.GetTempFileName();
+        await File.WriteAllTextAsync(path, "stdout\nstderr");
+        try
+        {
+            var factory = new RecordingClientFactory();
+            using var publisher = CreateSuccessfulPublisher(factory, out _);
+            publisher.ExecutionLogPath = path;
+            var reporter = CreateReporter(saveExecutionLogs: enabled);
+            reporter.WriteTestResults(CreateResult("assertion-a", "Session A"));
+            await publisher.ValidateAsync([reporter]);
+            await publisher.PublishAsync([reporter]);
+            Assert.That(factory.Services.Single().LogItemRequests
+                .Count(request => request.Attach?.Name == "execution.log"), Is.EqualTo(expected));
+            if (enabled) Assert.That(factory.Services.Single().LogItemRequests.Single(request => request.Attach?.Name == "execution.log").Attach!.Data, Is.EqualTo(Encoding.UTF8.GetBytes("stdout\nstderr")));
+        }
+        finally { File.Delete(path); }
     }
 
     [Test]
@@ -602,7 +625,8 @@ public class ReportPortalPublisherTests
         string? executionId = null,
         string? caseName = null,
         IReadOnlyDictionary<string, string>? extraLabels = null,
-        IReadOnlyDictionary<string, string>? reportPortalAttributes = null)
+        IReadOnlyDictionary<string, string>? reportPortalAttributes = null,
+        bool saveExecutionLogs = true)
     {
         var context = new InternalContext
         {
@@ -624,6 +648,7 @@ public class ReportPortalPublisherTests
 
         return new ReportPortalReporter
         {
+            SaveExecutionLogs = saveExecutionLogs,
             Config = new ReportPortalConfig
             {
                 Enabled = enabled,

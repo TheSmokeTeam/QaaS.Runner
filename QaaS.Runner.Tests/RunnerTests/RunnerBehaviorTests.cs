@@ -61,7 +61,7 @@ public class RunnerBehaviorTests
         ILifetimeScope scope,
         List<ExecutionBuilder> executionBuilders,
         Microsoft.Extensions.Logging.ILogger logger,
-        Serilog.ILogger serilogLogger) : Runner(scope, executionBuilders, logger, serilogLogger)
+        Serilog.ILogger serilogLogger, bool writeTerminal = false) : Runner(scope, executionBuilders, logger, serilogLogger)
     {
         public List<string> Calls { get; } = [];
         public int? ExitCode { get; private set; }
@@ -71,6 +71,7 @@ public class RunnerBehaviorTests
         protected override List<Execution> BuildExecutions()
         {
             Calls.Add("build");
+            if (writeTerminal) { Console.WriteLine("execution stdout"); Console.Error.WriteLine("execution stderr"); }
             return [];
         }
 
@@ -138,6 +139,7 @@ public class RunnerBehaviorTests
     {
         private readonly Exception? _validationException = validationException;
         public List<string> Calls { get; } = [];
+        public (string Path, string Text)? CapturedLog { get; private set; }
 
         public override Task ValidateAsync(IEnumerable<ReportPortalReporter> reporters,
             CancellationToken cancellationToken = default)
@@ -153,6 +155,7 @@ public class RunnerBehaviorTests
             CancellationToken cancellationToken = default)
         {
             Calls.Add("publish");
+            CapturedLog = (ExecutionLogPath!, File.ReadAllText(ExecutionLogPath!));
             return Task.CompletedTask;
         }
     }
@@ -634,12 +637,13 @@ public class RunnerBehaviorTests
     }
 
     [Test]
+    [NonParallelizable]
     public void RunAndGetExitCode_WhenReportPortalValidationFails_ReturnsFailureExitCodeBeforeStart()
     {
         using var scope = BuildScope();
         var publisher = new RecordingReportPortalPublisher(
             new InvalidConfigurationsException("ReportPortal validation failed"));
-        var runner = new RunLifecycleRunner(scope, [], Globals.Logger, new Mock<Serilog.ILogger>().Object)
+        var runner = new RunLifecycleRunner(scope, [CreateTemplateExecutionBuilder("case", reportPortalEnabled: true)], Globals.Logger, new Mock<Serilog.ILogger>().Object, true)
         {
             ReportPortalPublisher = publisher
         };
@@ -652,6 +656,8 @@ public class RunnerBehaviorTests
             Assert.That(runner.Calls, Is.EqualTo(new[] { "setup", "build", "teardown" }));
             Assert.That(publisher.Calls, Is.EqualTo(new[] { "validate", "publish" }));
             Assert.That(runner.LastExitCode, Is.EqualTo(1));
+            Assert.That(publisher.CapturedLog?.Text, Does.Contain("execution stdout").And.Contain("execution stderr"));
+            Assert.That(File.Exists(publisher.CapturedLog?.Path), Is.False);
         });
     }
 

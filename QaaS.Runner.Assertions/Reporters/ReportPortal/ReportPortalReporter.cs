@@ -40,6 +40,7 @@ public class ReportPortalReporter : BaseReporter
     
     private readonly ConcurrentQueue<AssertionResult> _queuedResults = new();
     public required ReportPortalConfig Config { get; init; }
+    public bool SaveExecutionLogs { get; init; } = true;
 
     /// <summary>
     /// Queues one runner-produced assertion result for final ReportPortal publishing.

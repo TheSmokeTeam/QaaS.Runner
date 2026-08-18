@@ -19,6 +19,7 @@ internal class ReportPortalPublisher(ILogger logger) : IDisposable
     private readonly DateTimeOffset _startedAtLocal = DateTimeOffset.Now;
     private readonly HashSet<string> _validatedGroupKeys = new(StringComparer.Ordinal);
     private bool _validationHttpClientDisposed;
+    internal string? ExecutionLogPath { get; set; }
 
     /// <summary>
     /// Validates every enabled ReportPortal launch group without creating launches or writing items.
@@ -345,6 +346,7 @@ internal class ReportPortalPublisher(ILogger logger) : IDisposable
             launchUuid = await StartLaunchAsync(service, launchPlan, projectName,
                 cancellationToken).ConfigureAwait(false);
 
+            await PublishExecutionLog(service, launchPlan, launchUuid, cancellationToken).ConfigureAwait(false);
             await PublishLaunchItems(service, launchPlan, projectName, launchUuid, cancellationToken)
                 .ConfigureAwait(false);
         }
@@ -360,6 +362,32 @@ internal class ReportPortalPublisher(ILogger logger) : IDisposable
         {
             DisposeService(service, projectName, launchPlan.System);
         }
+    }
+
+    private async Task PublishExecutionLog(IClientService service, ReportPortalLaunchPlan launchPlan,
+        string launchUuid, CancellationToken cancellationToken)
+    {
+        if (ExecutionLogPath is null ||
+            !launchPlan.ReporterResults.Any(result => result.Reporter.SaveExecutionLogs))
+            return;
+        try
+        {
+            var attachment = new LogItemAttach("text/plain",
+                await File.ReadAllBytesAsync(ExecutionLogPath, cancellationToken).ConfigureAwait(false))
+            {
+                Name = "execution.log"
+            };
+            await service.LogItem.CreateAsync(new CreateLogItemRequest
+            {
+                LaunchUuid = launchUuid,
+                Level = global::ReportPortal.Client.Abstractions.Models.LogLevel.Info,
+                Text = "Runner terminal output.",
+                Time = launchPlan.LaunchEndTimeUtc,
+                Attach = attachment
+            }, cancellationToken).ConfigureAwait(false);
+        }
+        catch (Exception exception) { logger.LogError(exception,
+            "Could not attach execution.log to ReportPortal launch {LaunchUuid}.", launchUuid); }
     }
 
     /// <summary>

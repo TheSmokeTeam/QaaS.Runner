@@ -1,4 +1,5 @@
 using System.Runtime.ExceptionServices;
+using System.Text;
 using Autofac;
 using Microsoft.Extensions.Logging;
 using QaaS.Framework.Configurations.CustomExceptions;
@@ -28,6 +29,7 @@ public class Runner : IRunner, IDisposable
     private bool DisposeSerilogLogger { get; set; } = true;
     private int? BootstrapHandledExitCode { get; set; }
     internal ReportPortalPublisher ReportPortalPublisher { get; set; }
+    private ExecutionLogCapture? _executionLog;
 
     /// <summary>
     /// Controls whether <see cref="Run" /> terminates the current process after the runner finishes successfully.
@@ -99,6 +101,7 @@ public class Runner : IRunner, IDisposable
             return CompleteBootstrapHandledRun();
 
         LastExitCode = null;
+        StartExecutionLogCapture();
         LogRunStart();
 
         var lifecycleOutcome = CaptureLifecycleOutcome();
@@ -243,8 +246,14 @@ public class Runner : IRunner, IDisposable
     /// <param name="executions">The executions whose ReportPortal reporters may have queued assertion results.</param>
     protected virtual void PublishReportPortalResults(IEnumerable<Execution>? executions)
     {
-        var reportPortalReporters = GetReportPortalReporters(executions).ToList();
-        ReportPortalPublisher.PublishAsync(reportPortalReporters).GetAwaiter().GetResult();
+        StopExecutionLogCapture();
+        ReportPortalPublisher.ExecutionLogPath = _executionLog?.Path;
+        try
+        {
+            var reportPortalReporters = GetReportPortalReporters(executions).ToList();
+            ReportPortalPublisher.PublishAsync(reportPortalReporters).GetAwaiter().GetResult();
+        }
+        finally { DeleteExecutionLog(); }
     }
 
     private static IEnumerable<ReportPortalReporter> GetReportPortalReporters(IEnumerable<Execution>? executions)
@@ -486,6 +495,55 @@ public class Runner : IRunner, IDisposable
 
         Logger.LogDebug("Runner cleanup completed. FailureCount={FailureCount}", cleanupFailures.Count);
         return cleanupFailures;
+    }
+
+    private void StartExecutionLogCapture()
+    {
+        if (!ExecutionBuilders.Any(builder => builder.Reporters is
+                { SaveExecutionLogs: true, ReportPortal: { Enabled: true } }))
+            return;
+
+        try
+        {
+            var path = Path.Combine(Path.GetTempPath(), $"qaas-{Guid.NewGuid():N}.log");
+            var writer = TextWriter.Synchronized(new StreamWriter(path) { AutoFlush = true });
+            var capture = _executionLog = new ExecutionLogCapture(path, writer, Console.Out, Console.Error);
+            Console.SetOut(new TeeTextWriter(capture.Output, capture.Writer));
+            Console.SetError(new TeeTextWriter(capture.Error, capture.Writer));
+        }
+        catch (Exception exception) { StopExecutionLogCapture(); DeleteExecutionLog();
+            Logger.LogWarning(exception, "Could not capture terminal output for ReportPortal."); }
+    }
+
+    private void StopExecutionLogCapture()
+    {
+        if (_executionLog is not { } capture) return;
+
+        try
+        {
+            Console.SetOut(capture.Output);
+            Console.SetError(capture.Error);
+            capture.Writer.Dispose();
+        }
+        catch (Exception exception) { Logger.LogWarning(exception, "Could not stop terminal output capture cleanly."); }
+    }
+
+    private void DeleteExecutionLog()
+    {
+        if (_executionLog is not { } capture) return;
+
+        try { File.Delete(capture.Path); }
+        catch (Exception exception) { Logger.LogWarning(exception, "Could not delete temporary execution log."); }
+        finally { _executionLog = null; }
+    }
+
+    private sealed record ExecutionLogCapture(string Path, TextWriter Writer, TextWriter Output, TextWriter Error);
+    private sealed class TeeTextWriter(TextWriter terminal, TextWriter file) : TextWriter
+    {
+        public override Encoding Encoding => terminal.Encoding;
+        public override void Write(char value) { terminal.Write(value); file.Write(value); }
+        public override void Write(string? value) { terminal.Write(value); file.Write(value); }
+        public override void Flush() { terminal.Flush(); file.Flush(); }
     }
 
     /// <summary>

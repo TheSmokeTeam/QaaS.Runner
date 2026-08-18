@@ -25,6 +25,10 @@ public class ReporterBuilder : IYamlConvertible, ICloneable<ReporterBuilder>
     [DefaultValue(null)]
     public bool? SaveLogs { get; internal set; }
 
+    [Description("Whether to capture logs from the entire QaaS execution and save them as an attachment.")]
+    [DefaultValue(true)]
+    public bool SaveExecutionLogs { get; internal set; } = true;
+
     [Description(
         "Whether to save the attachments belonging to the assertions in the test report. "
             + "If not set, each assertion will determine whether to save them."
@@ -88,6 +92,7 @@ public class ReporterBuilder : IYamlConvertible, ICloneable<ReporterBuilder>
             new
             {
                 SaveLogs,
+                SaveExecutionLogs,
                 SaveAttachments,
                 SaveTemplate,
                 SaveSessionData,
@@ -120,6 +125,14 @@ public class ReporterBuilder : IYamlConvertible, ICloneable<ReporterBuilder>
     public ReporterBuilder ShouldSaveLogs(bool shouldSaveLogs)
     {
         SaveLogs = shouldSaveLogs;
+        return this;
+    }
+
+    /// <summary>Configures whether logs from the entire QaaS execution are saved as an attachment.</summary>
+    /// <qaas-docs group="Configuration as Code" subgroup="Reporters" />
+    public ReporterBuilder ShouldSaveExecutionLogs(bool shouldSaveExecutionLogs)
+    {
+        SaveExecutionLogs = shouldSaveExecutionLogs;
         return this;
     }
 
@@ -219,6 +232,7 @@ public class ReporterBuilder : IYamlConvertible, ICloneable<ReporterBuilder>
                 Context = context,
                 DisplayTrace = DisplayTrace,
                 SaveLogs = SaveLogs,
+                SaveExecutionLogs = SaveExecutionLogs,
                 SaveAttachments = SaveAttachments,
                 SaveTemplate = SaveTemplate,
                 SaveSessionData = SaveSessionData,
