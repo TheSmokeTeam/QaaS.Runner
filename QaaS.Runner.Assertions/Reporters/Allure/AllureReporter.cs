@@ -29,6 +29,7 @@ public class AllureReporter : BaseReporter
             { AssertionStatus.Failed, Status.failed },
             { AssertionStatus.Broken, Status.broken },
             { AssertionStatus.Unknown, Status.none },
+            { AssertionStatus.Skipped, Status.skipped },
         };
 
     private static readonly IDictionary<
