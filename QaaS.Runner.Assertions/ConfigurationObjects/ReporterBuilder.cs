@@ -30,7 +30,7 @@ public class ReporterBuilder : IYamlConvertible, ICloneable<ReporterBuilder>
             + "not emitted through the context logger, and save it once per launch as an execution.log attachment."
     )]
     [DefaultValue(true)]
-    public bool? SaveExecutionLogs { get; internal set; } = true;
+    public bool? SaveTerminalOutput { get; internal set; } = true;
 
     [Description(
         "Whether to save the attachments belonging to the assertions in the test report. "
@@ -95,7 +95,7 @@ public class ReporterBuilder : IYamlConvertible, ICloneable<ReporterBuilder>
             new
             {
                 SaveLogs,
-                SaveExecutionLogs,
+                SaveTerminalOutput,
                 SaveAttachments,
                 SaveTemplate,
                 SaveSessionData,
@@ -133,9 +133,9 @@ public class ReporterBuilder : IYamlConvertible, ICloneable<ReporterBuilder>
 
     /// <summary>Configures whether execution-wide terminal output is saved once per launch as an attachment.</summary>
     /// <qaas-docs group="Configuration as Code" subgroup="Reporters" />
-    public ReporterBuilder ShouldSaveExecutionLogs(bool shouldSaveExecutionLogs)
+    public ReporterBuilder ShouldSaveTerminalOutput(bool shouldSaveTerminalOutput)
     {
-        SaveExecutionLogs = shouldSaveExecutionLogs;
+        SaveTerminalOutput = shouldSaveTerminalOutput;
         return this;
     }
 
@@ -235,7 +235,7 @@ public class ReporterBuilder : IYamlConvertible, ICloneable<ReporterBuilder>
                 Context = context,
                 DisplayTrace = DisplayTrace,
                 SaveLogs = SaveLogs,
-                SaveExecutionLogs = SaveExecutionLogs,
+                SaveTerminalOutput = SaveTerminalOutput,
                 SaveAttachments = SaveAttachments,
                 SaveTemplate = SaveTemplate,
                 SaveSessionData = SaveSessionData,

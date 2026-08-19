@@ -97,7 +97,7 @@ public class RunnerBehaviorTests
         Serilog.ILogger serilogLogger) : Runner(scope, executionBuilders, logger, serilogLogger)
     {
         public List<string> Calls { get; } = [];
-        public string? ExecutionLogPathAtPublish { get; private set; }
+        public string? TerminalOutputPathAtPublish { get; private set; }
 
         protected override void Setup() => Calls.Add("setup");
 
@@ -115,7 +115,7 @@ public class RunnerBehaviorTests
 
         protected override void PublishReportPortalResults(IEnumerable<Execution>? executions)
         {
-            ExecutionLogPathAtPublish = ReportPortalPublisher.ExecutionLogPath;
+            TerminalOutputPathAtPublish = ReportPortalPublisher.TerminalOutputPath;
             Calls.Add("publish-reportportal");
         }
 
@@ -141,7 +141,7 @@ public class RunnerBehaviorTests
     {
         private readonly Exception? _validationException = validationException;
         public List<string> Calls { get; } = [];
-        public (string Path, string Text)? CapturedLog { get; private set; }
+        public (string Path, string Text)? CapturedTerminalOutput { get; private set; }
 
         public override Task ValidateAsync(IEnumerable<ReportPortalReporter> reporters,
             CancellationToken cancellationToken = default)
@@ -157,7 +157,7 @@ public class RunnerBehaviorTests
             CancellationToken cancellationToken = default)
         {
             Calls.Add("publish");
-            CapturedLog = (ExecutionLogPath!, File.ReadAllText(ExecutionLogPath!));
+            CapturedTerminalOutput = (TerminalOutputPath!, File.ReadAllText(TerminalOutputPath!));
             return Task.CompletedTask;
         }
     }
@@ -658,8 +658,8 @@ public class RunnerBehaviorTests
             Assert.That(runner.Calls, Is.EqualTo(new[] { "setup", "build", "teardown" }));
             Assert.That(publisher.Calls, Is.EqualTo(new[] { "validate", "publish" }));
             Assert.That(runner.LastExitCode, Is.EqualTo(1));
-            Assert.That(publisher.CapturedLog?.Text, Does.Contain("execution stdout").And.Contain("execution stderr"));
-            Assert.That(File.Exists(publisher.CapturedLog?.Path), Is.False);
+            Assert.That(publisher.CapturedTerminalOutput?.Text, Does.Contain("execution stdout").And.Contain("execution stderr"));
+            Assert.That(File.Exists(publisher.CapturedTerminalOutput?.Path), Is.False);
         });
     }
 
@@ -677,8 +677,8 @@ public class RunnerBehaviorTests
         var exitCode = runner.RunAndGetExitCode();
 
         Assert.That(exitCode, Is.Zero);
-        Assert.That(runner.ExecutionLogPathAtPublish, Is.Not.Null);
-        Assert.That(File.Exists(runner.ExecutionLogPathAtPublish), Is.False);
+        Assert.That(runner.TerminalOutputPathAtPublish, Is.Not.Null);
+        Assert.That(File.Exists(runner.TerminalOutputPathAtPublish), Is.False);
         Assert.That(Console.Out, Is.SameAs(originalOut));
         Assert.That(Console.Error, Is.SameAs(originalError));
         Assert.That(runner.Calls,

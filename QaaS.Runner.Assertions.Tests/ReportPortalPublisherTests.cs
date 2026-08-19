@@ -213,7 +213,7 @@ public class ReportPortalPublisherTests
     [TestCase(true, 1)]
     [TestCase(false, 0)]
     [TestCase(null, 1)]
-    public async Task PublishAsync_WithExecutionLog_RespectsConfiguration(bool? enabled, int expected)
+    public async Task PublishAsync_WithTerminalOutput_RespectsConfiguration(bool? enabled, int expected)
     {
         var path = Path.GetTempFileName();
         await File.WriteAllTextAsync(path, "stdout\nstderr");
@@ -221,8 +221,8 @@ public class ReportPortalPublisherTests
         {
             var factory = new RecordingClientFactory();
             using var publisher = CreateSuccessfulPublisher(factory, out _);
-            publisher.ExecutionLogPath = path;
-            var reporter = CreateReporter(saveExecutionLogs: enabled);
+            publisher.TerminalOutputPath = path;
+            var reporter = CreateReporter(saveTerminalOutput: enabled);
             reporter.WriteTestResults(CreateResult("assertion-a", "Session A"));
             await publisher.ValidateAsync([reporter]);
             await publisher.PublishAsync([reporter]);
@@ -630,7 +630,7 @@ public class ReportPortalPublisherTests
         string? caseName = null,
         IReadOnlyDictionary<string, string>? extraLabels = null,
         IReadOnlyDictionary<string, string>? reportPortalAttributes = null,
-        bool? saveExecutionLogs = true)
+        bool? saveTerminalOutput = true)
     {
         var context = new InternalContext
         {
@@ -652,7 +652,7 @@ public class ReportPortalPublisherTests
 
         return new ReportPortalReporter
         {
-            SaveExecutionLogs = saveExecutionLogs,
+            SaveTerminalOutput = saveTerminalOutput,
             Config = new ReportPortalConfig
             {
                 Enabled = enabled,

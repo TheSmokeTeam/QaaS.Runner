@@ -19,7 +19,7 @@ internal class ReportPortalPublisher(ILogger logger) : IDisposable
     private readonly DateTimeOffset _startedAtLocal = DateTimeOffset.Now;
     private readonly HashSet<string> _validatedGroupKeys = new(StringComparer.Ordinal);
     private bool _validationHttpClientDisposed;
-    internal string? ExecutionLogPath { get; set; }
+    internal string? TerminalOutputPath { get; set; }
 
     /// <summary>
     /// Validates every enabled ReportPortal launch group without creating launches or writing items.
@@ -346,7 +346,7 @@ internal class ReportPortalPublisher(ILogger logger) : IDisposable
             launchUuid = await StartLaunchAsync(service, launchPlan, projectName,
                 cancellationToken).ConfigureAwait(false);
 
-            await PublishExecutionLog(service, launchPlan, launchUuid, cancellationToken).ConfigureAwait(false);
+            await PublishTerminalOutput(service, launchPlan, launchUuid, cancellationToken).ConfigureAwait(false);
             await PublishLaunchItems(service, launchPlan, projectName, launchUuid, cancellationToken)
                 .ConfigureAwait(false);
         }
@@ -364,15 +364,15 @@ internal class ReportPortalPublisher(ILogger logger) : IDisposable
         }
     }
 
-    private async Task PublishExecutionLog(IClientService service, ReportPortalLaunchPlan launchPlan,
+    private async Task PublishTerminalOutput(IClientService service, ReportPortalLaunchPlan launchPlan,
         string launchUuid, CancellationToken cancellationToken)
     {
-        if (ExecutionLogPath is null || launchPlan.ReporterResults.All(result => result.Reporter.SaveExecutionLogs == false))
+        if (TerminalOutputPath is null || launchPlan.ReporterResults.All(result => result.Reporter.SaveTerminalOutput == false))
             return;
         try
         {
             var attachment = new LogItemAttach("text/plain",
-                await File.ReadAllBytesAsync(ExecutionLogPath, cancellationToken).ConfigureAwait(false))
+                await File.ReadAllBytesAsync(TerminalOutputPath, cancellationToken).ConfigureAwait(false))
             {
                 Name = "execution.log"
             };

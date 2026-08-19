@@ -29,7 +29,7 @@ public class Runner : IRunner, IDisposable
     private bool DisposeSerilogLogger { get; set; } = true;
     private int? BootstrapHandledExitCode { get; set; }
     internal ReportPortalPublisher ReportPortalPublisher { get; set; }
-    private ExecutionLogCapture? _executionLog;
+    private TerminalOutputCapture? _terminalOutput;
 
     /// <summary>
     /// Controls whether <see cref="Run" /> terminates the current process after the runner finishes successfully.
@@ -101,7 +101,7 @@ public class Runner : IRunner, IDisposable
             return CompleteBootstrapHandledRun();
 
         LastExitCode = null;
-        StartExecutionLogCapture();
+        StartTerminalOutputCapture();
         LogRunStart();
 
         var lifecycleOutcome = CaptureLifecycleOutcome();
@@ -493,33 +493,33 @@ public class Runner : IRunner, IDisposable
 
     private void PublishReportPortalResultsWithCleanup(IEnumerable<Execution>? executions)
     {
-        StopExecutionLogCapture();
-        ReportPortalPublisher.ExecutionLogPath = _executionLog?.Path;
+        StopTerminalOutputCapture();
+        ReportPortalPublisher.TerminalOutputPath = _terminalOutput?.Path;
         try { PublishReportPortalResults(executions); }
-        finally { DeleteExecutionLog(); }
+        finally { DeleteTerminalOutput(); }
     }
 
-    private void StartExecutionLogCapture()
+    private void StartTerminalOutputCapture()
     {
         if (!ExecutionBuilders.Any(builder => builder.Reporters is
-                { SaveExecutionLogs: not false, ReportPortal: { Enabled: true } }))
+                { SaveTerminalOutput: not false, ReportPortal: { Enabled: true } }))
             return;
 
         try
         {
             var path = Path.Combine(Path.GetTempPath(), $"qaas-{Guid.NewGuid():N}.log");
             var writer = TextWriter.Synchronized(new StreamWriter(path) { AutoFlush = true });
-            var capture = _executionLog = new ExecutionLogCapture(path, writer, Console.Out, Console.Error);
+            var capture = _terminalOutput = new TerminalOutputCapture(path, writer, Console.Out, Console.Error);
             Console.SetOut(new TeeTextWriter(capture.Output, capture.Writer));
             Console.SetError(new TeeTextWriter(capture.Error, capture.Writer));
         }
-        catch (Exception exception) { StopExecutionLogCapture(); DeleteExecutionLog();
+        catch (Exception exception) { StopTerminalOutputCapture(); DeleteTerminalOutput();
             Logger.LogWarning(exception, "Could not capture terminal output for ReportPortal."); }
     }
 
-    private void StopExecutionLogCapture()
+    private void StopTerminalOutputCapture()
     {
-        if (_executionLog is not { } capture) return;
+        if (_terminalOutput is not { } capture) return;
 
         try
         {
@@ -530,16 +530,16 @@ public class Runner : IRunner, IDisposable
         catch (Exception exception) { Logger.LogWarning(exception, "Could not stop terminal output capture cleanly."); }
     }
 
-    private void DeleteExecutionLog()
+    private void DeleteTerminalOutput()
     {
-        if (_executionLog is not { } capture) return;
+        if (_terminalOutput is not { } capture) return;
 
         try { File.Delete(capture.Path); }
-        catch (Exception exception) { Logger.LogWarning(exception, "Could not delete temporary execution log."); }
-        finally { _executionLog = null; }
+        catch (Exception exception) { Logger.LogWarning(exception, "Could not delete temporary terminal output file."); }
+        finally { _terminalOutput = null; }
     }
 
-    private sealed record ExecutionLogCapture(string Path, TextWriter Writer, TextWriter Output, TextWriter Error);
+    private sealed record TerminalOutputCapture(string Path, TextWriter Writer, TextWriter Output, TextWriter Error);
     private sealed class TeeTextWriter(TextWriter terminal, TextWriter file) : TextWriter
     {
         public override Encoding Encoding => terminal.Encoding;
