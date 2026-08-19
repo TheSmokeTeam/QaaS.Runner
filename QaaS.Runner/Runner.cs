@@ -491,6 +491,10 @@ public class Runner : IRunner, IDisposable
         return cleanupFailures;
     }
 
+    /// <summary>
+    /// Publishes ReportPortal results and completes the associated cleanup.
+    /// </summary>
+    /// <param name="executions">The completed executions whose queued results should be published.</param>
     private void PublishReportPortalResultsWithCleanup(IEnumerable<Execution>? executions)
     {
         StopTerminalOutputCapture();
@@ -499,6 +503,13 @@ public class Runner : IRunner, IDisposable
         finally { DeleteTerminalOutput(); }
     }
 
+    /// <summary>
+    /// Starts teeing standard output and standard error to a temporary file when terminal-output saving is enabled.
+    /// </summary>
+    /// <remarks>
+    /// Output continues to appear through the original console writers. Capture failures are logged and do not stop
+    /// execution.
+    /// </remarks>
     private void StartTerminalOutputCapture()
     {
         if (!ExecutionBuilders.Any(builder => builder.Reporters is
@@ -517,6 +528,10 @@ public class Runner : IRunner, IDisposable
             Logger.LogWarning(exception, "Could not capture terminal output for ReportPortal."); }
     }
 
+    /// <summary>
+    /// Restores the original console writers and closes the temporary terminal-output writer.
+    /// </summary>
+    /// <remarks>Cleanup failures are logged and do not stop the remaining runner cleanup steps.</remarks>
     private void StopTerminalOutputCapture()
     {
         if (_terminalOutput is not { } capture) return;
@@ -530,6 +545,10 @@ public class Runner : IRunner, IDisposable
         catch (Exception exception) { Logger.LogWarning(exception, "Could not stop terminal output capture cleanly."); }
     }
 
+    /// <summary>
+    /// Deletes the temporary terminal-output file and clears its capture state.
+    /// </summary>
+    /// <remarks>Deletion failures are logged while capture state is cleared unconditionally.</remarks>
     private void DeleteTerminalOutput()
     {
         if (_terminalOutput is not { } capture) return;
@@ -539,12 +558,32 @@ public class Runner : IRunner, IDisposable
         finally { _terminalOutput = null; }
     }
 
+    /// <summary>
+    /// Holds the temporary file and original console writers for one terminal-output capture.
+    /// </summary>
+    /// <param name="Path">The temporary file path.</param>
+    /// <param name="Writer">The writer for the temporary file.</param>
+    /// <param name="Output">The original standard-output writer.</param>
+    /// <param name="Error">The original standard-error writer.</param>
     private sealed record TerminalOutputCapture(string Path, TextWriter Writer, TextWriter Output, TextWriter Error);
+
+    /// <summary>
+    /// Mirrors writes to the original terminal writer and the temporary capture writer.
+    /// </summary>
+    /// <param name="terminal">The original terminal writer.</param>
+    /// <param name="file">The temporary capture writer.</param>
     private sealed class TeeTextWriter(TextWriter terminal, TextWriter file) : TextWriter
     {
+        /// <inheritdoc />
         public override Encoding Encoding => terminal.Encoding;
+
+        /// <inheritdoc />
         public override void Write(char value) { terminal.Write(value); file.Write(value); }
+
+        /// <inheritdoc />
         public override void Write(string? value) { terminal.Write(value); file.Write(value); }
+
+        /// <inheritdoc />
         public override void Flush() { terminal.Flush(); file.Flush(); }
     }
 

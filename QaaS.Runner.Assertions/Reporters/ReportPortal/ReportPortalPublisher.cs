@@ -364,6 +364,14 @@ internal class ReportPortalPublisher(ILogger logger) : IDisposable
         }
     }
 
+    /// <summary>
+    /// Attaches the captured terminal output to a launch as <c>execution.log</c> when saving is enabled.
+    /// </summary>
+    /// <remarks>Attachment failures are logged and do not interrupt assertion-result publishing.</remarks>
+    /// <param name="service">The client service for the launch being published.</param>
+    /// <param name="launchPlan">The launch plan containing reporter configuration and timing.</param>
+    /// <param name="launchUuid">The identifier of the launch that receives the attachment.</param>
+    /// <param name="cancellationToken">A token that cancels attachment creation.</param>
     private async Task PublishTerminalOutput(IClientService service, ReportPortalLaunchPlan launchPlan,
         string launchUuid, CancellationToken cancellationToken)
     {
