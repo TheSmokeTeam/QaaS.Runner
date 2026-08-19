@@ -1,9 +1,9 @@
 using System.Runtime.ExceptionServices;
-using System.Text;
 using Autofac;
 using Microsoft.Extensions.Logging;
 using QaaS.Framework.Configurations.CustomExceptions;
 using QaaS.Framework.Executions;
+using QaaS.Runner.Output;
 using QaaS.Runner.Options;
 using QaaS.Runner.Assertions.Reporters.ReportPortal;
 using QaaS.Runner.WrappedExternals;
@@ -101,7 +101,9 @@ public class Runner : IRunner, IDisposable
             return CompleteBootstrapHandledRun();
 
         LastExitCode = null;
-        StartTerminalOutputCapture();
+        if (ExecutionBuilders.Any(builder => builder.Reporters is
+                { SaveTerminalOutput: not false, ReportPortal: { Enabled: true } }))
+            _terminalOutput = TerminalOutputCapture.TryStart(Logger);
         LogRunStart();
 
         var lifecycleOutcome = CaptureLifecycleOutcome();
@@ -497,94 +499,14 @@ public class Runner : IRunner, IDisposable
     /// <param name="executions">The completed executions whose queued results should be published.</param>
     private void PublishReportPortalResultsWithCleanup(IEnumerable<Execution>? executions)
     {
-        StopTerminalOutputCapture();
+        _terminalOutput?.Stop();
         ReportPortalPublisher.TerminalOutputPath = _terminalOutput?.Path;
         try { PublishReportPortalResults(executions); }
-        finally { DeleteTerminalOutput(); }
-    }
-
-    /// <summary>
-    /// Starts teeing standard output and standard error to a temporary file when terminal-output saving is enabled.
-    /// </summary>
-    /// <remarks>
-    /// Output continues to appear through the original console writers. Capture failures are logged and do not stop
-    /// execution.
-    /// </remarks>
-    private void StartTerminalOutputCapture()
-    {
-        if (!ExecutionBuilders.Any(builder => builder.Reporters is
-                { SaveTerminalOutput: not false, ReportPortal: { Enabled: true } }))
-            return;
-
-        try
+        finally
         {
-            var path = Path.Combine(Path.GetTempPath(), $"qaas-{Guid.NewGuid():N}.log");
-            var writer = TextWriter.Synchronized(new StreamWriter(path) { AutoFlush = true });
-            var capture = _terminalOutput = new TerminalOutputCapture(path, writer, Console.Out, Console.Error);
-            Console.SetOut(new TeeTextWriter(capture.Output, capture.Writer));
-            Console.SetError(new TeeTextWriter(capture.Error, capture.Writer));
+            _terminalOutput?.Dispose();
+            _terminalOutput = null;
         }
-        catch (Exception exception) { StopTerminalOutputCapture(); DeleteTerminalOutput();
-            Logger.LogWarning(exception, "Could not capture terminal output for ReportPortal."); }
-    }
-
-    /// <summary>
-    /// Restores the original console writers and closes the temporary terminal-output writer.
-    /// </summary>
-    /// <remarks>Cleanup failures are logged and do not stop the remaining runner cleanup steps.</remarks>
-    private void StopTerminalOutputCapture()
-    {
-        if (_terminalOutput is not { } capture) return;
-
-        try
-        {
-            Console.SetOut(capture.Output);
-            Console.SetError(capture.Error);
-            capture.Writer.Dispose();
-        }
-        catch (Exception exception) { Logger.LogWarning(exception, "Could not stop terminal output capture cleanly."); }
-    }
-
-    /// <summary>
-    /// Deletes the temporary terminal-output file and clears its capture state.
-    /// </summary>
-    /// <remarks>Deletion failures are logged while capture state is cleared unconditionally.</remarks>
-    private void DeleteTerminalOutput()
-    {
-        if (_terminalOutput is not { } capture) return;
-
-        try { File.Delete(capture.Path); }
-        catch (Exception exception) { Logger.LogWarning(exception, "Could not delete temporary terminal output file."); }
-        finally { _terminalOutput = null; }
-    }
-
-    /// <summary>
-    /// Holds the temporary file and original console writers for one terminal-output capture.
-    /// </summary>
-    /// <param name="Path">The temporary file path.</param>
-    /// <param name="Writer">The writer for the temporary file.</param>
-    /// <param name="Output">The original standard-output writer.</param>
-    /// <param name="Error">The original standard-error writer.</param>
-    private sealed record TerminalOutputCapture(string Path, TextWriter Writer, TextWriter Output, TextWriter Error);
-
-    /// <summary>
-    /// Mirrors writes to the original terminal writer and the temporary capture writer.
-    /// </summary>
-    /// <param name="terminal">The original terminal writer.</param>
-    /// <param name="file">The temporary capture writer.</param>
-    private sealed class TeeTextWriter(TextWriter terminal, TextWriter file) : TextWriter
-    {
-        /// <inheritdoc />
-        public override Encoding Encoding => terminal.Encoding;
-
-        /// <inheritdoc />
-        public override void Write(char value) { terminal.Write(value); file.Write(value); }
-
-        /// <inheritdoc />
-        public override void Write(string? value) { terminal.Write(value); file.Write(value); }
-
-        /// <inheritdoc />
-        public override void Flush() { terminal.Flush(); file.Flush(); }
     }
 
     /// <summary>
