@@ -25,9 +25,12 @@ public class ReporterBuilder : IYamlConvertible, ICloneable<ReporterBuilder>
     [DefaultValue(null)]
     public bool? SaveLogs { get; internal set; }
 
-    [Description("Whether to capture logs from the entire QaaS execution and save them as an attachment.")]
+    [Description(
+        "Whether to capture all terminal output from the entire QaaS execution, including output "
+            + "not emitted through the context logger, and save it once per launch as an execution.log attachment."
+    )]
     [DefaultValue(true)]
-    public bool SaveExecutionLogs { get; internal set; } = true;
+    public bool? SaveExecutionLogs { get; internal set; } = true;
 
     [Description(
         "Whether to save the attachments belonging to the assertions in the test report. "
@@ -128,7 +131,7 @@ public class ReporterBuilder : IYamlConvertible, ICloneable<ReporterBuilder>
         return this;
     }
 
-    /// <summary>Configures whether logs from the entire QaaS execution are saved as an attachment.</summary>
+    /// <summary>Configures whether execution-wide terminal output is saved once per launch as an attachment.</summary>
     /// <qaas-docs group="Configuration as Code" subgroup="Reporters" />
     public ReporterBuilder ShouldSaveExecutionLogs(bool shouldSaveExecutionLogs)
     {

@@ -502,7 +502,7 @@ public class Runner : IRunner, IDisposable
     private void StartExecutionLogCapture()
     {
         if (!ExecutionBuilders.Any(builder => builder.Reporters is
-                { SaveExecutionLogs: true, ReportPortal: { Enabled: true } }))
+                { SaveExecutionLogs: not false, ReportPortal: { Enabled: true } }))
             return;
 
         try

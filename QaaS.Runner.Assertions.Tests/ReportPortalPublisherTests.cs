@@ -212,7 +212,8 @@ public class ReportPortalPublisherTests
 
     [TestCase(true, 1)]
     [TestCase(false, 0)]
-    public async Task PublishAsync_WithExecutionLog_RespectsConfiguration(bool enabled, int expected)
+    [TestCase(null, 1)]
+    public async Task PublishAsync_WithExecutionLog_RespectsConfiguration(bool? enabled, int expected)
     {
         var path = Path.GetTempFileName();
         await File.WriteAllTextAsync(path, "stdout\nstderr");
@@ -227,7 +228,7 @@ public class ReportPortalPublisherTests
             await publisher.PublishAsync([reporter]);
             Assert.That(factory.Services.Single().LogItemRequests
                 .Count(request => request.Attach?.Name == "execution.log"), Is.EqualTo(expected));
-            if (enabled) Assert.That(factory.Services.Single().LogItemRequests.Single(request => request.Attach?.Name == "execution.log").Attach!.Data, Is.EqualTo(Encoding.UTF8.GetBytes("stdout\nstderr")));
+            if (enabled != false) Assert.That(factory.Services.Single().LogItemRequests.Single(request => request.Attach?.Name == "execution.log").Attach!.Data, Is.EqualTo(Encoding.UTF8.GetBytes("stdout\nstderr")));
         }
         finally { File.Delete(path); }
     }
@@ -629,7 +630,7 @@ public class ReportPortalPublisherTests
         string? caseName = null,
         IReadOnlyDictionary<string, string>? extraLabels = null,
         IReadOnlyDictionary<string, string>? reportPortalAttributes = null,
-        bool saveExecutionLogs = true)
+        bool? saveExecutionLogs = true)
     {
         var context = new InternalContext
         {

@@ -367,8 +367,7 @@ internal class ReportPortalPublisher(ILogger logger) : IDisposable
     private async Task PublishExecutionLog(IClientService service, ReportPortalLaunchPlan launchPlan,
         string launchUuid, CancellationToken cancellationToken)
     {
-        if (ExecutionLogPath is null ||
-            !launchPlan.ReporterResults.Any(result => result.Reporter.SaveExecutionLogs))
+        if (ExecutionLogPath is null || launchPlan.ReporterResults.All(result => result.Reporter.SaveExecutionLogs == false))
             return;
         try
         {
