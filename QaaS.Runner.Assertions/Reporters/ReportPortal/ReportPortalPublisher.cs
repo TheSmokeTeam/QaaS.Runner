@@ -19,6 +19,7 @@ internal class ReportPortalPublisher(ILogger logger) : IDisposable
     private readonly DateTimeOffset _startedAtLocal = DateTimeOffset.Now;
     private readonly HashSet<string> _validatedGroupKeys = new(StringComparer.Ordinal);
     private bool _validationHttpClientDisposed;
+    internal string? TerminalOutputPath { get; set; }
 
     /// <summary>
     /// Validates every enabled ReportPortal launch group without creating launches or writing items.
@@ -345,6 +346,7 @@ internal class ReportPortalPublisher(ILogger logger) : IDisposable
             launchUuid = await StartLaunchAsync(service, launchPlan, projectName,
                 cancellationToken).ConfigureAwait(false);
 
+            await PublishTerminalOutput(service, launchPlan, launchUuid, cancellationToken).ConfigureAwait(false);
             await PublishLaunchItems(service, launchPlan, projectName, launchUuid, cancellationToken)
                 .ConfigureAwait(false);
         }
@@ -360,6 +362,39 @@ internal class ReportPortalPublisher(ILogger logger) : IDisposable
         {
             DisposeService(service, projectName, launchPlan.System);
         }
+    }
+
+    /// <summary>
+    /// Attaches the captured terminal output to a launch as <c>execution.log</c> when saving is enabled.
+    /// </summary>
+    /// <remarks>Attachment failures are logged and do not interrupt assertion-result publishing.</remarks>
+    /// <param name="service">The client service for the launch being published.</param>
+    /// <param name="launchPlan">The launch plan containing reporter configuration and timing.</param>
+    /// <param name="launchUuid">The identifier of the launch that receives the attachment.</param>
+    /// <param name="cancellationToken">A token that cancels attachment creation.</param>
+    private async Task PublishTerminalOutput(IClientService service, ReportPortalLaunchPlan launchPlan,
+        string launchUuid, CancellationToken cancellationToken)
+    {
+        if (TerminalOutputPath is null || launchPlan.ReporterResults.All(result => result.Reporter.SaveTerminalOutput == false))
+            return;
+        try
+        {
+            var attachment = new LogItemAttach("text/plain",
+                await File.ReadAllBytesAsync(TerminalOutputPath, cancellationToken).ConfigureAwait(false))
+            {
+                Name = "execution.log"
+            };
+            await service.LogItem.CreateAsync(new CreateLogItemRequest
+            {
+                LaunchUuid = launchUuid,
+                Level = global::ReportPortal.Client.Abstractions.Models.LogLevel.Info,
+                Text = "Runner terminal output.",
+                Time = launchPlan.LaunchEndTimeUtc,
+                Attach = attachment
+            }, cancellationToken).ConfigureAwait(false);
+        }
+        catch (Exception exception) { logger.LogError(exception,
+            "Could not attach execution.log to ReportPortal launch {LaunchUuid}.", launchUuid); }
     }
 
     /// <summary>

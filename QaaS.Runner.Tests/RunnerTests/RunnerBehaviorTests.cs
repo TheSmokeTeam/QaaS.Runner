@@ -61,7 +61,7 @@ public class RunnerBehaviorTests
         ILifetimeScope scope,
         List<ExecutionBuilder> executionBuilders,
         Microsoft.Extensions.Logging.ILogger logger,
-        Serilog.ILogger serilogLogger) : Runner(scope, executionBuilders, logger, serilogLogger)
+        Serilog.ILogger serilogLogger, bool writeTerminal = false) : Runner(scope, executionBuilders, logger, serilogLogger)
     {
         public List<string> Calls { get; } = [];
         public int? ExitCode { get; private set; }
@@ -71,6 +71,7 @@ public class RunnerBehaviorTests
         protected override List<Execution> BuildExecutions()
         {
             Calls.Add("build");
+            if (writeTerminal) { Console.WriteLine("execution stdout"); Console.Error.WriteLine("execution stderr"); }
             return [];
         }
 
@@ -96,6 +97,7 @@ public class RunnerBehaviorTests
         Serilog.ILogger serilogLogger) : Runner(scope, executionBuilders, logger, serilogLogger)
     {
         public List<string> Calls { get; } = [];
+        public string? TerminalOutputPathAtPublish { get; private set; }
 
         protected override void Setup() => Calls.Add("setup");
 
@@ -113,6 +115,7 @@ public class RunnerBehaviorTests
 
         protected override void PublishReportPortalResults(IEnumerable<Execution>? executions)
         {
+            TerminalOutputPathAtPublish = ReportPortalPublisher.TerminalOutputPath;
             Calls.Add("publish-reportportal");
         }
 
@@ -138,6 +141,7 @@ public class RunnerBehaviorTests
     {
         private readonly Exception? _validationException = validationException;
         public List<string> Calls { get; } = [];
+        public (string Path, string Text)? CapturedTerminalOutput { get; private set; }
 
         public override Task ValidateAsync(IEnumerable<ReportPortalReporter> reporters,
             CancellationToken cancellationToken = default)
@@ -153,6 +157,7 @@ public class RunnerBehaviorTests
             CancellationToken cancellationToken = default)
         {
             Calls.Add("publish");
+            CapturedTerminalOutput = (TerminalOutputPath!, File.ReadAllText(TerminalOutputPath!));
             return Task.CompletedTask;
         }
     }
@@ -634,12 +639,13 @@ public class RunnerBehaviorTests
     }
 
     [Test]
+    [NonParallelizable]
     public void RunAndGetExitCode_WhenReportPortalValidationFails_ReturnsFailureExitCodeBeforeStart()
     {
         using var scope = BuildScope();
         var publisher = new RecordingReportPortalPublisher(
             new InvalidConfigurationsException("ReportPortal validation failed"));
-        var runner = new RunLifecycleRunner(scope, [], Globals.Logger, new Mock<Serilog.ILogger>().Object)
+        var runner = new RunLifecycleRunner(scope, [CreateTemplateExecutionBuilder("case", reportPortalEnabled: true)], Globals.Logger, new Mock<Serilog.ILogger>().Object, true)
         {
             ReportPortalPublisher = publisher
         };
@@ -652,18 +658,29 @@ public class RunnerBehaviorTests
             Assert.That(runner.Calls, Is.EqualTo(new[] { "setup", "build", "teardown" }));
             Assert.That(publisher.Calls, Is.EqualTo(new[] { "validate", "publish" }));
             Assert.That(runner.LastExitCode, Is.EqualTo(1));
+            Assert.That(publisher.CapturedTerminalOutput?.Text, Does.Contain("execution stdout").And.Contain("execution stderr"));
+            Assert.That(File.Exists(publisher.CapturedTerminalOutput?.Path), Is.False);
         });
     }
 
     [Test]
+    [NonParallelizable]
     public void RunAndGetExitCode_PublishesReportPortalResultsBeforeDisposingExecutions()
     {
         using var scope = BuildScope();
-        var runner = new PublishOrderRunner(scope, [], Globals.Logger, new Mock<Serilog.ILogger>().Object);
+        var originalOut = Console.Out;
+        var originalError = Console.Error;
+        var runner = new PublishOrderRunner(scope,
+            [CreateTemplateExecutionBuilder("case", reportPortalEnabled: true)], Globals.Logger,
+            new Mock<Serilog.ILogger>().Object);
 
         var exitCode = runner.RunAndGetExitCode();
 
         Assert.That(exitCode, Is.Zero);
+        Assert.That(runner.TerminalOutputPathAtPublish, Is.Not.Null);
+        Assert.That(File.Exists(runner.TerminalOutputPathAtPublish), Is.False);
+        Assert.That(Console.Out, Is.SameAs(originalOut));
+        Assert.That(Console.Error, Is.SameAs(originalError));
         Assert.That(runner.Calls,
             Is.EqualTo(new[]
             {

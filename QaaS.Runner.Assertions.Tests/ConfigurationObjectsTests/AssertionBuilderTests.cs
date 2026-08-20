@@ -316,6 +316,7 @@ public class AssertionBuilderTests
             Endpoint = "https://reportportal.local",
         };
         var builder = new ReporterBuilder()
+            .ShouldSaveTerminalOutput(false)
             .ShouldSaveLogs(false)
             .ShouldSaveAttachments(true)
             .ShouldSaveTemplate(false)
@@ -330,6 +331,7 @@ public class AssertionBuilderTests
         var serializedType = serialized!.GetType();
         Assert.Multiple(() =>
         {
+            Assert.That(serializedType.GetProperty("SaveTerminalOutput")!.GetValue(serialized), Is.False);
             Assert.That(
                 serializedType.GetProperty("SaveLogs")!.GetValue(serialized),
                 Is.EqualTo(false)
@@ -360,6 +362,7 @@ public class AssertionBuilderTests
     [Test]
     public void ReporterAndReportPortalConfigProperties_HaveDefaultValueAttributes()
     {
+        Assert.That(new ReporterBuilder().SaveTerminalOutput, Is.True);
         AssertPublicConfigPropertiesHaveDefaultValueAttribute(typeof(ReporterBuilder));
         AssertPublicConfigPropertiesHaveDefaultValueAttribute(typeof(ReportPortalConfig));
     }

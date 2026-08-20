@@ -3,6 +3,7 @@ using Autofac;
 using Microsoft.Extensions.Logging;
 using QaaS.Framework.Configurations.CustomExceptions;
 using QaaS.Framework.Executions;
+using QaaS.Runner.Output;
 using QaaS.Runner.Options;
 using QaaS.Runner.Assertions.Reporters.ReportPortal;
 using QaaS.Runner.WrappedExternals;
@@ -28,6 +29,7 @@ public class Runner : IRunner, IDisposable
     private bool DisposeSerilogLogger { get; set; } = true;
     private int? BootstrapHandledExitCode { get; set; }
     internal ReportPortalPublisher ReportPortalPublisher { get; set; }
+    private TerminalOutputCapture? _terminalOutput;
 
     /// <summary>
     /// Controls whether <see cref="Run" /> terminates the current process after the runner finishes successfully.
@@ -99,6 +101,9 @@ public class Runner : IRunner, IDisposable
             return CompleteBootstrapHandledRun();
 
         LastExitCode = null;
+        if (ExecutionBuilders.Any(builder => builder.Reporters is
+                { SaveTerminalOutput: not false, ReportPortal: { Enabled: true } }))
+            _terminalOutput = TerminalOutputCapture.TryStart(Logger);
         LogRunStart();
 
         var lifecycleOutcome = CaptureLifecycleOutcome();
@@ -479,13 +484,29 @@ public class Runner : IRunner, IDisposable
         Logger.LogDebug("Runner cleanup started");
 
         var cleanupFailures = new List<Exception>();
-        RunCleanupStep("publish ReportPortal results", () => PublishReportPortalResults(executions), cleanupFailures);
+        RunCleanupStep("publish ReportPortal results", () => PublishReportPortalResultsWithCleanup(executions), cleanupFailures);
         RunCleanupStep("dispose executions", () => DisposeExecutions(executions), cleanupFailures);
         RunCleanupStep("teardown", Teardown, cleanupFailures);
         RunCleanupStep("dispose runner", Dispose, cleanupFailures);
 
         Logger.LogDebug("Runner cleanup completed. FailureCount={FailureCount}", cleanupFailures.Count);
         return cleanupFailures;
+    }
+
+    /// <summary>
+    /// Publishes ReportPortal results and completes the associated cleanup.
+    /// </summary>
+    /// <param name="executions">The completed executions whose queued results should be published.</param>
+    private void PublishReportPortalResultsWithCleanup(IEnumerable<Execution>? executions)
+    {
+        _terminalOutput?.Stop();
+        ReportPortalPublisher.TerminalOutputPath = _terminalOutput?.Path;
+        try { PublishReportPortalResults(executions); }
+        finally
+        {
+            _terminalOutput?.Dispose();
+            _terminalOutput = null;
+        }
     }
 
     /// <summary>

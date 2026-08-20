@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Collections.Immutable;
+using System.IO;
 using System.Linq;
 using System.Net;
 using System.Net.Http;
@@ -209,6 +210,29 @@ public class ReportPortalPublisherTests
         });
     }
 
+    [TestCase(true, 1)]
+    [TestCase(false, 0)]
+    [TestCase(null, 1)]
+    public async Task PublishAsync_WithTerminalOutput_RespectsConfiguration(bool? enabled, int expected)
+    {
+        var path = Path.GetTempFileName();
+        await File.WriteAllTextAsync(path, "stdout\nstderr");
+        try
+        {
+            var factory = new RecordingClientFactory();
+            using var publisher = CreateSuccessfulPublisher(factory, out _);
+            publisher.TerminalOutputPath = path;
+            var reporter = CreateReporter(saveTerminalOutput: enabled);
+            reporter.WriteTestResults(CreateResult("assertion-a", "Session A"));
+            await publisher.ValidateAsync([reporter]);
+            await publisher.PublishAsync([reporter]);
+            Assert.That(factory.Services.Single().LogItemRequests
+                .Count(request => request.Attach?.Name == "execution.log"), Is.EqualTo(expected));
+            if (enabled != false) Assert.That(factory.Services.Single().LogItemRequests.Single(request => request.Attach?.Name == "execution.log").Attach!.Data, Is.EqualTo(Encoding.UTF8.GetBytes("stdout\nstderr")));
+        }
+        finally { File.Delete(path); }
+    }
+
     [Test]
     public async Task PublishAsync_WithLongAssertionDuration_LaunchContainsAssertionTiming()
     {
@@ -244,6 +268,7 @@ public class ReportPortalPublisherTests
         var factory = new RecordingClientFactory();
         using var publisher = CreateSuccessfulPublisher(factory, out _);
         var reporter = CreateReporter();
+        reporter.SaveTemplate = true;
         reporter.WriteTestResults(CreateResult("assertion-a", "Session A", testDurationMs: 5_000));
 
         await publisher.ValidateAsync([reporter]);
@@ -252,10 +277,12 @@ public class ReportPortalPublisherTests
         var service = factory.Services.Single();
         var assertionStartTime = service.TestItemStartRequests.Single().StartTime;
         var assertionEndTime = service.TestItemFinishRequests.Single().EndTime;
+        var templateAttachment = service.LogItemRequests
+            .Single(request => request.Attach?.Name == "template.yaml").Attach!;
 
         Assert.Multiple(() =>
         {
-            Assert.That(service.LogItemRequests, Is.Not.Empty);
+            Assert.That(templateAttachment.MimeType, Is.EqualTo("text/plain"));
             Assert.That(service.LogItemRequests.All(request =>
                 request.Time >= assertionStartTime && request.Time <= assertionEndTime), Is.True);
         });
@@ -602,7 +629,8 @@ public class ReportPortalPublisherTests
         string? executionId = null,
         string? caseName = null,
         IReadOnlyDictionary<string, string>? extraLabels = null,
-        IReadOnlyDictionary<string, string>? reportPortalAttributes = null)
+        IReadOnlyDictionary<string, string>? reportPortalAttributes = null,
+        bool? saveTerminalOutput = true)
     {
         var context = new InternalContext
         {
@@ -624,6 +652,7 @@ public class ReportPortalPublisherTests
 
         return new ReportPortalReporter
         {
+            SaveTerminalOutput = saveTerminalOutput,
             Config = new ReportPortalConfig
             {
                 Enabled = enabled,

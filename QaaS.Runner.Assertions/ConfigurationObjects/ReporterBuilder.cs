@@ -26,6 +26,13 @@ public class ReporterBuilder : IYamlConvertible, ICloneable<ReporterBuilder>
     public bool? SaveLogs { get; internal set; }
 
     [Description(
+        "Whether to capture all terminal output from the entire QaaS execution, including output "
+            + "not emitted through the context logger, and save it once per launch as an execution.log attachment."
+    )]
+    [DefaultValue(true)]
+    public bool? SaveTerminalOutput { get; internal set; } = true;
+
+    [Description(
         "Whether to save the attachments belonging to the assertions in the test report. "
             + "If not set, each assertion will determine whether to save them."
     )]
@@ -88,6 +95,7 @@ public class ReporterBuilder : IYamlConvertible, ICloneable<ReporterBuilder>
             new
             {
                 SaveLogs,
+                SaveTerminalOutput,
                 SaveAttachments,
                 SaveTemplate,
                 SaveSessionData,
@@ -120,6 +128,20 @@ public class ReporterBuilder : IYamlConvertible, ICloneable<ReporterBuilder>
     public ReporterBuilder ShouldSaveLogs(bool shouldSaveLogs)
     {
         SaveLogs = shouldSaveLogs;
+        return this;
+    }
+
+    /// <summary>
+    /// Configures whether all terminal output from the QaaS execution is saved once per launch as an
+    /// <c>execution.log</c> attachment.
+    /// </summary>
+    /// <remarks>
+    /// Use this method when working with the documented Runner reporter builder API surface in code. The change is stored on the current builder instance and is consumed by later build, validation, or execution steps.
+    /// </remarks>
+    /// <qaas-docs group="Configuration as Code" subgroup="Reporters" />
+    public ReporterBuilder ShouldSaveTerminalOutput(bool shouldSaveTerminalOutput)
+    {
+        SaveTerminalOutput = shouldSaveTerminalOutput;
         return this;
     }
 
@@ -219,6 +241,7 @@ public class ReporterBuilder : IYamlConvertible, ICloneable<ReporterBuilder>
                 Context = context,
                 DisplayTrace = DisplayTrace,
                 SaveLogs = SaveLogs,
+                SaveTerminalOutput = SaveTerminalOutput,
                 SaveAttachments = SaveAttachments,
                 SaveTemplate = SaveTemplate,
                 SaveSessionData = SaveSessionData,
