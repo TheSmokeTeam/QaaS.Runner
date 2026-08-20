@@ -83,12 +83,10 @@ Or
 ")]
     public IList<string> PushReferences { get; init; } = Array.Empty<string>();
 
-    /// <summary>
-    ///     Whether to preserve names and name references from pushed reference files
-    /// </summary>
     [Option("preserve-reference-names", Default = false,
-        HelpText = "Preserves names and name references from pushed reference files instead of prefixing them " +
-                   "with their replace keyword.")]
+        HelpText = "Use with -p or --push-references. By default, these options prefix the unique name field of " +
+                   "each item added from a reference file with the replace keyword. " +
+                   "This flag skips that prefix and keeps the raw name from the reference file.")]
     public bool PreserveReferenceNames { get; init; } = false;
 
     [ValidPath]
