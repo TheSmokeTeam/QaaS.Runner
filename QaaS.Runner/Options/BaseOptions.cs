@@ -42,7 +42,8 @@ For example: `Path:To:Variable:To:Overwrite=NewVariableValue`
 References to push onto the qaas configuration.
 References are configurations that are pushed in the completed test case's root level list configurations instead of a certain keyword to replace,
 if such a keyword is not found for a certain list nothing will be added to it.
-The items added to the configuration list will have a prefix of the given keyword to replace added to their unique name field.
+The items added to the configuration list will have a prefix of the given keyword to replace added to their unique name field,
+unless --preserve-reference-names is used.
 
 For example:
 If we push the reference below
@@ -81,6 +82,12 @@ Or
 !!! Note that the `KeyWordToReplace` must not end with the suffix `.yml` or `.yaml`.
 ")]
     public IList<string> PushReferences { get; init; } = Array.Empty<string>();
+
+    [Option("preserve-reference-names", Default = false,
+        HelpText = "Use with -p or --push-references. By default, these options prefix the unique name field of " +
+                   "each item added from a reference file with the replace keyword. " +
+                   "This flag skips that prefix and keeps the raw name from the reference file.")]
+    public bool PreserveReferenceNames { get; init; } = false;
 
     [ValidPath]
     [Option('c', "cases", Default = null,

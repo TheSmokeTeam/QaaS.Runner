@@ -51,8 +51,11 @@ public class RunLoader<TRunner, TOptions> : BaseLoader<TOptions, TRunner>
     protected virtual InternalContext BuildContext(string? executionId, string? relativeCaseFilePath = null,
         IContextBuilder? contextBuilder = null)
     {
+        IList<string> uniqueIdPathRegexes = Options.PreserveReferenceNames
+            ? Array.Empty<string>()
+            : Constants.SupportedUniqueIdsPathRegexes;
         contextBuilder ??= new ContextBuilder(new ConfigurationBuilder(),
-            Constants.SupportedReferenceLists, Constants.SupportedUniqueIdsPathRegexes);
+            Constants.SupportedReferenceLists, uniqueIdPathRegexes);
         contextBuilder.SetLogger(Logger);
         contextBuilder.SetExecutionId(executionId);
         var shouldLoadConfigurationFile = ShouldLoadConfigurationFile();

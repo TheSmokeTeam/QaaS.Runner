@@ -1,3 +1,4 @@
+using CommandLine;
 using Microsoft.Extensions.Logging;
 using NUnit.Framework;
 using QaaS.Framework.SDK.ExecutionObjects;
@@ -36,6 +37,27 @@ public class BaseOptionsTests
 
         // Assert
         Assert.That(result.Count(), Is.EqualTo(expectedCount));
+    }
+
+    [Test]
+    public void PreserveReferenceNames_DefaultsToFalse()
+    {
+        var options = new MockOptions();
+
+        Assert.That(options.PreserveReferenceNames, Is.False);
+    }
+
+    [Test]
+    public void PreserveReferenceNames_LongFlagParsesAsTrue()
+    {
+        RunOptions? options = null;
+
+        Parser.Default
+            .ParseArguments<RunOptions>(["test.qaas.yaml", "--preserve-reference-names"])
+            .WithParsed(parsedOptions => options = parsedOptions);
+
+        Assert.That(options, Is.Not.Null);
+        Assert.That(options!.PreserveReferenceNames, Is.True);
     }
 
     [Test]
