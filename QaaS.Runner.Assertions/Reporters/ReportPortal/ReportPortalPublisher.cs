@@ -365,7 +365,7 @@ internal class ReportPortalPublisher(ILogger logger) : IDisposable
     }
 
     /// <summary>
-    /// Attaches the captured terminal output to a launch as <c>execution.log</c> when saving is enabled.
+    /// Attaches the captured terminal output to a launch as <c>terminal.log</c> when saving is enabled.
     /// </summary>
     /// <remarks>Attachment failures are logged and do not interrupt assertion-result publishing.</remarks>
     /// <param name="service">The client service for the launch being published.</param>
@@ -382,7 +382,7 @@ internal class ReportPortalPublisher(ILogger logger) : IDisposable
             var attachment = new LogItemAttach("text/plain",
                 await File.ReadAllBytesAsync(TerminalOutputPath, cancellationToken).ConfigureAwait(false))
             {
-                Name = "execution.log"
+                Name = "terminal.log"
             };
             await service.LogItem.CreateAsync(new CreateLogItemRequest
             {
@@ -394,7 +394,7 @@ internal class ReportPortalPublisher(ILogger logger) : IDisposable
             }, cancellationToken).ConfigureAwait(false);
         }
         catch (Exception exception) { logger.LogError(exception,
-            "Could not attach execution.log to ReportPortal launch {LaunchUuid}.", launchUuid); }
+            "Could not attach terminal.log to ReportPortal launch {LaunchUuid}.", launchUuid); }
     }
 
     /// <summary>
