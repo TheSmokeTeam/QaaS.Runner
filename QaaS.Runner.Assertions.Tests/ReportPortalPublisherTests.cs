@@ -227,8 +227,8 @@ public class ReportPortalPublisherTests
             await publisher.ValidateAsync([reporter]);
             await publisher.PublishAsync([reporter]);
             Assert.That(factory.Services.Single().LogItemRequests
-                .Count(request => request.Attach?.Name == "execution.log"), Is.EqualTo(expected));
-            if (enabled != false) Assert.That(factory.Services.Single().LogItemRequests.Single(request => request.Attach?.Name == "execution.log").Attach!.Data, Is.EqualTo(Encoding.UTF8.GetBytes("stdout\nstderr")));
+                .Count(request => request.Attach?.Name == "terminal.log"), Is.EqualTo(expected));
+            if (enabled != false) Assert.That(factory.Services.Single().LogItemRequests.Single(request => request.Attach?.Name == "terminal.log").Attach!.Data, Is.EqualTo(Encoding.UTF8.GetBytes("stdout\nstderr")));
         }
         finally { File.Delete(path); }
     }

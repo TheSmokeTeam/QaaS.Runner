@@ -27,7 +27,7 @@ public class ReporterBuilder : IYamlConvertible, ICloneable<ReporterBuilder>
 
     [Description(
         "Whether to capture all terminal output from the entire QaaS execution, including output "
-            + "not emitted through the context logger, and save it once per launch as an execution.log attachment."
+            + "not emitted through the context logger, and save it once per launch as a terminal.log attachment."
     )]
     [DefaultValue(true)]
     public bool? SaveTerminalOutput { get; internal set; } = true;
@@ -133,7 +133,7 @@ public class ReporterBuilder : IYamlConvertible, ICloneable<ReporterBuilder>
 
     /// <summary>
     /// Configures whether all terminal output from the QaaS execution is saved once per launch as an
-    /// <c>execution.log</c> attachment.
+    /// <c>terminal.log</c> attachment.
     /// </summary>
     /// <remarks>
     /// Use this method when working with the documented Runner reporter builder API surface in code. The change is stored on the current builder instance and is consumed by later build, validation, or execution steps.
