@@ -8,7 +8,7 @@ namespace QaaS.Runner.Options;
 [Verb("execute", HelpText =
     "Executes a yaml execution file that contains a list of other commands to execute in a sequential order. " +
     "The flags of all commands in the execution file that can also be given in the execute command" +
-    " ('s', 'e', 'l', 'g') will be ignored.")]
+    " ('s', 'o', 'e', 'l', 'g') will be ignored.")]
 public record ExecuteOptions : LoggerOptions
 {
     [Required]
@@ -45,6 +45,13 @@ Uses a locally installed allure CLI tool, if allure CLI is not installed and add
             ? AssertableOptions.DefaultServeResultsFolder
             : ServeResultsFolder.Trim();
     }
+
+    [Option('o', "open-reportportal", Default = false,
+        HelpText = @"
+Opens each successfully published ReportPortal report in the default browser.
+ReportPortal reporting must be enabled in the configuration.
+When commands in the execution file use this flag it has no effect; this execute-level flag controls opening.")]
+    public bool OpenReportPortal { get; set; }
 
     [Option('e', "empty-allure-directory", Default = false,
         HelpText = "If flag is enabled will automatically empty the allure results directory before running.")]

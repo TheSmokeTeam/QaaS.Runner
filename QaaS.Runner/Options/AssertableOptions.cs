@@ -35,6 +35,11 @@ Provide a folder name such as 'allure-report' to open a generated report directo
             : ServeResultsFolder.Trim();
     }
 
+    [Option('o', "open-reportportal", Default = false,
+        HelpText = "Opens each successfully published ReportPortal report in the default browser. " +
+                   "ReportPortal reporting must be enabled in the configuration.")]
+    public bool OpenReportPortal { get; set; }
+
     [Option('e', "empty-results-directory", Default = false,
         HelpText = "If flag is enabled will automatically empty the results directory before running.")]
     public bool EmptyAllureDirectory { get; set; } = false;
