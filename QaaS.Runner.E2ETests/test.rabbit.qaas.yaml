@@ -1,0 +1,426 @@
+anchors:
+  rabbitmq: &rabbitmq ${variables:rabbitmq}
+
+MetaData:
+  Team: Smoke
+  System: QaaS
+
+Storages:
+  - FileSystem:
+      Path: SessionDataStorage
+
+DataSources:
+  - Name: DefaultExchangePayload
+    Generator: TestGenerator
+    GeneratorConfiguration:
+      Count: 1
+      Value: "DefaultExchange-403Fix-Payload"
+
+  - Name: DirectAnonymousPayload
+    Generator: TestGenerator
+    GeneratorConfiguration:
+      Count: 1
+      Value: "DirectAnonymous-Payload"
+      RoutingKey: "qaas.direct.rk"
+
+  - Name: DurablePayload
+    Generator: TestGenerator
+    GeneratorConfiguration:
+      Count: 1
+      Value: "DurableQueue-Payload"
+
+  - Name: AutoDeletePayload
+    Generator: TestGenerator
+    GeneratorConfiguration:
+      Count: 1
+      Value: "AutoDeleteQueue-Payload"
+
+  - Name: TtlPayload
+    Generator: TestGenerator
+    GeneratorConfiguration:
+      Count: 1
+      Value: "TtlQueue-Payload"
+
+  - Name: MaxLengthPayload
+    Generator: TestGenerator
+    GeneratorConfiguration:
+      Count: 1
+      Value: "MaxLengthQueue-Payload"
+
+  - Name: SacPayload
+    Generator: TestGenerator
+    GeneratorConfiguration:
+      Count: 1
+      Value: "SingleActiveConsumer-Payload"
+
+  - Name: PriorityPayload
+    Generator: TestGenerator
+    GeneratorConfiguration:
+      Count: 1
+      Value: "MaxPriority-Payload"
+
+  - Name: LazyPayload
+    Generator: TestGenerator
+    GeneratorConfiguration:
+      Count: 1
+      Value: "LazyQueue-Payload"
+
+  - Name: DlxPayload
+    Generator: TestGenerator
+    GeneratorConfiguration:
+      Count: 1
+      Value: "DeadLetterExchange-Payload"
+
+  - Name: CombinedPayload
+    Generator: TestGenerator
+    GeneratorConfiguration:
+      Count: 1
+      Value: "CombinedArgs-Payload"
+
+Sessions:
+  - Name: SetupExchanges
+    SaveData: true
+    Probes:
+      - Name: DeclareScenarioExchanges
+        Stage: 0
+        Probe: EnsureRabbitMqExchanges
+        ProbeConfiguration:
+          <<: *rabbitmq
+          Exchanges:
+            - Name: test
+              Type: Direct
+            - Name: qaas-test-direct-exchange
+              Type: Direct
+            - Name: qaas-test-dlx
+              Type: Direct
+
+  - Name: DefaultExchangeNamedQueue
+    SaveData: true
+    Publishers:
+      - Name: PublishToDefaultExchangeNamedQueue
+        Stage: 2
+        DataSourceNames: [ DefaultExchangePayload ]
+        RabbitMq:
+          <<: *rabbitmq
+          QueueName: qaas-e2e-default-exchange-queue
+        Serialize:
+          Serializer: Json
+    Consumers:
+      - Name: ConsumeFromDefaultExchangeNamedQueue
+        Stage: 1
+        TimeoutMs: 3000
+        RabbitMq:
+          <<: *rabbitmq
+          QueueName: qaas-e2e-default-exchange-queue
+          Durable: false
+          AutoDelete: false
+          Exclusive: false
+        Deserialize:
+          Deserializer: Json
+          SpecificType:
+            AssemblyName: QaaS.Runner.E2ETests
+            TypeFullName: QaaS.Runner.E2ETests.MockJson
+
+  - Name: DirectExchangeAnonymousQueue
+    SaveData: true
+    Publishers:
+      - Name: PublishToDirectExchangeAnonymousQueue
+        Stage: 2
+        DataSourceNames: [ DirectAnonymousPayload ]
+        RabbitMq:
+          <<: *rabbitmq
+          ExchangeName: qaas-test-direct-exchange
+          RoutingKey: qaas.direct.rk
+        Serialize:
+          Serializer: Json
+    Consumers:
+      - Name: ConsumeFromDirectExchangeAnonymousQueue
+        Stage: 1
+        TimeoutMs: 3000
+        RabbitMq:
+          <<: *rabbitmq
+          ExchangeName: qaas-test-direct-exchange
+          RoutingKey: qaas.direct.rk
+        Deserialize:
+          Deserializer: Json
+          SpecificType:
+            AssemblyName: QaaS.Runner.E2ETests
+            TypeFullName: QaaS.Runner.E2ETests.MockJson
+
+  - Name: DurableNamedQueue
+    SaveData: true
+    Publishers:
+      - Name: PublishToDurableNamedQueue
+        Stage: 2
+        DataSourceNames: [ DurablePayload ]
+        RabbitMq:
+          <<: *rabbitmq
+          QueueName: qaas-e2e-durable-queue
+        Serialize:
+          Serializer: Json
+    Consumers:
+      - Name: ConsumeFromDurableNamedQueue
+        Stage: 1
+        TimeoutMs: 3000
+        RabbitMq:
+          <<: *rabbitmq
+          QueueName: qaas-e2e-durable-queue
+          Durable: true
+          AutoDelete: false
+          Exclusive: false
+        Deserialize:
+          Deserializer: Json
+          SpecificType:
+            AssemblyName: QaaS.Runner.E2ETests
+            TypeFullName: QaaS.Runner.E2ETests.MockJson
+
+  - Name: AutoDeleteNamedQueue
+    SaveData: true
+    Publishers:
+      - Name: PublishToAutoDeleteNamedQueue
+        Stage: 2
+        DataSourceNames: [ AutoDeletePayload ]
+        RabbitMq:
+          <<: *rabbitmq
+          QueueName: qaas-e2e-autodelete-queue
+        Serialize:
+          Serializer: Json
+    Consumers:
+      - Name: ConsumeFromAutoDeleteNamedQueue
+        Stage: 1
+        TimeoutMs: 3000
+        RabbitMq:
+          <<: *rabbitmq
+          QueueName: qaas-e2e-autodelete-queue
+          Durable: false
+          AutoDelete: true
+          Exclusive: false
+        Deserialize:
+          Deserializer: Json
+          SpecificType:
+            AssemblyName: QaaS.Runner.E2ETests
+            TypeFullName: QaaS.Runner.E2ETests.MockJson
+
+  - Name: MessageTtlQueue
+    SaveData: true
+    Publishers:
+      - Name: PublishToMessageTtlQueue
+        Stage: 2
+        DataSourceNames: [ TtlPayload ]
+        RabbitMq:
+          <<: *rabbitmq
+          QueueName: qaas-e2e-ttl-queue
+        Serialize:
+          Serializer: Json
+    Consumers:
+      - Name: ConsumeFromMessageTtlQueue
+        Stage: 1
+        TimeoutMs: 3000
+        RabbitMq:
+          <<: *rabbitmq
+          QueueName: qaas-e2e-ttl-queue
+          Durable: false
+          AutoDelete: false
+          Exclusive: false
+          Arguments:
+            x-message-ttl: 60000
+        Deserialize:
+          Deserializer: Json
+          SpecificType:
+            AssemblyName: QaaS.Runner.E2ETests
+            TypeFullName: QaaS.Runner.E2ETests.MockJson
+
+  - Name: MaxLengthQueue
+    SaveData: true
+    Publishers:
+      - Name: PublishToMaxLengthQueue
+        Stage: 2
+        DataSourceNames: [ MaxLengthPayload ]
+        RabbitMq:
+          <<: *rabbitmq
+          QueueName: qaas-e2e-max-length-queue
+        Serialize:
+          Serializer: Json
+    Consumers:
+      - Name: ConsumeFromMaxLengthQueue
+        Stage: 1
+        TimeoutMs: 3000
+        RabbitMq:
+          <<: *rabbitmq
+          QueueName: qaas-e2e-max-length-queue
+          Durable: false
+          AutoDelete: false
+          Exclusive: false
+          Arguments:
+            x-max-length: 100
+            x-overflow: drop-head
+        Deserialize:
+          Deserializer: Json
+          SpecificType:
+            AssemblyName: QaaS.Runner.E2ETests
+            TypeFullName: QaaS.Runner.E2ETests.MockJson
+
+  - Name: SingleActiveConsumerQueue
+    SaveData: true
+    Publishers:
+      - Name: PublishToSingleActiveConsumerQueue
+        Stage: 2
+        DataSourceNames: [ SacPayload ]
+        RabbitMq:
+          <<: *rabbitmq
+          QueueName: qaas-e2e-sac-queue
+        Serialize:
+          Serializer: Json
+    Consumers:
+      - Name: ConsumeFromSingleActiveConsumerQueue
+        Stage: 1
+        TimeoutMs: 3000
+        RabbitMq:
+          <<: *rabbitmq
+          QueueName: qaas-e2e-sac-queue
+          Durable: false
+          AutoDelete: false
+          Exclusive: false
+          Arguments:
+            x-single-active-consumer: true
+        Deserialize:
+          Deserializer: Json
+          SpecificType:
+            AssemblyName: QaaS.Runner.E2ETests
+            TypeFullName: QaaS.Runner.E2ETests.MockJson
+
+  - Name: MaxPriorityQueue
+    SaveData: true
+    Publishers:
+      - Name: PublishToMaxPriorityQueue
+        Stage: 2
+        DataSourceNames: [ PriorityPayload ]
+        RabbitMq:
+          <<: *rabbitmq
+          QueueName: qaas-e2e-priority-queue
+        Serialize:
+          Serializer: Json
+    Consumers:
+      - Name: ConsumeFromMaxPriorityQueue
+        Stage: 1
+        TimeoutMs: 3000
+        RabbitMq:
+          <<: *rabbitmq
+          QueueName: qaas-e2e-priority-queue
+          Durable: false
+          AutoDelete: false
+          Exclusive: false
+          Arguments:
+            x-max-priority: 10
+        Deserialize:
+          Deserializer: Json
+          SpecificType:
+            AssemblyName: QaaS.Runner.E2ETests
+            TypeFullName: QaaS.Runner.E2ETests.MockJson
+
+  - Name: LazyQueue
+    SaveData: true
+    Publishers:
+      - Name: PublishToLazyQueue
+        Stage: 2
+        DataSourceNames: [ LazyPayload ]
+        RabbitMq:
+          <<: *rabbitmq
+          QueueName: qaas-e2e-lazy-queue
+        Serialize:
+          Serializer: Json
+    Consumers:
+      - Name: ConsumeFromLazyQueue
+        Stage: 1
+        TimeoutMs: 3000
+        RabbitMq:
+          <<: *rabbitmq
+          QueueName: qaas-e2e-lazy-queue
+          Durable: false
+          AutoDelete: false
+          Exclusive: false
+          Arguments:
+            x-queue-mode: lazy
+        Deserialize:
+          Deserializer: Json
+          SpecificType:
+            AssemblyName: QaaS.Runner.E2ETests
+            TypeFullName: QaaS.Runner.E2ETests.MockJson
+
+  - Name: DeadLetterExchangeQueue
+    SaveData: true
+    Publishers:
+      - Name: PublishToDeadLetterExchangeQueue
+        Stage: 2
+        DataSourceNames: [ DlxPayload ]
+        RabbitMq:
+          <<: *rabbitmq
+          QueueName: qaas-e2e-dlx-queue
+        Serialize:
+          Serializer: Json
+    Consumers:
+      - Name: ConsumeFromDeadLetterExchangeQueue
+        Stage: 1
+        TimeoutMs: 3000
+        RabbitMq:
+          <<: *rabbitmq
+          QueueName: qaas-e2e-dlx-queue
+          Durable: false
+          AutoDelete: false
+          Exclusive: false
+          Arguments:
+            x-dead-letter-exchange: qaas-test-dlx
+            x-dead-letter-routing-key: qaas-test-dlx-rk
+        Deserialize:
+          Deserializer: Json
+          SpecificType:
+            AssemblyName: QaaS.Runner.E2ETests
+            TypeFullName: QaaS.Runner.E2ETests.MockJson
+
+  - Name: MultiArgumentCombinedQueue
+    SaveData: true
+    Publishers:
+      - Name: PublishToMultiArgumentCombinedQueue
+        Stage: 2
+        DataSourceNames: [ CombinedPayload ]
+        RabbitMq:
+          <<: *rabbitmq
+          QueueName: qaas-e2e-combined-queue
+        Serialize:
+          Serializer: Json
+    Consumers:
+      - Name: ConsumeFromMultiArgumentCombinedQueue
+        Stage: 1
+        TimeoutMs: 3000
+        RabbitMq:
+          <<: *rabbitmq
+          QueueName: qaas-e2e-combined-queue
+          Durable: true
+          AutoDelete: false
+          Exclusive: false
+          Arguments:
+            x-message-ttl: 120000
+            x-max-length: 500
+            x-single-active-consumer: true
+            x-max-priority: 5
+        Deserialize:
+          Deserializer: Json
+          SpecificType:
+            AssemblyName: QaaS.Runner.E2ETests
+            TypeFullName: QaaS.Runner.E2ETests.MockJson
+
+Assertions:
+  - Name: ExhaustiveRabbitCombinationsAssertion
+    Assertion: RabbitExhaustiveCombinationsAssertion
+    SessionNames:
+      - DefaultExchangeNamedQueue
+      - DirectExchangeAnonymousQueue
+      - DurableNamedQueue
+      - AutoDeleteNamedQueue
+      - MessageTtlQueue
+      - MaxLengthQueue
+      - SingleActiveConsumerQueue
+      - MaxPriorityQueue
+      - LazyQueue
+      - DeadLetterExchangeQueue
+      - MultiArgumentCombinedQueue

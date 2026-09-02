@@ -122,6 +122,55 @@ public class BuilderCrudTests
     }
 
     [Test]
+    public void ConsumerBuilder_UpdateConfiguration_WithConfiguration_MergesRabbitMqQueueParametersAndPreservesExistingFields()
+    {
+        var builder = new ConsumerBuilder().Configure(
+            new RabbitMqReaderConfig
+            {
+                Host = "rabbitmq.local",
+                QueueName = "messages",
+                RoutingKey = "created",
+                Durable = false,
+                Exclusive = false,
+                AutoDelete = false,
+                Arguments = new Dictionary<string, object?> { ["x-message-ttl"] = 30000 },
+            }
+        );
+
+        var customArgs = new Dictionary<string, object?>
+        {
+            ["x-message-ttl"] = 60000,
+            ["x-max-length"] = 500,
+            ["x-single-active-consumer"] = true,
+        };
+
+        builder.UpdateConfiguration(
+            new RabbitMqReaderConfig
+            {
+                Durable = true,
+                Exclusive = true,
+                AutoDelete = true,
+                Arguments = customArgs,
+            }
+        );
+
+        var mergedConfiguration = builder.RabbitMq!;
+        Assert.Multiple(() =>
+        {
+            Assert.That(mergedConfiguration.Host, Is.EqualTo("rabbitmq.local"));
+            Assert.That(mergedConfiguration.QueueName, Is.EqualTo("messages"));
+            Assert.That(mergedConfiguration.RoutingKey, Is.EqualTo("created"));
+            Assert.That(mergedConfiguration.Durable, Is.True);
+            Assert.That(mergedConfiguration.Exclusive, Is.True);
+            Assert.That(mergedConfiguration.AutoDelete, Is.True);
+            Assert.That(mergedConfiguration.Arguments, Is.Not.Null);
+            Assert.That(mergedConfiguration.Arguments!["x-message-ttl"], Is.EqualTo("60000"));
+            Assert.That(mergedConfiguration.Arguments["x-max-length"], Is.EqualTo("500"));
+            Assert.That(mergedConfiguration.Arguments["x-single-active-consumer"], Is.EqualTo("True"));
+        });
+    }
+
+    [Test]
     public void ConsumerBuilder_UpdateConfiguration_WithObjectPatch_MergesRabbitMqAllFieldsAndPreservesExistingFields()
     {
         var builder = new ConsumerBuilder().Configure(
@@ -138,6 +187,10 @@ public class BuilderCrudTests
                 QueueName = "messages",
                 RoutingKey = "created",
                 CreatedQueueTimeToExpireMs = 300000,
+                Durable = false,
+                Exclusive = false,
+                AutoDelete = false,
+                Arguments = new Dictionary<string, object?> { ["x-message-ttl"] = "30000" },
             }
         );
 
@@ -155,6 +208,10 @@ public class BuilderCrudTests
                 QueueName = "messages-updated",
                 RoutingKey = "updated",
                 CreatedQueueTimeToExpireMs = 12345d,
+                Durable = true,
+                Exclusive = true,
+                AutoDelete = true,
+                Arguments = new Dictionary<string, object?> { ["x-message-ttl"] = "60000", ["x-max-length"] = "500" },
             }
         );
 
@@ -173,6 +230,12 @@ public class BuilderCrudTests
             Assert.That(mergedConfiguration.QueueName, Is.EqualTo("messages-updated"));
             Assert.That(mergedConfiguration.RoutingKey, Is.EqualTo("updated"));
             Assert.That(mergedConfiguration.CreatedQueueTimeToExpireMs, Is.EqualTo(12345d));
+            Assert.That(mergedConfiguration.Durable, Is.True);
+            Assert.That(mergedConfiguration.Exclusive, Is.True);
+            Assert.That(mergedConfiguration.AutoDelete, Is.True);
+            Assert.That(mergedConfiguration.Arguments, Does.ContainKey("x-message-ttl"));
+            Assert.That(mergedConfiguration.Arguments!["x-message-ttl"], Is.EqualTo("60000"));
+            Assert.That(mergedConfiguration.Arguments["x-max-length"], Is.EqualTo("500"));
         });
     }
 
