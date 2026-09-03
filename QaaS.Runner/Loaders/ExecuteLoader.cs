@@ -132,6 +132,7 @@ public class ExecuteLoader<TRunner> : BaseLoader<ExecuteOptions, TRunner> where 
             Options.EmptyAllureDirectory,
             Options.AutoServeTestResults);
         runner.WithServeResultsFolder(Options.AutoServeTestResults ? Options.GetServeResultsFolderOrDefault() : null);
+        runner.WithOpenReportPortal(Options.OpenReportPortal);
         runner.ExitProcessOnCompletion = !Options.NoProcessExit;
         return runner;
     }

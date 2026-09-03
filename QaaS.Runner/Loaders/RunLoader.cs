@@ -226,6 +226,7 @@ public class RunLoader<TRunner, TOptions> : BaseLoader<TOptions, TRunner>
             Options is AssertableOptions emptyResultsOptions && emptyResultsOptions.EmptyAllureDirectory,
             serveResultsFolder is not null);
         runner.WithServeResultsFolder(serveResultsFolder);
+        runner.WithOpenReportPortal(Options is AssertableOptions { OpenReportPortal: true });
         runner.ExitProcessOnCompletion = !Options.NoProcessExit;
         return runner;
     }

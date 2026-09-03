@@ -32,6 +32,20 @@ public class BootstrapTests
         Assert.That(result.ExitProcessOnCompletion, Is.False);
     }
 
+    [TestCase("run", "TestData/test.qaas.yaml", "-o")]
+    [TestCase("run", "TestData/test.qaas.yaml", "--open-reportportal")]
+    [TestCase("execute", "TestData/executable.yaml", "-o")]
+    [TestCase("execute", "TestData/executable.yaml", "--open-reportportal")]
+    public void TestGetRunner_WithOpenReportPortalFlag_EnablesAutomaticOpening(
+        string verb,
+        string configurationFile,
+        string flag)
+    {
+        using var result = Bootstrap.New([verb, configurationFile, flag]);
+
+        Assert.That(result.ReportPortalPublisher.OpenReportPortal, Is.True);
+    }
+
     [Test]
     public void CreateRunnerScope_RegistersAllureWrapper()
     {

@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using System.Net;
 using System.Net.Http.Headers;
 using System.Text.Json;
@@ -20,6 +21,7 @@ internal class ReportPortalPublisher(ILogger logger) : IDisposable
     private readonly HashSet<string> _validatedGroupKeys = new(StringComparer.Ordinal);
     private bool _validationHttpClientDisposed;
     internal string? TerminalOutputPath { get; set; }
+    internal bool OpenReportPortal { get; set; }
 
     /// <summary>
     /// Validates every enabled ReportPortal launch group without creating launches or writing items.
@@ -467,12 +469,48 @@ internal class ReportPortalPublisher(ILogger logger) : IDisposable
                 "Finished ReportPortal launch {LaunchUuid} in project {ProjectName} for system {SystemName}.",
                 launchUuid, projectName, launchPlan.System);
             logger.LogInformation("ReportPortal report: {ReportUrl}", finishedLaunch.Link);
+            if (OpenReportPortal)
+                TryOpenReportLink(finishedLaunch.Link);
         }
         catch (Exception exception)
         {
             logger.LogError(exception,
                 "Could not finish ReportPortal launch {LaunchUuid} in project {ProjectName}.",
                 launchUuid, projectName);
+        }
+    }
+
+    /// <summary>
+    /// Opens a ReportPortal report URL with the operating system's default browser.
+    /// </summary>
+    /// <param name="reportLink">The ReportPortal launch URL returned after publishing.</param>
+    protected virtual void OpenReportLink(string reportLink)
+    {
+        using var process = Process.Start(new ProcessStartInfo
+        {
+            FileName = reportLink,
+            UseShellExecute = true
+        }) ?? throw new InvalidOperationException("The default browser process could not be started.");
+    }
+
+    private void TryOpenReportLink(string reportLink)
+    {
+        if (!Uri.TryCreate(reportLink, UriKind.Absolute, out var reportUri) ||
+            reportUri.Scheme is not ("http" or "https"))
+        {
+            logger.LogWarning("Could not open ReportPortal report because the report URL is invalid: {ReportUrl}",
+                reportLink);
+            return;
+        }
+
+        try
+        {
+            OpenReportLink(reportLink);
+        }
+        catch (Exception exception)
+        {
+            logger.LogWarning(exception, "Could not open ReportPortal report in the default browser: {ReportUrl}",
+                reportLink);
         }
     }
 

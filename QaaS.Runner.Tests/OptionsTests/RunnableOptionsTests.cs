@@ -27,6 +27,7 @@ public class RunnableOptionsTests
         {
             Assert.That(options.AutoServeTestResults, Is.False);
             Assert.That(options.ServeResultsFolder, Is.Null);
+            Assert.That(options.OpenReportPortal, Is.False);
             Assert.That(options.EmptyAllureDirectory, Is.False);
         });
     }
@@ -40,6 +41,7 @@ public class RunnableOptionsTests
         {
             Assert.That(options.AutoServeTestResults, Is.False);
             Assert.That(options.ServeResultsFolder, Is.Null);
+            Assert.That(options.OpenReportPortal, Is.False);
             Assert.That(options.EmptyAllureDirectory, Is.False);
             Assert.That(options.NoProcessExit, Is.False);
             Assert.That(options.CommandIdsToRun, Is.Empty);

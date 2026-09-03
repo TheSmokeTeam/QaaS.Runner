@@ -327,6 +327,17 @@ public class Runner : IRunner, IDisposable
     }
 
     /// <summary>
+    /// Controls whether successfully published ReportPortal reports open in the default browser.
+    /// </summary>
+    /// <param name="openReportPortal"><see langword="true" /> to open each published report.</param>
+    /// <returns>The current runner instance for fluent configuration.</returns>
+    internal Runner WithOpenReportPortal(bool openReportPortal)
+    {
+        ReportPortalPublisher.OpenReportPortal = openReportPortal;
+        return this;
+    }
+
+    /// <summary>
     /// Applies the post-run completion policy to the resolved exit code.
     /// </summary>
     /// <param name="exitCode">The exit code produced by the runner lifecycle.</param>

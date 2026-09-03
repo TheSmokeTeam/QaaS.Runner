@@ -302,6 +302,27 @@ public class ReportPortalPublisherTests
         await publisher.PublishAsync([reporter]);
 
         VerifyInformationLoggedExactly(logger, $"ReportPortal report: {reportLink}");
+        Assert.That(publisher.OpenedReportLinks, Is.Empty);
+    }
+
+    [TestCase("http://localhost:8080/ui/#Smoke/launches/all/42", true)]
+    [TestCase("https://reportportal.example/ui/#Smoke/launches/all/42", true)]
+    [TestCase("javascript:alert('unsafe')", false)]
+    public async Task PublishAsync_WhenOpenReportPortalIsEnabled_OpensOnlyWebReportLinks(
+        string reportLink,
+        bool shouldOpen)
+    {
+        var factory = new RecordingClientFactory { LaunchLink = reportLink };
+        using var publisher = CreateSuccessfulPublisher(factory, out _);
+        publisher.OpenReportPortal = true;
+        var reporter = CreateReporter();
+        reporter.WriteTestResults(CreateResult("assertion-a", "Session A"));
+
+        await publisher.ValidateAsync([reporter]);
+        await publisher.PublishAsync([reporter]);
+
+        var expectedLinks = shouldOpen ? new[] { reportLink } : [];
+        Assert.That(publisher.OpenedReportLinks, Is.EqualTo(expectedLinks));
     }
 
     [Test]
@@ -722,6 +743,8 @@ public class ReportPortalPublisherTests
         RecordingClientFactory clientFactory,
         ILogger logger) : ReportPortalPublisher(logger)
     {
+        public List<string> OpenedReportLinks { get; } = [];
+
         protected override Task<HttpResponseMessage> SendValidationRequestAsync(HttpRequestMessage request,
             CancellationToken cancellationToken)
         {
@@ -731,6 +754,11 @@ public class ReportPortalPublisherTests
         protected override IClientService CreateClient(Uri endpointUri, string project, string apiKey)
         {
             return clientFactory.Create();
+        }
+
+        protected override void OpenReportLink(string reportLink)
+        {
+            OpenedReportLinks.Add(reportLink);
         }
     }
 
