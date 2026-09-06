@@ -313,6 +313,67 @@ public class ConsumerBuilderTests
     }
 
     [Test]
+    public void Configure_With_RabbitMqReaderConfig_DefaultValues_PreservesBackwardCompatibility()
+    {
+        // Arrange
+        var config = new RabbitMqReaderConfig();
+        var builder = new ConsumerBuilder();
+
+        // Act
+        builder.Configure(config);
+
+        // Assert
+        Assert.Multiple(() =>
+        {
+            Assert.That(builder.RabbitMq, Is.Not.Null);
+            Assert.That(builder.RabbitMq!.Durable, Is.False);
+            Assert.That(builder.RabbitMq.Exclusive, Is.False);
+            Assert.That(builder.RabbitMq.AutoDelete, Is.False);
+            Assert.That(builder.RabbitMq.Arguments, Is.Null);
+        });
+    }
+
+    [Test]
+    public void Configure_With_RabbitMqReaderConfig_CustomQueueParameters_SetsAllPropertiesCorrectly()
+    {
+        // Arrange
+        var customArguments = new Dictionary<string, object?>
+        {
+            ["x-message-ttl"] = 60000,
+            ["x-max-length"] = 500,
+            ["x-single-active-consumer"] = true,
+        };
+        var config = new RabbitMqReaderConfig
+        {
+            Host = "rabbitmq.local",
+            QueueName = "custom-queue",
+            Durable = true,
+            Exclusive = true,
+            AutoDelete = true,
+            Arguments = customArguments,
+        };
+        var builder = new ConsumerBuilder();
+
+        // Act
+        builder.Configure(config);
+
+        // Assert
+        Assert.Multiple(() =>
+        {
+            Assert.That(builder.RabbitMq, Is.SameAs(config));
+            Assert.That(builder.RabbitMq!.Host, Is.EqualTo("rabbitmq.local"));
+            Assert.That(builder.RabbitMq.QueueName, Is.EqualTo("custom-queue"));
+            Assert.That(builder.RabbitMq.Durable, Is.True);
+            Assert.That(builder.RabbitMq.Exclusive, Is.True);
+            Assert.That(builder.RabbitMq.AutoDelete, Is.True);
+            Assert.That(builder.RabbitMq.Arguments, Is.SameAs(customArguments));
+            Assert.That(builder.RabbitMq.Arguments!["x-message-ttl"], Is.EqualTo(60000));
+            Assert.That(builder.RabbitMq.Arguments["x-max-length"], Is.EqualTo(500));
+            Assert.That(builder.RabbitMq.Arguments["x-single-active-consumer"], Is.EqualTo(true));
+        });
+    }
+
+    [Test]
     public void Configure_With_KafkaTopicReaderConfig_Should_Set_KafkaTopic()
     {
         // Arrange
@@ -554,6 +615,41 @@ public class ConsumerBuilderTests
         // Assert
         Assert.That(result, Is.Not.Null);
         Assert.That(result!.Name, Is.EqualTo("TestConsumer"));
+    }
+
+    [Test]
+    public void Build_With_Valid_RabbitMq_Config_AndCustomQueueParameters_Should_Create_Consumer()
+    {
+        // Arrange
+        var config = new RabbitMqReaderConfig
+        {
+            Host = "https://test",
+            QueueName = "test-queue",
+            Durable = true,
+            Exclusive = false,
+            AutoDelete = true,
+            Arguments = new Dictionary<string, object?>
+            {
+                ["x-message-ttl"] = 60000,
+                ["x-dead-letter-exchange"] = "dlx",
+                ["x-max-length"] = 500,
+                ["x-single-active-consumer"] = true,
+            },
+        };
+        var builder = new ConsumerBuilder()
+            .Named("TestConsumerWithParams")
+            .AtStage(1)
+            .WithTimeout(1000)
+            .FilterData(new DataFilter())
+            .Configure(config);
+
+        // Act
+        var result = builder.Build(Globals.GetContextWithMetadata(), _actionFailures, _sessionName);
+
+        // Assert
+        Assert.That(result, Is.Not.Null);
+        Assert.That(result!.Name, Is.EqualTo("TestConsumerWithParams"));
+        Assert.That(_actionFailures, Is.Empty);
     }
 
     [Test]
