@@ -18,15 +18,17 @@ public class TestGenerator : BaseGenerator<TestGeneratorConfig>
             {
                 Body = new MockJson
                 {
-                    Property = "SomeValue"
+                    Property = Configuration.Value
                 },
-                MetaData = new MetaData
-                {
-                    RabbitMq = new RabbitMq
+                MetaData = !string.IsNullOrEmpty(Configuration.RoutingKey)
+                    ? new MetaData
                     {
-                        RoutingKey = "SomeRoutingKey"
+                        RabbitMq = new RabbitMq
+                        {
+                            RoutingKey = Configuration.RoutingKey
+                        }
                     }
-                }
+                    : null
             };
         }
     }
