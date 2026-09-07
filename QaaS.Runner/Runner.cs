@@ -217,7 +217,7 @@ public class Runner : IRunner, IDisposable
     }
 
     /// <summary>
-    /// Starts each materialized execution and returns the aggregated exit code.
+    /// Starts materialized executions in order and returns their aggregated exit code.
     /// </summary>
     /// <param name="executions">The executions to run.</param>
     /// <returns>The sum of the individual execution exit codes.</returns>
@@ -225,16 +225,11 @@ public class Runner : IRunner, IDisposable
     {
         Logger.LogInformation("Running {ExecutionCount} executions", executions.Count);
 
-        var reportPortalValidated = false;
+        var reporters = GetReportPortalReporters(executions);
         var exitCode = 0;
         foreach (var execution in executions)
         {
-            if (!reportPortalValidated && HasReportPortal(execution))
-            {
-                PrepareReportPortal(executions);
-                reportPortalValidated = true;
-            }
-
+            PrepareReportPortal(execution, reporters);
             exitCode += execution.Start();
         }
 
@@ -242,16 +237,30 @@ public class Runner : IRunner, IDisposable
         return exitCode;
     }
 
-    private void PrepareReportPortal(List<Execution> executions)
+    /// <summary>
+    /// Validates and initializes ReportPortal before its first reporting execution.
+    /// </summary>
+    /// <param name="execution">The execution about to start.</param>
+    /// <param name="reporters">The pending ReportPortal reporters.</param>
+    private void PrepareReportPortal(Execution execution, List<ReportPortalReporter> reporters)
     {
-        var reporters = GetReportPortalReporters(executions).ToList();
+        if (reporters.Count == 0 || !HasReportPortal(execution))
+            return;
+
         ReportPortalPublisher.ValidateAsync(reporters).GetAwaiter().GetResult();
         if (reporters.Any(reporter => reporter.SaveTerminalOutput != false))
             _terminalOutput = TerminalOutputCapture.TryStart(Logger);
+
+        reporters.Clear();
     }
 
+    /// <summary>
+    /// Returns whether an execution contains a ReportPortal reporter.
+    /// </summary>
+    /// <param name="execution">The execution to inspect.</param>
+    /// <returns><see langword="true" /> when ReportPortal reporting is configured.</returns>
     private static bool HasReportPortal(Execution execution) =>
-        execution.ReportLogic?.Reporters.OfType<ReportPortalReporter>().Any() == true;
+        execution.ReportLogic?.Reporters.Any(reporter => reporter is ReportPortalReporter) == true;
 
     /// <summary>
     /// Publishes queued ReportPortal assertion results after execution and before execution scopes are disposed.
@@ -259,19 +268,18 @@ public class Runner : IRunner, IDisposable
     /// <param name="executions">The executions whose ReportPortal reporters may have queued assertion results.</param>
     protected virtual void PublishReportPortalResults(IEnumerable<Execution>? executions)
     {
-        var reportPortalReporters = GetReportPortalReporters(executions).ToList();
-        if (reportPortalReporters.Count == 0)
+        var reporters = GetReportPortalReporters(executions);
+        if (reporters.Count == 0)
             return;
 
-        ReportPortalPublisher.PublishAsync(reportPortalReporters).GetAwaiter().GetResult();
+        ReportPortalPublisher.PublishAsync(reporters).GetAwaiter().GetResult();
     }
 
-    private static IEnumerable<ReportPortalReporter> GetReportPortalReporters(IEnumerable<Execution>? executions)
-    {
-        return (executions ?? Enumerable.Empty<Execution>())
+    private static List<ReportPortalReporter> GetReportPortalReporters(IEnumerable<Execution>? executions) =>
+        (executions ?? [])
             .SelectMany(execution => execution.ReportLogic?.Reporters ?? [])
-            .OfType<ReportPortalReporter>();
-    }
+            .OfType<ReportPortalReporter>()
+            .ToList();
 
     /// <summary>
     /// Disposes the provided executions in deterministic enumeration order.
