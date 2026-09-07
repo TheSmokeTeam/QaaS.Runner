@@ -224,24 +224,34 @@ public class Runner : IRunner, IDisposable
     protected virtual int StartExecutions(List<Execution> executions)
     {
         Logger.LogInformation("Running {ExecutionCount} executions", executions.Count);
-        var reporters = GetReportPortalReporters(executions).ToList();
-        var gate = executions.FirstOrDefault(execution =>
-            execution.ReportLogic?.Reporters.OfType<ReportPortalReporter>().Any() == true);
+
+        var reportPortalValidated = false;
         var exitCode = 0;
         foreach (var execution in executions)
         {
-            if (ReferenceEquals(execution, gate))
+            if (!reportPortalValidated && HasReportPortal(execution))
             {
-                ReportPortalPublisher.ValidateAsync(reporters).GetAwaiter().GetResult();
-                if (reporters.Any(reporter => reporter.SaveTerminalOutput != false))
-                    _terminalOutput = TerminalOutputCapture.TryStart(Logger);
+                PrepareReportPortal(executions);
+                reportPortalValidated = true;
             }
 
             exitCode += execution.Start();
         }
+
         Logger.LogInformation("Finished running executions. Aggregated exit code: {ExitCode}", exitCode);
         return exitCode;
     }
+
+    private void PrepareReportPortal(List<Execution> executions)
+    {
+        var reporters = GetReportPortalReporters(executions).ToList();
+        ReportPortalPublisher.ValidateAsync(reporters).GetAwaiter().GetResult();
+        if (reporters.Any(reporter => reporter.SaveTerminalOutput != false))
+            _terminalOutput = TerminalOutputCapture.TryStart(Logger);
+    }
+
+    private static bool HasReportPortal(Execution execution) =>
+        execution.ReportLogic?.Reporters.OfType<ReportPortalReporter>().Any() == true;
 
     /// <summary>
     /// Publishes queued ReportPortal assertion results after execution and before execution scopes are disposed.
