@@ -13,7 +13,7 @@ namespace QaaS.Runner.Assertions.Reporters.ReportPortal;
 /// <summary>
 /// Runner-owned ReportPortal coordinator that validates access before execution and publishes queued reporter results during cleanup.
 /// </summary>
-internal class ReportPortalPublisher(ILogger logger) : IDisposable
+public class ReportPortalPublisher(ILogger logger) : IDisposable
 {
     private readonly HttpClient _validationHttpClient = new();
     private readonly DateTimeOffset _startedAtLocal = DateTimeOffset.Now;
