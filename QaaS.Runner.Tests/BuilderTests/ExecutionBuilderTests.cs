@@ -839,6 +839,42 @@ public class ExecutionBuilderTests
     }
 
     [Test]
+    public void TemplateRendering_WithReportPortalConfiguration_PreservesReporterSection()
+    {
+        var builder = new ExecutionBuilder()
+            .ExecutionType(ExecutionType.Template)
+            .WithMetadata(new MetaDataConfig
+            {
+                Team = "Smoke",
+                System = "QaaS"
+            });
+        builder.Reporters!.ConfigureReportPortal(new ReportPortalConfig
+        {
+            Enabled = true,
+            Endpoint = "https://reportportal.example/api/",
+            ApiKey = "api-key",
+            Project = "project"
+        });
+
+        typeof(ExecutionBuilder)
+            .GetMethod("InitializeContext", BindingFlags.Instance | BindingFlags.NonPublic)!
+            .Invoke(builder, []);
+        typeof(ExecutionBuilder)
+            .GetMethod("StoreRenderedConfigurationTemplate", BindingFlags.Instance | BindingFlags.NonPublic)!
+            .Invoke(builder, []);
+
+        var renderedTemplate = ((InternalContext)typeof(ExecutionBuilder).BaseType!
+                .GetField("Context", BindingFlags.Instance | BindingFlags.NonPublic)!
+                .GetValue(builder)!)
+            .GetRenderedConfigurationTemplate();
+
+        Assert.That(renderedTemplate,
+            Does.Contain("Reporters:")
+                .And.Contain("ReportPortal:")
+                .And.Contain("Endpoint: https://reportportal.example/api/"));
+    }
+
+    [Test]
     public void ValidateCollection_WithNullCollectionAndNullItems_DoesNotAddValidationResults()
     {
         var builder = new ExecutionBuilder();
@@ -932,12 +968,14 @@ public class ExecutionBuilderTests
         });
     }
 
-    [Test]
-    public void BuildReports_WithAssertions_UsesReporterFactoryBuiltInReporters()
+    [TestCase(ExecutionType.Run)]
+    [TestCase(ExecutionType.Assert)]
+    public void BuildReports_WithReportingExecutionType_UsesReporterFactoryBuiltInReporters(
+        ExecutionType executionType)
     {
         ReportPortalConfig.RegisterDefaults(enabled: false);
         var context = CreateLoadedContext(new Dictionary<string, string?>());
-        var builder = new ExecutionBuilder(context, ExecutionType.Run, null, null, null, null)
+        var builder = new ExecutionBuilder(context, executionType, null, null, null, null)
         {
             Assertions =
             [
@@ -956,6 +994,38 @@ public class ExecutionBuilderTests
 
         Assert.That(builtReports, Has.Count.EqualTo(1));
         Assert.That(builtReports[0], Is.TypeOf<AllureReporter>());
+    }
+
+    [TestCase(ExecutionType.Template)]
+    [TestCase(ExecutionType.Act)]
+    public void BuildReports_WithNonReportingExecutionType_DoesNotBuildReporters(ExecutionType executionType)
+    {
+        var context = CreateLoadedContext(new Dictionary<string, string?>());
+        var builder = new ExecutionBuilder(context, executionType, null, null, null, null)
+        {
+            Assertions =
+            [
+                new AssertionBuilder
+                {
+                    Name = "assertion-display",
+                }
+            ]
+        };
+        builder.Reporters!.ConfigureReportPortal(new ReportPortalConfig
+        {
+            Enabled = true,
+            Endpoint = "https://reportportal.example/api/",
+            ApiKey = "api-key",
+            Project = "project"
+        });
+
+        var builtReports = ((System.Collections.IEnumerable)typeof(ExecutionBuilder)
+                .GetMethod("BuildReports", BindingFlags.Instance | BindingFlags.NonPublic)!
+                .Invoke(builder, [])!)
+            .Cast<IReporter>()
+            .ToList();
+
+        Assert.That(builtReports, Is.Empty);
     }
 
     [Test]
@@ -1134,5 +1204,4 @@ public class ExecutionBuilderTests
 
     private sealed record LogEntry(LogLevel LogLevel, string Message);
 }
-
 

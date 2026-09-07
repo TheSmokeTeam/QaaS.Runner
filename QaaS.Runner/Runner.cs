@@ -3,6 +3,7 @@ using Autofac;
 using Microsoft.Extensions.Logging;
 using QaaS.Framework.Configurations.CustomExceptions;
 using QaaS.Framework.Executions;
+using QaaS.Framework.SDK.ExecutionObjects;
 using QaaS.Runner.Output;
 using QaaS.Runner.Options;
 using QaaS.Runner.Assertions.Reporters.ReportPortal;
@@ -101,8 +102,9 @@ public class Runner : IRunner, IDisposable
             return CompleteBootstrapHandledRun();
 
         LastExitCode = null;
-        if (ExecutionBuilders.Any(builder => builder.Reporters is
-                { SaveTerminalOutput: not false, ReportPortal: { Enabled: true } }))
+        if (ExecutionBuilders.Any(builder =>
+                builder.ConfiguredExecutionType is ExecutionType.Run or ExecutionType.Assert &&
+                builder.Reporters is { SaveTerminalOutput: not false, ReportPortal: { Enabled: true } }))
             _terminalOutput = TerminalOutputCapture.TryStart(Logger);
         LogRunStart();
 
@@ -233,12 +235,15 @@ public class Runner : IRunner, IDisposable
     }
 
     /// <summary>
-    /// Validates ReportPortal access before executions start so invalid enabled publishing fails early.
+    /// Validates ReportPortal access before ReportPortal-enabled reporting executions start.
     /// </summary>
-    /// <param name="executions">The built executions that may contain ReportPortal reporters.</param>
+    /// <param name="executions">The reporting executions whose ReportPortal launch groups must pass the gate.</param>
     protected virtual void ValidateReportPortalAccess(List<Execution> executions)
     {
         var reportPortalReporters = GetReportPortalReporters(executions).ToList();
+        if (reportPortalReporters.Count == 0)
+            return;
+
         ReportPortalPublisher.ValidateAsync(reportPortalReporters).GetAwaiter().GetResult();
     }
 
@@ -249,6 +254,9 @@ public class Runner : IRunner, IDisposable
     protected virtual void PublishReportPortalResults(IEnumerable<Execution>? executions)
     {
         var reportPortalReporters = GetReportPortalReporters(executions).ToList();
+        if (reportPortalReporters.Count == 0)
+            return;
+
         ReportPortalPublisher.PublishAsync(reportPortalReporters).GetAwaiter().GetResult();
     }
 
@@ -257,6 +265,11 @@ public class Runner : IRunner, IDisposable
         return (executions ?? Enumerable.Empty<Execution>())
             .SelectMany(execution => execution.ReportLogic?.Reporters ?? [])
             .OfType<ReportPortalReporter>();
+    }
+
+    private static bool HasReportPortalReporter(Execution execution)
+    {
+        return GetReportPortalReporters([execution]).Any();
     }
 
     /// <summary>
@@ -401,14 +414,45 @@ public class Runner : IRunner, IDisposable
     {
         ExecuteLifecyclePhase(RunnerLifecyclePhase.Setup, Setup);
         lifecycleState.Executions = ExecuteLifecyclePhase(RunnerLifecyclePhase.BuildExecutions, BuildExecutions);
-        ExecuteLifecyclePhase(RunnerLifecyclePhase.ValidateReportPortal,
-            () => ValidateReportPortalAccess(lifecycleState.Executions!));
-
-        var exitCode = ExecuteLifecyclePhase(RunnerLifecyclePhase.StartExecutions,
-            () => StartExecutions(lifecycleState.Executions!));
+        var exitCode = StartExecutionsWithReportPortalGate(lifecycleState.Executions!);
         LastExitCode = exitCode;
 
         return RunnerLifecycleOutcome.Succeeded(lifecycleState.Executions!, exitCode);
+    }
+
+    /// <summary>
+    /// Starts executions in their configured order and validates ReportPortal immediately before the first execution
+    /// that can publish assertion results.
+    /// </summary>
+    private int StartExecutionsWithReportPortalGate(List<Execution> executions)
+    {
+        var firstReportingExecutionIndex = executions.FindIndex(HasReportPortalReporter);
+        if (firstReportingExecutionIndex < 0)
+        {
+            return ExecuteLifecyclePhase(
+                RunnerLifecyclePhase.StartExecutions,
+                () => StartExecutions(executions));
+        }
+
+        var exitCode = 0;
+        if (firstReportingExecutionIndex > 0)
+        {
+            var precedingExecutions = executions.Take(firstReportingExecutionIndex).ToList();
+            exitCode += ExecuteLifecyclePhase(
+                RunnerLifecyclePhase.StartExecutions,
+                () => StartExecutions(precedingExecutions));
+        }
+
+        var reportingExecutions = executions.Where(HasReportPortalReporter).ToList();
+        ExecuteLifecyclePhase(
+            RunnerLifecyclePhase.ValidateReportPortal,
+            () => ValidateReportPortalAccess(reportingExecutions));
+
+        var remainingExecutions = executions.Skip(firstReportingExecutionIndex).ToList();
+        exitCode += ExecuteLifecyclePhase(
+            RunnerLifecyclePhase.StartExecutions,
+            () => StartExecutions(remainingExecutions));
+        return exitCode;
     }
 
     /// <summary>

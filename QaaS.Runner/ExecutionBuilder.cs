@@ -161,6 +161,8 @@ public class ExecutionBuilder()
 
     private ExecutionType Type { get; set; }
 
+    internal ExecutionType ConfiguredExecutionType => Type;
+
     private bool LoadedContext { get; }
 
     private readonly Autofac.IContainer _container = new ContainerBuilder().Build();
@@ -347,7 +349,9 @@ public class ExecutionBuilder()
 
     private IEnumerable<IReporter> BuildReports()
     {
-        if (Assertions is null || Assertions.Length == 0 || Reporters is null)
+        if (Type is not (QaaS.Framework.SDK.ExecutionObjects.ExecutionType.Run or
+            QaaS.Framework.SDK.ExecutionObjects.ExecutionType.Assert) ||
+            Assertions is null || Assertions.Length == 0 || Reporters is null)
             return [];
         var testSuiteStartTimeUtc = DateTime.UtcNow;
 

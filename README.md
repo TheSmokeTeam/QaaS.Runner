@@ -71,12 +71,14 @@ Runtime rules:
 - QaaS never creates ReportPortal projects, dashboards, filters, users, or API keys.
 - Project routing uses `Reporters.ReportPortal.Project` when configured; otherwise it falls back to `MetaData.Team`.
 - Launches are grouped by resolved endpoint, project, and system.
-- One runner-owned ReportPortal publisher validates endpoint/API-key/project access after executions are built and before sessions start. Validation is read-only and failures stop the run with a configuration failure exit code.
+- ReportPortal reporters are created only for `run` and `assert`; `template` and `act` never contact ReportPortal.
+- One runner-owned ReportPortal publisher validates endpoint/API-key/project access immediately before the first ReportPortal-enabled `run` or `assert`. Validation is read-only and failures stop that command and every later command with a configuration failure exit code.
+- In a mixed `execute` sequence, earlier `template` and `act` commands complete before the ReportPortal gate is evaluated. All ReportPortal launch groups in the sequence must pass the gate before any reporting command starts.
 - ReportPortal reporters queue assertion results locally during execution. The publisher opens a ReportPortal client only at final publish time, starts the grouped launch, uploads queued items/logs/attachments, finishes the launch, and disposes the client.
 - `ExtraLabels` and other metadata key/value pairs are emitted as ReportPortal attributes so teams can filter by labels such as `Component`, `Area`, or `Owner`.
 - Each assertion is published as its own ReportPortal test item together with assertion message/trace, stack trace for broken assertions, session summaries, session failure history, assertion attachments, template YAML, and a generated assertion-context JSON artifact.
 - Assertion links configured in QaaS remain active in Allure and are also written into ReportPortal logs.
-- If final publishing fails after early validation succeeded, QaaS logs warnings and keeps the assertion-derived exit code unchanged.
+- If final publishing fails after early validation succeeded, QaaS logs errors and keeps the assertion-derived exit code unchanged.
 - The default launch name is stable and derived from team, system, and sessions, which keeps ReportPortal history grouped without creating new dashboards or projects.
 
 Configuration sources:
