@@ -62,9 +62,7 @@ public class RunnerBehaviorTests
         ILifetimeScope scope,
         List<ExecutionBuilder> executionBuilders,
         Microsoft.Extensions.Logging.ILogger logger,
-        Serilog.ILogger serilogLogger,
-        bool writeTerminal = false,
-        List<Execution>? builtExecutions = null) : Runner(scope, executionBuilders, logger, serilogLogger)
+        Serilog.ILogger serilogLogger) : Runner(scope, executionBuilders, logger, serilogLogger)
     {
         public List<string> Calls { get; } = [];
         public int? ExitCode { get; private set; }
@@ -74,8 +72,7 @@ public class RunnerBehaviorTests
         protected override List<Execution> BuildExecutions()
         {
             Calls.Add("build");
-            if (writeTerminal) { Console.WriteLine("execution stdout"); Console.Error.WriteLine("execution stderr"); }
-            return builtExecutions ?? [];
+            return [];
         }
 
         protected override int StartExecutions(List<Execution> executions)
@@ -98,25 +95,13 @@ public class RunnerBehaviorTests
         List<ExecutionBuilder> executionBuilders,
         Microsoft.Extensions.Logging.ILogger logger,
         Serilog.ILogger serilogLogger,
-        List<Execution> executions,
-        IList<string> calls,
-        Exception? validationException = null) : Runner(scope, executionBuilders, logger, serilogLogger)
+        List<Execution> executions) : Runner(scope, executionBuilders, logger, serilogLogger)
     {
-        public int ValidatedExecutionCount { get; private set; }
-
         protected override void Setup()
         {
         }
 
         protected override List<Execution> BuildExecutions() => executions;
-
-        protected override void ValidateReportPortalAccess(List<Execution> reportingExecutions)
-        {
-            calls.Add("validate");
-            ValidatedExecutionCount = reportingExecutions.Count;
-            if (validationException is not null)
-                throw validationException;
-        }
 
         protected override void Teardown()
         {
@@ -150,13 +135,13 @@ public class RunnerBehaviorTests
         protected override List<Execution> BuildExecutions()
         {
             Calls.Add("build");
-            return [];
+            return [CreateRecordingExecution(ExecutionType.Run, "run", [], reportPortalEnabled: true)];
         }
 
         protected override int StartExecutions(List<Execution> executions)
         {
             Calls.Add("start");
-            return 0;
+            return base.StartExecutions(executions);
         }
 
         protected override void PublishReportPortalResults(IEnumerable<Execution>? executions)
@@ -182,17 +167,22 @@ public class RunnerBehaviorTests
         }
     }
 
-    private sealed class RecordingReportPortalPublisher(Exception? validationException = null)
+    private sealed class RecordingReportPortalPublisher(
+        Exception? validationException = null,
+        IList<string>? executionCalls = null)
         : ReportPortalPublisher(Globals.Logger)
     {
         private readonly Exception? _validationException = validationException;
         public List<string> Calls { get; } = [];
+        public int ValidatedReporterCount { get; private set; }
         public (string Path, string Text)? CapturedTerminalOutput { get; private set; }
 
         public override Task ValidateAsync(IEnumerable<ReportPortalReporter> reporters,
             CancellationToken cancellationToken = default)
         {
             Calls.Add("validate");
+            executionCalls?.Add("validate");
+            ValidatedReporterCount = reporters.Count();
             if (_validationException is not null)
                 throw _validationException;
 
@@ -203,7 +193,8 @@ public class RunnerBehaviorTests
             CancellationToken cancellationToken = default)
         {
             Calls.Add("publish");
-            CapturedTerminalOutput = (TerminalOutputPath!, File.ReadAllText(TerminalOutputPath!));
+            if (TerminalOutputPath is not null)
+                CapturedTerminalOutput = (TerminalOutputPath, File.ReadAllText(TerminalOutputPath));
             return Task.CompletedTask;
         }
     }
@@ -689,12 +680,12 @@ public class RunnerBehaviorTests
     public void RunAndGetExitCode_WhenReportPortalValidationFails_ReturnsFailureExitCodeBeforeStart()
     {
         using var scope = BuildScope();
+        var calls = new List<string>();
         var publisher = new RecordingReportPortalPublisher(
-            new InvalidConfigurationsException("ReportPortal validation failed"));
-        var execution = CreateRecordingExecution(ExecutionType.Run, "run", [], reportPortalEnabled: true);
-        var runner = new RunLifecycleRunner(scope,
-            [CreateExecutionBuilder(ExecutionType.Run, "case", reportPortalEnabled: true)], Globals.Logger,
-            new Mock<Serilog.ILogger>().Object, true, [execution])
+            new InvalidConfigurationsException("ReportPortal validation failed"), calls);
+        var execution = CreateRecordingExecution(ExecutionType.Run, "run", calls, reportPortalEnabled: true);
+        var runner = new CommandAwareGateRunner(scope, [], Globals.Logger,
+            new Mock<Serilog.ILogger>().Object, [execution])
         {
             ReportPortalPublisher = publisher
         };
@@ -704,11 +695,9 @@ public class RunnerBehaviorTests
         Assert.Multiple(() =>
         {
             Assert.That(exitCode, Is.EqualTo(1));
-            Assert.That(runner.Calls, Is.EqualTo(new[] { "setup", "build", "teardown" }));
+            Assert.That(calls, Is.EqualTo(new[] { "validate" }));
             Assert.That(publisher.Calls, Is.EqualTo(new[] { "validate", "publish" }));
             Assert.That(runner.LastExitCode, Is.EqualTo(1));
-            Assert.That(publisher.CapturedTerminalOutput?.Text, Does.Contain("execution stdout").And.Contain("execution stderr"));
-            Assert.That(File.Exists(publisher.CapturedTerminalOutput?.Path), Is.False);
         });
     }
 
@@ -724,15 +713,19 @@ public class RunnerBehaviorTests
             CreateRecordingExecution(ExecutionType.Run, "run", calls, reportPortalEnabled: true),
             CreateRecordingExecution(ExecutionType.Assert, "assert", calls, reportPortalEnabled: true)
         };
+        var publisher = new RecordingReportPortalPublisher(executionCalls: calls);
         var runner = new CommandAwareGateRunner(scope, [], Globals.Logger,
-            new Mock<Serilog.ILogger>().Object, executions, calls);
+            new Mock<Serilog.ILogger>().Object, executions)
+        {
+            ReportPortalPublisher = publisher
+        };
 
         var exitCode = runner.RunAndGetExitCode();
 
         Assert.Multiple(() =>
         {
             Assert.That(exitCode, Is.Zero);
-            Assert.That(runner.ValidatedExecutionCount, Is.EqualTo(2));
+            Assert.That(publisher.ValidatedReporterCount, Is.EqualTo(2));
             Assert.That(calls, Is.EqualTo(new[]
             {
                 "start-template",
@@ -756,9 +749,13 @@ public class RunnerBehaviorTests
             CreateRecordingExecution(ExecutionType.Run, "run", calls, reportPortalEnabled: true),
             CreateRecordingExecution(ExecutionType.Template, "later-template", calls)
         };
+        var publisher = new RecordingReportPortalPublisher(
+            new InvalidConfigurationsException("ReportPortal validation failed"), calls);
         var runner = new CommandAwareGateRunner(scope, [], Globals.Logger,
-            new Mock<Serilog.ILogger>().Object, executions, calls,
-            new InvalidConfigurationsException("ReportPortal validation failed"));
+            new Mock<Serilog.ILogger>().Object, executions)
+        {
+            ReportPortalPublisher = publisher
+        };
 
         var exitCode = runner.RunAndGetExitCode();
 
@@ -783,7 +780,10 @@ public class RunnerBehaviorTests
         var originalError = Console.Error;
         var runner = new PublishOrderRunner(scope,
             [CreateExecutionBuilder(ExecutionType.Run, "case", reportPortalEnabled: true)], Globals.Logger,
-            new Mock<Serilog.ILogger>().Object);
+            new Mock<Serilog.ILogger>().Object)
+        {
+            ReportPortalPublisher = new RecordingReportPortalPublisher()
+        };
 
         var exitCode = runner.RunAndGetExitCode();
 
@@ -814,9 +814,9 @@ public class RunnerBehaviorTests
         var calls = new List<string>();
         var publisher = new RecordingReportPortalPublisher();
         var execution = CreateRecordingExecution(executionType, executionType.ToString(), calls);
-        var runner = new RunLifecycleRunner(scope,
+        var runner = new CommandAwareGateRunner(scope,
             [CreateExecutionBuilder(executionType, "case", reportPortalEnabled: true)], Globals.Logger,
-            new Mock<Serilog.ILogger>().Object, builtExecutions: [execution])
+            new Mock<Serilog.ILogger>().Object, [execution])
         {
             ReportPortalPublisher = publisher
         };
@@ -825,7 +825,8 @@ public class RunnerBehaviorTests
 
         Assert.Multiple(() =>
         {
-            Assert.That(exitCode, Is.EqualTo(7));
+            Assert.That(exitCode, Is.Zero);
+            Assert.That(calls, Is.EqualTo(new[] { $"start-{executionType}" }));
             Assert.That(publisher.Calls, Is.Empty);
             Assert.That(publisher.TerminalOutputPath, Is.Null);
         });
@@ -838,8 +839,8 @@ public class RunnerBehaviorTests
         var calls = new List<string>();
         var publisher = new RecordingReportPortalPublisher();
         var execution = CreateRecordingExecution(ExecutionType.Run, "run", calls);
-        var runner = new RunLifecycleRunner(scope, [CreateExecutionBuilder(ExecutionType.Run, "case")],
-            Globals.Logger, new Mock<Serilog.ILogger>().Object, builtExecutions: [execution])
+        var runner = new CommandAwareGateRunner(scope, [CreateExecutionBuilder(ExecutionType.Run, "case")],
+            Globals.Logger, new Mock<Serilog.ILogger>().Object, [execution])
         {
             ReportPortalPublisher = publisher
         };
@@ -848,7 +849,8 @@ public class RunnerBehaviorTests
 
         Assert.Multiple(() =>
         {
-            Assert.That(exitCode, Is.EqualTo(7));
+            Assert.That(exitCode, Is.Zero);
+            Assert.That(calls, Is.EqualTo(new[] { "start-run" }));
             Assert.That(publisher.Calls, Is.Empty);
         });
     }

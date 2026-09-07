@@ -3,7 +3,6 @@ using Autofac;
 using Microsoft.Extensions.Logging;
 using QaaS.Framework.Configurations.CustomExceptions;
 using QaaS.Framework.Executions;
-using QaaS.Framework.SDK.ExecutionObjects;
 using QaaS.Runner.Output;
 using QaaS.Runner.Options;
 using QaaS.Runner.Assertions.Reporters.ReportPortal;
@@ -102,10 +101,6 @@ public class Runner : IRunner, IDisposable
             return CompleteBootstrapHandledRun();
 
         LastExitCode = null;
-        if (ExecutionBuilders.Any(builder =>
-                builder.ConfiguredExecutionType is ExecutionType.Run or ExecutionType.Assert &&
-                builder.Reporters is { SaveTerminalOutput: not false, ReportPortal: { Enabled: true } }))
-            _terminalOutput = TerminalOutputCapture.TryStart(Logger);
         LogRunStart();
 
         var lifecycleOutcome = CaptureLifecycleOutcome();
@@ -229,22 +224,23 @@ public class Runner : IRunner, IDisposable
     protected virtual int StartExecutions(List<Execution> executions)
     {
         Logger.LogInformation("Running {ExecutionCount} executions", executions.Count);
-        var exitCode = executions.Select(execution => execution.Start()).Sum();
+        var reporters = GetReportPortalReporters(executions).ToList();
+        var gate = executions.FirstOrDefault(execution =>
+            execution.ReportLogic?.Reporters.OfType<ReportPortalReporter>().Any() == true);
+        var exitCode = 0;
+        foreach (var execution in executions)
+        {
+            if (ReferenceEquals(execution, gate))
+            {
+                ReportPortalPublisher.ValidateAsync(reporters).GetAwaiter().GetResult();
+                if (reporters.Any(reporter => reporter.SaveTerminalOutput != false))
+                    _terminalOutput = TerminalOutputCapture.TryStart(Logger);
+            }
+
+            exitCode += execution.Start();
+        }
         Logger.LogInformation("Finished running executions. Aggregated exit code: {ExitCode}", exitCode);
         return exitCode;
-    }
-
-    /// <summary>
-    /// Validates ReportPortal access before ReportPortal-enabled reporting executions start.
-    /// </summary>
-    /// <param name="executions">The reporting executions whose ReportPortal launch groups must pass the gate.</param>
-    protected virtual void ValidateReportPortalAccess(List<Execution> executions)
-    {
-        var reportPortalReporters = GetReportPortalReporters(executions).ToList();
-        if (reportPortalReporters.Count == 0)
-            return;
-
-        ReportPortalPublisher.ValidateAsync(reportPortalReporters).GetAwaiter().GetResult();
     }
 
     /// <summary>
@@ -265,11 +261,6 @@ public class Runner : IRunner, IDisposable
         return (executions ?? Enumerable.Empty<Execution>())
             .SelectMany(execution => execution.ReportLogic?.Reporters ?? [])
             .OfType<ReportPortalReporter>();
-    }
-
-    private static bool HasReportPortalReporter(Execution execution)
-    {
-        return GetReportPortalReporters([execution]).Any();
     }
 
     /// <summary>
@@ -414,45 +405,11 @@ public class Runner : IRunner, IDisposable
     {
         ExecuteLifecyclePhase(RunnerLifecyclePhase.Setup, Setup);
         lifecycleState.Executions = ExecuteLifecyclePhase(RunnerLifecyclePhase.BuildExecutions, BuildExecutions);
-        var exitCode = StartExecutionsWithReportPortalGate(lifecycleState.Executions!);
+        var exitCode = ExecuteLifecyclePhase(RunnerLifecyclePhase.StartExecutions,
+            () => StartExecutions(lifecycleState.Executions!));
         LastExitCode = exitCode;
 
         return RunnerLifecycleOutcome.Succeeded(lifecycleState.Executions!, exitCode);
-    }
-
-    /// <summary>
-    /// Starts executions in their configured order and validates ReportPortal immediately before the first execution
-    /// that can publish assertion results.
-    /// </summary>
-    private int StartExecutionsWithReportPortalGate(List<Execution> executions)
-    {
-        var firstReportingExecutionIndex = executions.FindIndex(HasReportPortalReporter);
-        if (firstReportingExecutionIndex < 0)
-        {
-            return ExecuteLifecyclePhase(
-                RunnerLifecyclePhase.StartExecutions,
-                () => StartExecutions(executions));
-        }
-
-        var exitCode = 0;
-        if (firstReportingExecutionIndex > 0)
-        {
-            var precedingExecutions = executions.Take(firstReportingExecutionIndex).ToList();
-            exitCode += ExecuteLifecyclePhase(
-                RunnerLifecyclePhase.StartExecutions,
-                () => StartExecutions(precedingExecutions));
-        }
-
-        var reportingExecutions = executions.Where(HasReportPortalReporter).ToList();
-        ExecuteLifecyclePhase(
-            RunnerLifecyclePhase.ValidateReportPortal,
-            () => ValidateReportPortalAccess(reportingExecutions));
-
-        var remainingExecutions = executions.Skip(firstReportingExecutionIndex).ToList();
-        exitCode += ExecuteLifecyclePhase(
-            RunnerLifecyclePhase.StartExecutions,
-            () => StartExecutions(remainingExecutions));
-        return exitCode;
     }
 
     /// <summary>
@@ -618,7 +575,6 @@ public class Runner : IRunner, IDisposable
         {
             RunnerLifecyclePhase.Setup => "setup",
             RunnerLifecyclePhase.BuildExecutions => "build executions",
-            RunnerLifecyclePhase.ValidateReportPortal => "validate ReportPortal",
             RunnerLifecyclePhase.StartExecutions => "start executions",
             _ => throw new ArgumentOutOfRangeException(nameof(phase), phase, "Unknown runner lifecycle phase.")
         };
@@ -638,11 +594,6 @@ public class Runner : IRunner, IDisposable
         /// The execution materialization phase.
         /// </summary>
         BuildExecutions,
-
-        /// <summary>
-        /// The pre-execution ReportPortal access validation phase.
-        /// </summary>
-        ValidateReportPortal,
 
         /// <summary>
         /// The execution start phase.
