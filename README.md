@@ -65,36 +65,12 @@ dotnet restore
 ```
 
 ## ReportPortal
-QaaS can publish the same assertion results it already writes to Allure into an existing ReportPortal instance.
+Configure `Reporters.ReportPortal` with `Enabled`, `Endpoint`, `ApiKey`, and an optional `Project` (defaults to `MetaData.Team`). YAML values override package defaults.
 
-Runtime rules:
-- QaaS never creates ReportPortal projects, dashboards, filters, users, or API keys.
-- Project routing uses `Reporters.ReportPortal.Project` when configured; otherwise it falls back to `MetaData.Team`.
-- Launches are grouped by resolved endpoint, project, and system.
-- ReportPortal reporters are created only for `run` and `assert`; `template` and `act` never contact ReportPortal.
-- One runner-owned ReportPortal publisher validates endpoint/API-key/project access immediately before the first ReportPortal-enabled `run` or `assert`. Validation is read-only and failures stop that command and every later command with a configuration failure exit code.
-- In a mixed `execute` sequence, earlier `template` and `act` commands complete before the ReportPortal gate is evaluated. All ReportPortal launch groups in the sequence must pass the gate before any reporting command starts.
-- ReportPortal reporters queue assertion results locally during execution. The publisher opens a ReportPortal client only at final publish time, starts the grouped launch, uploads queued items/logs/attachments, finishes the launch, and disposes the client.
-- `ExtraLabels` and other metadata key/value pairs are emitted as ReportPortal attributes so teams can filter by labels such as `Component`, `Area`, or `Owner`.
-- Each assertion is published as its own ReportPortal test item together with assertion message/trace, stack trace for broken assertions, session summaries, session failure history, assertion attachments, template YAML, and a generated assertion-context JSON artifact.
-- Assertion links configured in QaaS remain active in Allure and are also written into ReportPortal logs.
-- If final publishing fails after early validation succeeded, QaaS logs errors and keeps the assertion-derived exit code unchanged.
-- The default launch name is stable and derived from team, system, and sessions, which keeps ReportPortal history grouped without creating new dashboards or projects.
-
-Configuration sources:
-
-| Setting | Default source | Override source | Notes |
-|---|---|---|
-| `Reporters.ReportPortal.Enabled` | `QaaS.Configuration.ReportPortalDefaults.Enabled` (`false` in the public package) | YAML `Reporters.ReportPortal.Enabled` | Enables early-validated, final ReportPortal publishing. |
-| `Reporters.ReportPortal.Endpoint` | `QaaS.Configuration.ReportPortalDefaults.ReportPortalUri` | YAML `Reporters.ReportPortal.Endpoint` | Required when reporting is enabled. Must point to the ReportPortal base URL or API URL. |
-| `Reporters.ReportPortal.ApiKey` | `QaaS.Configuration.ReportPortalDefaults.ReportPortalApiKey` | YAML `Reporters.ReportPortal.ApiKey` | Required when reporting is enabled. Must already have write access to the target team projects. |
-| `Reporters.ReportPortal.Project` | `MetaData.Team` | YAML `Reporters.ReportPortal.Project` | Overrides the target ReportPortal project. If omitted, QaaS uses `MetaData.Team`. |
-
-Notes:
-- Public `QaaS.Configuration` keeps ReportPortal disabled with null endpoint/key. Internal environments can publish a same-ID `QaaS.Configuration` package with internal ReportPortal defaults.
-- YAML `Reporters.ReportPortal` values always override `QaaS.Configuration` defaults for that run.
-- Launch names are derived from the grouped team, system, and sessions unless you explicitly override the launch name/description in YAML.
-- Allure remains active and unchanged when ReportPortal publishing is enabled.
+- Only `run` and `assert` publish; `template` and `act` do not contact ReportPortal.
+- Before the first reporting execution, the runner validates every configured endpoint, API key, and project. Earlier non-reporting commands in an `execute` sequence still run.
+- Assertion results are queued locally and published during cleanup, grouped by endpoint, project, and system.
+- Publishing errors are logged without changing the assertion-derived exit code. Allure output is unaffected.
 
 ## Documentation
 - Official docs: [thesmoketeam.github.io/qaas-docs](https://thesmoketeam.github.io/qaas-docs/)
