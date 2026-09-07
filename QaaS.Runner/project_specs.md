@@ -48,7 +48,10 @@ help text; verb classes inherit a common base for shared options
 - Logger (Serilog) per `QaaS.Framework.Executions.ExecutionLogging`.
 - Configuration loaders (YAML + placeholder/reference parsers).
 - ReportPortal has one runner-owned publisher: reporters queue results locally,
-  then `Runner` validates read-only before sessions and publishes at cleanup without a container-managed ReportPortal client.
+  then `Runner` validates all launch groups read-only immediately before the first
+  ReportPortal-enabled `run` or `assert` and publishes at cleanup without a
+  container-managed ReportPortal client. Earlier non-reporting commands in a mixed
+  sequence run before the gate; `template` and `act` never create reporters.
 
 ## Conventions
 

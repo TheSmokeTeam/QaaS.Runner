@@ -12,7 +12,7 @@ using ReportPortal.Client.Abstractions.Requests;
 namespace QaaS.Runner.Assertions.Reporters.ReportPortal;
 
 /// <summary>
-/// Runner-owned ReportPortal coordinator that validates access before execution and publishes queued reporter results during cleanup.
+/// Runner-owned ReportPortal coordinator that validates access before reporting execution and publishes queued reporter results during cleanup.
 /// </summary>
 internal class ReportPortalPublisher(ILogger logger) : IDisposable
 {
@@ -27,8 +27,8 @@ internal class ReportPortalPublisher(ILogger logger) : IDisposable
     /// Validates every enabled ReportPortal launch group without creating launches or writing items.
     /// </summary>
     /// <remarks>
-    /// The runner calls this after executions are built and before sessions start. Configuration or access failures are
-    /// reported as <see cref="InvalidConfigurationsException" /> so the run stops before test execution.
+    /// The runner calls this immediately before the first ReportPortal-enabled reporting execution. Configuration or
+    /// access failures are reported as <see cref="InvalidConfigurationsException" /> so reporting commands do not start.
     /// </remarks>
     /// <param name="reporters">The ReportPortal reporters built for this runner invocation.</param>
     /// <param name="cancellationToken">A token that cancels read-only ReportPortal access checks.</param>

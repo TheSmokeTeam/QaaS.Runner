@@ -17,6 +17,7 @@ using Allure.Commons;
 using QaaS.Runner.Assertions.Reporters;
 using QaaS.Runner.Assertions.ConfigurationObjects.ReporterConfigs;
 using QaaS.Runner.Assertions.Reporters.ReportPortal;
+using QaaS.Runner.Logics;
 
 namespace QaaS.Runner.Tests.RunnerTests;
 
@@ -61,7 +62,7 @@ public class RunnerBehaviorTests
         ILifetimeScope scope,
         List<ExecutionBuilder> executionBuilders,
         Microsoft.Extensions.Logging.ILogger logger,
-        Serilog.ILogger serilogLogger, bool writeTerminal = false) : Runner(scope, executionBuilders, logger, serilogLogger)
+        Serilog.ILogger serilogLogger) : Runner(scope, executionBuilders, logger, serilogLogger)
     {
         public List<string> Calls { get; } = [];
         public int? ExitCode { get; private set; }
@@ -71,7 +72,6 @@ public class RunnerBehaviorTests
         protected override List<Execution> BuildExecutions()
         {
             Calls.Add("build");
-            if (writeTerminal) { Console.WriteLine("execution stdout"); Console.Error.WriteLine("execution stderr"); }
             return [];
         }
 
@@ -90,6 +90,37 @@ public class RunnerBehaviorTests
         }
     }
 
+    private sealed class CommandAwareGateRunner(
+        ILifetimeScope scope,
+        List<ExecutionBuilder> executionBuilders,
+        Microsoft.Extensions.Logging.ILogger logger,
+        Serilog.ILogger serilogLogger,
+        List<Execution> executions) : Runner(scope, executionBuilders, logger, serilogLogger)
+    {
+        protected override void Setup()
+        {
+        }
+
+        protected override List<Execution> BuildExecutions() => executions;
+
+        protected override void Teardown()
+        {
+        }
+    }
+
+    private sealed class RecordingExecution(
+        ExecutionType type,
+        InternalContext context,
+        string name,
+        IList<string> calls) : Execution(type, context)
+    {
+        public override int Start()
+        {
+            calls.Add($"start-{name}");
+            return 0;
+        }
+    }
+
     private sealed class PublishOrderRunner(
         ILifetimeScope scope,
         List<ExecutionBuilder> executionBuilders,
@@ -104,13 +135,13 @@ public class RunnerBehaviorTests
         protected override List<Execution> BuildExecutions()
         {
             Calls.Add("build");
-            return [];
+            return [CreateRecordingExecution(ExecutionType.Run, "run", [], reportPortalEnabled: true)];
         }
 
         protected override int StartExecutions(List<Execution> executions)
         {
             Calls.Add("start");
-            return 0;
+            return base.StartExecutions(executions);
         }
 
         protected override void PublishReportPortalResults(IEnumerable<Execution>? executions)
@@ -136,17 +167,22 @@ public class RunnerBehaviorTests
         }
     }
 
-    private sealed class RecordingReportPortalPublisher(Exception? validationException = null)
+    private sealed class RecordingReportPortalPublisher(
+        Exception? validationException = null,
+        IList<string>? executionCalls = null)
         : ReportPortalPublisher(Globals.Logger)
     {
         private readonly Exception? _validationException = validationException;
         public List<string> Calls { get; } = [];
+        public int ValidatedReporterCount { get; private set; }
         public (string Path, string Text)? CapturedTerminalOutput { get; private set; }
 
         public override Task ValidateAsync(IEnumerable<ReportPortalReporter> reporters,
             CancellationToken cancellationToken = default)
         {
             Calls.Add("validate");
+            executionCalls?.Add("validate");
+            ValidatedReporterCount = reporters.Count();
             if (_validationException is not null)
                 throw _validationException;
 
@@ -157,7 +193,8 @@ public class RunnerBehaviorTests
             CancellationToken cancellationToken = default)
         {
             Calls.Add("publish");
-            CapturedTerminalOutput = (TerminalOutputPath!, File.ReadAllText(TerminalOutputPath!));
+            if (TerminalOutputPath is not null)
+                CapturedTerminalOutput = (TerminalOutputPath, File.ReadAllText(TerminalOutputPath));
             return Task.CompletedTask;
         }
     }
@@ -643,9 +680,12 @@ public class RunnerBehaviorTests
     public void RunAndGetExitCode_WhenReportPortalValidationFails_ReturnsFailureExitCodeBeforeStart()
     {
         using var scope = BuildScope();
+        var calls = new List<string>();
         var publisher = new RecordingReportPortalPublisher(
-            new InvalidConfigurationsException("ReportPortal validation failed"));
-        var runner = new RunLifecycleRunner(scope, [CreateTemplateExecutionBuilder("case", reportPortalEnabled: true)], Globals.Logger, new Mock<Serilog.ILogger>().Object, true)
+            new InvalidConfigurationsException("ReportPortal validation failed"), calls);
+        var execution = CreateRecordingExecution(ExecutionType.Run, "run", calls, reportPortalEnabled: true);
+        var runner = new CommandAwareGateRunner(scope, [], Globals.Logger,
+            new Mock<Serilog.ILogger>().Object, [execution])
         {
             ReportPortalPublisher = publisher
         };
@@ -655,11 +695,79 @@ public class RunnerBehaviorTests
         Assert.Multiple(() =>
         {
             Assert.That(exitCode, Is.EqualTo(1));
-            Assert.That(runner.Calls, Is.EqualTo(new[] { "setup", "build", "teardown" }));
+            Assert.That(calls, Is.EqualTo(new[] { "validate" }));
             Assert.That(publisher.Calls, Is.EqualTo(new[] { "validate", "publish" }));
             Assert.That(runner.LastExitCode, Is.EqualTo(1));
-            Assert.That(publisher.CapturedTerminalOutput?.Text, Does.Contain("execution stdout").And.Contain("execution stderr"));
-            Assert.That(File.Exists(publisher.CapturedTerminalOutput?.Path), Is.False);
+        });
+    }
+
+    [Test]
+    public void RunAndGetExitCode_WithMixedCommands_ValidatesImmediatelyBeforeFirstReportingExecution()
+    {
+        using var scope = BuildScope();
+        var calls = new List<string>();
+        var executions = new List<Execution>
+        {
+            CreateRecordingExecution(ExecutionType.Template, "template", calls),
+            CreateRecordingExecution(ExecutionType.Act, "act", calls),
+            CreateRecordingExecution(ExecutionType.Run, "run", calls, reportPortalEnabled: true),
+            CreateRecordingExecution(ExecutionType.Assert, "assert", calls, reportPortalEnabled: true)
+        };
+        var publisher = new RecordingReportPortalPublisher(executionCalls: calls);
+        var runner = new CommandAwareGateRunner(scope, [], Globals.Logger,
+            new Mock<Serilog.ILogger>().Object, executions)
+        {
+            ReportPortalPublisher = publisher
+        };
+
+        var exitCode = runner.RunAndGetExitCode();
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(exitCode, Is.Zero);
+            Assert.That(publisher.ValidatedReporterCount, Is.EqualTo(2));
+            Assert.That(calls, Is.EqualTo(new[]
+            {
+                "start-template",
+                "start-act",
+                "validate",
+                "start-run",
+                "start-assert"
+            }));
+        });
+    }
+
+    [Test]
+    public void RunAndGetExitCode_WhenMixedCommandValidationFails_StopsAtFirstReportingExecution()
+    {
+        using var scope = BuildScope();
+        var calls = new List<string>();
+        var executions = new List<Execution>
+        {
+            CreateRecordingExecution(ExecutionType.Template, "template", calls),
+            CreateRecordingExecution(ExecutionType.Act, "act", calls),
+            CreateRecordingExecution(ExecutionType.Run, "run", calls, reportPortalEnabled: true),
+            CreateRecordingExecution(ExecutionType.Template, "later-template", calls)
+        };
+        var publisher = new RecordingReportPortalPublisher(
+            new InvalidConfigurationsException("ReportPortal validation failed"), calls);
+        var runner = new CommandAwareGateRunner(scope, [], Globals.Logger,
+            new Mock<Serilog.ILogger>().Object, executions)
+        {
+            ReportPortalPublisher = publisher
+        };
+
+        var exitCode = runner.RunAndGetExitCode();
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(exitCode, Is.EqualTo(1));
+            Assert.That(calls, Is.EqualTo(new[]
+            {
+                "start-template",
+                "start-act",
+                "validate"
+            }));
         });
     }
 
@@ -671,8 +779,11 @@ public class RunnerBehaviorTests
         var originalOut = Console.Out;
         var originalError = Console.Error;
         var runner = new PublishOrderRunner(scope,
-            [CreateTemplateExecutionBuilder("case", reportPortalEnabled: true)], Globals.Logger,
-            new Mock<Serilog.ILogger>().Object);
+            [CreateExecutionBuilder(ExecutionType.Run, "case", reportPortalEnabled: true)], Globals.Logger,
+            new Mock<Serilog.ILogger>().Object)
+        {
+            ReportPortalPublisher = new RecordingReportPortalPublisher()
+        };
 
         var exitCode = runner.RunAndGetExitCode();
 
@@ -692,6 +803,56 @@ public class RunnerBehaviorTests
                 "teardown",
                 "dispose"
             }));
+    }
+
+    [TestCase(ExecutionType.Template)]
+    [TestCase(ExecutionType.Act)]
+    [NonParallelizable]
+    public void RunAndGetExitCode_WithNonReportingCommand_DoesNotUseReportPortal(ExecutionType executionType)
+    {
+        using var scope = BuildScope();
+        var calls = new List<string>();
+        var publisher = new RecordingReportPortalPublisher();
+        var execution = CreateRecordingExecution(executionType, executionType.ToString(), calls);
+        var runner = new CommandAwareGateRunner(scope,
+            [CreateExecutionBuilder(executionType, "case", reportPortalEnabled: true)], Globals.Logger,
+            new Mock<Serilog.ILogger>().Object, [execution])
+        {
+            ReportPortalPublisher = publisher
+        };
+
+        var exitCode = runner.RunAndGetExitCode();
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(exitCode, Is.Zero);
+            Assert.That(calls, Is.EqualTo(new[] { $"start-{executionType}" }));
+            Assert.That(publisher.Calls, Is.Empty);
+            Assert.That(publisher.TerminalOutputPath, Is.Null);
+        });
+    }
+
+    [Test]
+    public void RunAndGetExitCode_WithDisabledReportPortal_DoesNotValidateOrPublish()
+    {
+        using var scope = BuildScope();
+        var calls = new List<string>();
+        var publisher = new RecordingReportPortalPublisher();
+        var execution = CreateRecordingExecution(ExecutionType.Run, "run", calls);
+        var runner = new CommandAwareGateRunner(scope, [CreateExecutionBuilder(ExecutionType.Run, "case")],
+            Globals.Logger, new Mock<Serilog.ILogger>().Object, [execution])
+        {
+            ReportPortalPublisher = publisher
+        };
+
+        var exitCode = runner.RunAndGetExitCode();
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(exitCode, Is.Zero);
+            Assert.That(calls, Is.EqualTo(new[] { "start-run" }));
+            Assert.That(publisher.Calls, Is.Empty);
+        });
     }
 
     [Test]
@@ -795,6 +956,18 @@ public class RunnerBehaviorTests
         string system = "QaaS",
         bool reportPortalEnabled = false)
     {
+        return CreateExecutionBuilder(ExecutionType.Template, caseName, rootConfiguration, team, system,
+            reportPortalEnabled);
+    }
+
+    private static ExecutionBuilder CreateExecutionBuilder(
+        ExecutionType executionType,
+        string caseName,
+        IConfiguration? rootConfiguration = null,
+        string team = "Smoke",
+        string system = "QaaS",
+        bool reportPortalEnabled = false)
+    {
         var context = new InternalContext
         {
             Logger = Globals.Logger,
@@ -809,7 +982,7 @@ public class RunnerBehaviorTests
             System = system
         });
 
-        var builder = new ExecutionBuilder(context, ExecutionType.Template, null, null, null, null)
+        var builder = new ExecutionBuilder(context, executionType, null, null, null, null)
             .SetExecutionId($"exec-{caseName}")
             .SetCase(caseName)
             .WithMetadata(new MetaDataConfig
@@ -822,6 +995,36 @@ public class RunnerBehaviorTests
             builder.Reporters!.ConfigureReportPortal(new ReportPortalConfig { Enabled = true });
 
         return builder;
+    }
+
+    private static Execution CreateRecordingExecution(
+        ExecutionType executionType,
+        string name,
+        IList<string> calls,
+        bool reportPortalEnabled = false)
+    {
+        var context = CreateContext();
+        var reporters = reportPortalEnabled
+            ? new List<IReporter>
+            {
+                new ReportPortalReporter
+                {
+                    Context = context,
+                    Config = new ReportPortalConfig
+                    {
+                        Enabled = true,
+                        Endpoint = "https://reportportal.example/api/",
+                        ApiKey = "api-key",
+                        Project = "project"
+                    }
+                }
+            }
+            : [];
+
+        return new RecordingExecution(executionType, context, name, calls)
+        {
+            ReportLogic = new ReportLogic(reporters, context)
+        };
     }
 
     private static InternalContext CreateContext()

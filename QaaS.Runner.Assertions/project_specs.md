@@ -31,8 +31,9 @@ Assertion engine and reporter dispatcher.
 `ReportLogic` routes each reportable assertion result to built reporters whose
 type is listed on the runtime assertion's `ReporterTypes`.
 Allure writes immediately. ReportPortal queues locally during execution; one
-runner-owned publisher validates access read-only before sessions start and
-publishes grouped launches at cleanup.
+runner-owned publisher validates all launch groups read-only immediately before
+the first ReportPortal-enabled `run` or `assert` and publishes grouped launches
+at cleanup. `template` and `act` do not build reporters.
 
 ## Concurrency
 

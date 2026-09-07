@@ -146,8 +146,9 @@ or `QaaS.Common.*` over baking the hook into the runner.
   `ConcurrentDictionary`).
 - ReportPortal integration ships as a passive reporter; `ReportLogic`
   queues reportable assertion results locally, while one runner-owned publisher
-  validates access read-only before execution and publishes grouped launches
-  during cleanup.
+  validates all configured launch groups read-only immediately before the first
+  ReportPortal-enabled `run` or `assert`, then publishes grouped launches during
+  cleanup. `template` and `act` never create ReportPortal reporters.
 - Reporters are now **shared across assertions** rather than reconstructed
   per assertion (commit `4876603`).
 

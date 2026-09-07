@@ -101,9 +101,6 @@ public class Runner : IRunner, IDisposable
             return CompleteBootstrapHandledRun();
 
         LastExitCode = null;
-        if (ExecutionBuilders.Any(builder => builder.Reporters is
-                { SaveTerminalOutput: not false, ReportPortal: { Enabled: true } }))
-            _terminalOutput = TerminalOutputCapture.TryStart(Logger);
         LogRunStart();
 
         var lifecycleOutcome = CaptureLifecycleOutcome();
@@ -220,27 +217,50 @@ public class Runner : IRunner, IDisposable
     }
 
     /// <summary>
-    /// Starts each materialized execution and returns the aggregated exit code.
+    /// Starts materialized executions in order and returns their aggregated exit code.
     /// </summary>
     /// <param name="executions">The executions to run.</param>
     /// <returns>The sum of the individual execution exit codes.</returns>
     protected virtual int StartExecutions(List<Execution> executions)
     {
         Logger.LogInformation("Running {ExecutionCount} executions", executions.Count);
-        var exitCode = executions.Select(execution => execution.Start()).Sum();
+
+        var reporters = GetReportPortalReporters(executions);
+        var exitCode = 0;
+        foreach (var execution in executions)
+        {
+            PrepareReportPortal(execution, reporters);
+            exitCode += execution.Start();
+        }
+
         Logger.LogInformation("Finished running executions. Aggregated exit code: {ExitCode}", exitCode);
         return exitCode;
     }
 
     /// <summary>
-    /// Validates ReportPortal access before executions start so invalid enabled publishing fails early.
+    /// Validates and initializes ReportPortal before its first reporting execution.
     /// </summary>
-    /// <param name="executions">The built executions that may contain ReportPortal reporters.</param>
-    protected virtual void ValidateReportPortalAccess(List<Execution> executions)
+    /// <param name="execution">The execution about to start.</param>
+    /// <param name="reporters">The pending ReportPortal reporters.</param>
+    private void PrepareReportPortal(Execution execution, List<ReportPortalReporter> reporters)
     {
-        var reportPortalReporters = GetReportPortalReporters(executions).ToList();
-        ReportPortalPublisher.ValidateAsync(reportPortalReporters).GetAwaiter().GetResult();
+        if (reporters.Count == 0 || !HasReportPortal(execution))
+            return;
+
+        ReportPortalPublisher.ValidateAsync(reporters).GetAwaiter().GetResult();
+        if (reporters.Any(reporter => reporter.SaveTerminalOutput != false))
+            _terminalOutput = TerminalOutputCapture.TryStart(Logger);
+
+        reporters.Clear();
     }
+
+    /// <summary>
+    /// Returns whether an execution contains a ReportPortal reporter.
+    /// </summary>
+    /// <param name="execution">The execution to inspect.</param>
+    /// <returns><see langword="true" /> when ReportPortal reporting is configured.</returns>
+    private static bool HasReportPortal(Execution execution) =>
+        execution.ReportLogic?.Reporters.Any(reporter => reporter is ReportPortalReporter) == true;
 
     /// <summary>
     /// Publishes queued ReportPortal assertion results after execution and before execution scopes are disposed.
@@ -248,16 +268,18 @@ public class Runner : IRunner, IDisposable
     /// <param name="executions">The executions whose ReportPortal reporters may have queued assertion results.</param>
     protected virtual void PublishReportPortalResults(IEnumerable<Execution>? executions)
     {
-        var reportPortalReporters = GetReportPortalReporters(executions).ToList();
-        ReportPortalPublisher.PublishAsync(reportPortalReporters).GetAwaiter().GetResult();
+        var reporters = GetReportPortalReporters(executions);
+        if (reporters.Count == 0)
+            return;
+
+        ReportPortalPublisher.PublishAsync(reporters).GetAwaiter().GetResult();
     }
 
-    private static IEnumerable<ReportPortalReporter> GetReportPortalReporters(IEnumerable<Execution>? executions)
-    {
-        return (executions ?? Enumerable.Empty<Execution>())
+    private static List<ReportPortalReporter> GetReportPortalReporters(IEnumerable<Execution>? executions) =>
+        (executions ?? [])
             .SelectMany(execution => execution.ReportLogic?.Reporters ?? [])
-            .OfType<ReportPortalReporter>();
-    }
+            .OfType<ReportPortalReporter>()
+            .ToList();
 
     /// <summary>
     /// Disposes the provided executions in deterministic enumeration order.
@@ -412,9 +434,6 @@ public class Runner : IRunner, IDisposable
     {
         ExecuteLifecyclePhase(RunnerLifecyclePhase.Setup, Setup);
         lifecycleState.Executions = ExecuteLifecyclePhase(RunnerLifecyclePhase.BuildExecutions, BuildExecutions);
-        ExecuteLifecyclePhase(RunnerLifecyclePhase.ValidateReportPortal,
-            () => ValidateReportPortalAccess(lifecycleState.Executions!));
-
         var exitCode = ExecuteLifecyclePhase(RunnerLifecyclePhase.StartExecutions,
             () => StartExecutions(lifecycleState.Executions!));
         LastExitCode = exitCode;
@@ -585,7 +604,6 @@ public class Runner : IRunner, IDisposable
         {
             RunnerLifecyclePhase.Setup => "setup",
             RunnerLifecyclePhase.BuildExecutions => "build executions",
-            RunnerLifecyclePhase.ValidateReportPortal => "validate ReportPortal",
             RunnerLifecyclePhase.StartExecutions => "start executions",
             _ => throw new ArgumentOutOfRangeException(nameof(phase), phase, "Unknown runner lifecycle phase.")
         };
@@ -605,11 +623,6 @@ public class Runner : IRunner, IDisposable
         /// The execution materialization phase.
         /// </summary>
         BuildExecutions,
-
-        /// <summary>
-        /// The pre-execution ReportPortal access validation phase.
-        /// </summary>
-        ValidateReportPortal,
 
         /// <summary>
         /// The execution start phase.

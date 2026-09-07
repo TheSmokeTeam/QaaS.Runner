@@ -39,6 +39,7 @@ using QaaS.Runner.Sessions.Session;
 using QaaS.Runner.Sessions.Session.Builders;
 using QaaS.Runner.Storage;
 using ILogger = Microsoft.Extensions.Logging.ILogger;
+using static QaaS.Framework.SDK.ExecutionObjects.ExecutionType;
 
 [assembly: InternalsVisibleTo("QaaS.Runner.Tests")]
 [assembly: InternalsVisibleTo("QaaS.Runner.Sessions.Tests")]
@@ -347,7 +348,8 @@ public class ExecutionBuilder()
 
     private IEnumerable<IReporter> BuildReports()
     {
-        if (Assertions is null || Assertions.Length == 0 || Reporters is null)
+        if (Type is not (Run or Assert) ||
+            Assertions is null || Assertions.Length == 0 || Reporters is null)
             return [];
         var testSuiteStartTimeUtc = DateTime.UtcNow;
 
