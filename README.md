@@ -65,12 +65,13 @@ dotnet restore
 ```
 
 ## ReportPortal
-Configure `Reporters.ReportPortal` with `Enabled`, `Endpoint`, `ApiKey`, and an optional `Project` (defaults to `MetaData.Team`). YAML values override package defaults.
+QaaS can send its assertion results to an existing ReportPortal instance. Configure `Reporters.ReportPortal` with `Enabled`, `Endpoint`, `ApiKey`, and an optional `Project` (defaults to `MetaData.Team`). YAML values override package defaults.
 
-- Only `run` and `assert` publish; `template` and `act` do not contact ReportPortal.
-- Before the first ReportPortal-enabled `run` or `assert`, the runner validates all configured launch groups. If validation fails, it returns exit code `1` and skips that command and everything after it; earlier non-reporting commands remain completed.
-- Assertion results are queued locally and published during cleanup, grouped by endpoint, project, and system.
-- Publishing errors are logged without changing the assertion-derived exit code. Allure output is unaffected.
+- QaaS does not create ReportPortal projects or credentials; the target project and API key must already exist.
+- Only `run` and `assert` use ReportPortal. `template` still renders its configuration, while `template` and `act` perform no validation or publishing.
+- Immediately before the first ReportPortal-enabled `run` or `assert`, the runner validates every enabled launch group with a read-only project lookup. If validation fails, it returns exit code `1` and skips that command and everything after it; earlier commands remain completed.
+- Assertion results are queued locally and published during cleanup. Compatible ReportPortal configurations share a launch.
+- Final publishing errors are logged without changing the execution-derived exit code. Allure output is unaffected.
 
 ## Documentation
 - Official docs: [thesmoketeam.github.io/qaas-docs](https://thesmoketeam.github.io/qaas-docs/)
