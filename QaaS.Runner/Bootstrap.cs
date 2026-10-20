@@ -67,15 +67,66 @@ public static class Bootstrap
         return cliParserResult
             .MapResult(
                 (TemplateOptions options) =>
-                    new RunLoader<TRunner, TemplateOptions>(GetSafeLoggerOptions(options), executionId).GetLoadedRunner(),
+                    new RunLoader<TRunner, TemplateOptions>(GetSafeLoggerOptions(NormalizePathOptions(options)), executionId).GetLoadedRunner(),
                 (RunOptions options) =>
-                    new RunLoader<TRunner, RunOptions>(GetSafeLoggerOptions(options), executionId).GetLoadedRunner(),
+                    new RunLoader<TRunner, RunOptions>(GetSafeLoggerOptions(NormalizePathOptions(options)), executionId).GetLoadedRunner(),
                 (ActOptions options) =>
-                    new RunLoader<TRunner, ActOptions>(GetSafeLoggerOptions(options), executionId).GetLoadedRunner(),
+                    new RunLoader<TRunner, ActOptions>(GetSafeLoggerOptions(NormalizePathOptions(options)), executionId).GetLoadedRunner(),
                 (AssertOptions options) =>
-                    new RunLoader<TRunner, AssertOptions>(GetSafeLoggerOptions(options), executionId).GetLoadedRunner(),
-                (ExecuteOptions options) => new ExecuteLoader<TRunner>(GetSafeLoggerOptions(options)).GetLoadedRunner(),
+                    new RunLoader<TRunner, AssertOptions>(GetSafeLoggerOptions(NormalizePathOptions(options)), executionId).GetLoadedRunner(),
+                (ExecuteOptions options) => new ExecuteLoader<TRunner>(GetSafeLoggerOptions(NormalizePathOptions(options))).GetLoadedRunner(),
                 errors => HandleParseError<TRunner>(cliParserResult, errors));
+    }
+
+    internal static TOptions NormalizePathOptions<TOptions>(TOptions options) where TOptions : BaseOptions
+    {
+        BaseOptions normalized = ((BaseOptions)options) with
+        {
+            ConfigurationFile = NormalizeLocalPath(options.ConfigurationFile),
+            OverwriteFiles = NormalizeLocalPaths(options.OverwriteFiles),
+            OverwriteFolders = NormalizeLocalPaths(options.OverwriteFolders),
+            PushReferences = options.PushReferences.Select(NormalizePushReferenceArgument).ToArray(),
+            CasesRootDirectory = NormalizeLocalPath(options.CasesRootDirectory),
+            LoggerConfigurationFilePath = NormalizeLocalPath(options.LoggerConfigurationFilePath)
+        };
+
+        if (normalized is AssertableOptions assertableOptions)
+        {
+            normalized = assertableOptions with
+            {
+                ServeResultsFolder = NormalizeLocalPath(assertableOptions.ServeResultsFolder)
+            };
+        }
+
+        return (TOptions)normalized;
+    }
+
+    internal static ExecuteOptions NormalizePathOptions(ExecuteOptions options) => options with
+    {
+        ConfigurationFile = NormalizeLocalPath(options.ConfigurationFile),
+        LoggerConfigurationFilePath = NormalizeLocalPath(options.LoggerConfigurationFilePath),
+        ServeResultsFolder = NormalizeLocalPath(options.ServeResultsFolder)
+    };
+
+    private static IList<string> NormalizeLocalPaths(IEnumerable<string> paths) =>
+        paths.Select(path => NormalizeLocalPath(path)!).ToArray();
+
+    private static string NormalizePushReferenceArgument(string argument) =>
+        argument.EndsWith(".yaml", StringComparison.OrdinalIgnoreCase) ||
+        argument.EndsWith(".yml", StringComparison.OrdinalIgnoreCase)
+            ? NormalizeLocalPath(argument)!
+            : argument;
+
+    private static string? NormalizeLocalPath(string? path)
+    {
+        if (string.IsNullOrEmpty(path) ||
+            Uri.TryCreate(path, UriKind.Absolute, out var uri) &&
+            (uri.Scheme == Uri.UriSchemeHttp || uri.Scheme == Uri.UriSchemeHttps))
+        {
+            return path;
+        }
+
+        return path.Replace('\\', Path.DirectorySeparatorChar).Replace('/', Path.DirectorySeparatorChar);
     }
 
     /// <summary>
