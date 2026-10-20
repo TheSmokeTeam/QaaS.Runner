@@ -206,6 +206,96 @@ public class BootstrapTests
             Is.EqualTo(new[] { "run", "--serve-results", AssertableOptions.DefaultServeResultsFolder, "test.qaas.yaml" }));
     }
 
+    [Test]
+    public void NormalizePathOptions_WithRunnableOptions_NormalizesOnlyLocalPathFields()
+    {
+        var options = new RunOptions
+        {
+            ConfigurationFile = @"configs\test.qaas.yaml",
+            OverwriteFiles = [@"overrides\first.yaml"],
+            OverwriteFolders = [@"overrides\folders"],
+            OverwriteArguments = [@"Variables:Path=content\file.json"],
+            PushReferences = ["Sessions", @"references\sessions.yaml"],
+            CasesRootDirectory = @"cases\smoke",
+            CasesNamePatternsToIgnore = [@"legacy\.*"],
+            LoggerConfigurationFilePath = @"logging\logger.yaml",
+            ServeResultsFolder = @"results\allure"
+        };
+
+        var normalized = Bootstrap.NormalizePathOptions(options);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(normalized.ConfigurationFile, Is.EqualTo(NativePath("configs/test.qaas.yaml")));
+            Assert.That(normalized.OverwriteFiles, Is.EqualTo(new[] { NativePath("overrides/first.yaml") }));
+            Assert.That(normalized.OverwriteFolders, Is.EqualTo(new[] { NativePath("overrides/folders") }));
+            Assert.That(normalized.OverwriteArguments, Is.EqualTo(new[] { @"Variables:Path=content\file.json" }));
+            Assert.That(normalized.PushReferences,
+                Is.EqualTo(new[] { "Sessions", NativePath("references/sessions.yaml") }));
+            Assert.That(normalized.CasesRootDirectory, Is.EqualTo(NativePath("cases/smoke")));
+            Assert.That(normalized.CasesNamePatternsToIgnore, Is.EqualTo(new[] { @"legacy\.*" }));
+            Assert.That(normalized.LoggerConfigurationFilePath, Is.EqualTo(NativePath("logging/logger.yaml")));
+            Assert.That(normalized.ServeResultsFolder, Is.EqualTo(NativePath("results/allure")));
+        });
+    }
+
+    [Test]
+    public void NormalizePathOptions_WithExecuteOptions_NormalizesPathsAndPreservesUrlsAndCommandIds()
+    {
+        var options = new ExecuteOptions
+        {
+            ConfigurationFile = @"execution\executable.yaml",
+            LoggerConfigurationFilePath = "https://example.com/logger.yaml",
+            ServeResultsFolder = @"results\allure",
+            CommandIdsToRun = [@"command\id"]
+        };
+
+        var normalized = Bootstrap.NormalizePathOptions(options);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(normalized.ConfigurationFile, Is.EqualTo(NativePath("execution/executable.yaml")));
+            Assert.That(normalized.LoggerConfigurationFilePath, Is.EqualTo("https://example.com/logger.yaml"));
+            Assert.That(normalized.ServeResultsFolder, Is.EqualTo(NativePath("results/allure")));
+            Assert.That(normalized.CommandIdsToRun, Is.EqualTo(new[] { @"command\id" }));
+        });
+    }
+
+    [Test]
+    public void New_WithNonNativeSeparatorsInExecutableCommand_LoadsNestedCommand()
+    {
+        var configurationPath = Path.Combine(AppContext.BaseDirectory, "TestData", "test.qaas.yaml");
+        var executablePath = Path.Combine(Path.GetTempPath(), $"qaas-executable-{Guid.NewGuid():N}.yaml");
+        File.WriteAllText(executablePath,
+            $"""
+             Commands:
+               - Id: CrossPlatformPath
+                 Command: run {OppositeSeparatorPath(configurationPath)}
+             """);
+
+        try
+        {
+            using var runner = Bootstrap.New([
+                "execute",
+                OppositeSeparatorPath(executablePath),
+                "--no-process-exit"
+            ]);
+
+            Assert.That(runner, Is.Not.Null);
+        }
+        finally
+        {
+            File.Delete(executablePath);
+        }
+    }
+
+    private static string NativePath(string path) =>
+        path.Replace('/', Path.DirectorySeparatorChar).Replace('\\', Path.DirectorySeparatorChar);
+
+    private static string OppositeSeparatorPath(string path) => Path.DirectorySeparatorChar == '/'
+        ? path.Replace('/', '\\')
+        : path.Replace('\\', '/');
+
     private static string CaptureConsoleOut(out int exitCode, Action action)
     {
         var originalOut = Console.Out;
