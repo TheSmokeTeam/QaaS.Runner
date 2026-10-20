@@ -386,8 +386,3 @@ Chart.lock
 
 # macOS metadata
 .DS_Store
-
-# graphify
-/.codex/
-/.claude/
-/graphify-out/
