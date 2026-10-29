@@ -1,5 +1,7 @@
 ﻿using System.Collections.Generic;
 using System.Collections.Immutable;
+using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Logging;
 using Moq;
 using NUnit.Framework;
 using QaaS.Framework.Executions.Logics;
@@ -16,6 +18,53 @@ namespace QaaS.Runner.Tests.LogicsTests;
 public class AssertionLogicTests
 {
     [Test]
+    public void Run_EmitsStructuredAssertionIdentityAndStatus()
+    {
+        var logger = new Mock<ILogger>();
+        logger.Setup(value => value.IsEnabled(It.IsAny<LogLevel>())).Returns(true);
+        var context = new InternalContext
+        {
+            Logger = logger.Object,
+            RootConfiguration = new ConfigurationBuilder().Build(),
+        };
+        var assertion = new Mock<Assertion>();
+        assertion.Object.Name = "response-is-correct";
+        assertion.Object.AssertionName = "CustomAssertion";
+        var outcome = new AssertionResult
+        {
+            Assertion = assertion.Object,
+            AssertionStatus = AssertionStatus.Failed,
+            TestDurationMs = 0,
+            Flaky = null,
+        };
+        assertion
+            .Setup(value =>
+                value.Execute(
+                    It.IsAny<IImmutableList<SessionData?>>(),
+                    It.IsAny<IImmutableList<DataSource>?>()
+                )
+            )
+            .Returns(outcome);
+
+        var execution = new AssertionLogic([assertion.Object], context).Run(new ExecutionData());
+        var completion = logger
+            .Invocations.Where(call => call.Method.Name == "Log")
+            .Select(call => call.Arguments[2])
+            .OfType<IEnumerable<KeyValuePair<string, object?>>>()
+            .Single(fields => fields.Any(field => field.Key == "DiagnosticCode"));
+        var properties = completion.ToDictionary(field => field.Key, field => field.Value);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(properties["DiagnosticCode"], Is.EqualTo("QAAS_ASSERTION_COMPLETED"));
+            Assert.That(properties["AssertionName"], Is.EqualTo("response-is-correct"));
+            Assert.That(properties["AssertionType"], Is.EqualTo("CustomAssertion"));
+            Assert.That(properties["AssertionStatus"], Is.EqualTo("Failed"));
+            Assert.That(execution.AssertionResults.Single(), Is.SameAs(outcome));
+        });
+    }
+
+    [Test]
     public void TestRun_WithAssertions_ReturnsExecutionDataWithAssertionResults()
     {
         // Arrange
@@ -26,21 +75,31 @@ public class AssertionLogicTests
             Assertion = mockAssertion1.Object,
             AssertionStatus = AssertionStatus.Passed,
             TestDurationMs = 0,
-            Flaky = null
+            Flaky = null,
         };
         var mockResult2 = new AssertionResult
         {
             Assertion = mockAssertion2.Object,
             AssertionStatus = AssertionStatus.Skipped,
             TestDurationMs = 0,
-            Flaky = null
+            Flaky = null,
         };
 
-        mockAssertion1.Setup(a =>
-                a.Execute(It.IsAny<IImmutableList<SessionData?>>(), It.IsAny<IImmutableList<DataSource>?>()))
+        mockAssertion1
+            .Setup(a =>
+                a.Execute(
+                    It.IsAny<IImmutableList<SessionData?>>(),
+                    It.IsAny<IImmutableList<DataSource>?>()
+                )
+            )
             .Returns(mockResult1);
-        mockAssertion2.Setup(a =>
-                a.Execute(It.IsAny<IImmutableList<SessionData?>>(), It.IsAny<IImmutableList<DataSource>?>()))
+        mockAssertion2
+            .Setup(a =>
+                a.Execute(
+                    It.IsAny<IImmutableList<SessionData?>>(),
+                    It.IsAny<IImmutableList<DataSource>?>()
+                )
+            )
             .Returns(mockResult2);
 
         var mockAssertions = new List<Assertion> { mockAssertion1.Object, mockAssertion2.Object };

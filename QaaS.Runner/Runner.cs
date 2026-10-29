@@ -463,11 +463,12 @@ public class Runner : IRunner, IDisposable
         {
             if (ShouldReturnFailureExitCode(exception))
             {
-                Logger.LogDebug("Runner phase ended with configuration failure: {Phase}", phaseName);
+                Logger.LogWarning(RunnerDiagnosticEvents.ConfigurationRejected, exception,
+                    "Runner configuration rejected during {Phase}", phaseName);
                 throw new RunnerLifecyclePhaseException(phase, ExceptionDispatchInfo.Capture(exception));
             }
 
-            Logger.LogError(exception, "Runner phase failed: {Phase}", phaseName);
+            Logger.LogError(RunnerDiagnosticEvents.PhaseFailed, exception, "Runner phase failed: {Phase}", phaseName);
             throw new RunnerLifecyclePhaseException(phase, ExceptionDispatchInfo.Capture(exception));
         }
     }
