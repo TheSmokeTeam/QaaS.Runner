@@ -873,6 +873,14 @@ public class RunnerBehaviorTests
         });
 
         logger.Verify(log => log.Log(
+                LogLevel.Warning,
+                It.Is<EventId>(id => id.Id == 4102 && id.Name == "ConfigurationRejected"),
+                It.Is<It.IsAnyType>((state, _) => state.ToString()!.Contains("build executions")),
+                It.Is<Exception>(exception => exception is InvalidConfigurationsException),
+                It.IsAny<Func<It.IsAnyType, Exception?, string>>()),
+            Times.Once);
+
+        logger.Verify(log => log.Log(
                 It.Is<LogLevel>(level => level == LogLevel.Error),
                 It.IsAny<EventId>(),
                 It.Is<It.IsAnyType>((_, _) => true),
@@ -925,12 +933,20 @@ public class RunnerBehaviorTests
     public void Run_WhenBuildExecutionsThrows_StillRunsTeardownAndDispose()
     {
         using var scope = BuildScope();
-        var runner = new FailingBuildRunner(scope, [], Globals.Logger, new Mock<Serilog.ILogger>().Object);
+        var logger = new Mock<Microsoft.Extensions.Logging.ILogger>();
+        var runner = new FailingBuildRunner(scope, [], logger.Object, new Mock<Serilog.ILogger>().Object);
 
         Assert.Throws<InvalidOperationException>(() => runner.Run());
 
         Assert.That(runner.Calls, Is.EqualTo(new[] { "setup", "build", "teardown", "dispose" }));
         Assert.That(runner.Disposed, Is.True);
+        logger.Verify(log => log.Log(
+                LogLevel.Error,
+                It.Is<EventId>(id => id.Id == 4101 && id.Name == "PhaseFailed"),
+                It.Is<It.IsAnyType>((state, _) => state.ToString()!.Contains("build executions")),
+                It.Is<Exception>(exception => exception is InvalidOperationException),
+                It.IsAny<Func<It.IsAnyType, Exception?, string>>()),
+            Times.Once);
     }
 
     private static ILifetimeScope BuildScope()

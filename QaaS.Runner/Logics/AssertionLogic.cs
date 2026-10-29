@@ -40,9 +40,11 @@ public class AssertionLogic(IList<Assertion> assertions, InternalContext context
             // Execute the assertion
             var result = assertion.Execute(sessionDataSnapshot, dataSourcesSnapshot);
 
-            // Log debug with exit code after execution
-            context.Logger.LogDebugWithMetaData("Assertion {AssertionName} completed with exit code: {ExitCode}",
-                metaData, new object?[] { assertion.Name, result.AssertionStatus.ToString() });
+            context.Logger.LogDebugWithMetaData(
+                "Assertion completed. DiagnosticCode={DiagnosticCode} AssertionName={AssertionName} " +
+                "AssertionType={AssertionType} AssertionStatus={AssertionStatus}",
+                metaData, new object?[] { "QAAS_ASSERTION_COMPLETED", assertion.Name,
+                    assertion.AssertionName, result.AssertionStatus.ToString() });
 
             assertionResults.Add(result);
         });

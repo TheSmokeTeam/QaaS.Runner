@@ -62,7 +62,7 @@ internal static partial class RunnerYamlConfigurationExceptionFactory
                     [
                         "Fix the YAML syntax at the reported file and location, then retry.",
                         "Parser locations are 1-based line and column numbers when available."
-                    ]));
+                    ]), exception);
         }
 
         return new InvalidConfigurationsException(
@@ -74,7 +74,7 @@ internal static partial class RunnerYamlConfigurationExceptionFactory
                 ],
                 null,
                 null,
-                ["Fix the file contents or accessibility issue and retry."]));
+                ["Fix the file contents or accessibility issue and retry."]), exception);
     }
 
     private static string ResolveLocalPath(string configuredPath)
