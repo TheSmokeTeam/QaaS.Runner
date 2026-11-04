@@ -346,7 +346,7 @@ public class TransactionBuilderTests
     }
 
     [Test]
-    public void Validate_EmptyDataSourceCollectionsWithoutEmptyRequest_ShouldPreserveCodeFirstCompatibility()
+    public void Validate_EmptyDataSourceCollectionsWithoutEmptyRequest_IsValid()
     {
         var builder = CreateHttpBuilder();
         builder.DataSourceNames = [];
@@ -364,7 +364,7 @@ public class TransactionBuilderTests
     [TestCase(2, 0, true)]
     [TestCase(2, 1, true)]
     [TestCase(2, 2, true)]
-    public void Validate_LegacySelectorTruthTable_IsPreserved(
+    public void Validate_DataSourceSelectorCombinations_MatchExpectedValidity(
         int dataSourceNamesState,
         int dataSourcePatternsState,
         bool expectedValid
@@ -388,7 +388,7 @@ public class TransactionBuilderTests
 
     [TestCase(nameof(TransactionBuilder.DataSourceNames))]
     [TestCase(nameof(TransactionBuilder.DataSourcePatterns))]
-    public void ValidateProperty_LegacyRequiredIfAnyMetadata_RemainsConditionalOnEmptyRequest(
+    public void ValidateProperty_RequiredIfAnyMetadata_IsConditionalOnEmptyRequest(
         string propertyName
     )
     {
@@ -397,14 +397,14 @@ public class TransactionBuilderTests
         var validationResults = new List<ValidationResult>();
         var validationContext = new ValidationContext(builder) { MemberName = propertyName };
 
-        var isValidWithoutOptIn = Validator.TryValidateProperty(
+        var isValidWithoutEmptyRequest = Validator.TryValidateProperty(
             null,
             validationContext,
             validationResults
         );
         builder.WithEmptyRequest();
         validationResults.Clear();
-        var isValidWithOptIn = Validator.TryValidateProperty(
+        var isValidWithEmptyRequest = Validator.TryValidateProperty(
             null,
             validationContext,
             validationResults
@@ -412,8 +412,8 @@ public class TransactionBuilderTests
 
         Assert.Multiple(() =>
         {
-            Assert.That(isValidWithoutOptIn, Is.False);
-            Assert.That(isValidWithOptIn, Is.True);
+            Assert.That(isValidWithoutEmptyRequest, Is.False);
+            Assert.That(isValidWithEmptyRequest, Is.True);
             Assert.That(
                 property
                     .GetCustomAttributes(false)
@@ -431,7 +431,7 @@ public class TransactionBuilderTests
 
     [TestCase(false)]
     [TestCase(true)]
-    public void Validate_PublicFluentRemovalToEmptySelector_PreservesCodeFirstNoOp(bool usePattern)
+    public void Validate_PublicFluentRemovalToEmptySelector_IsValid(bool usePattern)
     {
         var builder = CreateHttpBuilder();
         if (usePattern)
@@ -443,7 +443,7 @@ public class TransactionBuilderTests
     }
 
     [Test]
-    public void Validate_LegacyMode_DoesNotApplyEmptyRequestProtocolOrSerializerRestrictions()
+    public void Validate_DataSourceMode_DoesNotApplyEmptyRequestProtocolOrSerializerRestrictions()
     {
         var builder = CreateHttpBuilder(HttpMethods.Post)
             .AddDataSource("source")

@@ -30,10 +30,10 @@ Policies/                — runtime wrappers around Framework policies
 
 | Type | Purpose |
 |---|---|
-| `Session` | Runtime executor for a single session. Drives stages sequentially, awaits stage tasks. |
-| `Stage` | Logical grouping; all `Action`s in a stage run concurrently. |
+| `Session` | Launches internal stages in order, awaits all staged action tasks, then runs collectors. |
+| `Stage` | Launches its actions concurrently; before/after delays control launches without waiting for action completion. |
 | `Action` (abstract) | Base for `Publisher` / `Consumer` / `Transaction` / `Probe` / `Collector` / `MockerCommand`. |
-| `IterableSerializableDataIterator<T>` | Wraps generator output; exposes `IterateEnumerable`, `IterateWithOriginal`, `ApplyToAll(parallel: bool)`. The concurrency pivot. |
+| `IterableSerializableDataIterator` | Wraps generator output and exposes `IterateEnumerable`, `IterateWithOriginal`, and bounded `ApplyToAll` overloads. |
 | `RunningCommunicationData<T>` | Thread-safe live mirror of action I/O exposed on `InternalContext`. |
 | `*Builder` partials | `*Properties` / `*Logic` / `*Validation`. |
 
@@ -42,30 +42,35 @@ Policies/                — runtime wrappers around Framework policies
 1. Builder validated and `.Build()` invoked → produces `Transaction`.
 2. Stage `Task.Run`s all actions; `Transaction` resolves data sources to a
    single iterable.
-3. `ApplyToAll(parallel: cfg.Parallel.Parallelism > 1)` walks items.
+3. `ApplyToAll` executes sequentially when `Parallel` is omitted; a configured
+   degree sets `ParallelOptions.MaxDegreeOfParallelism`, including degree one.
+   Parallel transaction input is materialized before workers start.
 4. For each item: serialise → call protocol `ITransactor.Transact()` →
    deserialise reply → append to `SessionData.Inputs/Outputs` under a
    `lock` → evaluate `Policy` chain.
 5. On `StopActionException` the iterator exits cleanly (the chain reached a
    stop condition such as `CountPolicy` or `TimeoutPolicy`).
 
-Publishers, Consumers, Collectors, Probes, and MockerCommands follow
-analogous patterns — Publishers and Transactions are the parallelism-heavy
-ones.
+Publishers and transactions support per-action workers through
+`Parallel.Parallelism`; chunk publishers count chunks as worker operations.
+Consumers, collectors, probes and mocker commands have no per-action worker
+setting. Separate consumer actions have separate protocol instances. Probes
+execute their hook once; collectors run after all staged actions complete.
 
 ## Policies
 
-Each Action accepts a `Policies` list; runtime wraps them in the
+Publisher, consumer and transaction builders accept a `Policies` list; runtime wraps them in the
 `QaaS.Framework.Policies` chain. The chain is constructed in ascending
 `Index` order; `RunChain()` returns `false` when a `*StopException` was
 caught.
 
 ## Concurrency invariants
 
-- `SemaphoreSlim` throttles `Parallel.ForEach`.
+- Publisher and transaction loops bound `Parallel.ForEach` workers to the configured degree, with a nonbuffering partitioner and a send/transact semaphore.
 - All shared collections under `lock`.
 - `Interlocked` for counters.
-- `StopActionException` only inside `ApplyToAll`.
+- Parallel iteration unwraps aggregates containing only `StopActionException`; mixed transport failures propagate.
+- Policies are evaluated under a per-action lock; already-running work can finish after a stop condition.
 
 ## Tests
 

@@ -183,7 +183,7 @@ public class ReportLogicTests
     }
 
     [Test]
-    public void Assertion_DefaultReporterTypes_PreserveLegacyReporterTargets()
+    public void Assertion_DefaultReporterTypes_IncludeAllureAndReportPortal()
     {
         var assertion = new Assertion();
 
@@ -194,7 +194,7 @@ public class ReportLogicTests
     }
 
     [Test]
-    public void ReporterTarget_PublicEnum_RemainsAvailableForCompatibility()
+    public void ReporterTarget_PublicEnum_DefinesAllureAndReportPortal()
     {
         Assert.That(
             Enum.GetNames<ReporterTarget>(),

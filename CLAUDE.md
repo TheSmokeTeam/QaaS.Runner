@@ -77,10 +77,10 @@ Runner.Run() ──► ExecutionBuilder.Build()
                       └─ BuildLinks()
                       │
                       ▼
-                 SessionLogic ── for each Stage:
-                                    └ run all Actions concurrently (Task.Run)
-                                       └ each Action iterates data with
-                                         SemaphoreSlim-bounded parallelism,
+                 SessionLogic ── outer session stages:
+                                    └ sessions launch internal action stages
+                                       └ publishers/transactions iterate with
+                                         bounded publisher/transaction workers,
                                          locks shared lists, observes Policies
                       │
                       ▼
@@ -101,12 +101,18 @@ Runner.Run() ──► ExecutionBuilder.Build()
 
 Three nested concurrency levels:
 
-1. **Stage-level**: every Action in a Stage is launched via `Task.Run` and
-   awaited together at stage end.
-2. **Action-level (data parallelism)**: inside a single Action,
-   `IterableSerializableDataIterator.ApplyToAll(data, body, parallel: true)`
-   uses `Parallel.ForEach` throttled by `SemaphoreSlim(parallelism, parallelism)`.
-3. **Session-level**: deferred sessions can overlap stages.
+1. **Action-stage level**: each internal stage launches its actions concurrently.
+   Its before/after delays control launch timing, not completion barriers; action
+   tasks can overlap later internal stages. The session awaits all staged actions
+   after launching its internal stages, then runs collectors.
+2. **Action-level (data parallelism)**: publisher and transaction builders support
+   `Parallel.Parallelism`. Their four-argument `ApplyToAll` calls use
+   `Parallel.ForEach` with `MaxDegreeOfParallelism` and a nonbuffering partitioner.
+   Chunk publishers assign one chunk per worker. Omitting `Parallel` executes
+   the input sequentially; a configured degree of one uses one worker. Consumers,
+   probes, collectors and mocker commands have no `Parallel` field.
+3. **Session-level**: sessions assigned to the same outer session stage run
+   concurrently. `RunUntilStage` can defer completion across outer stages.
 
 Safety rules:
 - Mutating shared lists from inside the parallel body **must** use `lock`.
@@ -116,9 +122,9 @@ Safety rules:
   that loop.
 - Live action data flows through `RunningCommunicationData<T>` /
   `BlockingCollection<T>` exposed on `InternalContext`.
-- Recent change (PR #33 / commit `a6f4c7d`): transactions now also support
-  parallelism. If you touch the iterator, mirror behaviour for both
-  publishers and transactions, and re-run `QaaS.Runner.Sessions.Tests`.
+- Publishers and transactions share the bounded iterator. Validate iterator
+  behavior for both action types with `QaaS.Runner.Sessions.Tests`. Policy checks
+  are serialized per action; in-flight operations can finish after a stop condition.
 
 ## Hook discovery
 
@@ -149,8 +155,7 @@ or `QaaS.Common.*` over baking the hook into the runner.
   validates all configured launch groups read-only immediately before the first
   ReportPortal-enabled `run` or `assert`, then publishes grouped launches during
   cleanup. `template` and `act` never create ReportPortal reporters.
-- Reporters are now **shared across assertions** rather than reconstructed
-  per assertion (commit `4876603`).
+- Reporter instances are shared across their configured assertions.
 
 When you change reporter wiring, keep `Reporters` keyed by their configured
 type, preserve `Assertion.ReporterTypes` as the per-assertion routing gate, and verify with
@@ -162,9 +167,10 @@ Top-level sections:
 `MetaData`, `DataSources`, `Storages`, `Sessions`, `Assertions`, `Links`, `Variables`.
 
 A `Session` contains `Publishers`, `Consumers`, `Transactions`, `Probes`,
-`Collectors`, `MockerCommands`. Each Action carries `Name`, `Stage`,
-`DataSourceNames`, `DataSourcePatterns`, `Parallel.Parallelism`, `Policies`,
-plus protocol-specific config.
+`Collectors`, and `MockerCommands`. Fields depend on the action type.
+Publishers and transactions support `Parallel.Parallelism`; consumers, probes,
+collectors and mocker commands do not. Use separate actions/connections for
+concurrent consumers, with protocol-specific queue/group/partition semantics.
 
 The canonical YAML reference lives at
 <https://docs.qaas.online/qaas/userInterfaces/runner/configurationSections/configurationSections/>
@@ -241,15 +247,6 @@ at the corresponding docs URL when one exists. The docs generator
   the data-iteration abstraction.
 - `QaaS.Runner.Assertions/AllureReporter.cs` — reporter reference.
 - `.github/workflows/ci.yml` — CI pipeline.
-
-## Known recent / in-flight work
-
-- PR #33 (`feature/transaction-parallelism`) — adds parallelism to
-  transactions, bundles initial CLAUDE.md drop.
-- PR #32 (`feature/reportportal_integration`) — passive ReportPortal
-  reporter.
-- PR #28 (`Skidskad:feat/clone-builders`) — `ICloneable<T>` deep-clone for
-  builders (cross-repo with Mocker/Framework PR #31).
 
 ## When you are stuck
 

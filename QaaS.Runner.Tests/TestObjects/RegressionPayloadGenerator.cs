@@ -13,6 +13,6 @@ public class RegressionPayloadGenerator : BaseGenerator<object>
         IImmutableList<DataSource> dataSourceList
     )
     {
-        return [new Data<object> { Body = "legacy-payload" }];
+        return [new Data<object> { Body = "source-payload" }];
     }
 }

@@ -1,3 +1,5 @@
+using System.Collections.Concurrent;
+using QaaS.Framework.Policies.Exceptions;
 using QaaS.Framework.SDK.Session.DataObjects;
 using QaaS.Framework.Serialization.Serializers;
 
@@ -11,7 +13,10 @@ public sealed class IterableSerializableDataIterator
     private readonly IEnumerable<Data<object>>? _iterableData;
     private readonly ISerializer? _serializer;
 
-    public IterableSerializableDataIterator(IEnumerable<Data<object>>? iterableData, ISerializer? serializer)
+    public IterableSerializableDataIterator(
+        IEnumerable<Data<object>>? iterableData,
+        ISerializer? serializer
+    )
     {
         IteratedData = new List<Data<object>>();
         _iterableData = iterableData;
@@ -51,11 +56,43 @@ public sealed class IterableSerializableDataIterator
     ///     and returning the serialized data
     /// </summary>
     /// <returns> The iterable enumerable with its items serialized </returns>
-    public void ApplyToAll<TData>(IEnumerable<TData>? iterator, Action<TData> methodToApply,
-        bool parallel)
+    public void ApplyToAll<TData>(
+        IEnumerable<TData>? iterator,
+        Action<TData> methodToApply,
+        bool parallel
+    ) => ApplyToAll(iterator, methodToApply, parallel, Environment.ProcessorCount);
+
+    /// <summary>
+    /// Apply work with a bounded number of workers and no speculative input buffering.
+    /// The three-argument overload uses Environment.ProcessorCount as its worker limit.
+    /// </summary>
+    public void ApplyToAll<TData>(
+        IEnumerable<TData>? iterator,
+        Action<TData> methodToApply,
+        bool parallel,
+        int maxDegreeOfParallelism
+    )
     {
+        ArgumentOutOfRangeException.ThrowIfLessThan(maxDegreeOfParallelism, 1);
         iterator ??= IterateEnumerable().Cast<TData>();
-        if (parallel) Parallel.ForEach(iterator, methodToApply);
+        if (parallel)
+        {
+            try
+            {
+                Parallel.ForEach(
+                    Partitioner.Create(iterator, EnumerablePartitionerOptions.NoBuffering),
+                    new ParallelOptions { MaxDegreeOfParallelism = maxDegreeOfParallelism },
+                    methodToApply
+                );
+            }
+            catch (AggregateException exception)
+                when (exception.Flatten().InnerExceptions.All(error => error is StopActionException)
+                )
+            {
+                // Policy stops are normal control flow. Never hide a concurrent transport failure.
+                throw exception.Flatten().InnerExceptions[0];
+            }
+        }
         else
             foreach (var data in iterator)
                 methodToApply.Invoke(data);
@@ -65,8 +102,8 @@ public sealed class IterableSerializableDataIterator
     /// Returns the data contained under the IteratedData list before it was serialized.
     /// </summary>
     /// <param name="indexToFetch"> The index of the data you wish to fetch </param>
-    public Data<object> GetDataBeforeSerialization(int indexToFetch)
-        => IteratedData[indexToFetch % IteratedData.Count];
+    public Data<object> GetDataBeforeSerialization(int indexToFetch) =>
+        IteratedData[indexToFetch % IteratedData.Count];
 
     private Data<object> Serialize(Data<object> item)
     {
@@ -76,7 +113,7 @@ public sealed class IterableSerializableDataIterator
         return new Data<object>
         {
             Body = _serializer.Serialize(item.Body),
-            MetaData = item.MetaData
+            MetaData = item.MetaData,
         };
     }
 }

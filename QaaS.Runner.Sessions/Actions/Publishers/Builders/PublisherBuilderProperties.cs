@@ -50,7 +50,7 @@ public partial class PublisherBuilder : ICloneable<PublisherBuilder>
     [Range(ulong.MinValue, ulong.MaxValue),
      Description("The time to sleep in milliseconds in between iterations"), DefaultValue(0)]
     public ulong SleepTimeMs { get; internal set; } = 0;
-    [Description("Whether to publish in a specified parallelism")]
+    [Description("Optional worker limit for this publisher. Omit for sequential execution. Workers send individual items or chunks on the action's shared sender; completion order is not guaranteed.")]
     public Parallel? Parallel { get; internal set; }
     [Description("Determines whether the publisher acts as a chunk publisher")]
     public Chunks? Chunk { get; internal set; }

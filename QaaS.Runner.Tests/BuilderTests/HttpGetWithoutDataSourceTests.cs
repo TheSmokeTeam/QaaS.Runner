@@ -78,7 +78,7 @@ public class HttpGetWithoutDataSourceTests
     }
 
     [Test]
-    public void Start_FromYaml_WithLegacyDataSourceGet_PreservesSelectionSerializationAndIterations()
+    public void Start_FromYaml_WithDataSourceGet_AppliesSelectionSerializationAndIterations()
     {
         var capturedRequests = new ConcurrentBag<Data<object>>();
         var transactor = new Mock<ITransactor>();
@@ -125,7 +125,7 @@ public class HttpGetWithoutDataSourceTests
                 capturedRequests,
                 Has.All.Matches<Data<object>>(request =>
                     request.Body is byte[] bytes
-                    && JsonSerializer.Deserialize<string>(bytes) == "legacy-payload"
+                    && JsonSerializer.Deserialize<string>(bytes) == "source-payload"
                 )
             );
         });
@@ -134,7 +134,7 @@ public class HttpGetWithoutDataSourceTests
     [TestCase("TestData/http-get-no-selector-regression.qaas.yaml")]
     [TestCase("TestData/http-get-empty-names-regression.qaas.yaml")]
     [TestCase("TestData/http-get-empty-patterns-regression.qaas.yaml")]
-    public void Build_FromYaml_WithoutOptInAndUsableSelector_RemainsInvalid(string fixture)
+    public void Build_FromYaml_WithoutEmptyRequestAndUsableSelector_IsInvalid(string fixture)
     {
         using var runner = Bootstrap.New([
             "act",

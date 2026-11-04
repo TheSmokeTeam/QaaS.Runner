@@ -22,8 +22,7 @@ namespace QaaS.Runner.Sessions.Actions.Transactions.Builders;
 
 public partial class TransactionBuilder : ICloneable<TransactionBuilder>
 {
-    // Present empty selectors only in explicit empty-request mode so the legacy RequiredIfAny
-    // attributes and their reflection-visible metadata remain unchanged.
+    // Empty-request mode exposes empty data-source selectors to RequiredIfAny validation.
     private string[]? _dataSourceNames;
     private string[]? _dataSourcePatterns;
 
@@ -79,7 +78,9 @@ public partial class TransactionBuilder : ICloneable<TransactionBuilder>
     [DefaultValue(false)]
     public bool Loop { get; internal set; }
 
-    [Description("Whether to run the transaction in a specified parallelism")]
+    [Description(
+        "Optional worker limit for this transaction. Omit for sequential execution. Workers share the transactor, and completion order is not guaranteed."
+    )]
     public Parallel? Parallel { get; internal set; }
 
     [
@@ -126,7 +127,7 @@ public partial class TransactionBuilder : ICloneable<TransactionBuilder>
     /// Sets the name used for the current Runner transaction builder instance.
     /// </summary>
     /// <remarks>
-    /// Use this method when working with the documented Runner transaction builder API surface in code. The change is stored on the current builder instance and is consumed by later build, validation, or execution steps.
+    /// Stores settings on this builder for validation and action construction.
     /// </remarks>
     /// <qaas-docs group="Configuration as Code" subgroup="Transactions" />
     public TransactionBuilder Named(string name)
@@ -139,7 +140,7 @@ public partial class TransactionBuilder : ICloneable<TransactionBuilder>
     /// Sets the stage used by the current Runner transaction builder instance.
     /// </summary>
     /// <remarks>
-    /// Use this method when working with the documented Runner transaction builder API surface in code. The change is stored on the current builder instance and is consumed by later build, validation, or execution steps.
+    /// Stores settings on this builder for validation and action construction.
     /// </remarks>
     /// <qaas-docs group="Configuration as Code" subgroup="Transactions" />
     public TransactionBuilder AtStage(int stage)
@@ -152,7 +153,7 @@ public partial class TransactionBuilder : ICloneable<TransactionBuilder>
     /// Configures timeout on the current Runner transaction builder instance.
     /// </summary>
     /// <remarks>
-    /// Use this method when working with the documented Runner transaction builder API surface in code. The change is stored on the current builder instance and is consumed by later build, validation, or execution steps.
+    /// Stores settings on this builder for validation and action construction.
     /// </remarks>
     /// <qaas-docs group="Configuration as Code" subgroup="Transactions" />
     public TransactionBuilder WithTimeout(int timeoutMs)
@@ -165,7 +166,7 @@ public partial class TransactionBuilder : ICloneable<TransactionBuilder>
     /// Sets the input data filter used by the transaction.
     /// </summary>
     /// <remarks>
-    /// Use this method when working with the documented Runner transaction builder API surface in code. The change is stored on the current builder instance and is consumed by later build, validation, or execution steps.
+    /// Stores settings on this builder for validation and action construction.
     /// </remarks>
     /// <qaas-docs group="Configuration as Code" subgroup="Transactions" />
     public TransactionBuilder FilterInputData(DataFilter dataFilter)
@@ -178,7 +179,7 @@ public partial class TransactionBuilder : ICloneable<TransactionBuilder>
     /// Sets the output data filter used by the transaction.
     /// </summary>
     /// <remarks>
-    /// Use this method when working with the documented Runner transaction builder API surface in code. The change is stored on the current builder instance and is consumed by later build, validation, or execution steps.
+    /// Stores settings on this builder for validation and action construction.
     /// </remarks>
     /// <qaas-docs group="Configuration as Code" subgroup="Transactions" />
     public TransactionBuilder FilterOutputData(DataFilter dataFilter)
@@ -191,7 +192,7 @@ public partial class TransactionBuilder : ICloneable<TransactionBuilder>
     /// Sets the deserializer configuration used by the current Runner transaction builder instance.
     /// </summary>
     /// <remarks>
-    /// Use this method when working with the documented Runner transaction builder API surface in code. The change is stored on the current builder instance and is consumed by later build, validation, or execution steps.
+    /// Stores settings on this builder for validation and action construction.
     /// </remarks>
     /// <qaas-docs group="Configuration as Code" subgroup="Transactions" />
     public TransactionBuilder WithDeserializer(DeserializeConfig deserializeConfig)
@@ -204,7 +205,7 @@ public partial class TransactionBuilder : ICloneable<TransactionBuilder>
     /// Sets the serializer configuration used by the current Runner transaction builder instance.
     /// </summary>
     /// <remarks>
-    /// Use this method when working with the documented Runner transaction builder API surface in code. The change is stored on the current builder instance and is consumed by later build, validation, or execution steps.
+    /// Stores settings on this builder for validation and action construction.
     /// </remarks>
     /// <qaas-docs group="Configuration as Code" subgroup="Transactions" />
     public TransactionBuilder WithSerializer(SerializeConfig serializeConfig)
@@ -217,7 +218,7 @@ public partial class TransactionBuilder : ICloneable<TransactionBuilder>
     /// Sets how many iterations the transaction should execute.
     /// </summary>
     /// <remarks>
-    /// Use this method when working with the documented Runner transaction builder API surface in code. The change is stored on the current builder instance and is consumed by later build, validation, or execution steps.
+    /// Stores settings on this builder for validation and action construction.
     /// </remarks>
     /// <qaas-docs group="Configuration as Code" subgroup="Transactions" />
     public TransactionBuilder WithIterations(int iterations)
@@ -230,7 +231,7 @@ public partial class TransactionBuilder : ICloneable<TransactionBuilder>
     /// Adds the supplied data source to the current Runner transaction builder instance.
     /// </summary>
     /// <remarks>
-    /// Use this method when working with the documented Runner transaction builder API surface in code. The change is stored on the current builder instance and is consumed by later build, validation, or execution steps.
+    /// Stores settings on this builder for validation and action construction.
     /// </remarks>
     /// <qaas-docs group="Configuration as Code" subgroup="Transactions" />
     public TransactionBuilder AddDataSource(string dataSourceName)
@@ -245,7 +246,7 @@ public partial class TransactionBuilder : ICloneable<TransactionBuilder>
     /// Adds the supplied data source pattern to the current Runner transaction builder instance.
     /// </summary>
     /// <remarks>
-    /// Use this method when working with the documented Runner transaction builder API surface in code. The change is stored on the current builder instance and is consumed by later build, validation, or execution steps.
+    /// Stores settings on this builder for validation and action construction.
     /// </remarks>
     /// <qaas-docs group="Configuration as Code" subgroup="Transactions" />
     public TransactionBuilder AddDataSourcePattern(string dataSourcePattern)
@@ -274,7 +275,7 @@ public partial class TransactionBuilder : ICloneable<TransactionBuilder>
     /// Marks the transaction to execute continuously in loop mode.
     /// </summary>
     /// <remarks>
-    /// Use this method when working with the documented Runner transaction builder API surface in code. The change is stored on the current builder instance and is consumed by later build, validation, or execution steps.
+    /// Stores settings on this builder for validation and action construction.
     /// </remarks>
     /// <qaas-docs group="Configuration as Code" subgroup="Transactions" />
     public TransactionBuilder InLoops()
@@ -284,10 +285,12 @@ public partial class TransactionBuilder : ICloneable<TransactionBuilder>
     }
 
     /// <summary>
-    /// Configures the transaction to run with the supplied parallelism.
+    /// Sets the maximum concurrent workers for this transaction action.
     /// </summary>
     /// <remarks>
-    /// Use this method when working with the documented Runner transaction builder API surface in code. The change is stored on the current builder instance and is consumed by later build, validation, or execution steps.
+    /// The value must be at least one. Each worker executes one request/response operation on
+    /// the shared transactor. Omitting this setting runs sequentially. Parallel input is
+    /// materialized before execution; worker limits do not bound retained session memory.
     /// </remarks>
     /// <qaas-docs group="Configuration as Code" subgroup="Transactions" />
     public TransactionBuilder WithParallelism(int parallelism)
@@ -300,7 +303,7 @@ public partial class TransactionBuilder : ICloneable<TransactionBuilder>
     /// Sets the delay applied between transaction iterations.
     /// </summary>
     /// <remarks>
-    /// Use this method when working with the documented Runner transaction builder API surface in code. The change is stored on the current builder instance and is consumed by later build, validation, or execution steps.
+    /// Stores settings on this builder for validation and action construction.
     /// </remarks>
     /// <qaas-docs group="Configuration as Code" subgroup="Transactions" />
     public TransactionBuilder WithSleep(ulong sleepTimeMs)
@@ -313,7 +316,7 @@ public partial class TransactionBuilder : ICloneable<TransactionBuilder>
     /// Adds the supplied policy to the current Runner transaction builder instance.
     /// </summary>
     /// <remarks>
-    /// Use this method when working with the documented Runner transaction builder API surface in code. The change is stored on the current builder instance and is consumed by later build, validation, or execution steps.
+    /// Stores settings on this builder for validation and action construction.
     /// </remarks>
     /// <qaas-docs group="Configuration as Code" subgroup="Transactions" />
     public TransactionBuilder AddPolicy(PolicyBuilder policy)
@@ -328,7 +331,7 @@ public partial class TransactionBuilder : ICloneable<TransactionBuilder>
     /// Updates the configured policy at the specified index on the current Runner transaction builder instance.
     /// </summary>
     /// <remarks>
-    /// Use this method when working with the documented Runner transaction builder API surface in code. The change is stored on the current builder instance and is consumed by later build, validation, or execution steps.
+    /// Stores settings on this builder for validation and action construction.
     /// </remarks>
     /// <qaas-docs group="Configuration as Code" subgroup="Transactions" />
     public TransactionBuilder UpdatePolicyAt(int index, PolicyBuilder policy)
@@ -348,7 +351,7 @@ public partial class TransactionBuilder : ICloneable<TransactionBuilder>
     /// Removes the configured policy at the specified index from the current Runner transaction builder instance.
     /// </summary>
     /// <remarks>
-    /// Use this method when working with the documented Runner transaction builder API surface in code. The change is stored on the current builder instance and is consumed by later build, validation, or execution steps.
+    /// Stores settings on this builder for validation and action construction.
     /// </remarks>
     /// <qaas-docs group="Configuration as Code" subgroup="Transactions" />
     public TransactionBuilder RemovePolicyAt(int index)
@@ -367,7 +370,7 @@ public partial class TransactionBuilder : ICloneable<TransactionBuilder>
     /// Updates the configured data source stored on the current Runner transaction builder instance.
     /// </summary>
     /// <remarks>
-    /// Use this method when working with the documented Runner transaction builder API surface in code. The change is stored on the current builder instance and is consumed by later build, validation, or execution steps.
+    /// Stores settings on this builder for validation and action construction.
     /// </remarks>
     /// <qaas-docs group="Configuration as Code" subgroup="Transactions" />
     public TransactionBuilder UpdateDataSource(string existingValue, string newValue)
@@ -390,7 +393,7 @@ public partial class TransactionBuilder : ICloneable<TransactionBuilder>
     /// Removes the configured data source from the current Runner transaction builder instance.
     /// </summary>
     /// <remarks>
-    /// Use this method when working with the documented Runner transaction builder API surface in code. The change is stored on the current builder instance and is consumed by later build, validation, or execution steps.
+    /// Stores settings on this builder for validation and action construction.
     /// </remarks>
     /// <qaas-docs group="Configuration as Code" subgroup="Transactions" />
     public TransactionBuilder RemoveDataSource(string dataSourceName)
@@ -403,7 +406,7 @@ public partial class TransactionBuilder : ICloneable<TransactionBuilder>
     /// Removes the configured data source at the specified index from the current Runner transaction builder instance.
     /// </summary>
     /// <remarks>
-    /// Use this method when working with the documented Runner transaction builder API surface in code. The change is stored on the current builder instance and is consumed by later build, validation, or execution steps.
+    /// Stores settings on this builder for validation and action construction.
     /// </remarks>
     /// <qaas-docs group="Configuration as Code" subgroup="Transactions" />
     public TransactionBuilder RemoveDataSourceAt(int index)
@@ -426,7 +429,7 @@ public partial class TransactionBuilder : ICloneable<TransactionBuilder>
     /// Updates the configured data source pattern stored on the current Runner transaction builder instance.
     /// </summary>
     /// <remarks>
-    /// Use this method when working with the documented Runner transaction builder API surface in code. The change is stored on the current builder instance and is consumed by later build, validation, or execution steps.
+    /// Stores settings on this builder for validation and action construction.
     /// </remarks>
     /// <qaas-docs group="Configuration as Code" subgroup="Transactions" />
     public TransactionBuilder UpdateDataSourcePattern(string existingValue, string newValue)
@@ -449,7 +452,7 @@ public partial class TransactionBuilder : ICloneable<TransactionBuilder>
     /// Removes the configured data source pattern from the current Runner transaction builder instance.
     /// </summary>
     /// <remarks>
-    /// Use this method when working with the documented Runner transaction builder API surface in code. The change is stored on the current builder instance and is consumed by later build, validation, or execution steps.
+    /// Stores settings on this builder for validation and action construction.
     /// </remarks>
     /// <qaas-docs group="Configuration as Code" subgroup="Transactions" />
     public TransactionBuilder RemoveDataSourcePattern(string dataSourcePattern)
@@ -464,7 +467,7 @@ public partial class TransactionBuilder : ICloneable<TransactionBuilder>
     /// Removes the configured data source pattern at the specified index from the current Runner transaction builder instance.
     /// </summary>
     /// <remarks>
-    /// Use this method when working with the documented Runner transaction builder API surface in code. The change is stored on the current builder instance and is consumed by later build, validation, or execution steps.
+    /// Stores settings on this builder for validation and action construction.
     /// </remarks>
     /// <qaas-docs group="Configuration as Code" subgroup="Transactions" />
     public TransactionBuilder RemoveDataSourcePatternAt(int index)
@@ -487,7 +490,7 @@ public partial class TransactionBuilder : ICloneable<TransactionBuilder>
     /// Updates the configuration currently stored on the Runner transaction builder instance.
     /// </summary>
     /// <remarks>
-    /// Use this method when working with the documented Runner transaction builder API surface in code. The change is stored on the current builder instance and is consumed by later build, validation, or execution steps.
+    /// Stores settings on this builder for validation and action construction.
     /// </remarks>
     /// <qaas-docs group="Configuration as Code" subgroup="Transactions" />
     public TransactionBuilder UpdateConfiguration(object configuration)
@@ -525,7 +528,7 @@ public partial class TransactionBuilder : ICloneable<TransactionBuilder>
     /// Sets the configuration currently stored on the Runner transaction builder instance.
     /// </summary>
     /// <remarks>
-    /// Use this method when working with the documented Runner transaction builder API surface in code. The change is stored on the current builder instance and is consumed by later build, validation, or execution steps.
+    /// Stores settings on this builder for validation and action construction.
     /// </remarks>
     /// <qaas-docs group="Configuration as Code" subgroup="Transactions" />
     public TransactionBuilder Configure(ITransactorConfig config)

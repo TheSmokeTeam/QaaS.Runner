@@ -50,15 +50,19 @@ dotnet run --project QaaS.Runner -- run test.qaas.yaml
 - **Hook discovery**: hooks must be in assemblies discoverable by Providers scanning (entry assembly + loaded assemblies + `*.dll` in the app base directory). Assembly-name priority (`QaaS.*` → `Common.*` → others) is used as a tie-breaker for hooks sharing the same simple type name; resolution prefers `FullName`/`AssemblyQualifiedName` matches before falling back to `Type.Name`.
 - **Act/Assert split** requires a shared `Storages` section in the YAML; the FileSystem path must
   be stable and identical across both runs.
-- **`IterableSerializableDataIterator`** drives parallel Transaction execution (PR #33) — data
-  iteration count and Transaction count must align; mismatches cause data-loss silently.
-- **ReportPortal reporter is passive** alongside Allure raw JSON (PR #32) — results go to both;
+- **`IterableSerializableDataIterator`** drives bounded publisher and transaction workers.
+  `Parallel.Parallelism` limits one action; chunk publishers assign one chunk
+  per operation. Consumers, probes, collectors, and mocker commands have no `Parallel` field.
+- **ReportPortal reporter is passive** alongside Allure raw JSON — results go to both;
   ReportPortal failure does not block test outcome.
 - **`${variables:x}` placeholders** are resolved by QaaS.Framework.Configurations; do not
   pre-expand them in C# code.
 - **E2ETests require live RabbitMQ** — always filter them out in unit/integration CI jobs.
 
 ## Process
+Keep user-facing docs focused on current behavior, configuration, examples and operational limits.
+Discuss development history, delivery status and validation evidence in chat.
+
 Follow the QaaS harness pipeline: plan → contract → implement → adversarial evaluation
 (rubric: Correctness/Completeness/Craft/Robustness, each ≥7/10). Write tests first (TDD).
 Conventional commits: `feat:`, `fix:`, `chore(release):`.

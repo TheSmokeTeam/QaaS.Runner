@@ -122,19 +122,19 @@ public class ConfigurationTemplateRendererTests
     }
 
     [Test]
-    public void Render_UsesStorageAliasWhenSourceConfigurationUsesLegacySectionName()
+    public void Render_UsesStoragesSectionWhenSourceConfigurationUsesStorageAlias()
     {
         var configuration = new ConfigurationBuilder()
             .AddInMemoryCollection(new Dictionary<string, string?>
             {
-                ["Storage:0:FileSystem:Path"] = "LegacyStorage"
+                ["Storage:0:FileSystem:Path"] = "AliasStorage"
             })
             .Build();
 
         var yaml = ConfigurationTemplateRenderer.Render(configuration);
 
         Assert.That(yaml, Does.Contain("Storages:"));
-        Assert.That(yaml, Does.Contain("LegacyStorage"));
+        Assert.That(yaml, Does.Contain("AliasStorage"));
     }
 
     [Test]

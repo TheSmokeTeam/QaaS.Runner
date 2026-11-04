@@ -26,7 +26,7 @@ In scope:
 - YAML loading + placeholder/reference resolution + DataAnnotations
   validation.
 - Composition of the execution graph from builders.
-- Concurrent execution with bounded parallelism per action.
+- Concurrent action execution with bounded item/chunk workers for publishers and transactions.
 - Assertion evaluation and report dispatch (Allure, ReportPortal).
 - Session-data persistence (FileSystem, S3) for the `act → assert` split.
 
@@ -111,11 +111,16 @@ Top-level: `MetaData`, `Variables`, `Links`, `Storages`, `DataSources`,
 ### 5.2 Run
 
 - `Runner.Run()` (a.k.a. `RunAndGetExitCode()`) drives the execution.
-- `SessionLogic` advances stage-by-stage; within a stage all Actions launch
-  via `Task.Run` and are awaited together.
-- Each Action iterates data via `IterableSerializableDataIterator`. With
-  `Parallel.Parallelism > 1` the iterator uses
-  `Parallel.ForEach` with a `SemaphoreSlim`-bounded body.
+- `SessionLogic` starts sessions by their outer stage and observes `RunUntilStage`
+  completion rules. Within a session, internal stages launch actions in order
+  with configured before/after delays. An internal stage does not wait for its
+  actions to complete; the session awaits all staged actions after launching
+  its stages, then runs collectors.
+- Publishers and transactions iterate data via `IterableSerializableDataIterator`.
+  When `Parallel` is configured, its degree bounds `Parallel.ForEach` workers
+  using `MaxDegreeOfParallelism` and a nonbuffering partitioner. A chunk publisher
+  assigns one chunk per worker. Omitting `Parallel` executes sequentially.
+  Consumers, probes, collectors and mocker commands have no `Parallel` field.
 - Per-item flow inside an Action: get data → serialize → send/transact via
   protocol → deserialize response → log input/output (locked) → evaluate
   Policies (may throw `StopActionException` to short-circuit).
@@ -166,8 +171,7 @@ DataAnnotations.
   launch group immediately before the first ReportPortal-enabled `run` or
   `assert` and publishes grouped launches at cleanup before execution scopes
   are disposed. `template` and `act` never build reporters.
-- Recent change: reporters are **shared** across assertions rather than
-  rebuilt per-assertion (see `06e23d1`, `4876603`, `9da3c76`).
+- Reporter instances are shared across their configured assertions.
 
 ## 8. Persistence (Storage)
 
@@ -207,15 +211,7 @@ implementations: `FileSystemStorage`, `S3Storage`. Used by:
 - Breaking YAML changes require a docs update *and* a major-version bump.
 - Internal types behind `internal` are not part of the public contract.
 
-## 12. Roadmap signals
-
-Tracked in open PRs:
-
-- Transaction parallelism (PR #33) — landing.
-- ReportPortal integration (PR #32) — adds passive reporter.
-- Builder cloning (PR #28) — `ICloneable<T>` deep-clone of builders.
-
-## 13. References
+## 12. References
 
 - Live docs: <https://docs.qaas.online/>
 - Docs source: `qaas-docs` repo, `docs/qaas/userInterfaces/runner/`.

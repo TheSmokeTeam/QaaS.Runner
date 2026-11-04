@@ -19,14 +19,10 @@ namespace QaaS.Runner;
 /// <see cref="ExecutionType" />.
 /// </summary>
 /// <remarks>
-/// The class uses a small strategy/pipeline model instead of embedding execution-type branching
-/// directly inside <see cref="Start" />. Each supported <see cref="ExecutionType" /> maps to an
+/// Each supported <see cref="ExecutionType" /> maps to an
 /// <see cref="ExecutionPlan" /> that declares:
 /// - which logic steps run, in order
 /// - how the final exit code is computed
-///
-/// This keeps orchestration open to extension while preserving the exact runtime behavior expected
-/// by the current tests and callers.
 /// </remarks>
 public class Execution : BaseExecution
 {
