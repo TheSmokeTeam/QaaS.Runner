@@ -581,7 +581,8 @@ public partial class PublisherBuilder
                         Serialize?.Serializer,
                         DataSourcePatterns,
                         DataSourceNames,
-                        context.Logger
+                        context.Logger,
+                        Chunk.MaxBytes
                     )
                 : null;
         }
