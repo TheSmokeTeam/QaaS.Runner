@@ -60,6 +60,9 @@ dotnet run --project QaaS.Runner -- run test.qaas.yaml
 - **E2ETests require live RabbitMQ** — always filter them out in unit/integration CI jobs.
 
 ## Process
+Keep user-facing docs focused on current behavior, configuration, examples and operational limits.
+Discuss development history, delivery status and validation evidence in chat.
+
 Follow the QaaS harness pipeline: plan → contract → implement → adversarial evaluation
 (rubric: Correctness/Completeness/Craft/Robustness, each ≥7/10). Write tests first (TDD).
 Conventional commits: `feat:`, `fix:`, `chore(release):`.
