@@ -246,17 +246,14 @@ public class Session : ISession
             var action = actionTask.Result?.Item1;
             if (internalCommunicationData?.Input != null)
             {
-                // InternalCommunicationData now inherits CommunicationData for the input side.
-                // Reusing the same object here preserves the exact input payload and serialization
-                // metadata captured by the action instead of rebuilding a second wrapper around it.
-                // Clone only to stamp the session-facing action name, which is an init-only property
-                // on the public CommunicationData contract.
+                // Clone the input communication record with its session-facing action name.
+                // The clone contains the payload and serialization metadata captured by the action.
                 sessionData.Inputs.Add(internalCommunicationData with { Name = action!.Name });
             }
 
             if (internalCommunicationData?.Output != null)
             {
-                // Outputs still live on a dedicated property because an action can capture input and
+                // Outputs use a dedicated property because an action can capture input and
                 // output in the same internal result object. Materialize a separate public
                 // CommunicationData instance here so SessionData.Outputs remains an isolated view.
                 var serializationType = internalCommunicationData.OutputSerializationType;

@@ -81,7 +81,8 @@ public class Transaction : StagedAction
             dataSourceNames,
             logger,
             false
-        ) { }
+        )
+    { }
 
     internal Transaction(
         string name,
@@ -251,8 +252,8 @@ public class Transaction : StagedAction
         var indexedDataToTransact = _iterableSerializableSaveIterator
             .IterateEnumerable()
             .Select((data, pairIndex) => (data, pairIndex));
-        // Materialize only for parallel so workers can safely index into IteratedData;
-        // sequential mode stays streaming to preserve the original lazy-generator behavior.
+        // Parallel execution materializes input before workers index into IteratedData.
+        // Sequential execution enumerates the input lazily.
         if (_parallelism != null)
             indexedDataToTransact = indexedDataToTransact.ToList();
 

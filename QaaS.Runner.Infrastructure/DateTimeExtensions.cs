@@ -1,13 +1,13 @@
 ﻿namespace QaaS.Runner.Infrastructure;
 
 /// <summary>
-/// Legacy date and time conversion helpers that preserve the runner's historical daylight-saving behavior.
+/// Date and time conversion helpers using summer-time offsets and daylight-saving resolution.
 /// </summary>
 public static class DateTimeExtensions
 {
     /// <summary>
-     /// Converts a local wall-clock value into UTC using a summer-time offset and optional DST override.
-     /// </summary>
+    /// Converts a local wall-clock value into UTC using a summer-time offset and optional DST override.
+    /// </summary>
     /// <param name="timeToConvertToUtc"> the datetime to convert to utc </param>
     /// <param name="insertionTimeTimeZoneOffsetSummerTime">
     ///     The timezone offset during summer time

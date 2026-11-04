@@ -35,7 +35,7 @@ internal static class ByteBoundedChunks
                 throw new InvalidOperationException(
                     $"One serialized message body ({size} bytes) exceeds Chunk.MaxBytes ({limit})."
                 );
-            if (chunk.Count > 0 && (chunk.Count == count || size > limit - bytes))
+            if (chunk.Count > 0 && size > limit - bytes)
             {
                 yield return chunk.ToArray();
                 chunk.Clear();
@@ -43,6 +43,12 @@ internal static class ByteBoundedChunks
             }
             chunk.Add(item);
             bytes += size;
+            if (chunk.Count == count)
+            {
+                yield return chunk.ToArray();
+                chunk.Clear();
+                bytes = 0;
+            }
         }
         if (chunk.Count > 0)
             yield return chunk.ToArray();

@@ -3,7 +3,7 @@ using QaaS.Framework.SDK.Session.SessionDataObjects;
 namespace QaaS.Runner.Assertions;
 
 /// <summary>
-/// Provides deterministic action-failure projections for assertions and reporters, including restored legacy data.
+/// Provides deterministic action-failure projections for assertions and reporters, including data restored from storage.
 /// </summary>
 internal static class ActionFailureNormalizer
 {

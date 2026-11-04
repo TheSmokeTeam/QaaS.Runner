@@ -95,8 +95,8 @@ public class AllureReporterTests
             && steps.ValueKind == JsonValueKind.Array
         )
             foreach (var step in steps.EnumerateArray())
-            foreach (var attachment in GetAttachments(step))
-                yield return attachment;
+                foreach (var attachment in GetAttachments(step))
+                    yield return attachment;
     }
 
     private static IEnumerable<string> GetAttachmentSources(JsonElement executableItem)
@@ -667,7 +667,7 @@ public class AllureReporterTests
     }
 
     [Test]
-    public void WriteTestResults_WithSessionArtifacts_PreservesLegacyCopiesAndUsesAllureCompatibleSources()
+    public void WriteTestResults_WithSessionArtifacts_WritesArtifactDirectoriesAndAllureCompatibleSources()
     {
         Reporter!.SaveSessionData = true;
         Reporter.SaveTemplate = true;
@@ -761,7 +761,7 @@ public class AllureReporterTests
     }
 
     [Test]
-    public void WriteTestResults_WithCustomAttachments_PreservesLegacyCopyAndUsesAllureCompatibleSource()
+    public void WriteTestResults_WithCustomAttachments_WritesAttachmentDirectoryAndAllureCompatibleSource()
     {
         Reporter!.SaveSessionData = false;
         Reporter.SaveTemplate = false;
@@ -871,9 +871,9 @@ public class AllureReporterTests
             "*-attachment.json",
             SearchOption.TopDirectoryOnly
         );
-        var legacyRoot = Path.Combine(AllureResultsFolder, "AssertionsAttachments");
-        var legacyFiles = Directory.Exists(legacyRoot)
-            ? Directory.GetFiles(legacyRoot, "*.json", SearchOption.AllDirectories)
+        var attachmentDirectory = Path.Combine(AllureResultsFolder, "AssertionsAttachments");
+        var directoryAttachments = Directory.Exists(attachmentDirectory)
+            ? Directory.GetFiles(attachmentDirectory, "*.json", SearchOption.AllDirectories)
             : [];
 
         Assert.Multiple(() =>
@@ -882,7 +882,7 @@ public class AllureReporterTests
             Assert.That(attachmentSources, Has.Count.EqualTo(attachmentCount));
             Assert.That(attachmentSources.Distinct().Count(), Is.EqualTo(attachmentCount));
             Assert.That(portableFiles, Has.Length.EqualTo(attachmentCount));
-            Assert.That(legacyFiles, Has.Length.EqualTo(attachmentCount));
+            Assert.That(directoryAttachments, Has.Length.EqualTo(attachmentCount));
             AssertAllureAttachmentSourceContract(attachmentSources);
             Assert.That(
                 attachments.Select(attachment =>
@@ -907,7 +907,7 @@ public class AllureReporterTests
                     )
                 );
                 Assert.That(
-                    legacyFiles,
+                    directoryAttachments,
                     Has.Some.Matches<string>(path =>
                         File.ReadAllText(path).Contains($"\"Index\":{index}")
                     )
@@ -1017,7 +1017,7 @@ public class AllureReporterTests
         var portableAttachment = Directory
             .GetFiles(AllureResultsFolder, "*-attachment.json", SearchOption.TopDirectoryOnly)
             .Single();
-        var legacyAttachment = Directory
+        var directoryAttachment = Directory
             .GetFiles(
                 Path.Combine(AllureResultsFolder, "AssertionsAttachments"),
                 "payload.json",
@@ -1032,8 +1032,8 @@ public class AllureReporterTests
             Assert.That(attachmentSources.Distinct().Count(), Is.EqualTo(1));
             Assert.That(File.ReadAllText(portableAttachment), Does.Contain("\"Value\":1"));
             Assert.That(File.ReadAllText(portableAttachment), Does.Not.Contain("\"Value\":2"));
-            Assert.That(File.ReadAllText(legacyAttachment), Does.Contain("\"Value\":1"));
-            Assert.That(File.ReadAllText(legacyAttachment), Does.Not.Contain("\"Value\":2"));
+            Assert.That(File.ReadAllText(directoryAttachment), Does.Contain("\"Value\":1"));
+            Assert.That(File.ReadAllText(directoryAttachment), Does.Not.Contain("\"Value\":2"));
         });
     }
 

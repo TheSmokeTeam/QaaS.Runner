@@ -13,7 +13,7 @@ using ReportPortalLogLevel = ReportPortal.Client.Abstractions.Models.LogLevel;
 namespace QaaS.Runner.Assertions.Reporters.ReportPortal;
 
 /// <summary>
-/// Publishes QaaS runner assertion results into ReportPortal while preserving the existing Allure writer. Publishing is
+/// Publishes QaaS runner assertion results into ReportPortal independently of the Allure writer. Publishing is
 /// best-effort: failures are logged as errors and never change the runner exit code.
 /// </summary>
 public class ReportPortalReporter : BaseReporter
@@ -37,7 +37,7 @@ public class ReportPortalReporter : BaseReporter
             { AssertionSeverity.Critical, "critical" },
             { AssertionSeverity.Blocker, "blocker" }
         };
-    
+
     private readonly ConcurrentQueue<AssertionResult> _queuedResults = new();
     public required ReportPortalConfig Config { get; init; }
     public bool? SaveTerminalOutput { get; init; } = true;

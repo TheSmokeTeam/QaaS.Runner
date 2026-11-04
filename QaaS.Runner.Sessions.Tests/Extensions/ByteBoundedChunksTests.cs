@@ -36,7 +36,15 @@ public class ByteBoundedChunksTests
     }
 
     [Test]
-    public void UnconfiguredLimit_PreservesCountOnlyBehavior()
+    public void FullCountChunk_IsReturnedBeforeAdvancingTheSource()
+    {
+        var first = ByteBoundedChunks.Create(Bodies(new byte[1], new byte[2]), 1, 1).First();
+        Assert.That(first, Has.Length.EqualTo(1));
+        Assert.That(first[0].Serialized.Body, Is.EqualTo(new byte[1]));
+    }
+
+    [Test]
+    public void UnconfiguredLimit_UsesCountOnlyChunks()
     {
         Assert.That(
             ByteBoundedChunks

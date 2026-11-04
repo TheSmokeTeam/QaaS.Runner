@@ -64,7 +64,7 @@ public sealed class IterableSerializableDataIterator
 
     /// <summary>
     /// Apply work with a bounded number of workers and no speculative input buffering.
-    /// The three-argument overload remains available for existing callers.
+    /// The three-argument overload uses Environment.ProcessorCount as its worker limit.
     /// </summary>
     public void ApplyToAll<TData>(
         IEnumerable<TData>? iterator,

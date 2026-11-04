@@ -313,7 +313,7 @@ public class ConsumerBuilderTests
     }
 
     [Test]
-    public void Configure_With_RabbitMqReaderConfig_DefaultValues_PreservesBackwardCompatibility()
+    public void Configure_With_RabbitMqReaderConfig_DefaultValues_SetsQueueDefaults()
     {
         // Arrange
         var config = new RabbitMqReaderConfig();

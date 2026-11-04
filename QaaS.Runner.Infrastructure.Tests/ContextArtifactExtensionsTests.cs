@@ -46,12 +46,12 @@ public class ContextArtifactExtensionsTests
     }
 
     [Test]
-    public void GetRenderedConfigurationTemplate_FallsBackToLegacyUnscopedValue()
+    public void GetRenderedConfigurationTemplate_FallsBackToUnscopedValue()
     {
         var context = CreateContext(new Dictionary<string, object?>(), "exec-a", "case-a");
-        context.InsertValueIntoGlobalDictionary(["__RunnerArtifacts", "RenderedTemplate"], "legacy-template");
+        context.InsertValueIntoGlobalDictionary(["__RunnerArtifacts", "RenderedTemplate"], "unscoped-template");
 
-        Assert.That(context.GetRenderedConfigurationTemplate(), Is.EqualTo("legacy-template"));
+        Assert.That(context.GetRenderedConfigurationTemplate(), Is.EqualTo("unscoped-template"));
     }
 
     [Test]
@@ -91,17 +91,17 @@ public class ContextArtifactExtensionsTests
     }
 
     [Test]
-    public void GetSessionLog_FallsBackToLegacyUnscopedStore()
+    public void GetSessionLog_FallsBackToUnscopedStore()
     {
         var context = CreateContext(new Dictionary<string, object?>(), "exec-a", "case-a");
         context.InsertValueIntoGlobalDictionary(
             ["__RunnerArtifacts", "SessionLogs"],
             new ConcurrentDictionary<string, ConcurrentQueue<string>>(StringComparer.Ordinal)
             {
-                ["legacy-session"] = new ConcurrentQueue<string>(["legacy-line"])
+                ["unscoped-session"] = new ConcurrentQueue<string>(["unscoped-line"])
             });
 
-        Assert.That(context.GetSessionLog("legacy-session"), Does.Contain("legacy-line"));
+        Assert.That(context.GetSessionLog("unscoped-session"), Does.Contain("unscoped-line"));
     }
 
     [Test]

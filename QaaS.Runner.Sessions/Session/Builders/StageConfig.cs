@@ -11,9 +11,8 @@ public class StageConfig
     /// Creates an empty stage configuration for configuration binding scenarios.
     /// </summary>
     /// <remarks>
-    /// The runner binds YAML and configuration objects through reflection-based construction. A
-    /// parameterless constructor keeps that binding path compatible without changing the public API
-    /// used by existing callers that already construct stages with explicit values.
+    /// The runner uses the parameterless constructor when binding YAML and configuration objects
+    /// through reflection. The other constructor accepts an explicit stage number and delays.
     /// </remarks>
     public StageConfig()
     {
@@ -33,6 +32,6 @@ public class StageConfig
     public int StageNumber { get; internal set; }
     [Description("Optional time in milliseconds to wait before starting this internal session stage.")]
     public int? TimeoutBefore { get; internal set; }
-    [Description("Optional time in milliseconds to wait after this internal session stage completes.")]
+    [Description("Optional time in milliseconds to wait after launching this internal session stage's actions. This delay does not wait for those actions to complete.")]
     public int? TimeoutAfter { get; internal set; }
 }

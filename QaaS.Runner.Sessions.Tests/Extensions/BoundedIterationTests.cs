@@ -51,6 +51,32 @@ public class BoundedIterationTests
     }
 
     [Test]
+    public void ConcurrentPolicyStop_DoesNotHideTransportFailure()
+    {
+        using var callbacks = new Barrier(2);
+        var iterator = new IterableSerializableDataIterator(null, null);
+        var error = Assert.Throws<AggregateException>(() =>
+            iterator.ApplyToAll(
+                new[] { 0, 1 },
+                item =>
+                {
+                    if (!callbacks.SignalAndWait(TimeSpan.FromSeconds(10)))
+                        throw new TimeoutException("The parallel callbacks did not both start.");
+                    if (item == 0)
+                        throw new StopActionException("done");
+                    throw new IOException("transport failed");
+                },
+                true,
+                2
+            )
+        );
+        Assert.That(
+            error!.Flatten().InnerExceptions.Select(exception => exception.GetType()),
+            Is.EquivalentTo(new[] { typeof(StopActionException), typeof(IOException) })
+        );
+    }
+
+    [Test]
     public void PolicyStop_IsNormalControlFlow_ButTransportFailuresAreNotSwallowed()
     {
         var iterator = new IterableSerializableDataIterator(null, null);
