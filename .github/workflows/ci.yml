@@ -13,7 +13,7 @@ concurrency:
   cancel-in-progress: true
 
 permissions:
-  contents: write
+  contents: read
 
 env:
   DOTNET_NOLOGO: true
@@ -31,32 +31,56 @@ env:
 jobs:
   build-test-deploy:
     permissions:
-      contents: write
-      id-token: write
-    name: Build, Test & Deploy
+      contents: read
+    outputs:
+      is_stable_tag: ${{ steps.stable_tag.outputs.is_stable_tag }}
+    name: Build, Test & Pack
     runs-on: windows-latest
     steps:
       - name: Checkout
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
+          persist-credentials: false
+
+      - name: Install Python for workflow security tests
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Test publishing security boundaries
+        shell: pwsh
+        run: |
+          python -m pip install PyYAML==6.0.3
+          if ($LASTEXITCODE -ne 0) { throw 'Unable to install workflow test dependency.' }
+          python .github/tests/test_publish_security.py
+          if ($LASTEXITCODE -ne 0) { throw 'Publishing security tests failed.' }
 
       - name: Install dotnet
         uses: actions/setup-dotnet@v4
         with:
           dotnet-version: 10.0.x
 
-      - name: Detect tag
+      - name: Validate release tag
         id: stable_tag
         shell: bash
         run: |
-          if [[ "${GITHUB_REF}" == refs/tags/* ]]; then
-            echo "is_stable_tag=true" >> "$GITHUB_OUTPUT"
-            echo "tag=${GITHUB_REF#refs/tags/}" >> "$GITHUB_OUTPUT"
-          else
-            echo "is_stable_tag=false" >> "$GITHUB_OUTPUT"
+          set -euo pipefail
+          echo "is_stable_tag=false" >> "$GITHUB_OUTPUT"
+          if [[ "$GITHUB_EVENT_NAME" != push || "$GITHUB_REF" != refs/tags/* ]]; then
+            exit 0
           fi
-
+          tag="${GITHUB_REF#refs/tags/}"
+          if [[ ! "$tag" =~ ^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$ ]]; then
+            echo "Release tags must use X.Y.Z without leading zeros." >&2
+            exit 1
+          fi
+          release_commit=$(git rev-parse --verify "refs/tags/${tag}^{commit}")
+          test "$release_commit" = "$(git rev-parse HEAD)"
+          test "$release_commit" = "$(git rev-parse "${GITHUB_SHA}^{commit}")"
+          git merge-base --is-ancestor "$release_commit" origin/master
+          echo "is_stable_tag=true" >> "$GITHUB_OUTPUT"
+          echo "tag=$tag" >> "$GITHUB_OUTPUT"
 
       - name: Install coverage tools
         shell: pwsh
@@ -307,16 +331,14 @@ jobs:
             Copy-Item $packageFile.FullName $versionDirectory -Force
           }
 
-      - name: Authenticate to NuGet
-        if: steps.stable_tag.outputs.is_stable_tag == 'true' || github.event_name == 'workflow_dispatch'
-        uses: NuGet/login@8d196754b4036150537f80ac539e15c2f1028841 # v1.2.0
-        id: nuget_login
-        with:
-          user: Smoke
-
-      - name: Push package
+      - name: Upload tested packages
         if: steps.stable_tag.outputs.is_stable_tag == 'true'
-        run: dotnet nuget push ${{ env.PACKAGE_OUTPUT_DIRECTORY }}\*.nupkg -k ${{ steps.nuget_login.outputs.NUGET_API_KEY }} -s https://api.nuget.org/v3/index.json --skip-duplicate
+        uses: actions/upload-artifact@v4
+        with:
+          name: nuget-packages
+          path: ${{ env.PACKAGE_OUTPUT_DIRECTORY }}/*.nupkg
+          if-no-files-found: error
+          retention-days: 7
 
       - name: Write restored packages metadata
         if: steps.stable_tag.outputs.is_stable_tag == 'true'
@@ -340,3 +362,43 @@ jobs:
           path: ${{ env.RESTORED_PACKAGES_PATH }}
           if-no-files-found: error
           retention-days: 7
+
+  publish:
+    name: Publish tested packages
+    needs: build-test-deploy
+    if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/') && needs.build-test-deploy.outputs.is_stable_tag == 'true'
+    runs-on: windows-latest
+    environment: nuget-release
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      # No checkout, restore, build, or repository scripts in this job.
+      - name: Install dotnet
+        uses: actions/setup-dotnet@v5
+        with:
+          dotnet-version: 10.0.x
+
+      - name: Download tested packages from this run
+        uses: actions/download-artifact@v4
+        with:
+          name: nuget-packages
+          path: ${{ runner.temp }}/nuget-packages
+
+      - name: Authenticate to NuGet
+        uses: NuGet/login@8d196754b4036150537f80ac539e15c2f1028841 # v1.2.0
+        id: nuget_login
+        with:
+          user: Smoke
+
+      - name: Push packages
+        shell: pwsh
+        env:
+          NUGET_API_KEY: ${{ steps.nuget_login.outputs.NUGET_API_KEY }}
+        run: |
+          $packages = @(Get-ChildItem "${{ runner.temp }}/nuget-packages" -Filter '*.nupkg' -File)
+          if ($packages.Count -eq 0) { throw 'No tested NuGet packages found.' }
+          foreach ($package in $packages) {
+            dotnet nuget push $package.FullName --api-key $env:NUGET_API_KEY --source https://api.nuget.org/v3/index.json --skip-duplicate
+            if ($LASTEXITCODE -ne 0) { throw "NuGet push failed for '$($package.Name)'." }
+          }
