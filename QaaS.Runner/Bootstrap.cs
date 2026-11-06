@@ -392,7 +392,7 @@ public static class Bootstrap
         return containerBuilder.Build();
     }
 
-    private static TRunner CreateDefaultRunner<TRunner>(
+    internal static TRunner CreateDefaultRunner<TRunner>(
         ILogger? logger = null,
         Serilog.ILogger? serilogLogger = null,
         bool? ownsSerilogLogger = null)

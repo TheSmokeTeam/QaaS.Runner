@@ -683,6 +683,11 @@ public class ExecutionBuilder()
     }
 
     /// <summary>
+    /// Gets the configured case name applied by SetCase.
+    /// </summary>
+    public string? CaseName => _configuredCaseName;
+
+    /// <summary>
     /// Sets the execution identifier stored on the built context.
     /// </summary>
     /// <remarks>
