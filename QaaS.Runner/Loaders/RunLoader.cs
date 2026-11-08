@@ -102,7 +102,9 @@ public class RunLoader<TRunner, TOptions> : BaseLoader<TOptions, TRunner>
 
     private List<InternalContext> GetContextsWithFileSystemCases(string? executionId, string casesDirectoryPath)
     {
-        var resolvedCasesDirectoryPath = ResolveLocalPath(casesDirectoryPath);
+        var normalizedCasesDirectoryPath = NormalizeDirectorySeparators(
+            casesDirectoryPath, Path.DirectorySeparatorChar);
+        var resolvedCasesDirectoryPath = ResolveLocalPath(normalizedCasesDirectoryPath);
         if (!_fileSystem.Directory.Exists(resolvedCasesDirectoryPath))
             throw new DirectoryNotFoundException(RunnerDiagnosticMessageFormatter.Format(
                 "Cases root directory was not found.",
@@ -134,16 +136,24 @@ public class RunLoader<TRunner, TOptions> : BaseLoader<TOptions, TRunner>
         else
         {
             // Load contexts in different ways depending on if the Cases are http based or file based
-            contexts = PathUtils.IsPathHttpUrl(Options.CasesRootDirectory)
+            var casesRootIsHttp = PathUtils.IsPathHttpUrl(Options.CasesRootDirectory);
+            var normalizeCaseNameSeparators = !casesRootIsHttp;
+            contexts = casesRootIsHttp
                 ? GetContextsWithJfrogArtifactoryCases(ExecutionId, Options.CasesRootDirectory)
                 : GetContextsWithFileSystemCases(ExecutionId, Options.CasesRootDirectory);
-            contexts = FilterIgnoredCases(contexts).ToList();
+            contexts = FilterIgnoredCases(contexts, normalizeCaseNameSeparators).ToList();
 
             // If casesNamesToRun is 0 all cases would run.
             if (Options.CasesNamesToRun.Count <= 0) return contexts;
 
-            var notFoundGivenCases =
-                Options.CasesNamesToRun.Except(contexts.Select(context => context.CaseName!)).ToList();
+            var discoveredCaseNames = contexts
+                .Select(context => GetCaseNameComparisonKey(context.CaseName!, normalizeCaseNameSeparators))
+                .ToHashSet(StringComparer.Ordinal);
+            var notFoundGivenCases = Options.CasesNamesToRun
+                .Where(caseName =>
+                    !discoveredCaseNames.Contains(GetCaseNameComparisonKey(caseName, normalizeCaseNameSeparators)))
+                .Distinct(StringComparer.Ordinal)
+                .ToList();
             if (notFoundGivenCases.Count > 0)
                 throw new InvalidOperationException(RunnerDiagnosticMessageFormatter.Format(
                     "The test-cases-to-run filter contains case names that were not discovered.",
@@ -158,15 +168,24 @@ public class RunLoader<TRunner, TOptions> : BaseLoader<TOptions, TRunner>
                         "Update the test-cases-to-run values or the cases directory contents and retry."
                     ]));
 
-            contexts = contexts.Where(context => Options.CasesNamesToRun.Contains(context.CaseName!)).ToList();
+            var requestedCaseNames = Options.CasesNamesToRun
+                .Select(caseName => GetCaseNameComparisonKey(caseName, normalizeCaseNameSeparators))
+                .ToHashSet(StringComparer.Ordinal);
+            contexts = contexts
+                .Where(context => requestedCaseNames.Contains(
+                    GetCaseNameComparisonKey(context.CaseName!, normalizeCaseNameSeparators)))
+                .ToList();
         }
 
         return contexts;
     }
 
-    private IEnumerable<InternalContext> FilterIgnoredCases(IEnumerable<InternalContext> contexts)
+    private IEnumerable<InternalContext> FilterIgnoredCases(IEnumerable<InternalContext> contexts,
+        bool normalizeCaseNameSeparators)
     {
-        var ignoredCaseNames = new HashSet<string>(Options.CasesNamesToIgnore ?? [], StringComparer.Ordinal);
+        var ignoredCaseNames = (Options.CasesNamesToIgnore ?? [])
+            .Select(caseName => GetCaseNameComparisonKey(caseName, normalizeCaseNameSeparators))
+            .ToHashSet(StringComparer.Ordinal);
         var ignoredCasePatterns = (Options.CasesNamePatternsToIgnore ?? [])
             .Select(pattern => new Regex(pattern, RegexOptions.Compiled))
             .ToArray();
@@ -178,13 +197,24 @@ public class RunLoader<TRunner, TOptions> : BaseLoader<TOptions, TRunner>
                 return true;
             }
 
-            if (ignoredCaseNames.Contains(context.CaseName))
+            if (ignoredCaseNames.Contains(
+                    GetCaseNameComparisonKey(context.CaseName, normalizeCaseNameSeparators)))
             {
                 return false;
             }
 
             return ignoredCasePatterns.All(pattern => !pattern.IsMatch(context.CaseName));
         });
+    }
+
+    private static string NormalizeDirectorySeparators(string value, char separator)
+    {
+        return value.Replace('/', separator).Replace('\\', separator);
+    }
+
+    private static string GetCaseNameComparisonKey(string caseName, bool normalizeSeparators)
+    {
+        return normalizeSeparators ? NormalizeDirectorySeparators(caseName, '/') : caseName;
     }
 
     private ExecutionBuilder LoadContextToExecutionBuilder(InternalContext context)
