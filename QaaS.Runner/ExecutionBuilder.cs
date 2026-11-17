@@ -160,7 +160,20 @@ public class ExecutionBuilder()
     )]
     public ReporterBuilder? Reporters { get; internal set; } = new();
 
-    private ExecutionType Type { get; set; }
+    /// <summary>
+    /// Gets the execution type configured for this builder.
+    /// </summary>
+    public ExecutionType Type { get; internal set; }
+
+    /// <summary>
+    /// Gets whether this builder was loaded from a configuration context.
+    /// </summary>
+    public bool HasLoadedContext => LoadedContext;
+
+    /// <summary>
+    /// Gets the root configuration loaded from context, if available.
+    /// </summary>
+    public IConfiguration? RootConfiguration => LoadedContext ? Context.RootConfiguration : null;
 
     private bool LoadedContext { get; }
 

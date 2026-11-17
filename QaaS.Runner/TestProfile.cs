@@ -1,10 +1,9 @@
 using System;
 using System.Collections.Generic;
-using System.IO;
 using System.Linq;
-using System.Net.Http;
 using Microsoft.Extensions.Configuration;
-using QaaS.Framework.Configurations.ConfigurationBuilderExtensions;
+using QaaS.Framework.Executions;
+using QaaS.Framework.SDK.ExecutionObjects;
 using QaaS.Runner.Cases;
 
 namespace QaaS.Runner;
@@ -16,13 +15,12 @@ namespace QaaS.Runner;
 /// </summary>
 public abstract class TestProfile
 {
-    private static readonly HttpClient HttpClient = new();
-
     private Runner? _runner;
     private IConfiguration? _variables;
     private ExecutionBuilder? _baseExecutionBuilder;
     private readonly object _initLock = new();
     private bool _isInitialized;
+    private bool _hasExecuted;
 
     /// <summary>
     /// Gets or sets the underlying QaaS Runner instance for this profile.
@@ -104,12 +102,6 @@ public abstract class TestProfile
     protected virtual string[] ProfileSpecificYamlFiles => Array.Empty<string>();
 
     /// <summary>
-    /// Common base path for remote Artifactory YAML modules.
-    /// </summary>
-    protected const string ModulesBasePath =
-        "https://8200artifactory.d8200.mil/artifactory/general-7140/qaas-modules/Crawler.Common.Modules/qaas4/latest";
-
-    /// <summary>
     /// Initializes a new instance of the <see cref="TestProfile"/> class.
     /// </summary>
     /// <param name="testEnv">The target test environment (e.g., local, k8s, dev).</param>
@@ -131,48 +123,66 @@ public abstract class TestProfile
         lock (_initLock)
         {
             if (_isInitialized) return;
-            Initialize();
             _isInitialized = true;
+            Initialize();
         }
     }
 
     private void Initialize()
     {
-        var runnerInitArgs = SetupRunnerInitArgs(_customCommandKeyword);
-
-        if (runnerInitArgs.Length > 0)
+        var isFileless = false;
+        if (_runner == null)
         {
-            _runner = Bootstrap.New(runnerInitArgs);
-        }
-        else
-        {
-            _runner = Bootstrap.CreateDefaultRunner<Runner>();
-        }
-
-        _runner.ExitProcessOnCompletion = false;
-
-        if (_runner.ExecutionBuilders.Count > 0)
-        {
-            _baseExecutionBuilder = _runner.ExecutionBuilders.First();
-            _runner.ExecutionBuilders.RemoveAt(0);
-        }
-        else
-        {
-            _baseExecutionBuilder = new ExecutionBuilder();
+            var runnerInitArgs = SetupRunnerInitArgs(_customCommandKeyword);
+            if (runnerInitArgs.Length > 0)
+            {
+                _runner = Bootstrap.New(runnerInitArgs);
+            }
+            else
+            {
+                isFileless = true;
+                _runner = Bootstrap.CreateDefaultRunner<Runner>();
+            }
+            _runner.ExitProcessOnCompletion = false;
         }
 
-        _variables = BuildVariablesConfiguration();
+        if (_baseExecutionBuilder == null)
+        {
+            _baseExecutionBuilder = _runner.ExtractBaseBuilder();
+            if (isFileless)
+            {
+                var executionType = _customCommandKeyword.ToLowerInvariant() switch
+                {
+                    "act" => ExecutionType.Act,
+                    "assert" => ExecutionType.Assert,
+                    "template" => ExecutionType.Template,
+                    _ => ExecutionType.Run
+                };
+                _baseExecutionBuilder.ExecutionType(executionType);
+            }
+        }
+
+        if (_variables == null)
+        {
+            _variables = BuildVariablesConfiguration();
+        }
     }
 
     /// <summary>
-    /// Executes the full profile lifecycle:
+    /// Executes the full profile lifecycle and returns the resulting exit code:
     /// 1. Applies BaseCase if enabled.
     /// 2. Applies profile-specific baseline modifications.
     /// 3. Clones and expands TestCases with their logical names.
     /// 4. Runs the runner.
     /// </summary>
-    public virtual void Execute()
+    /// <returns>The process exit code produced by the runner.</returns>
+    /// <exception cref="InvalidOperationException">Thrown if called more than once on the same profile instance.</exception>
+    public virtual int Execute()
     {
+        if (_hasExecuted)
+            throw new InvalidOperationException("A TestProfile instance can only be executed once. Create a new instance for subsequent runs.");
+
+        _hasExecuted = true;
         EnsureInitialized();
 
         if (_addBaseCase && BaseCase != null)
@@ -182,7 +192,7 @@ public abstract class TestProfile
 
         SetupBaseExecutionBuilder(BaseExecutionBuilder);
         IncludeTestCases();
-        Runner.Run();
+        return Runner.RunAndGetExitCode();
     }
 
     /// <summary>
@@ -199,18 +209,18 @@ public abstract class TestProfile
     public void ApplySharedBebSetup(ExecutionBuilder builder) => SetupBaseExecutionBuilder(builder);
 
     /// <summary>
-    /// Builds the flattened variables configuration by merging VariablesYamlFiles and stripping the 'variables:' prefix.
+    /// Builds the flattened variables configuration from the runner's resolved root configuration,
+    /// stripping the 'variables:' prefix.
     /// </summary>
     protected virtual IConfiguration BuildVariablesConfiguration()
     {
-        var fullBuilder = new ConfigurationBuilder();
-        foreach (var file in VariablesYamlFiles)
+        var rootConfig = _baseExecutionBuilder?.RootConfiguration;
+        if (rootConfig == null)
         {
-            AddYamlSourceToVariables(fullBuilder, file);
+            return new ConfigurationBuilder().Build();
         }
-        var fullRoot = fullBuilder.Build();
 
-        var variablesSection = fullRoot.GetSection("variables");
+        var variablesSection = rootConfig.GetSection("variables");
         var flattened = new Dictionary<string, string?>(StringComparer.OrdinalIgnoreCase);
 
         foreach (var kv in variablesSection.AsEnumerable())
@@ -228,27 +238,6 @@ public abstract class TestProfile
         var variablesBuilder = new ConfigurationBuilder();
         variablesBuilder.AddInMemoryCollection(flattened);
         return variablesBuilder.Build();
-    }
-
-    private void AddYamlSourceToVariables(IConfigurationBuilder builder, string pathOrUrl)
-    {
-        if (Uri.TryCreate(pathOrUrl, UriKind.Absolute, out var uri) &&
-            (uri.Scheme == Uri.UriSchemeHttp || uri.Scheme == Uri.UriSchemeHttps))
-        {
-            var tmp = Path.GetTempFileName();
-            var yaml = HttpClient.GetStringAsync(uri).GetAwaiter().GetResult();
-            File.WriteAllText(tmp, yaml);
-            builder.AddYaml(tmp);
-            return;
-        }
-
-        string resolvedPath = pathOrUrl;
-        if (!Path.IsPathRooted(pathOrUrl))
-            resolvedPath = Path.Combine(Directory.GetCurrentDirectory(), pathOrUrl);
-
-        resolvedPath = Path.GetFullPath(resolvedPath);
-        if (File.Exists(resolvedPath))
-            builder.AddYaml(resolvedPath);
     }
 
     private string[] SetupRunnerInitArgs(string customCommandKeyword = "")
@@ -279,19 +268,6 @@ public abstract class TestProfile
 
     private void IncludeTestCases()
     {
-        if (TestCases.Count == 0)
-        {
-            Runner.ExecutionBuilders.Add(BaseExecutionBuilder);
-        }
-        else
-        {
-            foreach (var testCase in TestCases)
-            {
-                ExecutionBuilder caseExecutionBuilder = BaseExecutionBuilder.Clone();
-                caseExecutionBuilder.SetCase(testCase.Name);
-                testCase.ModifyCaseExecutionBuilder(caseExecutionBuilder, Variables);
-                Runner.ExecutionBuilders.Add(caseExecutionBuilder);
-            }
-        }
+        Runner.AddTestCases(BaseExecutionBuilder, Variables, TestCases.ToArray());
     }
 }
