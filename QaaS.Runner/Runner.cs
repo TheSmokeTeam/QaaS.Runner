@@ -30,6 +30,9 @@ public class Runner : IRunner, IDisposable
     private int? BootstrapHandledExitCode { get; set; }
     internal ReportPortalPublisher ReportPortalPublisher { get; set; }
     private TerminalOutputCapture? _terminalOutput;
+    private AttemptSummary? _attemptSummary;
+
+    internal void WithAttemptSummary(AttemptSummary summary) => _attemptSummary = summary;
 
     /// <summary>
     /// Controls whether <see cref="Run" /> terminates the current process after the runner finishes successfully.
@@ -100,16 +103,50 @@ public class Runner : IRunner, IDisposable
         if (BootstrapHandledExitCode.HasValue)
             return CompleteBootstrapHandledRun();
 
-        LastExitCode = null;
-        LogRunStart();
+        var summary = Interlocked.Exchange(ref _attemptSummary, null);
+        var outcome = AttemptOutcome.InfrastructureFailure;
+        int? returnedExitCode = null;
+        try
+        {
+            LastExitCode = null;
+            LogRunStart();
 
-        var lifecycleOutcome = CaptureLifecycleOutcome();
-        CompleteRun(lifecycleOutcome);
+            var lifecycleOutcome = CaptureLifecycleOutcome();
+            var observedOutcome = summary is not null && !lifecycleOutcome.HasFailure
+                ? ClassifyAttemptWithoutAffectingLifecycle(summary, lifecycleOutcome)
+                : AttemptOutcome.InfrastructureFailure;
+            CompleteRun(lifecycleOutcome);
 
-        var exitCode = lifecycleOutcome.GetRequiredExitCode();
-        LastExitCode = exitCode;
-        Logger.LogInformation("Runner completed. ExitCode={ExitCode}", exitCode);
-        return exitCode;
+            var exitCode = lifecycleOutcome.GetRequiredExitCode();
+            LastExitCode = exitCode;
+            Logger.LogInformation("Runner completed. ExitCode={ExitCode}", exitCode);
+            returnedExitCode = exitCode;
+            outcome = observedOutcome;
+            return exitCode;
+        }
+        catch (OperationCanceledException)
+        {
+            outcome = AttemptOutcome.Cancelled;
+            throw;
+        }
+        finally
+        {
+            summary?.Publish(outcome, returnedExitCode);
+        }
+    }
+
+    private static AttemptOutcome ClassifyAttemptWithoutAffectingLifecycle(
+        AttemptSummary summary, RunnerLifecycleOutcome lifecycleOutcome)
+    {
+        try
+        {
+            return summary.Classify(lifecycleOutcome.GetRequiredExitCode(), lifecycleOutcome.Executions ?? []);
+        }
+        catch (Exception)
+        {
+            // A custom execution can expose nonstandard/disposed result data. Do not replace its result.
+            return AttemptOutcome.Unknown;
+        }
     }
 
     /// <summary>
