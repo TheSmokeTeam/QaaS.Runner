@@ -1,0 +1,64 @@
+{
+  "schema_version": 1,
+  "roster_id": "independent-synthetic-roster-v1",
+  "valid_from": "2026-10-01T00:00:00Z",
+  "valid_until": "2026-12-01T00:00:00Z",
+  "teams": [
+    "payments",
+    "platform"
+  ],
+  "environments": [
+    "ci",
+    "staging"
+  ],
+  "projects": [
+    {
+      "team": "payments",
+      "environment": "ci",
+      "eligible_from": "2026-10-01T00:00:00Z",
+      "ineligible_at": null,
+      "enrolled": true,
+      "project_key": "a2e485bc9476f7968f733663ab3881ed"
+    },
+    {
+      "team": "payments",
+      "environment": "ci",
+      "eligible_from": "2026-10-01T00:00:00Z",
+      "ineligible_at": null,
+      "enrolled": true,
+      "project_key": "89b6dc3fb439088afaef751e408fa964"
+    },
+    {
+      "team": "platform",
+      "environment": "ci",
+      "eligible_from": "2026-10-01T00:00:00Z",
+      "ineligible_at": null,
+      "enrolled": true,
+      "project_key": "91a86093571c96dfa6b29cd0189cc148"
+    },
+    {
+      "team": "platform",
+      "environment": "staging",
+      "eligible_from": "2026-10-01T00:00:00Z",
+      "ineligible_at": null,
+      "enrolled": true,
+      "project_key": "c3ce539bf1913b042be83adcc16f2327"
+    },
+    {
+      "team": "platform",
+      "environment": "staging",
+      "eligible_from": "2026-11-20T16:00:00Z",
+      "ineligible_at": null,
+      "enrolled": false,
+      "project_key": "d117dff897c0ff3841241bc5a733b6f3"
+    },
+    {
+      "team": "payments",
+      "environment": "ci",
+      "eligible_from": "2026-10-01T00:00:00Z",
+      "ineligible_at": "2026-11-21T16:00:00Z",
+      "enrolled": true,
+      "project_key": "d682fd29b47a734212aca0fb04a4df0f"
+    }
+  ]
+}

@@ -1,0 +1,15 @@
+{
+  "mappings": {
+    "dynamic": "strict",
+    "properties": {
+      "schema_version": {"type": "integer"},
+      "attempt_id": {"type": "keyword"},
+      "project_key": {"type": "keyword"},
+      "operation": {"type": "keyword"},
+      "outcome": {"type": "keyword"},
+      "completed_at": {"type": "date", "format": "strict_date_optional_time"},
+      "duration_ms": {"type": "long"},
+      "exit_code": {"type": "integer"}
+    }
+  }
+}

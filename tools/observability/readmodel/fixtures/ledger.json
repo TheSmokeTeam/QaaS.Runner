@@ -1,0 +1,86 @@
+{
+  "schema_version": 1,
+  "ledger_id": "independent-synthetic-ledger-v1",
+  "valid_from": "2026-10-01T00:00:00Z",
+  "valid_until": "2026-12-01T00:00:00Z",
+  "attempts": [
+    {
+      "attempt_id": "b96c3c3ec0aec42ae55728ef34fe4b90",
+      "project_key": "a2e485bc9476f7968f733663ab3881ed",
+      "due_at": "2026-10-23T16:00:00Z",
+      "mature_at": "2026-10-23T16:00:00Z"
+    },
+    {
+      "attempt_id": "2d56ad1ecb2959b508ab562b74354c81",
+      "project_key": "a2e485bc9476f7968f733663ab3881ed",
+      "due_at": "2026-11-15T16:00:00Z",
+      "mature_at": "2026-11-15T16:00:00Z"
+    },
+    {
+      "attempt_id": "688c3b353be54754161a702578ea553d",
+      "project_key": "a2e485bc9476f7968f733663ab3881ed",
+      "due_at": "2026-11-21T15:00:00Z",
+      "mature_at": "2026-11-21T15:00:00Z"
+    },
+    {
+      "attempt_id": "7cd26341a81f349d8cd3642d23c8e90e",
+      "project_key": "a2e485bc9476f7968f733663ab3881ed",
+      "due_at": "2026-11-21T16:00:00Z",
+      "mature_at": "2026-11-21T16:00:00Z"
+    },
+    {
+      "attempt_id": "b8fb9de589cc0c2b9c7d415da36db4db",
+      "project_key": "a2e485bc9476f7968f733663ab3881ed",
+      "due_at": "2026-11-21T16:15:00Z",
+      "mature_at": "2026-11-21T16:15:00Z"
+    },
+    {
+      "attempt_id": "9a4c3cbb4517fb16c38a72a1127895c3",
+      "project_key": "89b6dc3fb439088afaef751e408fa964",
+      "due_at": "2026-11-15T15:59:59Z",
+      "mature_at": "2026-11-15T15:59:59Z"
+    },
+    {
+      "attempt_id": "0078fbcb8e0b6b515db05b5bbe04481e",
+      "project_key": "91a86093571c96dfa6b29cd0189cc148",
+      "due_at": "2026-11-01T16:00:00Z",
+      "mature_at": "2026-11-01T16:00:00Z"
+    },
+    {
+      "attempt_id": "531549f4cc679e6b002ee0e586557d8e",
+      "project_key": "91a86093571c96dfa6b29cd0189cc148",
+      "due_at": "2026-11-20T16:00:00Z",
+      "mature_at": "2026-11-20T16:00:00Z"
+    },
+    {
+      "attempt_id": "e3b740b53182a3d23c769f3dd5aa6f75",
+      "project_key": "91a86093571c96dfa6b29cd0189cc148",
+      "due_at": "2026-11-21T16:00:00Z",
+      "mature_at": "2026-11-21T16:00:00Z"
+    },
+    {
+      "attempt_id": "cfe6db2002afa59934324068eda2af47",
+      "project_key": "c3ce539bf1913b042be83adcc16f2327",
+      "due_at": "2026-11-19T16:00:00Z",
+      "mature_at": "2026-11-19T16:00:00Z"
+    },
+    {
+      "attempt_id": "0add4006b8b3cdc3bb54b3e0150582d4",
+      "project_key": "d117dff897c0ff3841241bc5a733b6f3",
+      "due_at": "2026-11-20T15:59:59Z",
+      "mature_at": "2026-11-20T15:59:59Z"
+    },
+    {
+      "attempt_id": "0ffc42da157670a8da0a63c4e1b2d86f",
+      "project_key": "d682fd29b47a734212aca0fb04a4df0f",
+      "due_at": "2026-11-20T16:00:00Z",
+      "mature_at": "2026-11-20T16:00:00Z"
+    },
+    {
+      "attempt_id": "218fb836ea8072875c89bc1275e0577e",
+      "project_key": "89b6dc3fb439088afaef751e408fa964",
+      "due_at": "2026-11-22T16:00:00Z",
+      "mature_at": "2026-11-22T16:00:00Z"
+    }
+  ]
+}

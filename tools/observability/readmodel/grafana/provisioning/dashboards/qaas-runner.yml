@@ -1,0 +1,9 @@
+apiVersion: 1
+providers:
+  - name: QaaS Runner local KPI
+    folder: QaaS Runner
+    type: file
+    disableDeletion: true
+    allowUiUpdates: false
+    options:
+      path: ${QAAS_KPI_DASHBOARD_DIR}
