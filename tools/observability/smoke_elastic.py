@@ -37,15 +37,24 @@ with tempfile.TemporaryDirectory() as temp:
     def emit(v):
         p=spool/(v['attempt_id']+'.json')
         p.write_text(json.dumps(v))
-    def run(expected=0,target=index):
-        p=subprocess.run([sys.executable,str(folder/'collect.py'),'--spool',str(spool),
-                          '--elastic',origin,'--allow-loopback-http','--index',target],
+    def run(expected=0,target=index,canary=None):
+        cmd=[sys.executable,str(folder/'collect.py'),'--spool',str(spool),
+             '--elastic',origin,'--allow-loopback-http','--index',target]
+        if canary:
+            cmd += ['--expect-attempt', canary['attempt_id'], '--expect-project-key', canary['project_key']]
+        p=subprocess.run(cmd,
                           text=True,capture_output=True)
         assert p.returncode==expected,(p.returncode,p.stdout,p.stderr)
+        if canary and expected == 1:
+            assert 'Expected Runner canary is missing' in p.stderr, p.stderr
         return json.loads(p.stdout) if p.stdout else None
 
+    assert run()['offered'] == 0
+    assert run(1, canary=case(1)) is None
     emit(case(1)); emit(case(2,'assertion_failure'))
-    a=run(); assert a['created']==2,a
+    a=run(canary=case(1)); assert a['created']==1 and a['scanned']==1,a
+    assert (spool/('2'*32+'.json')).is_file()
+    a2=run(); assert a2['created']==1,a2
     emit(case(1)); b=run(); assert b['duplicate']==1,b
     emit(case(1,duration=2)); c=run(3); assert c['conflict']==1,c
     req('PUT','/'+index+'-new',mapping)
@@ -62,5 +71,6 @@ if args.accepted_jsonl:
     with args.accepted_jsonl.open('x', encoding='utf-8') as output:
         for row in accepted:
             output.write(json.dumps(row, separators=(',', ':')) + '\n')
-print(json.dumps({'elastic':'8.15.5','created':a,'retry':b,'conflict':c,'route_change_blocked':True,
+print(json.dumps({'elastic':'8.15.5','idle_ok':True,'expected_canary_missing_fails':True,
+                  'fixture_canary_created':a,'ordinary_created':a2,'retry':b,'conflict':c,'route_change_blocked':True,
                   'accepted_read_model_query':{'total':2,'by_outcome':agg}},indent=2))

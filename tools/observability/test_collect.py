@@ -3,7 +3,7 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from collect import Collector, Deadline, Retry, identity
+from collect import Collector, Deadline, ProducerGate, Retry, identity
 
 ID = "a" * 32
 IDX = "qaas-attempts-v1-000001"
@@ -108,6 +108,40 @@ class CollectorTests(unittest.TestCase):
         with self.assertRaises(Deadline):
             self.collect(SlowReply((409,)))
         self.assertTrue(p.exists())
+
+    def test_expected_canary_missing_but_ordinary_idle_is_healthy(self):
+        other = self.write(record("d" * 32))
+        fake = Elastic()
+        with self.assertRaisesRegex(ProducerGate, "canary is missing"):
+            Collector(self.spool, IDX, fake).run(expected_attempt=ID, expected_project_key="b" * 32)
+        self.assertTrue(other.exists())
+        self.assertEqual(fake.calls, [])
+        other.unlink()
+        self.assertEqual(self.collect(fake)["offered"], 0)
+        self.assertEqual(fake.calls, [])
+
+    def test_expected_canary_rejects_wrong_project_and_accepts_only_known_file(self):
+        known = self.write(record())
+        other = self.write(record("d" * 32))
+        fake = Elastic()
+        collector = Collector(self.spool, IDX, fake)
+        with self.assertRaisesRegex(ProducerGate, "different project key"):
+            collector.run(expected_attempt=ID, expected_project_key="c" * 32)
+        self.assertTrue(known.exists())
+        self.assertEqual(fake.calls, [])
+        result = collector.run(expected_attempt=ID, expected_project_key="b" * 32)
+        self.assertEqual((result["created"], result["scanned"]), (1, 1))
+        self.assertEqual(fake.docs, [record()])
+        self.assertTrue(other.exists())
+        self.assertFalse(known.exists())
+
+    def test_expected_canary_preserves_invalid_file(self):
+        path = self.write(record(schema_version=2))
+        fake = Elastic()
+        with self.assertRaisesRegex(ProducerGate, "valid schema-v1 summary"):
+            Collector(self.spool, IDX, fake).run(expected_attempt=ID, expected_project_key="b" * 32)
+        self.assertTrue(path.exists())
+        self.assertEqual(fake.calls, [])
 
     def test_alias_is_rejected_before_send(self):
         p = self.write(record())

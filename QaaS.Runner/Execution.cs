@@ -1,6 +1,7 @@
 using Autofac;
 using Microsoft.Extensions.Logging;
 using QaaS.Framework.Executions;
+using QaaS.Framework.SDK.AssertionObjects;
 using QaaS.Framework.SDK.ContextObjects;
 using QaaS.Framework.SDK.ExecutionObjects;
 using QaaS.Framework.SDK.Hooks.Assertion;
@@ -89,6 +90,9 @@ public class Execution : BaseExecution
     internal AssertionLogic AssertionLogic { get; init; } = null!;
     internal ReportLogic ReportLogic { get; init; } = null!;
     internal TemplateLogic TemplateLogic { get; init; } = null!;
+
+    // Terminal summary classification needs statuses, not the protected execution context.
+    internal IEnumerable<IAssertionResult> AttemptAssertionResults => Context.ExecutionData.AssertionResults;
 
     /// <inheritdoc />
     public override int Start()

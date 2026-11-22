@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Collect one bounded batch of QaaS Runner attempts without involving the Runner."""
 import argparse
+from contextlib import nullcontext
 import errno
 from datetime import datetime
 import fcntl
@@ -36,6 +37,14 @@ class Deadline(Retry):
     """Pass-wide deadline; never swallowed by per-item replay handling."""
 
 
+class ProducerGate(ValueError):
+    """A deliberately expected canary did not prove the producer handoff."""
+
+
+def opaque_key(token):
+    return isinstance(token, str) and HEX.fullmatch(token) and token != "0" * 32
+
+
 def encode(value):
     return json.dumps(value, ensure_ascii=True, sort_keys=True,
                       separators=(",", ":"), allow_nan=False).encode("ascii")
@@ -59,7 +68,7 @@ def checked(value, name):
         raise ValueError("invalid summary shape")
     for key in ("attempt_id", "project_key"):
         token = value[key]
-        if not isinstance(token, str) or not HEX.fullmatch(token) or token == "0"*32:
+        if not opaque_key(token):
             raise ValueError("invalid summary identity")
     if name != value["attempt_id"] + ".json":
         raise ValueError("summary filename does not match attempt")
@@ -150,7 +159,10 @@ class Collector:
         self.spool, self.index, self.elastic = spool, index, elastic
         self.max_items, self.max_scan = max_items, max_scan
 
-    def run(self):
+    def run(self, *, expected_attempt=None, expected_project_key=None):
+        gated = expected_attempt is not None or expected_project_key is not None
+        if gated and not (opaque_key(expected_attempt) and opaque_key(expected_project_key)):
+            raise ProducerGate("Canary requires an expected attempt ID and project key of 32 lowercase hex digits, not all zero")
         info = self.spool.lstat()
         if not stat.S_ISDIR(info.st_mode) or info.st_uid != os.getuid() or info.st_mode & 0o077:
             raise ValueError("spool must be a private directory owned by the collector user")
@@ -161,7 +173,7 @@ class Collector:
                 fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
             except BlockingIOError as err:
                 raise Retry("spool already has an active collector") from err
-            return self._run()
+            return self._run(expected_attempt, expected_project_key)
 
     def _check_route(self):
         binding = self.spool / ".collect-target"
@@ -207,30 +219,41 @@ class Collector:
         path.rename(destination)  # Same filesystem, only collector writes quarantine.
         return True
 
-    def _run(self):
+    def _run(self, expected_attempt, expected_project_key):
         result = dict(scanned=0, offered=0, created=0, duplicate=0,
                       invalid=0, rejected=0, deferred=0, conflict=0)
         pending = []
-        with os.scandir(self.spool) as entries:
+        gated = expected_attempt is not None
+        candidates = (nullcontext((self.spool / (expected_attempt + ".json"),))
+                      if gated else os.scandir(self.spool))
+        with candidates as entries:
             for entry in entries:
                 result["scanned"] += 1
                 if FILENAME.fullmatch(entry.name):
-                    path = Path(entry.path)
+                    path = Path(entry)
                     try:
                         value = read_summary(path)
                     except FileNotFoundError:
+                        if gated:
+                            raise ProducerGate("Expected Runner canary is missing; verify producer support and opt-in")
                         continue
                     except (UnicodeError, ValueError, RecursionError):
+                        if gated:
+                            raise ProducerGate("Expected Runner canary is not a valid schema-v1 summary")
                         if self._quarantine(path):
                             result["invalid"] += 1
                         else:
                             result["deferred"] += 1
                     except OSError as err:
+                        if gated:
+                            raise ProducerGate("Expected Runner canary could not be read")
                         if err.errno == errno.ELOOP and self._quarantine(path):
                             result["invalid"] += 1
                         else:
                             result["deferred"] += 1
                     else:
+                        if gated and value["project_key"] != expected_project_key:
+                            raise ProducerGate("Expected Runner canary has a different project key")
                         pending.append((path, value, identity(value)))
                 if result["scanned"] == self.max_scan or len(pending) == self.max_items:
                     break
@@ -292,6 +315,8 @@ def main():
     p.add_argument("--index", required=True)
     p.add_argument("--elastic", required=True)
     p.add_argument("--allow-loopback-http", action="store_true")
+    p.add_argument("--expect-attempt", help="One-time setup gate for this independently assigned attempt ID")
+    p.add_argument("--expect-project-key", help="Expected project key for the same canary")
     p.add_argument("--max-items", type=int, default=100)
     p.add_argument("--max-scan", type=int, default=1000)
     p.add_argument("--deadline", type=int, default=30, help="Total pass deadline in seconds (1–120)")
@@ -308,10 +333,14 @@ def main():
         elastic = HttpElastic(args.elastic, allow_loopback_http=args.allow_loopback_http,
                               api_key=os.environ.get("QAAS_ELASTIC_API_KEY"))
         result = Collector(args.spool, args.index, elastic,
-                           max_items=args.max_items, max_scan=args.max_scan).run()
+                           max_items=args.max_items, max_scan=args.max_scan).run(
+                               expected_attempt=args.expect_attempt, expected_project_key=args.expect_project_key)
     except Retry as err:
         print(str(err), file=sys.stderr)
         return 2
+    except ProducerGate as err:
+        print(str(err), file=sys.stderr)
+        return 1
     except (OSError, ValueError):
         print("Collector configuration or spool I/O failed; see the collector guide", file=sys.stderr)
         return 1
