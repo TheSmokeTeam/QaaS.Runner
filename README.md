@@ -66,7 +66,7 @@ dotnet restore
 
 ## Execution observability
 
-Enable the existing Elasticsearch log sink with `--send-logs --elastic-uri <uri>` or your configured Elastic defaults. Import the [Runner usage dashboard](docs/grafana/runner-usage.json) into Grafana and select an Elasticsearch data source for `qaas-*` with time field `@timestamp`.
+Enable the existing Elasticsearch log sink with `--send-logs --elastic-uri <uri>` or your configured Elastic defaults. Import the [Runner usage dashboard](docs/grafana/runner-usage.json) into Grafana and select an Elasticsearch data source for `qaas-*` with time field `@timestamp`. The dashboard detects the `.raw` or `.keyword` exact-match fields. Use an index pattern with a consistent field mapping across the time range. [View the dashboard preview](docs/grafana/runner-usage.png).
 
 Each `run`, `act`, or `assert` execution with configured team and system metadata writes a structured start and finish at Debug level. The default Elastic sink receives these events independently of the console level. A custom logging configuration must admit Debug events. Case expansion and `execute` count each execution that starts. Help, templates, setup failures before execution, and errors during later Runner cleanup fall outside these counts.
 
