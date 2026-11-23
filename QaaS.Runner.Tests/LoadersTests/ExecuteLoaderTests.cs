@@ -2,6 +2,7 @@ using System.Reflection;
 using Microsoft.Extensions.Logging;
 using NUnit.Framework;
 using QaaS.Framework.Configurations.CustomExceptions;
+using QaaS.Framework.SDK.ContextObjects;
 using QaaS.Runner.ConfigurationObjects;
 using QaaS.Runner.Loaders;
 using QaaS.Runner.Options;
@@ -12,6 +13,12 @@ public class ExecuteLoaderTests
 {
     private static readonly MethodInfo? GetCommandsToRunMethodInfo = typeof(ExecuteLoader<Runner>).GetMethod(
         "GetCommandsToRun", BindingFlags.NonPublic | BindingFlags.Instance)!;
+
+    private static string UseOppositeDirectorySeparator(string path)
+    {
+        var oppositeSeparator = Path.DirectorySeparatorChar == '/' ? '\\' : '/';
+        return path.Replace(Path.DirectorySeparatorChar, oppositeSeparator);
+    }
 
 
     private static IEnumerable<TestCaseData> TestGetCommandsToRunCaseData()
@@ -156,6 +163,47 @@ public class ExecuteLoaderTests
         var runner = loader.GetLoadedRunner();
 
         Assert.That(runner.ExitProcessOnCompletion, Is.False);
+    }
+
+    [Test]
+    public void GetLoadedRunner_WithNestedRunUsingOppositeSeparators_LoadsCase()
+    {
+        var relativeCasesDir = Path.Combine("TestData", $"ExecuteLoaderCases-{Guid.NewGuid():N}");
+        var absoluteCasesDir = Path.Combine(Environment.CurrentDirectory, relativeCasesDir);
+        Directory.CreateDirectory(Path.Combine(absoluteCasesDir, "nested"));
+
+        var caseFile = Path.Combine(absoluteCasesDir, "nested", "case.yaml");
+        File.WriteAllText(caseFile, "Variables: {}");
+        var nativeCaseName = Path.GetRelativePath(Environment.CurrentDirectory, caseFile);
+        var executablePath = Path.Combine(Path.GetTempPath(), $"qaas-executable-{Guid.NewGuid():N}.yaml");
+        File.WriteAllText(executablePath,
+            $"""
+            Commands:
+              - Id: OppositeSeparators
+                Command: run TestData/test.qaas.yaml -c {UseOppositeDirectorySeparator(relativeCasesDir)} -n {UseOppositeDirectorySeparator(nativeCaseName)} --send-logs false
+            """);
+
+        try
+        {
+            var loader = new ExecuteLoader<Runner>(new ExecuteOptions
+            {
+                ConfigurationFile = executablePath,
+                SendLogs = false
+            });
+
+            using var runner = loader.GetLoadedRunner();
+            var executionBuilder = runner.ExecutionBuilders.Single();
+            var contextField = typeof(ExecutionBuilder).BaseType!
+                .GetField("Context", BindingFlags.Instance | BindingFlags.NonPublic)!;
+            var context = (InternalContext)contextField.GetValue(executionBuilder)!;
+
+            Assert.That(context.CaseName, Is.EqualTo(nativeCaseName));
+        }
+        finally
+        {
+            Directory.Delete(absoluteCasesDir, true);
+            File.Delete(executablePath);
+        }
     }
 
     [Test]

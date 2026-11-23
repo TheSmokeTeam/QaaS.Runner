@@ -109,6 +109,12 @@ namespace QaaS.Runner.Tests.LoadersTests
             return Path.Combine("TestData", $"{name}-{Guid.NewGuid():N}");
         }
 
+        private static string UseOppositeDirectorySeparator(string path)
+        {
+            var oppositeSeparator = Path.DirectorySeparatorChar == '/' ? '\\' : '/';
+            return path.Replace(Path.DirectorySeparatorChar, oppositeSeparator);
+        }
+
         private static string? NormalizeCasePath(string? path)
         {
             return path?.Replace('\\', '/');
@@ -446,6 +452,110 @@ namespace QaaS.Runner.Tests.LoadersTests
         }
 
         [Test]
+        public void GetLoadedContexts_WithOppositeSeparatorInCasesRootDirectory_LoadsCases()
+        {
+            var relativeCasesDir = CreateRelativeTestDataDirectory("RunLoaderOppositeRoot");
+            var absoluteCasesDir = Path.Combine(Environment.CurrentDirectory, relativeCasesDir);
+            Directory.CreateDirectory(Path.Combine(absoluteCasesDir, "nested"));
+
+            var caseFile = Path.Combine(absoluteCasesDir, "nested", "case.yaml");
+            File.WriteAllText(caseFile, "content");
+
+            try
+            {
+                var options = new RunOptions
+                {
+                    ConfigurationFile = "test.yaml",
+                    SendLogs = false,
+                    CasesRootDirectory = UseOppositeDirectorySeparator(relativeCasesDir)
+                };
+
+                var loader = new TestRunLoader(options, "exec-opposite-root");
+                var contexts =
+                    ((IEnumerable<InternalContext>)GetLoadedContextsMethodInfo.Invoke(loader, null)!).ToList();
+
+                Assert.That(contexts, Has.Count.EqualTo(1));
+                Assert.That(contexts[0].CaseName,
+                    Is.EqualTo(Path.GetRelativePath(Environment.CurrentDirectory, caseFile)));
+            }
+            finally
+            {
+                Directory.Delete(absoluteCasesDir, true);
+            }
+        }
+
+        [Test]
+        public void GetLoadedContexts_WithOppositeSeparatorInCaseNameFilter_ReturnsRequestedCaseAndPreservesNativeCaseName()
+        {
+            var relativeCasesDir = CreateRelativeTestDataDirectory("RunLoaderOppositeName");
+            var absoluteCasesDir = Path.Combine(Environment.CurrentDirectory, relativeCasesDir);
+            Directory.CreateDirectory(Path.Combine(absoluteCasesDir, "nested"));
+
+            var requestedCase = Path.Combine(absoluteCasesDir, "nested", "requested.yaml");
+            File.WriteAllText(requestedCase, "requested");
+            File.WriteAllText(Path.Combine(absoluteCasesDir, "other.yaml"), "other");
+            var nativeCaseName = Path.GetRelativePath(Environment.CurrentDirectory, requestedCase);
+
+            try
+            {
+                var options = new RunOptions
+                {
+                    ConfigurationFile = "test.yaml",
+                    SendLogs = false,
+                    CasesRootDirectory = relativeCasesDir,
+                    CasesNamesToRun = [UseOppositeDirectorySeparator(nativeCaseName)]
+                };
+
+                var loader = new TestRunLoader(options, "exec-opposite-name");
+                var contexts =
+                    ((IEnumerable<InternalContext>)GetLoadedContextsMethodInfo.Invoke(loader, null)!).ToList();
+
+                Assert.That(contexts, Has.Count.EqualTo(1));
+                Assert.That(contexts[0].CaseName, Is.EqualTo(nativeCaseName));
+            }
+            finally
+            {
+                Directory.Delete(absoluteCasesDir, true);
+            }
+        }
+
+        [Test]
+        public void GetLoadedContexts_WithOppositeSeparatorInIgnoredCaseName_ExcludesCase()
+        {
+            var relativeCasesDir = CreateRelativeTestDataDirectory("RunLoaderOppositeIgnore");
+            var absoluteCasesDir = Path.Combine(Environment.CurrentDirectory, relativeCasesDir);
+            Directory.CreateDirectory(Path.Combine(absoluteCasesDir, "nested"));
+
+            var keepCase = Path.Combine(absoluteCasesDir, "keep.yaml");
+            var ignoredCase = Path.Combine(absoluteCasesDir, "nested", "ignored.yaml");
+            File.WriteAllText(keepCase, "keep");
+            File.WriteAllText(ignoredCase, "ignored");
+            var ignoredCaseName = Path.GetRelativePath(Environment.CurrentDirectory, ignoredCase);
+
+            try
+            {
+                var options = new RunOptions
+                {
+                    ConfigurationFile = "test.yaml",
+                    SendLogs = false,
+                    CasesRootDirectory = relativeCasesDir,
+                    CasesNamesToIgnore = [UseOppositeDirectorySeparator(ignoredCaseName)]
+                };
+
+                var loader = new TestRunLoader(options, "exec-opposite-ignore");
+                var contexts =
+                    ((IEnumerable<InternalContext>)GetLoadedContextsMethodInfo.Invoke(loader, null)!).ToList();
+
+                Assert.That(contexts.Select(context => context.CaseName),
+                    Is.EqualTo(new[] { Path.GetRelativePath(Environment.CurrentDirectory, keepCase) }));
+            }
+            finally
+            {
+                Directory.Delete(absoluteCasesDir, true);
+            }
+        }
+
+        [Test]
         public void GetLoadedContexts_WithUnknownCaseName_ThrowsInvalidOperationException()
         {
             var relativeCasesDir = CreateRelativeTestDataDirectory("RunLoaderMissingCase");
@@ -579,6 +689,53 @@ namespace QaaS.Runner.Tests.LoadersTests
                 "https://artifactory.example.com/cases/case-a.yaml",
                 "https://artifactory.example.com/cases/case-b.yaml"
             }));
+        }
+
+        [Test]
+        public void GetLoadedContexts_WithHttpCasesAndBackslashSpelledCaseNameFilter_ThrowsNotFound()
+        {
+            const string caseUrl = "https://artifactory.example.com/cases/case-a.yaml";
+            var requestedCaseName = caseUrl.Replace('/', '\\');
+            var options = new RunOptions
+            {
+                ConfigurationFile = "test.yaml",
+                SendLogs = false,
+                CasesRootDirectory = "https://artifactory.example.com/cases",
+                CasesNamesToRun = [requestedCaseName]
+            };
+
+            var loader = new TestRunLoader(options, "exec-http-name-boundary");
+            var helperField = typeof(RunLoader<Runner, RunOptions>)
+                .GetField("_jfrogArtifactoryHelper", BindingFlags.Instance | BindingFlags.NonPublic)!;
+            helperField.SetValue(loader, new TestJfrogArtifactoryHelper([caseUrl]));
+
+            var ex = Assert.Throws<TargetInvocationException>(() => GetLoadedContextsMethodInfo.Invoke(loader, null));
+
+            Assert.That(ex!.InnerException, Is.TypeOf<InvalidOperationException>());
+            Assert.That(ex.InnerException!.Message,
+                Does.Contain($"Requested case names not found: {requestedCaseName}"));
+        }
+
+        [Test]
+        public void GetLoadedContexts_WithHttpCasesAndBackslashSpelledExactIgnore_DoesNotIgnoreUrl()
+        {
+            const string caseUrl = "https://artifactory.example.com/cases/case-a.yaml";
+            var options = new RunOptions
+            {
+                ConfigurationFile = "test.yaml",
+                SendLogs = false,
+                CasesRootDirectory = "https://artifactory.example.com/cases",
+                CasesNamesToIgnore = [caseUrl.Replace('/', '\\')]
+            };
+
+            var loader = new TestRunLoader(options, "exec-http-ignore-boundary");
+            var helperField = typeof(RunLoader<Runner, RunOptions>)
+                .GetField("_jfrogArtifactoryHelper", BindingFlags.Instance | BindingFlags.NonPublic)!;
+            helperField.SetValue(loader, new TestJfrogArtifactoryHelper([caseUrl]));
+
+            var contexts = ((IEnumerable<InternalContext>)GetLoadedContextsMethodInfo.Invoke(loader, null)!).ToList();
+
+            Assert.That(contexts.Select(context => context.CaseName), Is.EqualTo(new[] { caseUrl }));
         }
 
         [Test]
@@ -753,11 +910,13 @@ namespace QaaS.Runner.Tests.LoadersTests
         [Test]
         public void GetLoadedContexts_WithMissingCasesDirectory_ThrowsDirectoryNotFoundException()
         {
+            var configuredCasesRoot = UseOppositeDirectorySeparator(
+                Path.Combine($"missing-parent-{Guid.NewGuid():N}", "missing-cases"));
             var options = new RunOptions
             {
                 ConfigurationFile = "test.yaml",
                 SendLogs = false,
-                CasesRootDirectory = $"missing-cases-{Guid.NewGuid():N}"
+                CasesRootDirectory = configuredCasesRoot
             };
 
             var loader = new TestRunLoader(options, "exec-missing-cases");
@@ -766,7 +925,8 @@ namespace QaaS.Runner.Tests.LoadersTests
 
             Assert.That(ex!.InnerException, Is.TypeOf<DirectoryNotFoundException>());
             Assert.That(ex.InnerException!.Message, Does.Contain("Cases root directory was not found."));
-            Assert.That(ex.InnerException.Message, Does.Contain("Configured cases root directory:"));
+            Assert.That(ex.InnerException.Message,
+                Does.Contain($"Configured cases root directory: {configuredCasesRoot}"));
         }
 
         [Test]
