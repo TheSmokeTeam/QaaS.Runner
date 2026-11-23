@@ -99,7 +99,7 @@ public class ExecutionTests
     }
 
     [Test]
-    public void Start_UsesEachCasesOwnMetadata()
+    public void Start_UsesEachCasesOriginalOwnershipThroughoutExecution()
     {
         var sink = new RecordingSink();
         using var logger = new LoggerConfiguration()
@@ -115,22 +115,36 @@ public class ExecutionTests
             new MetaDataConfig { Team = "Other team", System = "Other system" }
         );
 
-        CreateExecution(ExecutionType.Run, first).Start();
+        var original = first.GetMetaDataFromContext();
+        var storage = new Mock<IStorage>();
+        storage
+            .Setup(s => s.Retrieve(first.CaseName))
+            .Returns(() =>
+            {
+                original.Team = "New team";
+                original.System = "New system";
+                return [];
+            });
+        CreateExecution(ExecutionType.Assert, first, storages: [storage.Object]).Start();
         CreateExecution(ExecutionType.Act, second).Start();
+        storage.Verify(s => s.Retrieve(first.CaseName), Times.Once);
 
-        var starts = sink.Events.Where(e =>
-            e.Properties.TryGetValue("QaasEvent", out var kind)
-            && kind.Equals(new ScalarValue("RunnerExecutionStarted"))
-        );
+        var events = sink.Events.Where(e => e.Properties.ContainsKey("QaasEvent"));
         Assert.That(
-            starts.Select(e =>
+            events.Select(e =>
                 (
                     ((ScalarValue)e.Properties["Team"]).Value,
                     ((ScalarValue)e.Properties["System"]).Value
                 )
             ),
             Is.EqualTo(
-                new (object?, object?)[] { ("Smoke", "QaaS"), ("Other team", "Other system") }
+                new (object?, object?)[]
+                {
+                    ("Smoke", "QaaS"),
+                    ("Smoke", "QaaS"),
+                    ("Other team", "Other system"),
+                    ("Other team", "Other system"),
+                }
             )
         );
     }

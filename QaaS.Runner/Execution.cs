@@ -1,7 +1,6 @@
 using Autofac;
 using Microsoft.Extensions.Logging;
 using QaaS.Framework.Executions;
-using QaaS.Framework.SDK;
 using QaaS.Framework.SDK.ContextObjects;
 using QaaS.Framework.SDK.ExecutionObjects;
 using QaaS.Framework.SDK.Extensions;
@@ -99,11 +98,10 @@ public class Execution : BaseExecution
             "Running {ExecutionType} execution with executionId {ExecutionId} and case name {CaseName}", Type,
             Context.ExecutionId, Context.CaseName);
         var plan = ResolvePlan(Type);
-        var metadata = GetLogMetadata();
-        if (metadata == null)
+        if (GetLogMetadata() is not { } owner)
             return plan.Execute(this);
 
-        LogExecutionEvent(metadata, failed: null);
+        LogExecutionEvent(owner, failed: null);
         var failed = 1;
         try
         {
@@ -113,11 +111,11 @@ public class Execution : BaseExecution
         }
         finally
         {
-            LogExecutionEvent(metadata, failed);
+            LogExecutionEvent(owner, failed);
         }
     }
 
-    private MetaDataConfig? GetLogMetadata()
+    private (string Team, string System)? GetLogMetadata()
     {
         try
         {
@@ -129,11 +127,11 @@ public class Execution : BaseExecution
                 return null;
 
             var metadata = context.GetMetaDataFromContext();
-            return
-                string.IsNullOrWhiteSpace(metadata.Team)
-                || string.IsNullOrWhiteSpace(metadata.System)
+            var team = metadata.Team;
+            var system = metadata.System;
+            return string.IsNullOrWhiteSpace(team) || string.IsNullOrWhiteSpace(system)
                 ? null
-                : metadata;
+                : (team, system);
         }
         catch (Exception exception)
             when (exception is not OutOfMemoryException and not AccessViolationException)
@@ -143,7 +141,7 @@ public class Execution : BaseExecution
         }
     }
 
-    private void LogExecutionEvent(MetaDataConfig metadata, int? failed)
+    private void LogExecutionEvent((string Team, string System) owner, int? failed)
     {
         try
         {
@@ -152,8 +150,8 @@ public class Execution : BaseExecution
                     "{QaasEvent}: {ExecutionType} for {Team}/{System}, ExecutionId={ExecutionId}, Failed={Failed}",
                     "RunnerExecutionFinished",
                     Type,
-                    metadata.Team,
-                    metadata.System,
+                    owner.Team,
+                    owner.System,
                     Context.ExecutionId,
                     failed.Value
                 );
@@ -162,8 +160,8 @@ public class Execution : BaseExecution
                     "{QaasEvent}: {ExecutionType} for {Team}/{System}, ExecutionId={ExecutionId}",
                     "RunnerExecutionStarted",
                     Type,
-                    metadata.Team,
-                    metadata.System,
+                    owner.Team,
+                    owner.System,
                     Context.ExecutionId
                 );
         }
