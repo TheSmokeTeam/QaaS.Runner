@@ -1,9 +1,10 @@
 using Autofac;
 using Microsoft.Extensions.Logging;
 using QaaS.Framework.Executions;
-using QaaS.Framework.SDK.AssertionObjects;
+using QaaS.Framework.SDK;
 using QaaS.Framework.SDK.ContextObjects;
 using QaaS.Framework.SDK.ExecutionObjects;
+using QaaS.Framework.SDK.Extensions;
 using QaaS.Framework.SDK.Hooks.Assertion;
 using QaaS.Runner.Assertions.AssertionObjects;
 using QaaS.Runner.Logics;
@@ -91,16 +92,86 @@ public class Execution : BaseExecution
     internal ReportLogic ReportLogic { get; init; } = null!;
     internal TemplateLogic TemplateLogic { get; init; } = null!;
 
-    // Terminal summary classification needs statuses, not the protected execution context.
-    internal IEnumerable<IAssertionResult> AttemptAssertionResults => Context.ExecutionData.AssertionResults;
-
     /// <inheritdoc />
     public override int Start()
     {
         Context.Logger.LogInformation(
             "Running {ExecutionType} execution with executionId {ExecutionId} and case name {CaseName}", Type,
             Context.ExecutionId, Context.CaseName);
-        return ResolvePlan(Type).Execute(this);
+        var plan = ResolvePlan(Type);
+        var metadata = GetLogMetadata();
+        if (metadata == null)
+            return plan.Execute(this);
+
+        LogExecutionEvent(metadata, failed: null);
+        var failed = 1;
+        try
+        {
+            var exitCode = plan.Execute(this);
+            failed = exitCode == 0 ? 0 : 1;
+            return exitCode;
+        }
+        finally
+        {
+            LogExecutionEvent(metadata, failed);
+        }
+    }
+
+    private MetaDataConfig? GetLogMetadata()
+    {
+        try
+        {
+            if (
+                Type == ExecutionType.Template
+                || Context is not InternalContext context
+                || !context.Logger.IsEnabled(LogLevel.Debug)
+            )
+                return null;
+
+            var metadata = context.GetMetaDataFromContext();
+            return
+                string.IsNullOrWhiteSpace(metadata.Team)
+                || string.IsNullOrWhiteSpace(metadata.System)
+                ? null
+                : metadata;
+        }
+        catch (Exception exception)
+            when (exception is not OutOfMemoryException and not AccessViolationException)
+        {
+            // Missing metadata and unavailable log providers must not alter execution.
+            return null;
+        }
+    }
+
+    private void LogExecutionEvent(MetaDataConfig metadata, int? failed)
+    {
+        try
+        {
+            if (failed.HasValue)
+                Context.Logger.LogDebug(
+                    "{QaasEvent}: {ExecutionType} for {Team}/{System}, ExecutionId={ExecutionId}, Failed={Failed}",
+                    "RunnerExecutionFinished",
+                    Type,
+                    metadata.Team,
+                    metadata.System,
+                    Context.ExecutionId,
+                    failed.Value
+                );
+            else
+                Context.Logger.LogDebug(
+                    "{QaasEvent}: {ExecutionType} for {Team}/{System}, ExecutionId={ExecutionId}",
+                    "RunnerExecutionStarted",
+                    Type,
+                    metadata.Team,
+                    metadata.System,
+                    Context.ExecutionId
+                );
+        }
+        catch (Exception exception)
+            when (exception is not OutOfMemoryException and not AccessViolationException)
+        {
+            // A custom log provider must preserve the execution's original result or exception.
+        }
     }
 
     public override void Dispose()

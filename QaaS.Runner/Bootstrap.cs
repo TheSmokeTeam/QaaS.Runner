@@ -6,7 +6,6 @@ using QaaS.Framework.Executions.CommandLineBuilders;
 using QaaS.Runner.Loaders;
 using QaaS.Runner.Modules;
 using QaaS.Runner.Options;
-using QaaS.Runner.Output;
 using Serilog;
 using Serilog.Extensions.Logging;
 using ExecuteOptions = QaaS.Runner.Options.ExecuteOptions;
@@ -30,7 +29,7 @@ public static class Bootstrap
     /// <qaas-docs group="Getting Started" subgroup="Bootstrap" />
     public static Runner New(IEnumerable<string>? args = null)
     {
-        return GetRunner<Runner>(args, recordAttempt: true);
+        return GetRunner<Runner>(args);
     }
 
     /// <summary>
@@ -42,7 +41,7 @@ public static class Bootstrap
     /// <qaas-docs group="Getting Started" subgroup="Bootstrap" />
     public static Runner New<TRunner>(IEnumerable<string>? args = null) where TRunner : Runner
     {
-        return GetRunner<TRunner>(args, recordAttempt: true);
+        return GetRunner<TRunner>(args);
     }
 
     /// <summary>
@@ -51,8 +50,7 @@ public static class Bootstrap
     /// <param name="args">Command-line arguments</param>
     /// <param name="executionId">Optional execution ID</param>
     /// <returns>A <see cref="Runner" /> instance</returns>
-    internal static TRunner GetRunner<TRunner>(IEnumerable<string>? args, string? executionId = null,
-        bool recordAttempt = false)
+    internal static TRunner GetRunner<TRunner>(IEnumerable<string>? args, string? executionId = null)
         where TRunner : Runner
     {
         var commandLineArgs = NormalizeArguments(args ?? []);
@@ -71,41 +69,13 @@ public static class Bootstrap
                 (TemplateOptions options) =>
                     new RunLoader<TRunner, TemplateOptions>(GetSafeLoggerOptions(options), executionId).GetLoadedRunner(),
                 (RunOptions options) =>
-                    LoadAttempt(AttemptOperation.Run, recordAttempt, () =>
-                        new RunLoader<TRunner, RunOptions>(GetSafeLoggerOptions(options), executionId).GetLoadedRunner()),
+                    new RunLoader<TRunner, RunOptions>(GetSafeLoggerOptions(options), executionId).GetLoadedRunner(),
                 (ActOptions options) =>
-                    LoadAttempt(AttemptOperation.Act, recordAttempt, () =>
-                        new RunLoader<TRunner, ActOptions>(GetSafeLoggerOptions(options), executionId).GetLoadedRunner()),
+                    new RunLoader<TRunner, ActOptions>(GetSafeLoggerOptions(options), executionId).GetLoadedRunner(),
                 (AssertOptions options) =>
-                    LoadAttempt(AttemptOperation.Assert, recordAttempt, () =>
-                        new RunLoader<TRunner, AssertOptions>(GetSafeLoggerOptions(options), executionId).GetLoadedRunner()),
+                    new RunLoader<TRunner, AssertOptions>(GetSafeLoggerOptions(options), executionId).GetLoadedRunner(),
                 (ExecuteOptions options) => new ExecuteLoader<TRunner>(GetSafeLoggerOptions(options)).GetLoadedRunner(),
                 errors => HandleParseError<TRunner>(cliParserResult, errors));
-    }
-
-    private static TRunner LoadAttempt<TRunner>(
-        AttemptOperation operation, bool recordAttempt, Func<TRunner> load) where TRunner : Runner
-    {
-        var summary = recordAttempt ? AttemptSummary.FromEnvironment(operation) : null;
-        if (summary is null)
-            return load();
-
-        try
-        {
-            var runner = load();
-            runner.WithAttemptSummary(summary);
-            return runner;
-        }
-        catch (OperationCanceledException)
-        {
-            summary.Publish(AttemptOutcome.Cancelled, null);
-            throw;
-        }
-        catch (Exception)
-        {
-            summary.Publish(AttemptOutcome.InfrastructureFailure, null);
-            throw;
-        }
     }
 
     /// <summary>

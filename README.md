@@ -64,39 +64,13 @@ dotnet add package QaaS.Runner --version <target-version>
 dotnet restore
 ```
 
-## Optional local attempt summary
+## Execution observability
 
-A direct top-level `run`, `act`, or `assert` started with `Bootstrap.New` can hand one compact terminal summary to an **operator-provisioned, private local directory**. It is off by default and does not send data over the network or change result reporting. Multiple cases within the same command are part of one attempt. `execute` (including its nested commands), `template`, help, version, and argument parse failures do not emit summaries.
+Enable the existing Elasticsearch log sink with `--send-logs --elastic-uri <uri>` or your configured Elastic defaults. Import the [Runner usage dashboard](docs/grafana/runner-usage.json) into Grafana and select an Elasticsearch data source for `qaas-*` with time field `@timestamp`.
 
-Set all three environment variables on the specific invocation:
+Each `run`, `act`, or `assert` execution with configured team and system metadata writes a structured start and finish at Debug level. The default Elastic sink receives these events independently of the console level. A custom logging configuration must admit Debug events. Case expansion and `execute` count each execution that starts. Help, templates, setup failures before execution, and errors during later Runner cleanup fall outside these counts.
 
-| Variable | Value |
-| --- | --- |
-| `QAAS_ATTEMPT_SUMMARY_DIRECTORY` | Absolute, existing directory on a healthy local filesystem, scoped to trusted producer and collector. Do not use shared/untrusted directories, network mounts or UNC paths. Runner does not create the directory. |
-| `QAAS_ATTEMPT_ID` | Externally assigned, globally unique opaque 32 lowercase hex characters, not all zero. Do not use the same ID for a new attempt, including a business retry. |
-| `QAAS_PROJECT_KEY` | Independently provisioned opaque project identifier in the same 32-character format. The trusted launch process owns project authorization and correlation. Runner validates the shape, not project ownership. |
-
-Example (synthetic IDs):
-
-```bash
-QAAS_ATTEMPT_SUMMARY_DIRECTORY=/var/spool/qaas-attempts \
-QAAS_ATTEMPT_ID=0123456789abcdef0123456789abcdef \
-QAAS_PROJECT_KEY=abcdef0123456789abcdef0123456789 \
-dotnet run -- run test.qaas.yaml
-```
-
-Runner makes one best-effort, create-if-absent publication of `<attempt_id>.json`. The collector should ignore temporary files, independently authenticate the producer/project, and deduplicate by attempt ID. Runner does not overwrite an existing terminal, retry, force an `fsync`, invoke a collector, or log the payload. A full/permission-denied/unavailable spool leaves the original return code or exception unchanged. An invalid or incomplete opt-in is ignored. Publication failure is intentionally silent at this layer: use an independent ledger of mature expected attempts to detect gaps, alongside collector and spool monitoring. Configure disk quotas/retention and access control separately. Local filesystem operations are synchronous and can still block on an unhealthy filesystem; there is no hard latency bound or crash-durability guarantee. Abrupt termination before publication may leave no terminal summary.
-
-The file is one UTF-8 JSON object capped at 1 KiB:
-
-- `schema_version`: integer `1`; `attempt_id` and `project_key`: the opaque keys above.
-- `operation`: `run`, `act`, or `assert`.
-- `outcome`: `pass` (nonempty fully passed assertions), `assertion_failure` (definite failed assertion results without an indeterminate or broken result), `infra_failure` (loading/lifecycle/cleanup failure or broken assertion), `cancelled` (observed cancellation exception), `completed` (successful `act` or success with no assertion evidence), or `unknown` (indeterminate/custom outcome). `completed` is not a passed test, and an exit code alone does not prove assertion failure.
-- `completed_at`: UTC timestamp, milliseconds; `duration_ms`: elapsed monotonic milliseconds from opted-in parsed command load through terminal lifecycle/logging, before writing the file; `exit_code`: integer normally returned by Runner or `null` when an exception propagates.
-
-No raw assertion, case, path, reporter, exception, payload, or user data is emitted. Opaque keys are pseudonymous operational identifiers, not metric labels or proof of personal use.
-
-For optional Elasticsearch delivery and dashboard setup, follow the [out-of-process collector guide](tools/observability/README.md). Run its setup canary against the actual deployed Runner build before enabling normal collection.
+`QaasEvent` identifies `RunnerExecutionStarted` and `RunnerExecutionFinished`. Both carry `Team`, `System`, `ExecutionType`, and the existing `ExecutionId` when provided. The finish carries numeric `Failed` (0 for exit code zero, 1 for another exit code, an exception, or cancellation). Failure rate is the mean of `Failed` over observed finishes. An abrupt process exit can leave a start without a finish. Adoption counts distinct teams and systems in the selected time window. The framework sets `Environment` to `CI` when `KUBERNETES_SERVICE_HOST` is present and `Local` otherwise.
 
 ## ReportPortal
 QaaS can send its assertion results to an existing ReportPortal instance. Configure `Reporters.ReportPortal` with `Enabled`, `Endpoint`, `ApiKey`, and an optional `Project` (defaults to `MetaData.Team`). YAML values override package defaults.
