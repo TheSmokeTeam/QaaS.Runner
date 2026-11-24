@@ -1,0 +1,2440 @@
+{
+  "uid": "qaas-runner-usage",
+  "title": "QaaS Runner observability",
+  "description": "Usage and reliability from reconciled Elasticsearch logs.",
+  "schemaVersion": 40,
+  "version": 2,
+  "tags": [
+    "qaas",
+    "runner"
+  ],
+  "timezone": "utc",
+  "editable": true,
+  "time": {
+    "from": "now-14d",
+    "to": "now"
+  },
+  "refresh": "1m",
+  "templating": {
+    "list": [
+      {
+        "name": "Team",
+        "label": "Team",
+        "type": "query",
+        "datasource": {
+          "type": "elasticsearch",
+          "uid": "qaas-runner-usage-v1"
+        },
+        "query": "{\"find\": \"terms\", \"field\": \"event.Team\", \"query\": \"event.Conflict:false\", \"size\": 1000}",
+        "refresh": 2,
+        "sort": 1,
+        "multi": true,
+        "includeAll": true,
+        "allValue": "*",
+        "options": [],
+        "current": {
+          "selected": true,
+          "text": [
+            "All"
+          ],
+          "value": [
+            "$__all"
+          ]
+        }
+      },
+      {
+        "name": "Project",
+        "label": "Project",
+        "type": "query",
+        "datasource": {
+          "type": "elasticsearch",
+          "uid": "qaas-runner-usage-v1"
+        },
+        "query": "{\"find\": \"terms\", \"field\": \"event.Project\", \"query\": \"event.Conflict:false AND event.Team:${Team:lucene}\", \"size\": 1000}",
+        "refresh": 2,
+        "sort": 1,
+        "multi": true,
+        "includeAll": true,
+        "allValue": "*",
+        "options": [],
+        "current": {
+          "selected": true,
+          "text": [
+            "All"
+          ],
+          "value": [
+            "$__all"
+          ]
+        }
+      },
+      {
+        "name": "System",
+        "label": "System",
+        "type": "query",
+        "datasource": {
+          "type": "elasticsearch",
+          "uid": "qaas-runner-usage-v1"
+        },
+        "query": "{\"find\": \"terms\", \"field\": \"event.System\", \"query\": \"event.Conflict:false AND event.Team:${Team:lucene} AND event.Project:${Project:lucene}\", \"size\": 1000}",
+        "refresh": 2,
+        "sort": 1,
+        "multi": true,
+        "includeAll": true,
+        "allValue": "*",
+        "options": [],
+        "current": {
+          "selected": true,
+          "text": [
+            "All"
+          ],
+          "value": [
+            "$__all"
+          ]
+        }
+      },
+      {
+        "name": "Environment",
+        "label": "Environment",
+        "type": "query",
+        "datasource": {
+          "type": "elasticsearch",
+          "uid": "qaas-runner-usage-v1"
+        },
+        "query": "{\"find\": \"terms\", \"field\": \"event.Environment\", \"query\": \"event.Conflict:false AND event.Team:${Team:lucene} AND event.Project:${Project:lucene} AND event.System:${System:lucene}\", \"size\": 1000}",
+        "refresh": 2,
+        "sort": 1,
+        "multi": true,
+        "includeAll": true,
+        "allValue": "*",
+        "options": [],
+        "current": {
+          "selected": true,
+          "text": [
+            "All"
+          ],
+          "value": [
+            "$__all"
+          ]
+        }
+      },
+      {
+        "name": "ExecutionType",
+        "label": "Mode",
+        "type": "query",
+        "datasource": {
+          "type": "elasticsearch",
+          "uid": "qaas-runner-usage-v1"
+        },
+        "query": "{\"find\": \"terms\", \"field\": \"event.ExecutionType\", \"query\": \"event.Conflict:false AND event.Team:${Team:lucene} AND event.Project:${Project:lucene} AND event.System:${System:lucene} AND event.Environment:${Environment:lucene}\", \"size\": 1000}",
+        "refresh": 2,
+        "sort": 1,
+        "multi": true,
+        "includeAll": true,
+        "allValue": "*",
+        "options": [],
+        "current": {
+          "selected": true,
+          "text": [
+            "All"
+          ],
+          "value": [
+            "$__all"
+          ]
+        }
+      },
+      {
+        "name": "Version",
+        "label": "Version",
+        "type": "query",
+        "datasource": {
+          "type": "elasticsearch",
+          "uid": "qaas-runner-usage-v1"
+        },
+        "query": "{\"find\": \"terms\", \"field\": \"event.Version\", \"query\": \"event.Conflict:false AND event.Team:${Team:lucene} AND event.Project:${Project:lucene} AND event.System:${System:lucene} AND event.Environment:${Environment:lucene} AND event.ExecutionType:${ExecutionType:lucene}\", \"size\": 1000}",
+        "refresh": 2,
+        "sort": 1,
+        "multi": true,
+        "includeAll": true,
+        "allValue": "*",
+        "options": [],
+        "current": {
+          "selected": true,
+          "text": [
+            "All"
+          ],
+          "value": [
+            "$__all"
+          ]
+        }
+      },
+      {
+        "name": "Features",
+        "label": "Feature",
+        "type": "query",
+        "datasource": {
+          "type": "elasticsearch",
+          "uid": "qaas-runner-usage-v1"
+        },
+        "query": "{\"find\": \"terms\", \"field\": \"event.Features\", \"query\": \"event.Conflict:false AND event.Team:${Team:lucene} AND event.Project:${Project:lucene} AND event.System:${System:lucene} AND event.Environment:${Environment:lucene} AND event.ExecutionType:${ExecutionType:lucene} AND event.Version:${Version:lucene}\", \"size\": 1000}",
+        "refresh": 2,
+        "sort": 1,
+        "multi": true,
+        "includeAll": true,
+        "allValue": "*",
+        "options": [],
+        "current": {
+          "selected": true,
+          "text": [
+            "All"
+          ],
+          "value": [
+            "$__all"
+          ]
+        }
+      }
+    ]
+  },
+  "panels": [
+    {
+      "id": 1,
+      "type": "row",
+      "title": "Execution health",
+      "collapsed": false,
+      "gridPos": {
+        "x": 0,
+        "y": 0,
+        "w": 24,
+        "h": 1
+      },
+      "panels": []
+    },
+    {
+      "id": 2,
+      "type": "stat",
+      "title": "Runs started",
+      "description": "One observed start per distinct execution attempt in the selected interval.",
+      "gridPos": {
+        "x": 0,
+        "y": 1,
+        "w": 6,
+        "h": 4
+      },
+      "datasource": {
+        "type": "elasticsearch",
+        "uid": "qaas-runner-usage-v1"
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "elasticsearch",
+            "uid": "qaas-runner-usage-v1"
+          },
+          "refId": "A",
+          "query": "event.Conflict:false AND event.Team:${Team:lucene} AND event.Project:${Project:lucene} AND event.System:${System:lucene} AND event.Environment:${Environment:lucene} AND event.ExecutionType:${ExecutionType:lucene} AND event.Version:${Version:lucene} AND event.Features:${Features:lucene} AND event.Kind:Execution AND event.StartedAt:[${__from} TO ${__to}]",
+          "metrics": [
+            {
+              "id": "1",
+              "type": "count"
+            }
+          ],
+          "bucketAggs": [
+            {
+              "id": "2",
+              "type": "terms",
+              "field": "event.Kind",
+              "settings": {
+                "size": "1",
+                "order": "desc",
+                "orderBy": "_count",
+                "min_doc_count": "1"
+              }
+            }
+          ]
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "noValue": "\u2014"
+        },
+        "overrides": []
+      },
+      "options": {
+        "textMode": "value",
+        "graphMode": "none",
+        "colorMode": "none",
+        "reduceOptions": {
+          "values": false,
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": ""
+        }
+      }
+    },
+    {
+      "id": 3,
+      "type": "stat",
+      "title": "Runs completed",
+      "description": "Distinct observed terminal attempts, successful, cancelled or failed. Finish time determines inclusion.",
+      "gridPos": {
+        "x": 6,
+        "y": 1,
+        "w": 6,
+        "h": 4
+      },
+      "datasource": {
+        "type": "elasticsearch",
+        "uid": "qaas-runner-usage-v1"
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "elasticsearch",
+            "uid": "qaas-runner-usage-v1"
+          },
+          "refId": "A",
+          "query": "event.Conflict:false AND event.Team:${Team:lucene} AND event.Project:${Project:lucene} AND event.System:${System:lucene} AND event.Environment:${Environment:lucene} AND event.ExecutionType:${ExecutionType:lucene} AND event.Version:${Version:lucene} AND event.Features:${Features:lucene} AND event.Kind:Execution AND event.FinishedAt:[${__from} TO ${__to}]",
+          "metrics": [
+            {
+              "id": "1",
+              "type": "count"
+            }
+          ],
+          "bucketAggs": [
+            {
+              "id": "2",
+              "type": "terms",
+              "field": "event.Kind",
+              "settings": {
+                "size": "1",
+                "order": "desc",
+                "orderBy": "_count",
+                "min_doc_count": "1"
+              }
+            }
+          ]
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "noValue": "\u2014"
+        },
+        "overrides": []
+      },
+      "options": {
+        "textMode": "value",
+        "graphMode": "none",
+        "colorMode": "none",
+        "reduceOptions": {
+          "values": false,
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": ""
+        }
+      }
+    },
+    {
+      "id": 4,
+      "type": "stat",
+      "title": "Unsuccessful finishes",
+      "description": "Sum of non-success flags divided by observed finishes. A missing finish never enters either side. Cancellation is a separate outcome below.",
+      "gridPos": {
+        "x": 12,
+        "y": 1,
+        "w": 6,
+        "h": 4
+      },
+      "datasource": {
+        "type": "elasticsearch",
+        "uid": "qaas-runner-usage-v1"
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "elasticsearch",
+            "uid": "qaas-runner-usage-v1"
+          },
+          "refId": "A",
+          "query": "event.Conflict:false AND event.Team:${Team:lucene} AND event.Project:${Project:lucene} AND event.System:${System:lucene} AND event.Environment:${Environment:lucene} AND event.ExecutionType:${ExecutionType:lucene} AND event.Version:${Version:lucene} AND event.Features:${Features:lucene} AND event.Kind:Execution AND event.FinishedAt:[${__from} TO ${__to}]",
+          "metrics": [
+            {
+              "id": "1",
+              "type": "avg",
+              "field": "event.Failed"
+            }
+          ],
+          "bucketAggs": [
+            {
+              "id": "2",
+              "type": "terms",
+              "field": "event.Kind",
+              "settings": {
+                "size": "1",
+                "order": "desc",
+                "orderBy": "_count",
+                "min_doc_count": "1"
+              }
+            }
+          ]
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percentunit",
+          "noValue": "\u2014"
+        },
+        "overrides": []
+      },
+      "options": {
+        "textMode": "value",
+        "graphMode": "none",
+        "colorMode": "none",
+        "reduceOptions": {
+          "values": false,
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": ""
+        }
+      }
+    },
+    {
+      "id": 5,
+      "type": "stat",
+      "title": "P95 run duration",
+      "description": "95th percentile of individual monotonic durations in milliseconds, over observed finishes. Executions without a measured duration contribute no sample.",
+      "gridPos": {
+        "x": 18,
+        "y": 1,
+        "w": 6,
+        "h": 4
+      },
+      "datasource": {
+        "type": "elasticsearch",
+        "uid": "qaas-runner-usage-v1"
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "elasticsearch",
+            "uid": "qaas-runner-usage-v1"
+          },
+          "refId": "A",
+          "query": "event.Conflict:false AND event.Team:${Team:lucene} AND event.Project:${Project:lucene} AND event.System:${System:lucene} AND event.Environment:${Environment:lucene} AND event.ExecutionType:${ExecutionType:lucene} AND event.Version:${Version:lucene} AND event.Features:${Features:lucene} AND event.Kind:Execution AND event.FinishedAt:[${__from} TO ${__to}]",
+          "metrics": [
+            {
+              "id": "1",
+              "type": "percentiles",
+              "field": "event.DurationMs",
+              "settings": {
+                "percents": [
+                  "95"
+                ]
+              }
+            }
+          ],
+          "bucketAggs": [
+            {
+              "id": "2",
+              "type": "terms",
+              "field": "event.Kind",
+              "settings": {
+                "size": "1",
+                "order": "desc",
+                "orderBy": "_count",
+                "min_doc_count": "1"
+              }
+            }
+          ]
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ms",
+          "noValue": "\u2014"
+        },
+        "overrides": []
+      },
+      "options": {
+        "textMode": "value",
+        "graphMode": "none",
+        "colorMode": "none",
+        "reduceOptions": {
+          "values": false,
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": ""
+        }
+      }
+    },
+    {
+      "id": 6,
+      "type": "timeseries",
+      "title": "Starts by environment",
+      "description": "Execution starts per time bucket by the framework's CI/local classification. A gap indicates no observed starts.",
+      "gridPos": {
+        "x": 0,
+        "y": 5,
+        "w": 12,
+        "h": 8
+      },
+      "datasource": {
+        "type": "elasticsearch",
+        "uid": "qaas-runner-usage-v1"
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "elasticsearch",
+            "uid": "qaas-runner-usage-v1"
+          },
+          "refId": "A",
+          "query": "event.Conflict:false AND event.Team:${Team:lucene} AND event.Project:${Project:lucene} AND event.System:${System:lucene} AND event.Environment:${Environment:lucene} AND event.ExecutionType:${ExecutionType:lucene} AND event.Version:${Version:lucene} AND event.Features:${Features:lucene} AND event.Kind:Execution AND event.StartedAt:[${__from} TO ${__to}]",
+          "metrics": [
+            {
+              "id": "1",
+              "type": "count"
+            }
+          ],
+          "bucketAggs": [
+            {
+              "id": "2",
+              "type": "terms",
+              "field": "event.Environment",
+              "settings": {
+                "size": "20",
+                "order": "desc",
+                "orderBy": "_count",
+                "min_doc_count": "1"
+              }
+            },
+            {
+              "id": "3",
+              "type": "date_histogram",
+              "field": "event.StartedAt",
+              "settings": {
+                "interval": "auto",
+                "min_doc_count": "1"
+              }
+            }
+          ],
+          "alias": "{{term event.Environment}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "noValue": "\u2014",
+          "min": 0,
+          "custom": {
+            "drawStyle": "bars",
+            "barAlignment": 0,
+            "lineWidth": 1,
+            "fillOpacity": 55,
+            "showPoints": "never",
+            "spanNulls": false
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "showLegend": true,
+          "placement": "bottom",
+          "displayMode": "list"
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      }
+    },
+    {
+      "id": 7,
+      "type": "timeseries",
+      "title": "Finished outcomes",
+      "description": "Terminal attempts per time bucket by outcome. Compare cancellation, execution errors and test failures to successful finishes.",
+      "gridPos": {
+        "x": 12,
+        "y": 5,
+        "w": 12,
+        "h": 8
+      },
+      "datasource": {
+        "type": "elasticsearch",
+        "uid": "qaas-runner-usage-v1"
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "elasticsearch",
+            "uid": "qaas-runner-usage-v1"
+          },
+          "refId": "A",
+          "query": "event.Conflict:false AND event.Team:${Team:lucene} AND event.Project:${Project:lucene} AND event.System:${System:lucene} AND event.Environment:${Environment:lucene} AND event.ExecutionType:${ExecutionType:lucene} AND event.Version:${Version:lucene} AND event.Features:${Features:lucene} AND event.Kind:Execution AND event.FinishedAt:[${__from} TO ${__to}]",
+          "metrics": [
+            {
+              "id": "1",
+              "type": "count"
+            }
+          ],
+          "bucketAggs": [
+            {
+              "id": "2",
+              "type": "terms",
+              "field": "event.Outcome",
+              "settings": {
+                "size": "20",
+                "order": "desc",
+                "orderBy": "_count",
+                "min_doc_count": "1"
+              }
+            },
+            {
+              "id": "3",
+              "type": "date_histogram",
+              "field": "event.FinishedAt",
+              "settings": {
+                "interval": "auto",
+                "min_doc_count": "1"
+              }
+            }
+          ],
+          "alias": "{{term event.Outcome}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "noValue": "\u2014",
+          "min": 0,
+          "custom": {
+            "drawStyle": "bars",
+            "barAlignment": 0,
+            "lineWidth": 1,
+            "fillOpacity": 55,
+            "showPoints": "never",
+            "spanNulls": false
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "showLegend": true,
+          "placement": "bottom",
+          "displayMode": "list"
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      }
+    },
+    {
+      "id": 8,
+      "type": "stat",
+      "title": "No observed finish after 15 min",
+      "description": "Starts in this range at least 15 minutes before its end, with no terminal by that cutoff. Includes long-running services and lost records. A dash means there are no matching records.",
+      "gridPos": {
+        "x": 0,
+        "y": 13,
+        "w": 5,
+        "h": 4
+      },
+      "datasource": {
+        "type": "elasticsearch",
+        "uid": "qaas-runner-usage-v1"
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "elasticsearch",
+            "uid": "qaas-runner-usage-v1"
+          },
+          "refId": "A",
+          "query": "event.Conflict:false AND event.Team:${Team:lucene} AND event.Project:${Project:lucene} AND event.System:${System:lucene} AND event.Environment:${Environment:lucene} AND event.ExecutionType:${ExecutionType:lucene} AND event.Version:${Version:lucene} AND event.Features:${Features:lucene} AND event.Kind:Execution AND event.StartedAt:[${__from} TO ${__to}] AND event.StartedAt:[* TO \"${__to:date:iso}||-15m\"] AND ((*:* AND NOT _exists_:event.FinishedAt) OR event.FinishedAt:{${__to} TO *])",
+          "metrics": [
+            {
+              "id": "1",
+              "type": "count"
+            }
+          ],
+          "bucketAggs": [
+            {
+              "id": "2",
+              "type": "terms",
+              "field": "event.Kind",
+              "settings": {
+                "size": "1",
+                "order": "desc",
+                "orderBy": "_count",
+                "min_doc_count": "1"
+              }
+            }
+          ]
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "noValue": "\u2014"
+        },
+        "overrides": []
+      },
+      "options": {
+        "textMode": "value",
+        "graphMode": "none",
+        "colorMode": "none",
+        "reduceOptions": {
+          "values": false,
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": ""
+        }
+      }
+    },
+    {
+      "id": 9,
+      "type": "stat",
+      "title": "Finish without observed start",
+      "description": "Terminal attempts in range for which no start exists in the retained reconciliation data. A dash means no matches.",
+      "gridPos": {
+        "x": 5,
+        "y": 13,
+        "w": 5,
+        "h": 4
+      },
+      "datasource": {
+        "type": "elasticsearch",
+        "uid": "qaas-runner-usage-v1"
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "elasticsearch",
+            "uid": "qaas-runner-usage-v1"
+          },
+          "refId": "A",
+          "query": "event.Conflict:false AND event.Team:${Team:lucene} AND event.Project:${Project:lucene} AND event.System:${System:lucene} AND event.Environment:${Environment:lucene} AND event.ExecutionType:${ExecutionType:lucene} AND event.Version:${Version:lucene} AND event.Features:${Features:lucene} AND event.Kind:Execution AND event.FinishedAt:[${__from} TO ${__to}] AND NOT _exists_:event.StartedAt",
+          "metrics": [
+            {
+              "id": "1",
+              "type": "count"
+            }
+          ],
+          "bucketAggs": [
+            {
+              "id": "2",
+              "type": "terms",
+              "field": "event.Kind",
+              "settings": {
+                "size": "1",
+                "order": "desc",
+                "orderBy": "_count",
+                "min_doc_count": "1"
+              }
+            }
+          ]
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "noValue": "\u2014"
+        },
+        "overrides": []
+      },
+      "options": {
+        "textMode": "value",
+        "graphMode": "none",
+        "colorMode": "none",
+        "reduceOptions": {
+          "values": false,
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": ""
+        }
+      }
+    },
+    {
+      "id": 10,
+      "type": "stat",
+      "title": "Completed runs / s",
+      "description": "Distinct finishes divided by the selected interval in seconds. The dashboard uses the whole chosen interval, including its quiet periods.",
+      "gridPos": {
+        "x": 10,
+        "y": 13,
+        "w": 5,
+        "h": 4
+      },
+      "datasource": {
+        "type": "elasticsearch",
+        "uid": "qaas-runner-usage-v1"
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "elasticsearch",
+            "uid": "qaas-runner-usage-v1"
+          },
+          "refId": "A",
+          "query": "event.Conflict:false AND event.Team:${Team:lucene} AND event.Project:${Project:lucene} AND event.System:${System:lucene} AND event.Environment:${Environment:lucene} AND event.ExecutionType:${ExecutionType:lucene} AND event.Version:${Version:lucene} AND event.Features:${Features:lucene} AND event.Kind:Execution AND event.FinishedAt:[${__from} TO ${__to}]",
+          "metrics": [
+            {
+              "id": "1",
+              "type": "count"
+            },
+            {
+              "id": "5",
+              "type": "bucket_script",
+              "settings": {
+                "script": "params.n / ((${__to}L - ${__from}L) / 1000.0)"
+              },
+              "pipelineVariables": [
+                {
+                  "name": "n",
+                  "pipelineAgg": "1"
+                }
+              ]
+            }
+          ],
+          "bucketAggs": [
+            {
+              "id": "2",
+              "type": "terms",
+              "field": "event.Kind",
+              "settings": {
+                "size": "1",
+                "order": "desc",
+                "orderBy": "_count",
+                "min_doc_count": "1"
+              }
+            }
+          ]
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ops",
+          "noValue": "\u2014"
+        },
+        "overrides": []
+      },
+      "options": {
+        "textMode": "value",
+        "graphMode": "none",
+        "colorMode": "none",
+        "reduceOptions": {
+          "values": false,
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "/^Bucket Script$/"
+        }
+      }
+    },
+    {
+      "id": 11,
+      "type": "stat",
+      "title": "Unknown attribution",
+      "description": "Starts missing at least one trusted team, project or system. Choose (unattributed) in an owner filter to see these attempts. A dash means no matches.",
+      "gridPos": {
+        "x": 15,
+        "y": 13,
+        "w": 5,
+        "h": 4
+      },
+      "datasource": {
+        "type": "elasticsearch",
+        "uid": "qaas-runner-usage-v1"
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "elasticsearch",
+            "uid": "qaas-runner-usage-v1"
+          },
+          "refId": "A",
+          "query": "event.Conflict:false AND event.Team:${Team:lucene} AND event.Project:${Project:lucene} AND event.System:${System:lucene} AND event.Environment:${Environment:lucene} AND event.ExecutionType:${ExecutionType:lucene} AND event.Version:${Version:lucene} AND event.Features:${Features:lucene} AND event.Kind:Execution AND event.StartedAt:[${__from} TO ${__to}] AND (event.TeamKnown:false OR event.ProjectKnown:false OR event.SystemKnown:false)",
+          "metrics": [
+            {
+              "id": "1",
+              "type": "count"
+            }
+          ],
+          "bucketAggs": [
+            {
+              "id": "2",
+              "type": "terms",
+              "field": "event.Kind",
+              "settings": {
+                "size": "1",
+                "order": "desc",
+                "orderBy": "_count",
+                "min_doc_count": "1"
+              }
+            }
+          ]
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "noValue": "\u2014"
+        },
+        "overrides": []
+      },
+      "options": {
+        "textMode": "value",
+        "graphMode": "none",
+        "colorMode": "none",
+        "reduceOptions": {
+          "values": false,
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": ""
+        }
+      }
+    },
+    {
+      "id": 12,
+      "type": "stat",
+      "title": "Conflicting replays",
+      "description": "Distinct reconciliation keys with incompatible copies of one phase or HTTP summary. Conflicting keys are excluded from all other panels; inspect the original logs by attempt or server identity.",
+      "gridPos": {
+        "x": 20,
+        "y": 13,
+        "w": 4,
+        "h": 4
+      },
+      "datasource": {
+        "type": "elasticsearch",
+        "uid": "qaas-runner-usage-v1"
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "elasticsearch",
+            "uid": "qaas-runner-usage-v1"
+          },
+          "refId": "A",
+          "query": "event.Team:${Team:lucene} AND event.Project:${Project:lucene} AND event.System:${System:lucene} AND event.Environment:${Environment:lucene} AND event.ExecutionType:${ExecutionType:lucene} AND event.Version:${Version:lucene} AND event.Features:${Features:lucene} AND event.Conflict:true",
+          "metrics": [
+            {
+              "id": "1",
+              "type": "count"
+            }
+          ],
+          "bucketAggs": [
+            {
+              "id": "2",
+              "type": "terms",
+              "field": "event.Conflict",
+              "settings": {
+                "size": "1",
+                "order": "desc",
+                "orderBy": "_count",
+                "min_doc_count": "1"
+              }
+            }
+          ]
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "noValue": "\u2014"
+        },
+        "overrides": []
+      },
+      "options": {
+        "textMode": "value",
+        "graphMode": "none",
+        "colorMode": "none",
+        "reduceOptions": {
+          "values": false,
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": ""
+        }
+      }
+    },
+    {
+      "id": 13,
+      "type": "row",
+      "title": "Observed and returning owners",
+      "collapsed": false,
+      "gridPos": {
+        "x": 0,
+        "y": 17,
+        "w": 24,
+        "h": 1
+      },
+      "panels": []
+    },
+    {
+      "id": 14,
+      "type": "stat",
+      "title": "Active teams",
+      "description": "Estimated distinct known team labels with an observed start in the selected range. This measures usage. No eligible-owner denominator is supplied.",
+      "gridPos": {
+        "x": 0,
+        "y": 18,
+        "w": 8,
+        "h": 3
+      },
+      "datasource": {
+        "type": "elasticsearch",
+        "uid": "qaas-runner-usage-v1"
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "elasticsearch",
+            "uid": "qaas-runner-usage-v1"
+          },
+          "refId": "A",
+          "query": "event.Conflict:false AND event.Team:${Team:lucene} AND event.Project:${Project:lucene} AND event.System:${System:lucene} AND event.Environment:${Environment:lucene} AND event.ExecutionType:${ExecutionType:lucene} AND event.Version:${Version:lucene} AND event.Features:${Features:lucene} AND event.Kind:Execution AND event.StartedAt:[${__from} TO ${__to}] AND event.TeamKnown:true",
+          "metrics": [
+            {
+              "id": "1",
+              "type": "cardinality",
+              "field": "event.Team",
+              "settings": {
+                "precision_threshold": 4000
+              }
+            }
+          ],
+          "bucketAggs": [
+            {
+              "id": "2",
+              "type": "terms",
+              "field": "event.Kind",
+              "settings": {
+                "size": "1",
+                "order": "desc",
+                "orderBy": "_count",
+                "min_doc_count": "1"
+              }
+            }
+          ]
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "noValue": "\u2014"
+        },
+        "overrides": []
+      },
+      "options": {
+        "textMode": "value",
+        "graphMode": "none",
+        "colorMode": "none",
+        "reduceOptions": {
+          "values": false,
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": ""
+        }
+      }
+    },
+    {
+      "id": 15,
+      "type": "stat",
+      "title": "Returning teams",
+      "description": "Estimated distinct known team labels present in both equal-duration halves of the selected UTC range. Intersection = first + second \u2212 union, bounded by the smaller half. If either half has no observed owners, comparison is unavailable.",
+      "gridPos": {
+        "x": 0,
+        "y": 21,
+        "w": 8,
+        "h": 3
+      },
+      "datasource": {
+        "type": "elasticsearch",
+        "uid": "qaas-runner-usage-v1"
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "elasticsearch",
+            "uid": "qaas-runner-usage-v1"
+          },
+          "refId": "A",
+          "query": "event.Conflict:false AND event.Team:${Team:lucene} AND event.Project:${Project:lucene} AND event.System:${System:lucene} AND event.Environment:${Environment:lucene} AND event.ExecutionType:${ExecutionType:lucene} AND event.Version:${Version:lucene} AND event.Features:${Features:lucene} AND event.Kind:Execution AND event.StartedAt:[${__from} TO ${__to}] AND event.TeamKnown:true",
+          "metrics": [
+            {
+              "id": "1",
+              "type": "cardinality",
+              "settings": {
+                "precision_threshold": 4000,
+                "script": {
+                  "source": "long a=Long.parseLong(params.lo); long b=Long.parseLong(params.hi); long mid=a+(b-a)/2; return doc['event.StartedAt'].value.toInstant().toEpochMilli() < mid ? [doc[params.axis].value] : []; ",
+                  "params": {
+                    "lo": "${__from}",
+                    "hi": "${__to}",
+                    "axis": "event.Team"
+                  }
+                }
+              }
+            },
+            {
+              "id": "3",
+              "type": "cardinality",
+              "settings": {
+                "precision_threshold": 4000,
+                "script": {
+                  "source": "long a=Long.parseLong(params.lo); long b=Long.parseLong(params.hi); long mid=a+(b-a)/2; return doc['event.StartedAt'].value.toInstant().toEpochMilli() >= mid ? [doc[params.axis].value] : []; ",
+                  "params": {
+                    "lo": "${__from}",
+                    "hi": "${__to}",
+                    "axis": "event.Team"
+                  }
+                }
+              }
+            },
+            {
+              "id": "4",
+              "type": "cardinality",
+              "field": "event.Team",
+              "settings": {
+                "precision_threshold": 4000
+              }
+            },
+            {
+              "id": "5",
+              "type": "bucket_script",
+              "settings": {
+                "script": "params.a == 0 || params.b == 0 ? Double.NaN : Math.max(0,Math.min(Math.min(params.a,params.b),params.a+params.b-params.u))"
+              },
+              "pipelineVariables": [
+                {
+                  "name": "a",
+                  "pipelineAgg": "1"
+                },
+                {
+                  "name": "b",
+                  "pipelineAgg": "3"
+                },
+                {
+                  "name": "u",
+                  "pipelineAgg": "4"
+                }
+              ]
+            }
+          ],
+          "bucketAggs": [
+            {
+              "id": "2",
+              "type": "terms",
+              "field": "event.Kind",
+              "settings": {
+                "size": "1",
+                "order": "desc",
+                "orderBy": "_count",
+                "min_doc_count": "1"
+              }
+            }
+          ]
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "noValue": "\u2014"
+        },
+        "overrides": []
+      },
+      "options": {
+        "textMode": "value",
+        "graphMode": "none",
+        "colorMode": "none",
+        "reduceOptions": {
+          "values": false,
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "/^Bucket Script$/"
+        }
+      }
+    },
+    {
+      "id": 16,
+      "type": "stat",
+      "title": "Active projects",
+      "description": "Estimated distinct known project labels with an observed start in the selected range. This measures usage. No eligible-owner denominator is supplied.",
+      "gridPos": {
+        "x": 8,
+        "y": 18,
+        "w": 8,
+        "h": 3
+      },
+      "datasource": {
+        "type": "elasticsearch",
+        "uid": "qaas-runner-usage-v1"
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "elasticsearch",
+            "uid": "qaas-runner-usage-v1"
+          },
+          "refId": "A",
+          "query": "event.Conflict:false AND event.Team:${Team:lucene} AND event.Project:${Project:lucene} AND event.System:${System:lucene} AND event.Environment:${Environment:lucene} AND event.ExecutionType:${ExecutionType:lucene} AND event.Version:${Version:lucene} AND event.Features:${Features:lucene} AND event.Kind:Execution AND event.StartedAt:[${__from} TO ${__to}] AND event.ProjectKnown:true",
+          "metrics": [
+            {
+              "id": "1",
+              "type": "cardinality",
+              "field": "event.Project",
+              "settings": {
+                "precision_threshold": 4000
+              }
+            }
+          ],
+          "bucketAggs": [
+            {
+              "id": "2",
+              "type": "terms",
+              "field": "event.Kind",
+              "settings": {
+                "size": "1",
+                "order": "desc",
+                "orderBy": "_count",
+                "min_doc_count": "1"
+              }
+            }
+          ]
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "noValue": "\u2014"
+        },
+        "overrides": []
+      },
+      "options": {
+        "textMode": "value",
+        "graphMode": "none",
+        "colorMode": "none",
+        "reduceOptions": {
+          "values": false,
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": ""
+        }
+      }
+    },
+    {
+      "id": 17,
+      "type": "stat",
+      "title": "Returning projects",
+      "description": "Estimated distinct known project labels present in both equal-duration halves of the selected UTC range. Intersection = first + second \u2212 union, bounded by the smaller half. If either half has no observed owners, comparison is unavailable.",
+      "gridPos": {
+        "x": 8,
+        "y": 21,
+        "w": 8,
+        "h": 3
+      },
+      "datasource": {
+        "type": "elasticsearch",
+        "uid": "qaas-runner-usage-v1"
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "elasticsearch",
+            "uid": "qaas-runner-usage-v1"
+          },
+          "refId": "A",
+          "query": "event.Conflict:false AND event.Team:${Team:lucene} AND event.Project:${Project:lucene} AND event.System:${System:lucene} AND event.Environment:${Environment:lucene} AND event.ExecutionType:${ExecutionType:lucene} AND event.Version:${Version:lucene} AND event.Features:${Features:lucene} AND event.Kind:Execution AND event.StartedAt:[${__from} TO ${__to}] AND event.ProjectKnown:true",
+          "metrics": [
+            {
+              "id": "1",
+              "type": "cardinality",
+              "settings": {
+                "precision_threshold": 4000,
+                "script": {
+                  "source": "long a=Long.parseLong(params.lo); long b=Long.parseLong(params.hi); long mid=a+(b-a)/2; return doc['event.StartedAt'].value.toInstant().toEpochMilli() < mid ? [doc[params.axis].value] : []; ",
+                  "params": {
+                    "lo": "${__from}",
+                    "hi": "${__to}",
+                    "axis": "event.Project"
+                  }
+                }
+              }
+            },
+            {
+              "id": "3",
+              "type": "cardinality",
+              "settings": {
+                "precision_threshold": 4000,
+                "script": {
+                  "source": "long a=Long.parseLong(params.lo); long b=Long.parseLong(params.hi); long mid=a+(b-a)/2; return doc['event.StartedAt'].value.toInstant().toEpochMilli() >= mid ? [doc[params.axis].value] : []; ",
+                  "params": {
+                    "lo": "${__from}",
+                    "hi": "${__to}",
+                    "axis": "event.Project"
+                  }
+                }
+              }
+            },
+            {
+              "id": "4",
+              "type": "cardinality",
+              "field": "event.Project",
+              "settings": {
+                "precision_threshold": 4000
+              }
+            },
+            {
+              "id": "5",
+              "type": "bucket_script",
+              "settings": {
+                "script": "params.a == 0 || params.b == 0 ? Double.NaN : Math.max(0,Math.min(Math.min(params.a,params.b),params.a+params.b-params.u))"
+              },
+              "pipelineVariables": [
+                {
+                  "name": "a",
+                  "pipelineAgg": "1"
+                },
+                {
+                  "name": "b",
+                  "pipelineAgg": "3"
+                },
+                {
+                  "name": "u",
+                  "pipelineAgg": "4"
+                }
+              ]
+            }
+          ],
+          "bucketAggs": [
+            {
+              "id": "2",
+              "type": "terms",
+              "field": "event.Kind",
+              "settings": {
+                "size": "1",
+                "order": "desc",
+                "orderBy": "_count",
+                "min_doc_count": "1"
+              }
+            }
+          ]
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "noValue": "\u2014"
+        },
+        "overrides": []
+      },
+      "options": {
+        "textMode": "value",
+        "graphMode": "none",
+        "colorMode": "none",
+        "reduceOptions": {
+          "values": false,
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "/^Bucket Script$/"
+        }
+      }
+    },
+    {
+      "id": 18,
+      "type": "stat",
+      "title": "Active systems",
+      "description": "Estimated distinct known system labels with an observed start in the selected range. This measures usage. No eligible-owner denominator is supplied.",
+      "gridPos": {
+        "x": 16,
+        "y": 18,
+        "w": 8,
+        "h": 3
+      },
+      "datasource": {
+        "type": "elasticsearch",
+        "uid": "qaas-runner-usage-v1"
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "elasticsearch",
+            "uid": "qaas-runner-usage-v1"
+          },
+          "refId": "A",
+          "query": "event.Conflict:false AND event.Team:${Team:lucene} AND event.Project:${Project:lucene} AND event.System:${System:lucene} AND event.Environment:${Environment:lucene} AND event.ExecutionType:${ExecutionType:lucene} AND event.Version:${Version:lucene} AND event.Features:${Features:lucene} AND event.Kind:Execution AND event.StartedAt:[${__from} TO ${__to}] AND event.SystemKnown:true",
+          "metrics": [
+            {
+              "id": "1",
+              "type": "cardinality",
+              "field": "event.System",
+              "settings": {
+                "precision_threshold": 4000
+              }
+            }
+          ],
+          "bucketAggs": [
+            {
+              "id": "2",
+              "type": "terms",
+              "field": "event.Kind",
+              "settings": {
+                "size": "1",
+                "order": "desc",
+                "orderBy": "_count",
+                "min_doc_count": "1"
+              }
+            }
+          ]
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "noValue": "\u2014"
+        },
+        "overrides": []
+      },
+      "options": {
+        "textMode": "value",
+        "graphMode": "none",
+        "colorMode": "none",
+        "reduceOptions": {
+          "values": false,
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": ""
+        }
+      }
+    },
+    {
+      "id": 19,
+      "type": "stat",
+      "title": "Returning systems",
+      "description": "Estimated distinct known system labels present in both equal-duration halves of the selected UTC range. Intersection = first + second \u2212 union, bounded by the smaller half. If either half has no observed owners, comparison is unavailable.",
+      "gridPos": {
+        "x": 16,
+        "y": 21,
+        "w": 8,
+        "h": 3
+      },
+      "datasource": {
+        "type": "elasticsearch",
+        "uid": "qaas-runner-usage-v1"
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "elasticsearch",
+            "uid": "qaas-runner-usage-v1"
+          },
+          "refId": "A",
+          "query": "event.Conflict:false AND event.Team:${Team:lucene} AND event.Project:${Project:lucene} AND event.System:${System:lucene} AND event.Environment:${Environment:lucene} AND event.ExecutionType:${ExecutionType:lucene} AND event.Version:${Version:lucene} AND event.Features:${Features:lucene} AND event.Kind:Execution AND event.StartedAt:[${__from} TO ${__to}] AND event.SystemKnown:true",
+          "metrics": [
+            {
+              "id": "1",
+              "type": "cardinality",
+              "settings": {
+                "precision_threshold": 4000,
+                "script": {
+                  "source": "long a=Long.parseLong(params.lo); long b=Long.parseLong(params.hi); long mid=a+(b-a)/2; return doc['event.StartedAt'].value.toInstant().toEpochMilli() < mid ? [doc[params.axis].value] : []; ",
+                  "params": {
+                    "lo": "${__from}",
+                    "hi": "${__to}",
+                    "axis": "event.System"
+                  }
+                }
+              }
+            },
+            {
+              "id": "3",
+              "type": "cardinality",
+              "settings": {
+                "precision_threshold": 4000,
+                "script": {
+                  "source": "long a=Long.parseLong(params.lo); long b=Long.parseLong(params.hi); long mid=a+(b-a)/2; return doc['event.StartedAt'].value.toInstant().toEpochMilli() >= mid ? [doc[params.axis].value] : []; ",
+                  "params": {
+                    "lo": "${__from}",
+                    "hi": "${__to}",
+                    "axis": "event.System"
+                  }
+                }
+              }
+            },
+            {
+              "id": "4",
+              "type": "cardinality",
+              "field": "event.System",
+              "settings": {
+                "precision_threshold": 4000
+              }
+            },
+            {
+              "id": "5",
+              "type": "bucket_script",
+              "settings": {
+                "script": "params.a == 0 || params.b == 0 ? Double.NaN : Math.max(0,Math.min(Math.min(params.a,params.b),params.a+params.b-params.u))"
+              },
+              "pipelineVariables": [
+                {
+                  "name": "a",
+                  "pipelineAgg": "1"
+                },
+                {
+                  "name": "b",
+                  "pipelineAgg": "3"
+                },
+                {
+                  "name": "u",
+                  "pipelineAgg": "4"
+                }
+              ]
+            }
+          ],
+          "bucketAggs": [
+            {
+              "id": "2",
+              "type": "terms",
+              "field": "event.Kind",
+              "settings": {
+                "size": "1",
+                "order": "desc",
+                "orderBy": "_count",
+                "min_doc_count": "1"
+              }
+            }
+          ]
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "noValue": "\u2014"
+        },
+        "overrides": []
+      },
+      "options": {
+        "textMode": "value",
+        "graphMode": "none",
+        "colorMode": "none",
+        "reduceOptions": {
+          "values": false,
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "/^Bucket Script$/"
+        }
+      }
+    },
+    {
+      "id": 20,
+      "type": "table",
+      "title": "Usage by team, project and system",
+      "description": "Observed starts by trusted ownership. Shows the five busiest teams, their five busiest projects and five systems each. Names need not be unique across owners.",
+      "gridPos": {
+        "x": 0,
+        "y": 24,
+        "w": 12,
+        "h": 8
+      },
+      "datasource": {
+        "type": "elasticsearch",
+        "uid": "qaas-runner-usage-v1"
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "elasticsearch",
+            "uid": "qaas-runner-usage-v1"
+          },
+          "refId": "A",
+          "query": "event.Conflict:false AND event.Team:${Team:lucene} AND event.Project:${Project:lucene} AND event.System:${System:lucene} AND event.Environment:${Environment:lucene} AND event.ExecutionType:${ExecutionType:lucene} AND event.Version:${Version:lucene} AND event.Features:${Features:lucene} AND event.Kind:Execution AND event.StartedAt:[${__from} TO ${__to}]",
+          "metrics": [
+            {
+              "id": "1",
+              "type": "count"
+            }
+          ],
+          "bucketAggs": [
+            {
+              "id": "2",
+              "type": "terms",
+              "field": "event.Team",
+              "settings": {
+                "size": "5",
+                "order": "desc",
+                "orderBy": "_count",
+                "min_doc_count": "1"
+              }
+            },
+            {
+              "id": "3",
+              "type": "terms",
+              "field": "event.Project",
+              "settings": {
+                "size": "5",
+                "order": "desc",
+                "orderBy": "_count",
+                "min_doc_count": "1"
+              }
+            },
+            {
+              "id": "4",
+              "type": "terms",
+              "field": "event.System",
+              "settings": {
+                "size": "5",
+                "order": "desc",
+                "orderBy": "_count",
+                "min_doc_count": "1"
+              }
+            }
+          ]
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "noValue": "\u2014"
+        },
+        "overrides": []
+      },
+      "options": {
+        "showHeader": true,
+        "cellHeight": "sm",
+        "footer": {
+          "show": false
+        }
+      },
+      "transformations": [
+        {
+          "id": "organize",
+          "options": {
+            "renameByName": {
+              "event.Team": "Team",
+              "event.Project": "Project",
+              "event.System": "System",
+              "Count": "Starts"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "id": 21,
+      "type": "table",
+      "title": "Usage by version and mode",
+      "description": "Observed starts for the eight most active versions and their execution modes. Use the filters to compare a specific release or environment.",
+      "gridPos": {
+        "x": 12,
+        "y": 24,
+        "w": 12,
+        "h": 8
+      },
+      "datasource": {
+        "type": "elasticsearch",
+        "uid": "qaas-runner-usage-v1"
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "elasticsearch",
+            "uid": "qaas-runner-usage-v1"
+          },
+          "refId": "A",
+          "query": "event.Conflict:false AND event.Team:${Team:lucene} AND event.Project:${Project:lucene} AND event.System:${System:lucene} AND event.Environment:${Environment:lucene} AND event.ExecutionType:${ExecutionType:lucene} AND event.Version:${Version:lucene} AND event.Features:${Features:lucene} AND event.Kind:Execution AND event.StartedAt:[${__from} TO ${__to}]",
+          "metrics": [
+            {
+              "id": "1",
+              "type": "count"
+            }
+          ],
+          "bucketAggs": [
+            {
+              "id": "2",
+              "type": "terms",
+              "field": "event.Version",
+              "settings": {
+                "size": "8",
+                "order": "desc",
+                "orderBy": "_count",
+                "min_doc_count": "1"
+              }
+            },
+            {
+              "id": "3",
+              "type": "terms",
+              "field": "event.ExecutionType",
+              "settings": {
+                "size": "8",
+                "order": "desc",
+                "orderBy": "_count",
+                "min_doc_count": "1"
+              }
+            }
+          ]
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "noValue": "\u2014"
+        },
+        "overrides": []
+      },
+      "options": {
+        "showHeader": true,
+        "cellHeight": "sm",
+        "footer": {
+          "show": false
+        }
+      },
+      "transformations": [
+        {
+          "id": "organize",
+          "options": {
+            "renameByName": {
+              "event.Version": "Version",
+              "event.ExecutionType": "Mode",
+              "Count": "Starts"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "id": 22,
+      "type": "timeseries",
+      "title": "Feature use",
+      "description": "Observed starts by configured, allowlisted capability per time bucket. One attempt can use several features, so series are not additive.",
+      "gridPos": {
+        "x": 0,
+        "y": 32,
+        "w": 12,
+        "h": 8
+      },
+      "datasource": {
+        "type": "elasticsearch",
+        "uid": "qaas-runner-usage-v1"
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "elasticsearch",
+            "uid": "qaas-runner-usage-v1"
+          },
+          "refId": "A",
+          "query": "event.Conflict:false AND event.Team:${Team:lucene} AND event.Project:${Project:lucene} AND event.System:${System:lucene} AND event.Environment:${Environment:lucene} AND event.ExecutionType:${ExecutionType:lucene} AND event.Version:${Version:lucene} AND event.Features:${Features:lucene} AND event.Kind:Execution AND event.StartedAt:[${__from} TO ${__to}]",
+          "metrics": [
+            {
+              "id": "1",
+              "type": "count"
+            }
+          ],
+          "bucketAggs": [
+            {
+              "id": "2",
+              "type": "terms",
+              "field": "event.Features",
+              "settings": {
+                "size": "20",
+                "order": "desc",
+                "orderBy": "_count",
+                "min_doc_count": "1"
+              }
+            },
+            {
+              "id": "3",
+              "type": "date_histogram",
+              "field": "event.StartedAt",
+              "settings": {
+                "interval": "auto",
+                "min_doc_count": "1"
+              }
+            }
+          ],
+          "alias": "{{term event.Features}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "noValue": "\u2014",
+          "min": 0,
+          "custom": {
+            "drawStyle": "bars",
+            "barAlignment": 0,
+            "lineWidth": 1,
+            "fillOpacity": 55,
+            "showPoints": "never",
+            "spanNulls": false
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "showLegend": true,
+          "placement": "bottom",
+          "displayMode": "list"
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      }
+    },
+    {
+      "id": 23,
+      "type": "table",
+      "title": "Outcomes by team and system",
+      "description": "Observed finishes and non-success counts per owner. The last column is the non-success fraction, including cancellations. Shows the eight teams and eight systems per team with the most finishes.",
+      "gridPos": {
+        "x": 12,
+        "y": 32,
+        "w": 12,
+        "h": 8
+      },
+      "datasource": {
+        "type": "elasticsearch",
+        "uid": "qaas-runner-usage-v1"
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "elasticsearch",
+            "uid": "qaas-runner-usage-v1"
+          },
+          "refId": "A",
+          "query": "event.Conflict:false AND event.Team:${Team:lucene} AND event.Project:${Project:lucene} AND event.System:${System:lucene} AND event.Environment:${Environment:lucene} AND event.ExecutionType:${ExecutionType:lucene} AND event.Version:${Version:lucene} AND event.Features:${Features:lucene} AND event.Kind:Execution AND event.FinishedAt:[${__from} TO ${__to}]",
+          "metrics": [
+            {
+              "id": "1",
+              "type": "count"
+            },
+            {
+              "id": "4",
+              "type": "sum",
+              "field": "event.Failed"
+            },
+            {
+              "id": "5",
+              "type": "avg",
+              "field": "event.Failed"
+            }
+          ],
+          "bucketAggs": [
+            {
+              "id": "2",
+              "type": "terms",
+              "field": "event.Team",
+              "settings": {
+                "size": "8",
+                "order": "desc",
+                "orderBy": "_count",
+                "min_doc_count": "1"
+              }
+            },
+            {
+              "id": "3",
+              "type": "terms",
+              "field": "event.System",
+              "settings": {
+                "size": "8",
+                "order": "desc",
+                "orderBy": "_count",
+                "min_doc_count": "1"
+              }
+            }
+          ]
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "noValue": "\u2014"
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Failure rate"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "percentunit"
+              }
+            ]
+          }
+        ]
+      },
+      "options": {
+        "showHeader": true,
+        "cellHeight": "sm",
+        "footer": {
+          "show": false
+        }
+      },
+      "transformations": [
+        {
+          "id": "organize",
+          "options": {
+            "renameByName": {
+              "event.Team": "Team",
+              "event.System": "System",
+              "Count": "Finishes",
+              "Sum": "Unsuccessful",
+              "Average": "Failure rate",
+              "Sum event.Failed": "Unsuccessful",
+              "Average event.Failed": "Failure rate"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "id": 24,
+      "type": "row",
+      "title": "Test execution",
+      "collapsed": false,
+      "gridPos": {
+        "x": 0,
+        "y": 40,
+        "w": 24,
+        "h": 1
+      },
+      "panels": []
+    },
+    {
+      "id": 25,
+      "type": "stat",
+      "title": "Test plans executed",
+      "description": "Full run test-plan/case units. Act and assert phases do not count again. Grouped by terminal time; a missing value is not a zero.",
+      "gridPos": {
+        "x": 0,
+        "y": 41,
+        "w": 6,
+        "h": 4
+      },
+      "datasource": {
+        "type": "elasticsearch",
+        "uid": "qaas-runner-usage-v1"
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "elasticsearch",
+            "uid": "qaas-runner-usage-v1"
+          },
+          "refId": "A",
+          "query": "event.Conflict:false AND event.Team:${Team:lucene} AND event.Project:${Project:lucene} AND event.System:${System:lucene} AND event.Environment:${Environment:lucene} AND event.ExecutionType:${ExecutionType:lucene} AND event.Version:${Version:lucene} AND event.Features:${Features:lucene} AND event.Kind:Execution AND event.FinishedAt:[${__from} TO ${__to}] AND _exists_:event.TestsExecuted",
+          "metrics": [
+            {
+              "id": "1",
+              "type": "sum",
+              "field": "event.TestsExecuted"
+            }
+          ],
+          "bucketAggs": [
+            {
+              "id": "2",
+              "type": "terms",
+              "field": "event.Kind",
+              "settings": {
+                "size": "1",
+                "order": "desc",
+                "orderBy": "_count",
+                "min_doc_count": "1"
+              }
+            }
+          ]
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "noValue": "\u2014"
+        },
+        "overrides": []
+      },
+      "options": {
+        "textMode": "value",
+        "graphMode": "none",
+        "colorMode": "none",
+        "reduceOptions": {
+          "values": false,
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": ""
+        }
+      }
+    },
+    {
+      "id": 26,
+      "type": "stat",
+      "title": "Assertions executed",
+      "description": "Observed completed assertion results. Interrupted attempts without a reliable result count are excluded. Grouped by terminal time; a missing value is not a zero.",
+      "gridPos": {
+        "x": 6,
+        "y": 41,
+        "w": 6,
+        "h": 4
+      },
+      "datasource": {
+        "type": "elasticsearch",
+        "uid": "qaas-runner-usage-v1"
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "elasticsearch",
+            "uid": "qaas-runner-usage-v1"
+          },
+          "refId": "A",
+          "query": "event.Conflict:false AND event.Team:${Team:lucene} AND event.Project:${Project:lucene} AND event.System:${System:lucene} AND event.Environment:${Environment:lucene} AND event.ExecutionType:${ExecutionType:lucene} AND event.Version:${Version:lucene} AND event.Features:${Features:lucene} AND event.Kind:Execution AND event.FinishedAt:[${__from} TO ${__to}] AND _exists_:event.AssertionsExecuted",
+          "metrics": [
+            {
+              "id": "1",
+              "type": "sum",
+              "field": "event.AssertionsExecuted"
+            }
+          ],
+          "bucketAggs": [
+            {
+              "id": "2",
+              "type": "terms",
+              "field": "event.Kind",
+              "settings": {
+                "size": "1",
+                "order": "desc",
+                "orderBy": "_count",
+                "min_doc_count": "1"
+              }
+            }
+          ]
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "noValue": "\u2014"
+        },
+        "overrides": []
+      },
+      "options": {
+        "textMode": "value",
+        "graphMode": "none",
+        "colorMode": "none",
+        "reduceOptions": {
+          "values": false,
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": ""
+        }
+      }
+    },
+    {
+      "id": 27,
+      "type": "stat",
+      "title": "Assertions / s",
+      "description": "Sum of known completed assertion counts divided by the selected range in seconds. Counts are attributed to finish time.",
+      "gridPos": {
+        "x": 12,
+        "y": 41,
+        "w": 6,
+        "h": 4
+      },
+      "datasource": {
+        "type": "elasticsearch",
+        "uid": "qaas-runner-usage-v1"
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "elasticsearch",
+            "uid": "qaas-runner-usage-v1"
+          },
+          "refId": "A",
+          "query": "event.Conflict:false AND event.Team:${Team:lucene} AND event.Project:${Project:lucene} AND event.System:${System:lucene} AND event.Environment:${Environment:lucene} AND event.ExecutionType:${ExecutionType:lucene} AND event.Version:${Version:lucene} AND event.Features:${Features:lucene} AND event.Kind:Execution AND event.FinishedAt:[${__from} TO ${__to}] AND _exists_:event.AssertionsExecuted",
+          "metrics": [
+            {
+              "id": "1",
+              "type": "sum",
+              "field": "event.AssertionsExecuted"
+            },
+            {
+              "id": "5",
+              "type": "bucket_script",
+              "settings": {
+                "script": "params.n / ((${__to}L - ${__from}L) / 1000.0)"
+              },
+              "pipelineVariables": [
+                {
+                  "name": "n",
+                  "pipelineAgg": "1"
+                }
+              ]
+            }
+          ],
+          "bucketAggs": [
+            {
+              "id": "2",
+              "type": "terms",
+              "field": "event.Kind",
+              "settings": {
+                "size": "1",
+                "order": "desc",
+                "orderBy": "_count",
+                "min_doc_count": "1"
+              }
+            }
+          ]
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ops",
+          "noValue": "\u2014"
+        },
+        "overrides": []
+      },
+      "options": {
+        "textMode": "value",
+        "graphMode": "none",
+        "colorMode": "none",
+        "reduceOptions": {
+          "values": false,
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "/^Bucket Script$/"
+        }
+      }
+    },
+    {
+      "id": 28,
+      "type": "stat",
+      "title": "Unmeasured assertion counts",
+      "description": "Finishes without an exact completed assertion count. They do not enter assertion totals or throughput.",
+      "gridPos": {
+        "x": 18,
+        "y": 41,
+        "w": 6,
+        "h": 4
+      },
+      "datasource": {
+        "type": "elasticsearch",
+        "uid": "qaas-runner-usage-v1"
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "elasticsearch",
+            "uid": "qaas-runner-usage-v1"
+          },
+          "refId": "A",
+          "query": "event.Conflict:false AND event.Team:${Team:lucene} AND event.Project:${Project:lucene} AND event.System:${System:lucene} AND event.Environment:${Environment:lucene} AND event.ExecutionType:${ExecutionType:lucene} AND event.Version:${Version:lucene} AND event.Features:${Features:lucene} AND event.Kind:Execution AND event.FinishedAt:[${__from} TO ${__to}] AND NOT _exists_:event.AssertionsExecuted",
+          "metrics": [
+            {
+              "id": "1",
+              "type": "count"
+            }
+          ],
+          "bucketAggs": [
+            {
+              "id": "2",
+              "type": "terms",
+              "field": "event.Kind",
+              "settings": {
+                "size": "1",
+                "order": "desc",
+                "orderBy": "_count",
+                "min_doc_count": "1"
+              }
+            }
+          ]
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "noValue": "\u2014"
+        },
+        "overrides": []
+      },
+      "options": {
+        "textMode": "value",
+        "graphMode": "none",
+        "colorMode": "none",
+        "reduceOptions": {
+          "values": false,
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": ""
+        }
+      }
+    },
+    {
+      "id": 29,
+      "type": "table",
+      "title": "Mode, case and batch",
+      "description": "Finishes by run/act/assert, named-case expansion and command-batch membership. An attempt may belong to both a case and a batch.",
+      "gridPos": {
+        "x": 0,
+        "y": 45,
+        "w": 24,
+        "h": 8
+      },
+      "datasource": {
+        "type": "elasticsearch",
+        "uid": "qaas-runner-usage-v1"
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "elasticsearch",
+            "uid": "qaas-runner-usage-v1"
+          },
+          "refId": "A",
+          "query": "event.Conflict:false AND event.Team:${Team:lucene} AND event.Project:${Project:lucene} AND event.System:${System:lucene} AND event.Environment:${Environment:lucene} AND event.ExecutionType:${ExecutionType:lucene} AND event.Version:${Version:lucene} AND event.Features:${Features:lucene} AND event.Kind:Execution AND event.FinishedAt:[${__from} TO ${__to}]",
+          "metrics": [
+            {
+              "id": "1",
+              "type": "count"
+            },
+            {
+              "id": "6",
+              "type": "sum",
+              "field": "event.TestsExecuted"
+            },
+            {
+              "id": "7",
+              "type": "sum",
+              "field": "event.AssertionsExecuted",
+              "hide": true
+            },
+            {
+              "id": "8",
+              "type": "avg",
+              "field": "event.AssertionsExecuted",
+              "hide": true
+            },
+            {
+              "id": "9",
+              "type": "bucket_script",
+              "settings": {
+                "script": "params.mean >= 0 ? params.total : Double.NaN"
+              },
+              "pipelineVariables": [
+                {
+                  "name": "mean",
+                  "pipelineAgg": "8"
+                },
+                {
+                  "name": "total",
+                  "pipelineAgg": "7"
+                }
+              ]
+            }
+          ],
+          "bucketAggs": [
+            {
+              "id": "2",
+              "type": "terms",
+              "field": "event.ExecutionType",
+              "settings": {
+                "size": "20",
+                "order": "desc",
+                "orderBy": "_count",
+                "min_doc_count": "1"
+              }
+            },
+            {
+              "id": "3",
+              "type": "terms",
+              "field": "event.Invocation",
+              "settings": {
+                "size": "20",
+                "order": "desc",
+                "orderBy": "_count",
+                "min_doc_count": "1"
+              }
+            }
+          ]
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "noValue": "\u2014"
+        },
+        "overrides": []
+      },
+      "options": {
+        "showHeader": true,
+        "cellHeight": "sm",
+        "footer": {
+          "show": false
+        }
+      },
+      "transformations": [
+        {
+          "id": "organize",
+          "options": {
+            "renameByName": {
+              "event.ExecutionType": "Mode",
+              "event.Invocation": "Invocation",
+              "Count": "Finishes",
+              "Sum event.TestsExecuted": "Test plans",
+              "Bucket Script": "Assertions"
+            },
+            "excludeByName": {
+              "Sum event.AssertionsExecuted": true,
+              "Average": true,
+              "Average event.AssertionsExecuted": true
+            }
+          }
+        }
+      ]
+    },
+    {
+      "id": 30,
+      "type": "table",
+      "title": "Recent unsuccessful executions",
+      "description": "Up to 25 failed or cancelled terminal attempts in descending event time. The attempt ID identifies the matching lifecycle pair in Elasticsearch. Existing application diagnostics retain their usual scope.",
+      "gridPos": {
+        "x": 0,
+        "y": 53,
+        "w": 24,
+        "h": 7
+      },
+      "datasource": {
+        "type": "elasticsearch",
+        "uid": "qaas-runner-usage-v1"
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "elasticsearch",
+            "uid": "qaas-runner-usage-v1"
+          },
+          "refId": "A",
+          "query": "event.Conflict:false AND event.Team:${Team:lucene} AND event.Project:${Project:lucene} AND event.System:${System:lucene} AND event.Environment:${Environment:lucene} AND event.ExecutionType:${ExecutionType:lucene} AND event.Version:${Version:lucene} AND event.Features:${Features:lucene} AND event.Kind:Execution AND event.FinishedAt:[${__from} TO ${__to}] AND event.Failed:1",
+          "metrics": [
+            {
+              "id": "1",
+              "type": "raw_data",
+              "settings": {
+                "size": "25"
+              }
+            }
+          ],
+          "bucketAggs": []
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "noValue": "\u2014"
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "FinishedAt"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "dateTimeAsIso"
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "DurationMs"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "ms"
+              }
+            ]
+          }
+        ]
+      },
+      "options": {
+        "showHeader": true,
+        "cellHeight": "sm",
+        "footer": {
+          "show": false
+        }
+      },
+      "transformations": [
+        {
+          "id": "filterFieldsByName",
+          "options": {
+            "include": {
+              "names": [
+                "event.FinishedAt",
+                "event.Team",
+                "event.Project",
+                "event.System",
+                "event.ExecutionType",
+                "event.Outcome",
+                "event.DurationMs",
+                "event.AttemptId"
+              ]
+            }
+          }
+        },
+        {
+          "id": "organize",
+          "options": {
+            "indexByName": {
+              "event.FinishedAt": 0,
+              "event.Team": 1,
+              "event.Project": 2,
+              "event.System": 3,
+              "event.ExecutionType": 4,
+              "event.Outcome": 5,
+              "event.DurationMs": 6,
+              "event.AttemptId": 7
+            },
+            "renameByName": {
+              "event.FinishedAt": "FinishedAt",
+              "event.Team": "Team",
+              "event.Project": "Project",
+              "event.System": "System",
+              "event.ExecutionType": "ExecutionType",
+              "event.Outcome": "Outcome",
+              "event.DurationMs": "DurationMs",
+              "event.AttemptId": "AttemptId"
+            }
+          }
+        }
+      ]
+    }
+  ]
+}
