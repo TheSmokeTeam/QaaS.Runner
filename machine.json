@@ -1,0 +1,13 @@
+{
+  "cpu": "11th Gen Intel(R) Core(TM) i5-1135G7 @ 2.40GHz",
+  "logical": 8,
+  "os": "Microsoft Windows 10 Home",
+  "memory_kib": 8075748,
+  "dotnet": "10.0.203",
+  "node": "v24.16.0",
+  "python": "Python 3.14.5",
+  "runner_base": "750dda829d0aa11616056382023cdf0b7f50ddac",
+  "mocker_base": "363f4e22e209952db336558ca8aa0e31f10733b5",
+  "elastic": "docker.elastic.co/elasticsearch/elasticsearch:7.17.29",
+  "grafana": "grafana/grafana:11.6.0"
+}
