@@ -323,12 +323,6 @@ public class ReportPortalReporter : BaseReporter
             .Distinct(StringComparer.OrdinalIgnoreCase)
             .OrderBy(sessionName => sessionName, StringComparer.OrdinalIgnoreCase)
             .ToArray();
-        attributes.Add(new ItemAttribute
-        {
-            Key = "sessionCount",
-            Value = sessionNames.Length.ToString()
-        });
-
         if (sessionNames.Length > 0)
         {
             attributes.Add(new ItemAttribute
