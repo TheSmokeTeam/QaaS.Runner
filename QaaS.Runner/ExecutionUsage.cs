@@ -149,7 +149,13 @@ internal sealed class ExecutionUsage
             );
     }
 
-    private static string? Known(string? value) => string.IsNullOrWhiteSpace(value) ? null : value;
+    private static string? Known(string? value)
+    {
+        if (value is not { Length: > 0 and <= 128 })
+            return null;
+        var trimmed = value.Trim();
+        return trimmed.Length == 0 ? null : trimmed;
+    }
 
     private static MetaDataConfig? ReadMetadata(Context context)
     {

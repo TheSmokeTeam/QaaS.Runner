@@ -198,6 +198,39 @@ public class ExecutionTests
     }
 
     [Test]
+    public void Start_BoundsAndTrimsUsageOwnershipLabels()
+    {
+        var sink = new RecordingSink();
+        using var logger = new LoggerConfiguration()
+            .MinimumLevel.Debug()
+            .WriteTo.Sink(sink)
+            .CreateLogger();
+        using var factory = new SerilogLoggerFactory(logger);
+        var context = CreateContext(factory.CreateLogger("Runner"));
+        var owner = context.GetMetaDataFromContext();
+        owner.Team = "  Unknown  ";
+        owner.System = " " + new string('s', 127) + " ";
+        owner.ExtraLabels["Project"] = new string('p', 128);
+        var execution = CreateExecution(ExecutionType.Run, context, []);
+
+        Assert.That(execution.Start(), Is.Zero);
+
+        var events = sink.Events.Where(e => e.Properties.ContainsKey("QaasEvent")).ToArray();
+        Assert.That(events, Has.Length.EqualTo(2));
+        Assert.That(
+            events.All(e =>
+                e.Properties["Team"].Equals(new ScalarValue("Unknown"))
+                && e.Properties["TeamKnown"].Equals(new ScalarValue(true))
+                && e.Properties["System"].Equals(new ScalarValue("Unknown"))
+                && e.Properties["SystemKnown"].Equals(new ScalarValue(false))
+                && e.Properties["Project"].Equals(new ScalarValue(new string('p', 128)))
+                && e.Properties["ProjectKnown"].Equals(new ScalarValue(true))
+            ),
+            Is.True
+        );
+    }
+
+    [Test]
     public void Start_ReportsUnknownAssertionCountOnInterruptedParallelBatch()
     {
         var sink = new RecordingSink();
