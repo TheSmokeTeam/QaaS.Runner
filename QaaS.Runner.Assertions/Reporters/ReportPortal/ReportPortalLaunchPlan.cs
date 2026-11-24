@@ -201,11 +201,7 @@ internal sealed class ReportPortalLaunchPlan
             .Distinct(StringComparer.OrdinalIgnoreCase)
             .OrderBy(sessionName => sessionName, StringComparer.OrdinalIgnoreCase)
             .ToArray();
-        var attributes = BuildAttributes(
-            reporterResults,
-            sessionNames,
-            firstConfig.Attributes
-        );
+        var attributes = BuildAttributes(reporterResults, firstConfig.Attributes);
         var assertions = reporterResults
             .SelectMany(reporter => reporter.Assertions)
             .ToList();
@@ -239,7 +235,6 @@ internal sealed class ReportPortalLaunchPlan
     /// </summary>
     private static IReadOnlyDictionary<string, string> BuildAttributes(
         IReadOnlyList<ReportPortalReporterResults> reporterResults,
-        IReadOnlyList<string> sessionNames,
         IReadOnlyDictionary<string, string>? configAttributes
     )
     {
@@ -265,8 +260,6 @@ internal sealed class ReportPortalLaunchPlan
                 StringComparer.OrdinalIgnoreCase
             );
 
-        attributes["builderCount"] = reporterResults.Count.ToString();
-        attributes["sessionCount"] = sessionNames.Count.ToString();
         attributes["environment"] =
             Environment.GetEnvironmentVariable("KUBERNETES_SERVICE_HOST") is null ? "local" : "k8s";
 

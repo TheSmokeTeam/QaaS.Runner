@@ -193,6 +193,8 @@ public class ReportPortalLaunchPlanTests
         Assert.That(attributes.Any(attribute => attribute.Key == "tool"), Is.False);
         Assert.That(attributes.Any(attribute => attribute.Key == "source"), Is.False);
         Assert.That(attributes.Any(attribute => attribute.Key == "executionMode"), Is.False);
+        Assert.That(attributes.Any(attribute => attribute.Key == "builderCount"), Is.False);
+        Assert.That(attributes.Any(attribute => attribute.Key == "sessionCount"), Is.False);
         Assert.That(
             attributes.Any(attribute => attribute.Key == "team" && attribute.Value == "Smoke"),
             Is.True
@@ -224,6 +226,33 @@ public class ReportPortalLaunchPlanTests
             attributes.Any(attribute => attribute.Key == "Area" && attribute.Value == "Checkout"),
             Is.True
         );
+    }
+
+    [Test]
+    public void BuildLaunchAttributes_WithConfiguredCountAttributes_PreservesThem()
+    {
+        var reporter = CreateReporter(
+            attributes: new Dictionary<string, string>
+            {
+                ["builderCount"] = "configured-builders",
+                ["sessionCount"] = "configured-sessions",
+            }
+        );
+        reporter.WriteTestResults(CreateResult("assertion-a", "Session A"));
+
+        var attributes = BuildPlan(reporter, requireQueuedResults: true).BuildLaunchAttributes();
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(
+                attributes.Single(attribute => attribute.Key == "builderCount").Value,
+                Is.EqualTo("configured-builders")
+            );
+            Assert.That(
+                attributes.Single(attribute => attribute.Key == "sessionCount").Value,
+                Is.EqualTo("configured-sessions")
+            );
+        });
     }
 
     [Test]

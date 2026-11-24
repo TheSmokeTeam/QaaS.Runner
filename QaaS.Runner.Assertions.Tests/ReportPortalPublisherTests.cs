@@ -362,8 +362,7 @@ public class ReportPortalPublisherTests
                 .Select(attribute => attribute.Value), Is.EqualTo(new[] { "case-a" }));
             Assert.That(itemRequest.Attributes.Any(attribute => attribute.Key == "executionMode"), Is.False);
             Assert.That(itemRequest.Attributes.Any(attribute => attribute.Key == "builderCount"), Is.False);
-            Assert.That(itemRequest.Attributes.Single(attribute =>
-                attribute.Key == "sessionCount").Value, Is.EqualTo("1"));
+            Assert.That(itemRequest.Attributes.Any(attribute => attribute.Key == "sessionCount"), Is.False);
             Assert.That(itemRequest.Attributes.Any(attribute => attribute.Key == "caseNames"), Is.False);
             Assert.That(itemRequest.Attributes.Any(attribute => attribute.Key == "environment"), Is.False);
             Assert.That(itemRequest.Attributes.Any(attribute => attribute.Key == "LaunchOnly"), Is.False);
@@ -428,7 +427,7 @@ public class ReportPortalPublisherTests
     }
 
     [Test]
-    public async Task PublishAsync_AddsAssertionScopedSessionNamesAndSessionCount()
+    public async Task PublishAsync_AddsAssertionScopedSessionNamesWithoutCountAttributes()
     {
         var factory = new RecordingClientFactory();
         using var publisher = CreateSuccessfulPublisher(factory, out _);
@@ -459,12 +458,10 @@ public class ReportPortalPublisherTests
                 attribute.Key == "sessions"), Is.False);
             Assert.That(items.Values.SelectMany(item => item.Attributes).Any(attribute =>
                 attribute.Key == "session"), Is.False);
-            Assert.That(items["assertion-a"].Attributes.Single(attribute =>
-                attribute.Key == "sessionCount").Value, Is.EqualTo("2"));
-            Assert.That(items["assertion-b"].Attributes.Single(attribute =>
-                attribute.Key == "sessionCount").Value, Is.EqualTo("1"));
-            Assert.That(service.LaunchStartRequests.Single().Attributes.Single(attribute =>
-                attribute.Key == "sessionCount").Value, Is.EqualTo("3"));
+            Assert.That(items.Values.SelectMany(item => item.Attributes).Any(attribute =>
+                attribute.Key == "sessionCount"), Is.False);
+            Assert.That(service.LaunchStartRequests.Single().Attributes.Any(attribute =>
+                attribute.Key is "builderCount" or "sessionCount"), Is.False);
         });
     }
 
