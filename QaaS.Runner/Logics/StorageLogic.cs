@@ -14,6 +14,8 @@ namespace QaaS.Runner.Logics;
 public class StorageLogic(IList<IStorage> storages, InternalContext context, ExecutionType executionType)
     : ILogic
 {
+    internal bool IsConfigured => storages.Count != 0;
+
     /// <summary>
     /// Stores or retrieves session data based on the execution mode provided to the logic instance.
     /// </summary>

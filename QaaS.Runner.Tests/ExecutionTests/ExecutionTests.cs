@@ -1,3 +1,4 @@
+using System.Collections.Concurrent;
 using System.Collections.Immutable;
 using Autofac;
 using Microsoft.Extensions.Configuration;
@@ -43,6 +44,8 @@ public class ExecutionTests
             .CreateLogger();
         using var factory = new SerilogLoggerFactory(logger);
         var context = CreateContext(factory.CreateLogger("Runner"));
+        context.GetMetaDataFromContext().ExtraLabels["Project"] = "Billing";
+        context.GetMetaDataFromContext().ExtraLabels["Untrusted"] = "private";
         var execution = CreateExecution(type, context, [CreateAssertion("assertion", status)]);
 
         Assert.That(execution.Start(), Is.EqualTo(expectedExit));
@@ -61,10 +64,55 @@ public class ExecutionTests
             measured.All(e =>
                 e.Properties["Team"].Equals(new ScalarValue("Smoke"))
                 && e.Properties["System"].Equals(new ScalarValue("QaaS"))
-                && e.Properties["ExecutionId"].Equals(new ScalarValue(context.ExecutionId))
+                && e.Properties["Project"].Equals(new ScalarValue("Billing"))
+                && e.Properties["TeamKnown"].Equals(new ScalarValue(true))
+                && e.Properties["SystemKnown"].Equals(new ScalarValue(true))
+                && e.Properties["ProjectKnown"].Equals(new ScalarValue(true))
+                && e.Properties["IsCase"].Equals(new ScalarValue(true))
+                && e.Properties["IsBatch"].Equals(new ScalarValue(false))
+                && !e.Properties.ContainsKey("ExecutionId")
+                && !e.Properties.ContainsKey("Untrusted")
             ),
             Is.True
         );
+        Assert.That(
+            measured[0].Properties["AttemptId"],
+            Is.EqualTo(measured[1].Properties["AttemptId"])
+        );
+        Assert.That(
+            measured[0].Properties["Version"],
+            Is.EqualTo(measured[1].Properties["Version"])
+        );
+        Assert.That(
+            ((ScalarValue)measured[0].Properties["Version"]).Value,
+            Is.Not.Null.And.Not.Empty
+        );
+        var features = ((SequenceValue)measured[1].Properties["Features"]).Elements;
+        Assert.That(
+            ((SequenceValue)measured[0].Properties["Features"]).Elements,
+            Is.EqualTo(features)
+        );
+        Assert.That(
+            features,
+            type == ExecutionType.Act ? Is.Empty : Does.Contain(new ScalarValue("Assertions"))
+        );
+        Assert.That(
+            measured[1].Properties["TestsExecuted"],
+            Is.EqualTo(new ScalarValue(type == ExecutionType.Run ? 1 : 0))
+        );
+        Assert.That(
+            measured[1].Properties["AssertionsExecuted"],
+            Is.EqualTo(new ScalarValue(type == ExecutionType.Act ? 0 : 1))
+        );
+        Assert.That(
+            ((ScalarValue)measured[1].Properties["DurationMs"]).Value,
+            Is.GreaterThanOrEqualTo(0)
+        );
+        var outcome =
+            expectedExit == 0 ? "success"
+            : status == AssertionStatus.Broken ? "broken_assertion"
+            : "assertion_failure";
+        Assert.That(measured[1].Properties["Outcome"], Is.EqualTo(new ScalarValue(outcome)));
         Assert.That(measured[1].Properties["Failed"], Is.EqualTo(new ScalarValue(expectedExit)));
         Assert.That(
             sink.Events.Any(e =>
@@ -96,6 +144,114 @@ public class ExecutionTests
             && kind.Equals(new ScalarValue("RunnerExecutionFinished"))
         );
         Assert.That(finish.Properties["Failed"], Is.EqualTo(new ScalarValue(1)));
+        Assert.That(
+            finish.Properties["Outcome"],
+            Is.EqualTo(new ScalarValue(cancelled ? "cancelled" : "runner_error"))
+        );
+        Assert.That(finish.Properties["AssertionsExecuted"], Is.EqualTo(new ScalarValue(0)));
+    }
+
+    [Test]
+    public void Start_RepeatedExecutionGetsFreshAttemptAndCountsOnlyThisAttemptsResults()
+    {
+        var sink = new RecordingSink();
+        using var logger = new LoggerConfiguration()
+            .MinimumLevel.Debug()
+            .WriteTo.Sink(sink)
+            .CreateLogger();
+        using var factory = new SerilogLoggerFactory(logger);
+        var context = CreateContext(factory.CreateLogger("Runner"));
+        var owner = context.GetMetaDataFromContext();
+        owner.Team = "Unknown";
+        owner.System = " ";
+        owner.ExtraLabels["Project"] = new[] { "untrusted", "values" };
+        var execution = CreateExecution(
+            ExecutionType.Run,
+            context,
+            [CreateAssertion("a", AssertionStatus.Passed)]
+        );
+
+        Assert.That(execution.Start(), Is.Zero);
+        Assert.That(execution.Start(), Is.Zero);
+
+        var events = sink.Events.Where(e => e.Properties.ContainsKey("QaasEvent")).ToList();
+        Assert.That(events, Has.Count.EqualTo(4));
+        Assert.That(
+            events[0].Properties["AttemptId"],
+            Is.Not.EqualTo(events[2].Properties["AttemptId"])
+        );
+        Assert.That(
+            events[2].Properties["AttemptId"],
+            Is.EqualTo(events[3].Properties["AttemptId"])
+        );
+        Assert.That(events[3].Properties["AssertionsExecuted"], Is.EqualTo(new ScalarValue(1)));
+        Assert.That(
+            events.All(e =>
+                e.Properties["TeamKnown"].Equals(new ScalarValue(true))
+                && e.Properties["System"].Equals(new ScalarValue("Unknown"))
+                && e.Properties["SystemKnown"].Equals(new ScalarValue(false))
+                && e.Properties["Project"].Equals(new ScalarValue("Unknown"))
+                && e.Properties["ProjectKnown"].Equals(new ScalarValue(false))
+            ),
+            Is.True
+        );
+    }
+
+    [Test]
+    public void Start_ReportsUnknownAssertionCountOnInterruptedParallelBatch()
+    {
+        var sink = new RecordingSink();
+        using var logger = new LoggerConfiguration()
+            .MinimumLevel.Debug()
+            .WriteTo.Sink(sink)
+            .CreateLogger();
+        using var factory = new SerilogLoggerFactory(logger);
+        var context = CreateContext(factory.CreateLogger("Runner"));
+        var assertion = new Mock<Assertion>();
+        assertion
+            .Setup(a =>
+                a.Execute(
+                    It.IsAny<IImmutableList<SessionData?>>(),
+                    It.IsAny<IImmutableList<DataSource>?>()
+                )
+            )
+            .Throws<OperationCanceledException>();
+        var execution = CreateExecution(ExecutionType.Run, context, [assertion.Object]);
+
+        Assert.Throws<AggregateException>(() => execution.Start());
+        var finish = sink.Events.Last(e => e.Properties.ContainsKey("QaasEvent"));
+        Assert.That(finish.Properties["Outcome"], Is.EqualTo(new ScalarValue("cancelled")));
+        Assert.That(finish.Properties["TestsExecuted"], Is.EqualTo(new ScalarValue(1)));
+        Assert.That(finish.Properties["AssertionsExecuted"], Is.EqualTo(new ScalarValue(null)));
+    }
+
+    [Test, NonParallelizable]
+    public void Start_DisabledUsagePreservesOrdinaryDiagnosticEvents()
+    {
+        var previous = Environment.GetEnvironmentVariable("QAAS_USAGE_ENABLED");
+        try
+        {
+            Environment.SetEnvironmentVariable("QAAS_USAGE_ENABLED", "fAlSe");
+            var sink = new RecordingSink();
+            using var logger = new LoggerConfiguration()
+                .MinimumLevel.Debug()
+                .WriteTo.Sink(sink)
+                .CreateLogger();
+            using var factory = new SerilogLoggerFactory(logger);
+            var context = CreateContext(factory.CreateLogger("Runner"));
+            Assert.That(CreateExecution(ExecutionType.Act, context).Start(), Is.Zero);
+            Assert.That(sink.Events.Any(e => e.Properties.ContainsKey("QaasEvent")), Is.False);
+            Assert.That(
+                sink.Events.Any(e =>
+                    e.MessageTemplate.Text.StartsWith("Running {ExecutionType} execution")
+                ),
+                Is.True
+            );
+        }
+        finally
+        {
+            Environment.SetEnvironmentVariable("QAAS_USAGE_ENABLED", previous);
+        }
     }
 
     [Test]
@@ -116,6 +272,7 @@ public class ExecutionTests
         );
 
         var original = first.GetMetaDataFromContext();
+        original.ExtraLabels["Project"] = "Orders";
         var storage = new Mock<IStorage>();
         storage
             .Setup(s => s.Retrieve(first.CaseName))
@@ -123,6 +280,7 @@ public class ExecutionTests
             {
                 original.Team = "New team";
                 original.System = "New system";
+                original.ExtraLabels["Project"] = "Changed";
                 return [];
             });
         CreateExecution(ExecutionType.Assert, first, storages: [storage.Object]).Start();
@@ -130,6 +288,10 @@ public class ExecutionTests
         storage.Verify(s => s.Retrieve(first.CaseName), Times.Once);
 
         var events = sink.Events.Where(e => e.Properties.ContainsKey("QaasEvent"));
+        Assert.That(
+            events.Take(2).All(e => e.Properties["Project"].Equals(new ScalarValue("Orders"))),
+            Is.True
+        );
         Assert.That(
             events.Select(e =>
                 (
@@ -151,24 +313,37 @@ public class ExecutionTests
 
     private sealed class RecordingSink : ILogEventSink
     {
-        public List<LogEvent> Events { get; } = [];
+        public ConcurrentQueue<LogEvent> Events { get; } = new();
 
-        public void Emit(LogEvent logEvent) => Events.Add(logEvent);
+        public void Emit(LogEvent logEvent) => Events.Enqueue(logEvent);
     }
 
     [TestCase(null)]
     [TestCase("invalid metadata")]
     public void Start_LeavesUnavailableOwnerMetadataUntouched(string? invalidMetadata)
     {
-        var logger = new Mock<Microsoft.Extensions.Logging.ILogger>();
-        logger.Setup(l => l.IsEnabled(Microsoft.Extensions.Logging.LogLevel.Debug)).Returns(true);
-        var context = CreateContext(logger.Object);
+        var sink = new RecordingSink();
+        using var logger = new LoggerConfiguration()
+            .MinimumLevel.Debug()
+            .WriteTo.Sink(sink)
+            .CreateLogger();
+        using var factory = new SerilogLoggerFactory(logger);
+        var context = CreateContext(factory.CreateLogger("Runner"));
         context.InternalGlobalDict.Clear();
         var path = context.GetMetaDataPath();
         if (invalidMetadata != null)
             context.InsertValueIntoGlobalDictionary(path, invalidMetadata);
 
         Assert.That(CreateExecution(ExecutionType.Act, context).Start(), Is.Zero);
+        var events = sink.Events.Where(e => e.Properties.ContainsKey("QaasEvent")).ToArray();
+        Assert.That(events, Has.Length.EqualTo(2));
+        Assert.That(
+            events.All(e =>
+                e.Properties["Team"].Equals(new ScalarValue("Unknown"))
+                && e.Properties["TeamKnown"].Equals(new ScalarValue(false))
+            ),
+            Is.True
+        );
         if (invalidMetadata == null)
             Assert.That(context.InternalGlobalDict, Is.Empty);
         else

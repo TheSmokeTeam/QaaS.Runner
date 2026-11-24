@@ -1,4 +1,4 @@
-﻿using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Logging;
 using QaaS.Framework.Executions.Logics;
 using QaaS.Framework.SDK.ContextObjects;
 using QaaS.Framework.SDK.DataSourceObjects;
@@ -11,6 +11,8 @@ namespace QaaS.Runner.Logics;
 /// </summary>
 public class DataSourceLogic(IList<DataSource> dataSources, InternalContext context) : ILogic
 {
+    internal bool IsConfigured => dataSources.Count != 0;
+
     /// <summary>
     /// Appends all configured data sources to <see cref="ExecutionData.DataSources" />.
     /// </summary>

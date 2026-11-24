@@ -121,8 +121,9 @@ public class ExecuteLoader<TRunner> : BaseLoader<ExecuteOptions, TRunner> where 
             return Bootstrap.GetRunner<TRunner>(stringCommand, command.Id);
         });
 
-        var allExecutions = runs.Select(run => run.ExecutionBuilders).SelectMany(runExecutions => runExecutions)
-            .ToList();
+        var allExecutions = runs.SelectMany(run => run.ExecutionBuilders).ToList();
+        foreach (var builder in allExecutions)
+            builder.IsBatch = true;
 
         var runner = Bootstrap.CreateRunner<TRunner>(
             _runScope,

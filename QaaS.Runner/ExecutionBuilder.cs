@@ -83,6 +83,7 @@ public class ExecutionBuilder()
         clone._configuredLogger = _configuredLogger;
         clone._configuredCaseName = _configuredCaseName;
         clone._configuredExecutionId = _configuredExecutionId;
+        clone.IsBatch = IsBatch;
         clone._globalDict = new Dictionary<string, object?>(_globalDict);
         clone._loadVariablesIntoGlobalDict = _loadVariablesIntoGlobalDict;
         return clone;
@@ -180,6 +181,7 @@ public class ExecutionBuilder()
     private ILogger _configuredLogger = default!;
     private string? _configuredCaseName;
     private string? _configuredExecutionId;
+    internal bool IsBatch { get; set; }
     private Dictionary<string, object?> _globalDict = new();
     private bool _loadVariablesIntoGlobalDict = true;
     private readonly IConfiguration? _templateSourceConfiguration;
@@ -1202,6 +1204,7 @@ public class ExecutionBuilder()
             // bind back context onto the executionBuilder object
             return new Execution(Type, Context, scope)
             {
+                IsBatch = IsBatch,
                 AssertionLogic = assertionLogic,
                 ReportLogic = reportLogic,
                 SessionLogic = sessionLogic,

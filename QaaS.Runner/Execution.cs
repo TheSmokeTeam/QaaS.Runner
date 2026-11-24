@@ -3,7 +3,6 @@ using Microsoft.Extensions.Logging;
 using QaaS.Framework.Executions;
 using QaaS.Framework.SDK.ContextObjects;
 using QaaS.Framework.SDK.ExecutionObjects;
-using QaaS.Framework.SDK.Extensions;
 using QaaS.Framework.SDK.Hooks.Assertion;
 using QaaS.Runner.Assertions.AssertionObjects;
 using QaaS.Runner.Logics;
@@ -37,14 +36,13 @@ public class Execution : BaseExecution
                     execution => execution.AssertionLogic,
                     execution => execution.ReportLogic
                 ],
-                execution => execution.ResolveAssertionExitCode()),
-            [ExecutionType.Act] = new(
-                [
-                    execution => execution.DataSourceLogic,
-                    execution => execution.SessionLogic,
-                    execution => execution.StorageLogic
-                ],
-                _ => 0),
+                checkAssertions: true
+            ),
+            [ExecutionType.Act] = new([
+                execution => execution.DataSourceLogic,
+                execution => execution.SessionLogic,
+                execution => execution.StorageLogic,
+            ]),
             [ExecutionType.Assert] = new(
                 [
                     execution => execution.DataSourceLogic,
@@ -52,12 +50,9 @@ public class Execution : BaseExecution
                     execution => execution.AssertionLogic,
                     execution => execution.ReportLogic
                 ],
-                execution => execution.ResolveAssertionExitCode()),
-            [ExecutionType.Template] = new(
-                [
-                    execution => execution.TemplateLogic
-                ],
-                _ => 0)
+                checkAssertions: true
+            ),
+            [ExecutionType.Template] = new([execution => execution.TemplateLogic]),
         };
 
     private readonly ILifetimeScope? _ownedScope;
@@ -90,6 +85,7 @@ public class Execution : BaseExecution
     internal AssertionLogic AssertionLogic { get; init; } = null!;
     internal ReportLogic ReportLogic { get; init; } = null!;
     internal TemplateLogic TemplateLogic { get; init; } = null!;
+    internal bool IsBatch { get; init; }
 
     /// <inheritdoc />
     public override int Start()
@@ -98,77 +94,24 @@ public class Execution : BaseExecution
             "Running {ExecutionType} execution with executionId {ExecutionId} and case name {CaseName}", Type,
             Context.ExecutionId, Context.CaseName);
         var plan = ResolvePlan(Type);
-        if (GetLogMetadata() is not { } owner)
+        var attempt = ExecutionUsage.Start(this, Context, Type);
+        if (attempt == null)
             return plan.Execute(this);
 
-        LogExecutionEvent(owner, failed: null);
-        var failed = 1;
         try
         {
-            var exitCode = plan.Execute(this);
-            failed = exitCode == 0 ? 0 : 1;
-            return exitCode;
+            return plan.Execute(this, attempt);
+        }
+        catch (Exception exception)
+        {
+            attempt.Outcome = ExecutionUsage.IsCancellation(exception)
+                ? "cancelled"
+                : "runner_error";
+            throw;
         }
         finally
         {
-            LogExecutionEvent(owner, failed);
-        }
-    }
-
-    private (string Team, string System)? GetLogMetadata()
-    {
-        try
-        {
-            if (
-                Type == ExecutionType.Template
-                || Context is not InternalContext context
-                || !context.Logger.IsEnabled(LogLevel.Debug)
-            )
-                return null;
-
-            var metadata = context.GetMetaDataFromContext();
-            var team = metadata.Team;
-            var system = metadata.System;
-            return string.IsNullOrWhiteSpace(team) || string.IsNullOrWhiteSpace(system)
-                ? null
-                : (team, system);
-        }
-        catch (Exception exception)
-            when (exception is not OutOfMemoryException and not AccessViolationException)
-        {
-            // Missing metadata and unavailable log providers must not alter execution.
-            return null;
-        }
-    }
-
-    private void LogExecutionEvent((string Team, string System) owner, int? failed)
-    {
-        try
-        {
-            if (failed.HasValue)
-                Context.Logger.LogDebug(
-                    "{QaasEvent}: {ExecutionType} for {Team}/{System}, ExecutionId={ExecutionId}, Failed={Failed}",
-                    "RunnerExecutionFinished",
-                    Type,
-                    owner.Team,
-                    owner.System,
-                    Context.ExecutionId,
-                    failed.Value
-                );
-            else
-                Context.Logger.LogDebug(
-                    "{QaasEvent}: {ExecutionType} for {Team}/{System}, ExecutionId={ExecutionId}",
-                    "RunnerExecutionStarted",
-                    Type,
-                    owner.Team,
-                    owner.System,
-                    Context.ExecutionId
-                );
-        }
-        catch (Exception exception)
-            when (exception is not OutOfMemoryException and not AccessViolationException)
-        {
-            // A custom log provider must preserve the execution's original result or exception.
+            attempt.Finish();
         }
     }
 
@@ -185,12 +128,21 @@ public class Execution : BaseExecution
                 "Unsupported execution type.");
     }
 
-    private int ResolveAssertionExitCode()
+    private int ResolveAssertionExitCode(ExecutionUsage? attempt)
     {
-        return Context.ExecutionData.AssertionResults.All(result =>
-            ((AssertionResult)result).AssertionStatus == AssertionStatus.Passed)
-            ? 0
-            : 1;
+        foreach (var result in Context.ExecutionData.AssertionResults)
+        {
+            var status = ((AssertionResult)result).AssertionStatus;
+            if (status == AssertionStatus.Passed)
+                continue;
+            if (attempt != null)
+                attempt.Outcome =
+                    attempt.HasBrokenAssertion || status == AssertionStatus.Broken
+                        ? "broken_assertion"
+                        : "assertion_failure";
+            return 1;
+        }
+        return 0;
     }
 
     /// <summary>
@@ -200,19 +152,26 @@ public class Execution : BaseExecution
     /// Selectors that resolve the concrete logic instances from an <see cref="Execution" /> and run
     /// them in declaration order.
     /// </param>
-    /// <param name="exitCodeResolver">
-    /// Strategy used to compute the final process exit code after the pipeline completes.
+    /// <param name="checkAssertions">
+    /// Whether non-passing assertion results set a nonzero process exit code.
     /// </param>
     private sealed class ExecutionPlan(
         IReadOnlyList<Func<Execution, QaaS.Framework.Executions.Logics.ILogic>> logicSelectors,
-        Func<Execution, int> exitCodeResolver)
+        bool checkAssertions = false
+    )
     {
-        public int Execute(Execution execution)
+        public int Execute(Execution execution, ExecutionUsage? attempt = null)
         {
             foreach (var logicSelector in logicSelectors)
-                logicSelector(execution).Run(execution.Context.ExecutionData);
+            {
+                var logic = logicSelector(execution);
+                if (attempt != null && logic is AssertionLogic assertions)
+                    assertions.Run(execution.Context.ExecutionData, attempt);
+                else
+                    logic.Run(execution.Context.ExecutionData);
+            }
 
-            return exitCodeResolver(execution);
+            return checkAssertions ? execution.ResolveAssertionExitCode(attempt) : 0;
         }
     }
 }
