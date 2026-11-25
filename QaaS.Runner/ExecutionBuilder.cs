@@ -282,6 +282,15 @@ public class ExecutionBuilder()
     private IEnumerable<DataSource> BuildDataSources(ILifetimeScope scope)
     {
         var configuredDataSources = DataSources ?? [];
+        if (configuredDataSources.Length == 0)
+        {
+            // Preserve the Framework loader diagnostic without discovering generators for an empty list.
+            Context?.Logger.LogDebug(
+                "Starting loading and validation of all hooks of type {HookType}",
+                nameof(IGenerator)
+            );
+            return [];
+        }
         var dataSources = configuredDataSources
             .Select(dataSourceBuilder => dataSourceBuilder.Register())
             .ToImmutableList();
