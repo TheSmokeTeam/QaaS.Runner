@@ -1,10 +1,14 @@
 using System.Reflection;
+using System.Runtime.CompilerServices;
+using System.Runtime.Loader;
 using Microsoft.Extensions.Logging;
 
 namespace QaaS.Runner.Loaders;
 
 internal static class ExecutionBuilderConfiguratorLoader
 {
+    private static readonly ConditionalWeakTable<Assembly, Type[]> ConfiguratorTypes = new();
+
     public static IReadOnlyList<IExecutionBuilderConfigurator> Load(ILogger logger)
     {
         return Load(logger, Assembly.GetEntryAssembly(), GetCandidateAssemblies());
@@ -18,7 +22,49 @@ internal static class ExecutionBuilderConfiguratorLoader
         return Load(
             logger,
             entryAssembly,
-            candidateAssemblies.SelectMany(GetLoadableTypes));
+            GetPotentialConfiguratorAssemblies(candidateAssemblies).SelectMany(GetLoadableTypes));
+    }
+
+    private static IEnumerable<Assembly> GetPotentialConfiguratorAssemblies(
+        IEnumerable<Assembly> candidates
+    )
+    {
+        var assemblies = candidates.ToArray();
+        var available = assemblies
+            .Select(a => a.FullName!)
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
+        var dependents = assemblies
+            .SelectMany(
+                a => a.GetReferencedAssemblies(),
+                (assembly, reference) =>
+                    (Reference: reference.FullName, Dependent: assembly.FullName!)
+            )
+            .ToLookup(
+                edge => edge.Reference,
+                edge => edge.Dependent,
+                StringComparer.OrdinalIgnoreCase
+            );
+
+        // Keep unresolved references and custom load contexts, where other dependencies may be supplied later.
+        var pending = new Queue<string>(
+            dependents.Select(group => group.Key).Where(name => !available.Contains(name))
+        );
+        pending.Enqueue(typeof(IExecutionBuilderConfigurator).Assembly.FullName!);
+        foreach (var assembly in assemblies)
+            if (
+                AssemblyLoadContext.GetLoadContext(assembly) is { } context
+                && context != AssemblyLoadContext.Default
+            )
+                pending.Enqueue(assembly.FullName!);
+
+        // Include implementations inherited through intermediate base classes or interfaces.
+        var possible = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        while (pending.TryDequeue(out var name))
+            if (possible.Add(name))
+                foreach (var dependent in dependents[name])
+                    pending.Enqueue(dependent);
+
+        return assemblies.Where(assembly => possible.Contains(assembly.FullName!));
     }
 
     internal static IReadOnlyList<IExecutionBuilderConfigurator> Load(
@@ -79,7 +125,14 @@ internal static class ExecutionBuilderConfiguratorLoader
     {
         try
         {
-            return assembly.GetTypes();
+            return ConfiguratorTypes.GetValue(
+                assembly,
+                static candidate =>
+                    Array.FindAll(
+                        candidate.GetTypes(),
+                        typeof(IExecutionBuilderConfigurator).IsAssignableFrom
+                    )
+            );
         }
         catch (ReflectionTypeLoadException exception)
         {

@@ -11,9 +11,6 @@ namespace QaaS.Runner;
 /// <summary>One invocation of an executable plan, including its original attribution.</summary>
 internal sealed class ExecutionUsage
 {
-    private const string Dimensions =
-        "{QaasEvent} {AttemptId} {ExecutionType} Team={Team} TeamKnown={TeamKnown} Project={Project} ProjectKnown={ProjectKnown} "
-        + "System={System} SystemKnown={SystemKnown} Version={Version} Features={Features} IsCase={IsCase} IsBatch={IsBatch}";
     private const string Unknown = "Unknown";
     private static readonly string Version =
         typeof(Execution)
@@ -107,46 +104,39 @@ internal sealed class ExecutionUsage
 
     private void Write(bool start)
     {
-        if (start)
-            _logger.LogDebug(
-                Dimensions,
-                "RunnerExecutionStarted",
-                _attemptId,
-                _type,
-                _team ?? Unknown,
-                _team != null,
-                _project ?? Unknown,
-                _project != null,
-                _system ?? Unknown,
-                _system != null,
-                Version,
-                _features,
-                _isCase,
-                _isBatch
-            );
-        else
-            _logger.LogDebug(
-                Dimensions
-                    + " DurationMs={DurationMs} Outcome={Outcome} Failed={Failed} TestsExecuted={TestsExecuted} AssertionsExecuted={AssertionsExecuted}",
-                "RunnerExecutionFinished",
-                _attemptId,
-                _type,
-                _team ?? Unknown,
-                _team != null,
-                _project ?? Unknown,
-                _project != null,
-                _system ?? Unknown,
-                _system != null,
-                Version,
-                _features,
-                _isCase,
-                _isBatch,
-                Stopwatch.GetElapsedTime(_started).TotalMilliseconds,
-                Outcome,
-                Outcome == "success" ? 0 : 1,
-                _type == ExecutionType.Run ? 1 : 0,
-                AssertionsExecuted
-            );
+        // The Elastic formatter writes both rendered text and structured properties. Render only the event and ID.
+        var fields = new List<KeyValuePair<string, object?>>(start ? 14 : 19)
+        {
+            new("QaasEvent", start ? "RunnerExecutionStarted" : "RunnerExecutionFinished"),
+            new("AttemptId", _attemptId),
+            new("{OriginalFormat}", "{QaasEvent} {AttemptId}"),
+            new("ExecutionType", _type),
+            new("Team", _team ?? Unknown),
+            new("TeamKnown", _team != null),
+            new("Project", _project ?? Unknown),
+            new("ProjectKnown", _project != null),
+            new("System", _system ?? Unknown),
+            new("SystemKnown", _system != null),
+            new("Version", Version),
+            new("Features", _features),
+            new("IsCase", _isCase),
+            new("IsBatch", _isBatch),
+        };
+        if (!start)
+        {
+            fields.Add(new("DurationMs", Stopwatch.GetElapsedTime(_started).TotalMilliseconds));
+            fields.Add(new("Outcome", Outcome));
+            fields.Add(new("Failed", Outcome == "success" ? 0 : 1));
+            fields.Add(new("TestsExecuted", _type == ExecutionType.Run ? 1 : 0));
+            fields.Add(new("AssertionsExecuted", AssertionsExecuted));
+        }
+        _logger.Log(
+            LogLevel.Debug,
+            default,
+            fields,
+            null,
+            static (values, _) => $"{values[0].Value} {values[1].Value}"
+        );
     }
 
     private static string? Known(string? value)

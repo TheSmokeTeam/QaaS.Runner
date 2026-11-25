@@ -61,6 +61,10 @@ public class ExecutionTests
             Is.EqualTo(new[] { "RunnerExecutionStarted", "RunnerExecutionFinished" })
         );
         Assert.That(
+            measured.Select(e => e.MessageTemplate.Text),
+            Is.All.EqualTo("{QaasEvent} {AttemptId}")
+        );
+        Assert.That(
             measured.All(e =>
                 e.Properties["Team"].Equals(new ScalarValue("Smoke"))
                 && e.Properties["System"].Equals(new ScalarValue("QaaS"))

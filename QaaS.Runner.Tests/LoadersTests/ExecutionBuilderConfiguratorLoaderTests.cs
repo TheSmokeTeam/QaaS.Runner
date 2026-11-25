@@ -1,3 +1,4 @@
+using System.Reflection;
 using Microsoft.Extensions.Logging;
 using Moq;
 using NUnit.Framework;
@@ -8,6 +9,76 @@ namespace QaaS.Runner.Tests.LoadersTests;
 [TestFixture]
 public class ExecutionBuilderConfiguratorLoaderTests
 {
+    [Test]
+    public void Load_ScansTransitiveAndUnresolvedDependenciesAndSkipsUnrelatedTypes()
+    {
+        var contract = typeof(IExecutionBuilderConfigurator).Assembly.FullName!;
+        var unrelated = Candidate("Library", "OtherLibrary");
+        var other = Candidate("OtherLibrary", "Library");
+        var bridge = Candidate("Bridge", contract);
+        var indirect = Candidate("Plugin", "Bridge");
+        var unresolved = Candidate("ExternalPlugin", "OutsideTheCandidateSet");
+        indirect.Setup(a => a.GetTypes()).Returns([typeof(PublicConfigurator)]);
+        var candidates = new[]
+        {
+            Candidate(contract).Object,
+            unrelated.Object,
+            other.Object,
+            bridge.Object,
+            indirect.Object,
+            unresolved.Object,
+        };
+
+        var first = ExecutionBuilderConfiguratorLoader.Load(Mock.Of<ILogger>(), null, candidates);
+        var second = ExecutionBuilderConfiguratorLoader.Load(Mock.Of<ILogger>(), null, candidates);
+
+        Assert.That(first.Single(), Is.TypeOf<PublicConfigurator>());
+        Assert.That(second.Single(), Is.Not.SameAs(first.Single()));
+        unrelated.Verify(a => a.GetTypes(), Times.Never);
+        indirect.Verify(a => a.GetTypes(), Times.Once);
+        unresolved.Verify(a => a.GetTypes(), Times.AtLeastOnce);
+    }
+
+    [Test]
+    public void Load_RetriesPartialTypeLoadsInLaterCommands()
+    {
+        var plugin = Candidate("Plugin", typeof(IExecutionBuilderConfigurator).Assembly.FullName!);
+        plugin
+            .SetupSequence(assembly => assembly.GetTypes())
+            .Throws(new ReflectionTypeLoadException([null], [new FileNotFoundException()]))
+            .Returns([typeof(PublicConfigurator)]);
+
+        var first = ExecutionBuilderConfiguratorLoader.Load(
+            Mock.Of<ILogger>(),
+            null,
+            [plugin.Object]
+        );
+        var next = ExecutionBuilderConfiguratorLoader.Load(
+            Mock.Of<ILogger>(),
+            null,
+            [plugin.Object]
+        );
+
+        Assert.That(first, Is.Empty);
+        Assert.That(next.Single(), Is.TypeOf<PublicConfigurator>());
+    }
+
+    private static Mock<Assembly> Candidate(string name, params string[] references)
+    {
+        var assembly = new Mock<Assembly>();
+        assembly.Setup(a => a.FullName).Returns(new AssemblyName(name).FullName);
+        assembly
+            .Setup(a => a.GetReferencedAssemblies())
+            .Returns(references.Select(r => new AssemblyName(r)).ToArray());
+        assembly.Setup(a => a.GetTypes()).Returns(Array.Empty<Type>());
+        return assembly;
+    }
+
+    public sealed class PublicConfigurator : IExecutionBuilderConfigurator
+    {
+        public void Configure(ExecutionBuilder executionBuilder) { }
+    }
+
     [Test]
     public void Load_WhenEntryAssemblyContainsInternalConfigurator_LoadsIt()
     {
