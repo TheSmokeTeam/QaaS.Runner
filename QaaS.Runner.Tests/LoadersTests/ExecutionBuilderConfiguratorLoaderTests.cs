@@ -1,4 +1,5 @@
 using System.Reflection;
+using System.Runtime.Loader;
 using Microsoft.Extensions.Logging;
 using Moq;
 using NUnit.Framework;
@@ -9,6 +10,60 @@ namespace QaaS.Runner.Tests.LoadersTests;
 [TestFixture]
 public class ExecutionBuilderConfiguratorLoaderTests
 {
+    [TestCase("older", false)]
+    [TestCase("newer", true)]
+    [TestCase("other key", true)]
+    [TestCase("other culture", true)]
+    public void Load_OnlyUnifiesCompatibleLoadedRuntimeReferences(string identity, bool shouldScan)
+    {
+        var runtime = typeof(object).Assembly;
+        var reference = new AssemblyName(runtime.FullName!);
+        reference.Version =
+            identity == "newer" ? new Version(99, 0, 0, 0) : new Version(1, 0, 0, 0);
+        if (identity == "other key")
+            reference.SetPublicKeyToken([1, 2, 3, 4, 5, 6, 7, 8]);
+        if (identity == "other culture")
+            reference.CultureName = "fr-FR";
+        var consumer = Candidate("Consumer", reference.FullName);
+
+        ExecutionBuilderConfiguratorLoader.Load(
+            Mock.Of<ILogger>(),
+            null,
+            [runtime, consumer.Object]
+        );
+
+        consumer.Verify(a => a.GetTypes(), shouldScan ? Times.Once() : Times.Never());
+    }
+
+    [Test]
+    public void Load_KeepsIndirectImplementationsAcrossCompatibleAndCustomContexts()
+    {
+        var current = typeof(PublicConfigurator).Assembly;
+        var earlier = new AssemblyName(current.FullName!) { Version = new Version(0, 0, 0, 0) };
+        var indirect = Candidate("UseInheritedConfigurator", earlier.FullName);
+        ExecutionBuilderConfiguratorLoader.Load(
+            Mock.Of<ILogger>(),
+            null,
+            [current, indirect.Object]
+        );
+        indirect.Verify(a => a.GetTypes(), Times.Once);
+
+        var custom = new AssemblyLoadContext("ConfiguratorTest", isCollectible: true);
+        try
+        {
+            var plugin = custom.LoadFromAssemblyPath(current.Location);
+            var found = ExecutionBuilderConfiguratorLoader.Load(Mock.Of<ILogger>(), null, [plugin]);
+            Assert.That(
+                found.Any(configurator => configurator.GetType().Assembly == plugin),
+                Is.True
+            );
+        }
+        finally
+        {
+            custom.Unload();
+        }
+    }
+
     [Test]
     public void Load_ScansTransitiveAndUnresolvedDependenciesAndSkipsUnrelatedTypes()
     {

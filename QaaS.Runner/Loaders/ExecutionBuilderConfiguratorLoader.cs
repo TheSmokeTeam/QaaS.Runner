@@ -33,11 +33,44 @@ internal static class ExecutionBuilderConfiguratorLoader
         var available = assemblies
             .Select(a => a.FullName!)
             .ToHashSet(StringComparer.OrdinalIgnoreCase);
+        var defaults = assemblies
+            .Where(a => AssemblyLoadContext.GetLoadContext(a) == AssemblyLoadContext.Default)
+            .Select(a => a.GetName())
+            .ToLookup(name => name.Name!, StringComparer.OrdinalIgnoreCase);
+        var aliases = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+
+        string ResolveReference(AssemblyName requested)
+        {
+            var name = requested.FullName;
+            if (available.Contains(name))
+                return name;
+            if (aliases.TryGetValue(name, out var resolved))
+                return resolved;
+
+            // A default-context assembly can satisfy an older reference to the same signed identity.
+            var loaded = defaults[requested.Name!]
+                .FirstOrDefault(candidate =>
+                    requested.Version != null
+                    && candidate.Version >= requested.Version
+                    && candidate.ContentType == requested.ContentType
+                    && (requested.Flags & AssemblyNameFlags.Retargetable) == 0
+                    && string.Equals(
+                        candidate.CultureName,
+                        requested.CultureName,
+                        StringComparison.OrdinalIgnoreCase
+                    )
+                    && (candidate.GetPublicKeyToken() ?? [])
+                        .AsSpan()
+                        .SequenceEqual(requested.GetPublicKeyToken() ?? [])
+                );
+            return aliases[name] = loaded?.FullName ?? name;
+        }
+
         var dependents = assemblies
             .SelectMany(
                 a => a.GetReferencedAssemblies(),
                 (assembly, reference) =>
-                    (Reference: reference.FullName, Dependent: assembly.FullName!)
+                    (Reference: ResolveReference(reference), Dependent: assembly.FullName!)
             )
             .ToLookup(
                 edge => edge.Reference,
