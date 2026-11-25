@@ -33,13 +33,12 @@ internal static class ExecutionBuilderConfiguratorLoader
         var available = assemblies
             .Select(a => a.FullName!)
             .ToHashSet(StringComparer.OrdinalIgnoreCase);
-        var defaults = assemblies
-            .Where(a => AssemblyLoadContext.GetLoadContext(a) == AssemblyLoadContext.Default)
-            .Select(a => a.GetName())
-            .ToLookup(name => name.Name!, StringComparer.OrdinalIgnoreCase);
-        var aliases = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+        var loadedByName = assemblies
+            .Select(a => (Identity: a.GetName(), Context: AssemblyLoadContext.GetLoadContext(a)))
+            .ToLookup(binding => binding.Identity.Name!, StringComparer.OrdinalIgnoreCase);
+        var aliases = new Dictionary<string, string?>(StringComparer.OrdinalIgnoreCase);
 
-        string ResolveReference(AssemblyName requested)
+        string? ResolveReference(AssemblyName requested)
         {
             var name = requested.FullName;
             if (available.Contains(name))
@@ -47,23 +46,23 @@ internal static class ExecutionBuilderConfiguratorLoader
             if (aliases.TryGetValue(name, out var resolved))
                 return resolved;
 
-            // A default-context assembly can satisfy an older reference to the same signed identity.
-            var loaded = defaults[requested.Name!]
-                .FirstOrDefault(candidate =>
-                    requested.Version != null
-                    && candidate.Version >= requested.Version
-                    && candidate.ContentType == requested.ContentType
-                    && (requested.Flags & AssemblyNameFlags.Retargetable) == 0
-                    && string.Equals(
-                        candidate.CultureName,
-                        requested.CultureName,
-                        StringComparison.OrdinalIgnoreCase
-                    )
-                    && (candidate.GetPublicKeyToken() ?? [])
-                        .AsSpan()
-                        .SequenceEqual(requested.GetPublicKeyToken() ?? [])
-                );
-            return aliases[name] = loaded?.FullName ?? name;
+            // A default-context assembly can satisfy an older reference to the same identity.
+            var loaded = loadedByName[requested.Name!];
+            var binding = loaded.FirstOrDefault();
+            if (
+                loaded.Count() == 1
+                && binding.Context == AssemblyLoadContext.Default
+                && SharedRuntimeAssemblies.CanBind(requested, binding.Identity)
+            )
+                resolved = binding.Identity.FullName;
+            else if (
+                !loadedByName.Contains(requested.Name!)
+                && SharedRuntimeAssemblies.Provides(requested)
+            )
+                resolved = null; // A verified framework dependency cannot supply an application configurator.
+            else
+                resolved = name;
+            return aliases[name] = resolved;
         }
 
         var dependents = assemblies
@@ -72,8 +71,9 @@ internal static class ExecutionBuilderConfiguratorLoader
                 (assembly, reference) =>
                     (Reference: ResolveReference(reference), Dependent: assembly.FullName!)
             )
+            .Where(edge => edge.Reference != null)
             .ToLookup(
-                edge => edge.Reference,
+                edge => edge.Reference!,
                 edge => edge.Dependent,
                 StringComparer.OrdinalIgnoreCase
             );
