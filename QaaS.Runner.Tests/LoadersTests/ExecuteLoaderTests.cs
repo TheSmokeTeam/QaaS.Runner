@@ -163,6 +163,11 @@ public class ExecuteLoaderTests
         var runner = loader.GetLoadedRunner();
 
         Assert.That(runner.ExitProcessOnCompletion, Is.False);
+        Assert.That(runner.ExecutionBuilders, Is.Not.Empty);
+        Assert.That(
+            runner.ExecutionBuilders.All(builder => builder.IsBatch && builder.Clone().IsBatch),
+            Is.True
+        );
     }
 
     [Test]

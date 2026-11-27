@@ -10,6 +10,7 @@ using QaaS.Framework.Protocols.ConfigurationObjects.RabbitMq;
 using QaaS.Framework.SDK;
 using QaaS.Framework.SDK.ContextObjects;
 using QaaS.Framework.SDK.DataSourceObjects;
+using QaaS.Framework.SDK.Hooks.Generator;
 using QaaS.Framework.SDK.ExecutionObjects;
 using QaaS.Framework.SDK.Session.SessionDataObjects;
 using QaaS.Framework.SDK.Session.SessionDataObjects.RunningSessionsObjects;
@@ -780,6 +781,62 @@ public class ExecutionBuilderTests
         }
     }
 
+    [TestCase(false)]
+    [TestCase(true)]
+    public void BuildDataSources_WithoutSourcesPreservesDebugRecordAndSkipsGeneratorResolution(
+        bool configuredEmpty
+    )
+    {
+        var logger = new CapturingLogger();
+        var builder = new ExecutionBuilder().WithLogger(logger);
+        builder.DataSources = configuredEmpty ? [] : null;
+        typeof(ExecutionBuilder)
+            .GetMethod("InitializeContext", BindingFlags.Instance | BindingFlags.NonPublic)!
+            .Invoke(builder, []);
+        var container = new ContainerBuilder();
+        var resolutions = 0;
+        container
+            .Register(_ =>
+            {
+                resolutions++;
+                return new List<KeyValuePair<string, IGenerator>>();
+            })
+            .As<IList<KeyValuePair<string, IGenerator>>>();
+        using var scope = container.Build();
+
+        var sources =
+            (IEnumerable<DataSource>)
+                typeof(ExecutionBuilder)
+                    .GetMethod(
+                        "BuildDataSources",
+                        BindingFlags.Instance | BindingFlags.NonPublic,
+                        null,
+                        [typeof(ILifetimeScope)],
+                        null
+                    )!
+                    .Invoke(builder, [scope])!;
+
+        Assert.That(sources, Is.Empty);
+        Assert.That(resolutions, Is.Zero);
+        var entry = logger.Entries.Single(e =>
+            e.Message == "Starting loading and validation of all hooks of type IGenerator"
+        );
+        Assert.That(entry.LogLevel, Is.EqualTo(LogLevel.Debug));
+        Assert.That(
+            entry.Properties,
+            Does.Contain(new KeyValuePair<string, object?>("HookType", "IGenerator"))
+        );
+        Assert.That(
+            entry.Properties,
+            Does.Contain(
+                new KeyValuePair<string, object?>(
+                    "{OriginalFormat}",
+                    "Starting loading and validation of all hooks of type {HookType}"
+                )
+            )
+        );
+    }
+
     [Test]
     public void InitializeContext_WithoutLoadedContext_UsesDefaultsAndCreatesMetadataEntry()
     {
@@ -1189,7 +1246,13 @@ public class ExecutionBuilderTests
         public void Log<TState>(LogLevel logLevel, EventId eventId, TState state, Exception? exception,
             Func<TState, Exception?, string> formatter)
         {
-            Entries.Add(new LogEntry(logLevel, formatter(state, exception)));
+            Entries.Add(
+                new LogEntry(
+                    logLevel,
+                    formatter(state, exception),
+                    state as IReadOnlyList<KeyValuePair<string, object?>>
+                )
+            );
         }
 
         private sealed class NoOpScope : IDisposable
@@ -1202,6 +1265,10 @@ public class ExecutionBuilderTests
         }
     }
 
-    private sealed record LogEntry(LogLevel LogLevel, string Message);
+    private sealed record LogEntry(
+        LogLevel LogLevel,
+        string Message,
+        IReadOnlyList<KeyValuePair<string, object?>>? Properties
+    );
 }
 

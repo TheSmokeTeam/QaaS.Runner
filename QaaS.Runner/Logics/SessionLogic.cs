@@ -1,4 +1,4 @@
-﻿using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Logging;
 using MoreLinq;
 using QaaS.Framework.Executions.Logics;
 using QaaS.Framework.SDK.ContextObjects;
@@ -23,6 +23,7 @@ namespace QaaS.Runner.Logics;
 public class SessionLogic : ILogic
 {
     private readonly IReadOnlyList<ISession> _sessions;
+    internal bool IsConfigured => _sessions.Count != 0;
     private readonly InternalContext _context;
 
     /// <summary>

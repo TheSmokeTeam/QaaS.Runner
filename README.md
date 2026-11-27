@@ -64,6 +64,18 @@ dotnet add package QaaS.Runner --version <target-version>
 dotnet restore
 ```
 
+## Execution observability
+
+Enable existing Elasticsearch logging with `--send-logs --elastic-uri <url>` or the configured defaults. A custom logger must admit Debug events. Set `MetaData.Team`, `MetaData.System` and the string `MetaData.ExtraLabels.Project` to trusted organizational labels. Runner prefers its resolved execution metadata and falls back to root configuration only when a label is absent or blank. Invalid labels appear under `(unattributed)`. The framework classifies Kubernetes executions as CI and other executions as Local.
+
+Runner measures each built `run`, `act` or `assert` invocation, including cases and commands within `execute`. A full `run` is one test-plan execution. A finish records its monotonic duration, outcome and known assertion-result count. Interrupted parallel assertions can leave that count unknown. Each measured invocation has a fresh attempt ID. Setup failures before the execution starts and template commands fall outside the lifecycle counts.
+
+1. Open the [Elasticsearch configuration](https://raw.githubusercontent.com/TheSmokeTeam/QaaS.Runner/320b05b7e7ce080bf1f75a3b4e49706edd5ae473/observability/elasticsearch.console) in Kibana Dev Tools. Install its shared ingest pipeline and mapping component. Add `qaas-usage-fields-v1` to the template for future daily logs, or copy its two field mappings into the existing legacy template. Apply the same mappings to current `qaas-20*` log indices before enabling the pipeline.
+2. Configure `qaas-usage-stamp-v1` as `index.final_pipeline` in the log template and current index settings. If a final pipeline is already in use, append a `pipeline` processor calling `qaas-usage-stamp-v1` to it. Preserve the existing processors. Run the remaining Console requests to create the product destination, create the continuous transform and start it. The stated resources require Elasticsearch ingest, transform and index privileges. The transform reads stamped logs from installation onward. Keep raw logs for at least the longest run plus the retry window, and size destination retention for the usage history you want to query.
+3. Configure Grafana’s Elasticsearch data source with UID `qaas-runner-usage-v1`, index `qaasusage-runner-v1` and time field `event.Time`. Import or file-provision the [Runner dashboard](https://raw.githubusercontent.com/TheSmokeTeam/QaaS.Runner/320b05b7e7ce080bf1f75a3b4e49706edd5ae473/grafana/runner-usage.json). Check `GET /_transform/qaasusage-runner-v1/_stats` for checkpoint progress. The transform checks every 30 seconds with a 10-second ingestion delay.
+
+Set `QAAS_USAGE_ENABLED=false` to disable these events while retaining ordinary diagnostics. To suspend analytics, stop the transform with `POST /_transform/qaasusage-runner-v1/_stop`. Existing raw logs remain available.
+
 ## ReportPortal
 QaaS can send its assertion results to an existing ReportPortal instance. Configure `Reporters.ReportPortal` with `Enabled`, `Endpoint`, `ApiKey`, and an optional `Project` (defaults to `MetaData.Team`). YAML values override package defaults.
 
