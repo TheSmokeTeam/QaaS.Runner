@@ -388,6 +388,53 @@ public class ExecutionTests
     }
 
     [Test]
+    public void Start_UsesSameOwnershipRulesAsMocker()
+    {
+        var sink = new RecordingSink();
+        using var logger = new LoggerConfiguration()
+            .MinimumLevel.Debug()
+            .WriteTo.Sink(sink)
+            .CreateLogger();
+        using var factory = new SerilogLoggerFactory(logger);
+        var context = new InternalContext
+        {
+            Logger = factory.CreateLogger("Runner"),
+            RootConfiguration = new ConfigurationBuilder()
+                .AddInMemoryCollection(
+                    new Dictionary<string, string?>
+                    {
+                        ["MetaData:Team"] = "fallback-only-for-absent-values",
+                        ["MetaData:System"] = " fallback-system ",
+                        ["MetaData:ExtraLabels:Project"] = "fallback-project",
+                    }
+                )
+                .Build(),
+        };
+        context.InsertValueIntoGlobalDictionary(
+            context.GetMetaDataPath(),
+            new MetaDataConfig
+            {
+                Team = "Plat\tform",
+                System = " ",
+                ExtraLabels = new() { ["Project"] = " sdk-project " },
+            }
+        );
+
+        Assert.That(CreateExecution(ExecutionType.Act, context).Start(), Is.Zero);
+        var events = sink.Events.Where(e => e.Properties.ContainsKey("QaasEvent")).ToArray();
+        Assert.That(events, Has.Length.EqualTo(2));
+        foreach (var e in events)
+        {
+            Assert.That(e.Properties["Team"], Is.EqualTo(new ScalarValue("Unknown")));
+            Assert.That(e.Properties["TeamKnown"], Is.EqualTo(new ScalarValue(false)));
+            Assert.That(e.Properties["System"], Is.EqualTo(new ScalarValue("fallback-system")));
+            Assert.That(e.Properties["SystemKnown"], Is.EqualTo(new ScalarValue(true)));
+            Assert.That(e.Properties["Project"], Is.EqualTo(new ScalarValue("sdk-project")));
+            Assert.That(e.Properties["ProjectKnown"], Is.EqualTo(new ScalarValue(true)));
+        }
+    }
+
+    [Test]
     public void Start_PreservesResultWhenLogLevelCheckThrows()
     {
         var logger = new Mock<Microsoft.Extensions.Logging.ILogger>();

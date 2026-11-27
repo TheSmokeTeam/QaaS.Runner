@@ -66,7 +66,7 @@ dotnet restore
 
 ## Execution observability
 
-Enable existing Elasticsearch logging with `--send-logs --elastic-uri <url>` or the configured defaults. A custom logger must admit Debug events. Set `MetaData.Team`, `MetaData.System` and the string `MetaData.ExtraLabels.Project` to trusted organizational labels. Missing ownership appears under `(unattributed)`. The framework classifies Kubernetes executions as CI and other executions as Local.
+Enable existing Elasticsearch logging with `--send-logs --elastic-uri <url>` or the configured defaults. A custom logger must admit Debug events. Set `MetaData.Team`, `MetaData.System` and the string `MetaData.ExtraLabels.Project` to trusted organizational labels. Runner prefers its resolved execution metadata and falls back to root configuration only when a label is absent or blank. Invalid labels appear under `(unattributed)`. The framework classifies Kubernetes executions as CI and other executions as Local.
 
 Runner measures each built `run`, `act` or `assert` invocation, including cases and commands within `execute`. A full `run` is one test-plan execution. A finish records its monotonic duration, outcome and known assertion-result count. Interrupted parallel assertions can leave that count unknown. Each measured invocation has a fresh attempt ID. Setup failures before the execution starts and template commands fall outside the lifecycle counts.
 

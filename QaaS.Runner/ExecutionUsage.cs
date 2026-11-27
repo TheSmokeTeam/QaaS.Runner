@@ -12,10 +12,9 @@ namespace QaaS.Runner;
 internal sealed class ExecutionUsage
 {
     private const string Unknown = "Unknown";
-    private static readonly string Version =
-        typeof(Execution)
-            .Assembly.GetCustomAttribute<AssemblyInformationalVersionAttribute>()
-            ?.InformationalVersion.Split('+')[0]
+    private static readonly string Version = typeof(Execution)
+        .Assembly.GetCustomAttribute<AssemblyInformationalVersionAttribute>()
+        ?.InformationalVersion.Split('+')[0]
         ?? Unknown;
 
     private readonly ILogger _logger;
@@ -40,10 +39,11 @@ internal sealed class ExecutionUsage
         _isCase = !string.IsNullOrWhiteSpace(context.CaseName);
         _isBatch = execution.IsBatch;
         var metadata = ReadMetadata(context);
-        _team = Known(metadata?.Team);
-        _system = Known(metadata?.System);
-        if (metadata?.ExtraLabels?.TryGetValue("Project", out var project) == true)
-            _project = Known(project as string);
+        var config = context.RootConfiguration;
+        _team = Known(metadata?.Team, config?["MetaData:Team"]);
+        _system = Known(metadata?.System, config?["MetaData:System"]);
+        var project = metadata?.ExtraLabels?.GetValueOrDefault("Project") as string;
+        _project = Known(project, config?["MetaData:ExtraLabels:Project"]);
 
         var features = new List<string>(5);
         if (execution.DataSourceLogic?.IsConfigured == true)
@@ -130,18 +130,15 @@ internal sealed class ExecutionUsage
             fields.Add(new("TestsExecuted", _type == ExecutionType.Run ? 1 : 0));
             fields.Add(new("AssertionsExecuted", AssertionsExecuted));
         }
-        _logger.Log(
-            LogLevel.Debug,
-            default,
-            fields,
-            null,
-            static (values, _) => $"{values[0].Value} {values[1].Value}"
+        _logger.Log(LogLevel.Debug, default, fields, null, static (values, _) =>
+            $"{values[0].Value} {values[1].Value}"
         );
     }
 
-    private static string? Known(string? value)
+    private static string? Known(string? configured, string? fallback)
     {
-        if (value is not { Length: > 0 and <= 128 })
+        var value = string.IsNullOrWhiteSpace(configured) ? fallback : configured;
+        if (value is not { Length: > 0 and <= 128 } || value.Any(char.IsControl))
             return null;
         var trimmed = value.Trim();
         return trimmed.Length == 0 ? null : trimmed;
